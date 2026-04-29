@@ -1,16 +1,26 @@
-## Hi there 👋
+# Quanfina
 
-<!--
-**Quanfina/quanfina** is a ✨ _special_ ✨ repository because its `README.md` (this file) appears on your GitHub profile.
+Kişisel kullanım için çoklu strateji puanlama, risk yönetimi ve trade journal sistemi.
 
-Here are some ideas to get you started:
+## Özellikler
 
-- 🔭 I’m currently working on ...
-- 🌱 I’m currently learning ...
-- 👯 I’m looking to collaborate on ...
-- 🤔 I’m looking for help with ...
-- 💬 Ask me about ...
-- 📫 How to reach me: ...
-- 😄 Pronouns: ...
-- ⚡ Fun fact: ...
--->
+- **Çoklu Strateji:** Minervini Trend Template + VCP, Dr. Thomas K. Carr 10 setup
+- **Risk Yönetimi:** Van K. Tharp formülleri (R-multiple, position sizing, expectancy)
+- **Trade Journal:** Davranış disiplini için günlük notlar, hata kataloğu, trading plan
+- **Piyasa Rejimi:** Weinstein Stage Analysis ile piyasa yönü tespiti
+
+## Teknoloji Yığını
+
+- Streamlit (UI)
+- Python 3.11+
+- SQLite (yerel veritabanı)
+- yfinance + Finviz Elite (veri kaynakları)
+- Plotly (grafikler)
+
+## Durum
+
+🚧 Aktif geliştirme aşamasında.
+
+## Lisans
+
+MIT
