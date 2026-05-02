@@ -148,13 +148,10 @@ st.caption("EPS Q/Q > %25 + Sales Q/Q > %25 + Fiyat > $10 + Hacim > 500K")
 @st.cache_data(ttl=300)
 def load_fundamental_only(scan_date):
     conn = sqlite3.connect(DB_PATH)
-    df = pd.read_sql_query("""
-        SELECT f.*, s.ma200_slope, s.eps_qoq, s.sales_qoq, s.grade
-        FROM minervini_fundamental_only f
-        LEFT JOIN minervini_scans s ON f.ticker = s.ticker AND f.scan_date = s.scan_date
-        WHERE f.scan_date = ?
-        ORDER BY f.market_cap DESC
-    """, conn, params=(scan_date,))
+    df = pd.read_sql_query(
+        "SELECT * FROM minervini_fundamental_only WHERE scan_date = ? ORDER BY market_cap DESC",
+        conn, params=(scan_date,)
+    )
     conn.close()
     return df
 
