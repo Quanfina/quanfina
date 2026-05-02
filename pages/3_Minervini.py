@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import sqlite3
 import os
+from datetime import date
 
 st.set_page_config(page_title="Minervini Trend Template", layout="wide")
 
@@ -65,6 +66,57 @@ def load_52w_high(scan_date):
     conn.close()
     return df
 
+def get_watchlist_tickers():
+    conn = sqlite3.connect(DB_PATH)
+    df = pd.read_sql_query("SELECT ticker FROM minervini_watchlist ORDER BY ticker", conn)
+    conn.close()
+    return df["ticker"].tolist()
+
+def save_watchlist(selected_tickers):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    today = str(date.today())
+    if selected_tickers:
+        placeholders = ','.join('?' * len(selected_tickers))
+        c.execute(f"DELETE FROM minervini_watchlist WHERE ticker NOT IN ({placeholders})",
+                  selected_tickers)
+        for ticker in selected_tickers:
+            c.execute("INSERT OR IGNORE INTO minervini_watchlist (ticker, added_date) VALUES (?,?)",
+                      (ticker, today))
+    else:
+        c.execute("DELETE FROM minervini_watchlist")
+    conn.commit()
+    conn.close()
+
+@st.cache_data(ttl=60)
+def load_watchlist_data(scan_date):
+    conn = sqlite3.connect(DB_PATH)
+    df = pd.read_sql_query("""
+        SELECT
+            w.ticker,
+            COALESCE(s.company,     h.company,     f.company)     AS company,
+            COALESCE(s.sector,      h.sector,      f.sector)      AS sector,
+            COALESCE(s.industry,    h.industry,    f.industry)    AS industry,
+            COALESCE(s.price,       h.price,       f.price)       AS price,
+            COALESCE(s.change_pct,  h.change_pct,  f.change_pct)  AS change_pct,
+            COALESCE(s.volume,      h.volume,      f.volume)      AS volume,
+            COALESCE(s.market_cap,  h.market_cap,  f.market_cap)  AS market_cap,
+            COALESCE(s.ma200_slope, h.ma200_slope, f.ma200_slope) AS ma200_slope,
+            COALESCE(s.eps_qoq,     h.eps_qoq,     f.eps_qoq)    AS eps_qoq,
+            COALESCE(s.sales_qoq,   h.sales_qoq,   f.sales_qoq)  AS sales_qoq,
+            COALESCE(s.grade,       h.grade,       f.grade)       AS grade
+        FROM minervini_watchlist w
+        LEFT JOIN minervini_scans s
+            ON s.ticker = w.ticker AND s.scan_date = ?
+        LEFT JOIN minervini_52w_high h
+            ON h.ticker = w.ticker AND h.scan_date = ?
+        LEFT JOIN minervini_fundamental_only f
+            ON f.ticker = w.ticker AND f.scan_date = ?
+        ORDER BY w.ticker
+    """, conn, params=(scan_date, scan_date, scan_date))
+    conn.close()
+    return df
+
 def apply_filters(data, sektor, grade_list, siralama, arama):
     d = data.copy()
     if sektor != "Tümü":
@@ -104,6 +156,8 @@ df           = load_scan(selected_date)
 df_fund      = load_fundamental_scan(selected_date)
 df_fund_only = load_fundamental_only(selected_date)
 df_52w       = load_52w_high(selected_date)
+wl_tickers   = get_watchlist_tickers()
+df_wl        = load_watchlist_data(selected_date)
 
 if df.empty:
     st.warning("Bu tarihe ait veri yok.")
@@ -135,13 +189,15 @@ df_partial_f   = apply_filters(df[df["passed"] == 0], secim_sektor, secim_grade,
 df_fund_f      = apply_filters(df_fund,      secim_sektor, secim_grade, secim_siralama, secim_arama)
 df_fund_only_f = apply_filters(df_fund_only, secim_sektor, secim_grade, secim_siralama, secim_arama)
 df_52w_f       = apply_filters(df_52w,       secim_sektor, secim_grade, secim_siralama, secim_arama)
+df_wl_f        = apply_filters(df_wl,        secim_sektor, secim_grade, secim_siralama, secim_arama)
 
 st.caption(
     f"📊 Filtreli sonuçlar: "
     f"Süper Performans **{len(df_fund_f)}/{len(df_fund)}** · "
     f"Trend Template **{len(df_pass_f)}/{len(df[df['passed']==1])}** · "
     f"Sadece Temel **{len(df_fund_only_f)}/{len(df_fund_only)}** · "
-    f"52H Yüksek **{len(df_52w_f)}/{len(df_52w)}**"
+    f"52H Yüksek **{len(df_52w_f)}/{len(df_52w)}** · "
+    f"Watch List **{len(df_wl_f)}/{len(df_wl)}**"
 )
 
 col_rename = {
@@ -163,11 +219,12 @@ col_config = {
 show_cols = ["ticker", "company", "sector", "industry", "price", "change_pct",
              "volume", "market_cap", "ma200_slope", "eps_qoq", "sales_qoq", "grade"]
 
-tab1, tab2, tab3, tab4 = st.tabs([
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "🌟 Süper Performans",
     "🚀 52 Hafta Yüksek",
     "✅ Trend Template 8/8",
     "📊 Sadece Temel",
+    "⭐ Watch List",
 ])
 
 with tab1:
@@ -240,6 +297,40 @@ with tab4:
         fo2.metric("Teknik Listeye Oranı", f"{len(df_fund_only)/len(df)*100:.1f}%")
         st.dataframe(
             df_fund_only_f[show_cols].rename(columns=col_rename),
+            hide_index=True,
+            use_container_width=True,
+            column_config=col_config
+        )
+
+with tab5:
+    st.subheader("⭐ Watch List")
+    st.caption("Takip listenizdeki hisseler — tarihten bağımsız, veriler seçili tarihe göre")
+
+    all_tickers = sorted(
+        set(df["ticker"]) | set(df_52w["ticker"]) | set(df_fund_only["ticker"])
+    )
+    selected = st.multiselect(
+        "Takip edilecek hisseler:",
+        options=all_tickers,
+        default=[t for t in wl_tickers if t in all_tickers],
+    )
+
+    if st.button("💾 Kaydet"):
+        save_watchlist(selected)
+        load_watchlist_data.clear()
+        st.success(f"{len(selected)} hisse kaydedildi.")
+        st.rerun()
+
+    st.divider()
+
+    if df_wl.empty:
+        st.info("Watch list boş. Yukarıdan hisse ekle ve kaydet.")
+    else:
+        wl1, wl2 = st.columns(2)
+        wl1.metric("Filtrelenmiş", len(df_wl_f))
+        wl2.metric("Toplam Takip", len(df_wl))
+        st.dataframe(
+            df_wl_f[show_cols].rename(columns=col_rename),
             hide_index=True,
             use_container_width=True,
             column_config=col_config

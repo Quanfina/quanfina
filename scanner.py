@@ -94,6 +94,13 @@ def init_db():
             UNIQUE(scan_date, ticker)
         )
     """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS minervini_watchlist (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            ticker     TEXT NOT NULL UNIQUE,
+            added_date TEXT NOT NULL
+        )
+    """)
     conn.commit()
     conn.close()
 
