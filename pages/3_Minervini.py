@@ -123,6 +123,13 @@ df_partial_f   = apply_filters(df[df["passed"] == 0], secim_sektor, secim_grade,
 df_fund_f      = apply_filters(df_fund,      secim_sektor, secim_grade, secim_siralama, secim_arama)
 df_fund_only_f = apply_filters(df_fund_only, secim_sektor, secim_grade, secim_siralama, secim_arama)
 
+st.caption(
+    f"📊 Filtreli sonuçlar: "
+    f"Süper Performans **{len(df_fund_f)}/{len(df_fund)}** · "
+    f"Trend Template **{len(df_pass_f)}/{len(df[df['passed']==1])}** · "
+    f"Sadece Temel **{len(df_fund_only_f)}/{len(df_fund_only)}**"
+)
+
 col_rename = {
     "ticker": "TICKER", "company": "ŞİRKET", "sector": "SEKTÖR",
     "industry": "SEKTÖR ALTI", "price": "FİYAT", "change_pct": "DEĞİŞİM",
