@@ -55,6 +55,16 @@ def load_fundamental_only(scan_date):
     conn.close()
     return df
 
+@st.cache_data(ttl=300)
+def load_52w_high(scan_date):
+    conn = sqlite3.connect(DB_PATH)
+    df = pd.read_sql_query(
+        "SELECT * FROM minervini_52w_high WHERE scan_date = ? ORDER BY ma200_slope DESC",
+        conn, params=(scan_date,)
+    )
+    conn.close()
+    return df
+
 def apply_filters(data, sektor, grade_list, siralama, arama):
     d = data.copy()
     if sektor != "Tümü":
@@ -93,6 +103,7 @@ selected_date = st.selectbox("Tarama tarihi:", dates)
 df           = load_scan(selected_date)
 df_fund      = load_fundamental_scan(selected_date)
 df_fund_only = load_fundamental_only(selected_date)
+df_52w       = load_52w_high(selected_date)
 
 if df.empty:
     st.warning("Bu tarihe ait veri yok.")
@@ -103,7 +114,8 @@ with st.expander("🔍 Filtreler", expanded=False):
     all_sectors = sorted(
         set(df["sector"].dropna()) |
         set(df_fund["sector"].dropna()) |
-        set(df_fund_only["sector"].dropna())
+        set(df_fund_only["sector"].dropna()) |
+        set(df_52w["sector"].dropna())
     )
     c1, c2, c3, c4 = st.columns(4)
     secim_sektor   = c1.selectbox("Sektör", ["Tümü"] + all_sectors)
@@ -122,12 +134,14 @@ df_pass_f      = apply_filters(df[df["passed"] == 1], secim_sektor, secim_grade,
 df_partial_f   = apply_filters(df[df["passed"] == 0], secim_sektor, secim_grade, secim_siralama, secim_arama)
 df_fund_f      = apply_filters(df_fund,      secim_sektor, secim_grade, secim_siralama, secim_arama)
 df_fund_only_f = apply_filters(df_fund_only, secim_sektor, secim_grade, secim_siralama, secim_arama)
+df_52w_f       = apply_filters(df_52w,       secim_sektor, secim_grade, secim_siralama, secim_arama)
 
 st.caption(
     f"📊 Filtreli sonuçlar: "
     f"Süper Performans **{len(df_fund_f)}/{len(df_fund)}** · "
     f"Trend Template **{len(df_pass_f)}/{len(df[df['passed']==1])}** · "
-    f"Sadece Temel **{len(df_fund_only_f)}/{len(df_fund_only)}**"
+    f"Sadece Temel **{len(df_fund_only_f)}/{len(df_fund_only)}** · "
+    f"52H Yüksek **{len(df_52w_f)}/{len(df_52w)}**"
 )
 
 col_rename = {
@@ -149,71 +163,84 @@ col_config = {
 show_cols = ["ticker", "company", "sector", "industry", "price", "change_pct",
              "volume", "market_cap", "ma200_slope", "eps_qoq", "sales_qoq", "grade"]
 
-# --- FUNDAMENTAL TABLO ---
-st.divider()
-st.subheader("⭐ Süper Performans Adayları (Teknik + EPS + Sales)")
-st.caption("Trend Template 8/8 + EPS Q/Q > %25 + Sales Q/Q > %25")
+tab1, tab2, tab3, tab4 = st.tabs([
+    "🌟 Süper Performans",
+    "🚀 52 Hafta Yüksek",
+    "✅ Trend Template 8/8",
+    "📊 Sadece Temel",
+])
 
-if df_fund.empty:
-    st.warning("Bu tarihe ait fundamental veri yok.")
-else:
-    f1, f2 = st.columns(2)
-    f1.metric("Süper Performans Adayı", len(df_fund_f))
-    f2.metric("Teknik Listeden Oranı", f"{len(df_fund)/len(df)*100:.1f}%")
+with tab1:
+    st.subheader("⭐ Süper Performans Adayları (Teknik + EPS + Sales)")
+    st.caption("Trend Template 8/8 + EPS Q/Q > %25 + Sales Q/Q > %25")
+    if df_fund.empty:
+        st.warning("Bu tarihe ait fundamental veri yok.")
+    else:
+        f1, f2 = st.columns(2)
+        f1.metric("Süper Performans Adayı", len(df_fund_f))
+        f2.metric("Teknik Listeden Oranı", f"{len(df_fund)/len(df)*100:.1f}%")
+        st.dataframe(
+            df_fund_f[show_cols].rename(columns=col_rename),
+            hide_index=True,
+            use_container_width=True,
+            column_config=col_config
+        )
 
-    st.dataframe(
-        df_fund_f[show_cols].rename(columns=col_rename),
-        hide_index=True,
-        use_container_width=True,
-        column_config=col_config
-    )
+with tab2:
+    st.subheader("🚀 52 Hafta Yüksek (Yeni Liderler)")
+    st.caption("Fiyat > $10 + Hacim > 500K + 52W yeni yüksek yapıyor")
+    if df_52w.empty:
+        st.warning("Bu tarihe ait 52W yüksek verisi yok.")
+    else:
+        hw1, hw2 = st.columns(2)
+        hw1.metric("52H Yüksek Adayı", len(df_52w_f))
+        hw2.metric("Trend Template'e Oranı", f"{len(df_52w)/len(df)*100:.1f}%")
+        st.dataframe(
+            df_52w_f[show_cols].rename(columns=col_rename),
+            hide_index=True,
+            use_container_width=True,
+            column_config=col_config
+        )
 
-# Trend Template tablosu
-st.divider()
-show_all = st.checkbox("Tüm hisseleri göster (MA200 slope dahil geçemeyenler)")
-m1, m2, m3, m4 = st.columns(4)
-m1.metric("Finviz Geçen", len(df))
-m2.metric("8/8 Tam Uyum", len(df_pass_f))
-m3.metric("MA200 Slope Bekliyor", len(df_partial_f))
-m4.metric("Geçme Oranı", f"{len(df[df['passed']==1])/len(df)*100:.1f}%")
-st.subheader("✅ Trend Template 8/8 — TAM UYUM")
+with tab3:
+    st.subheader("✅ Trend Template 8/8 — TAM UYUM")
+    st.caption("Tüm 8 Minervini kuralı — MA200 slope dahil")
+    show_all = st.checkbox("Tüm hisseleri göster (MA200 slope dahil geçemeyenler)")
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Finviz Geçen", len(df))
+    m2.metric("8/8 Tam Uyum", len(df_pass_f))
+    m3.metric("MA200 Slope Bekliyor", len(df_partial_f))
+    m4.metric("Geçme Oranı", f"{len(df[df['passed']==1])/len(df)*100:.1f}%")
+    if not df_pass_f.empty:
+        st.dataframe(
+            df_pass_f[show_cols].rename(columns=col_rename),
+            hide_index=True,
+            use_container_width=True,
+            column_config=col_config
+        )
+    else:
+        st.warning("Bu tarihte 8/8 geçen hisse yok.")
+    if show_all and not df_partial_f.empty:
+        st.subheader("⚠️ MA200 Slope Geçemeyen (7/8)")
+        st.dataframe(
+            df_partial_f[show_cols].rename(columns=col_rename),
+            hide_index=True,
+            use_container_width=True,
+            column_config=col_config
+        )
 
-if not df_pass_f.empty:
-    st.dataframe(
-        df_pass_f[show_cols].rename(columns=col_rename),
-        hide_index=True,
-        use_container_width=True,
-        column_config=col_config
-    )
-else:
-    st.warning("Bu tarihte 8/8 geçen hisse yok.")
-
-# Kısmi geçenler
-if show_all and not df_partial_f.empty:
-    st.divider()
-    st.subheader("⚠️ MA200 Slope Geçemeyen (7/8)")
-    st.dataframe(
-        df_partial_f[show_cols].rename(columns=col_rename),
-        hide_index=True,
-        use_container_width=True,
-        column_config=col_config
-    )
-
-# --- SADECE TEMEL TABLO ---
-st.divider()
-st.subheader("📊 Sadece Temel Kriterler (Teknik Filtresiz)")
-st.caption("EPS Q/Q > %25 + Sales Q/Q > %25 + Fiyat > $10 + Hacim > 500K")
-
-if df_fund_only.empty:
-    st.warning("Bu tarihe ait temel veri yok.")
-else:
-    fo1, fo2 = st.columns(2)
-    fo1.metric("Temel Kriter Geçen", len(df_fund_only_f))
-    fo2.metric("Teknik Listeye Oranı", f"{len(df_fund_only)/len(df)*100:.1f}%")
-
-    st.dataframe(
-        df_fund_only_f[show_cols].rename(columns=col_rename),
-        hide_index=True,
-        use_container_width=True,
-        column_config=col_config
-    )
+with tab4:
+    st.subheader("📊 Sadece Temel Kriterler (Teknik Filtresiz)")
+    st.caption("EPS Q/Q > %25 + Sales Q/Q > %25 + Fiyat > $10 + Hacim > 500K")
+    if df_fund_only.empty:
+        st.warning("Bu tarihe ait temel veri yok.")
+    else:
+        fo1, fo2 = st.columns(2)
+        fo1.metric("Temel Kriter Geçen", len(df_fund_only_f))
+        fo2.metric("Teknik Listeye Oranı", f"{len(df_fund_only)/len(df)*100:.1f}%")
+        st.dataframe(
+            df_fund_only_f[show_cols].rename(columns=col_rename),
+            hide_index=True,
+            use_container_width=True,
+            column_config=col_config
+        )

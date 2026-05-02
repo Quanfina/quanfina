@@ -75,6 +75,25 @@ def init_db():
             c.execute(col_sql)
         except sqlite3.OperationalError:
             pass
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS minervini_52w_high (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            scan_date   TEXT NOT NULL,
+            ticker      TEXT NOT NULL,
+            company     TEXT,
+            sector      TEXT,
+            industry    TEXT,
+            price       REAL,
+            change_pct  TEXT,
+            volume      INTEGER,
+            market_cap  REAL,
+            ma200_slope REAL,
+            eps_qoq     REAL,
+            sales_qoq   REAL,
+            grade       TEXT,
+            UNIQUE(scan_date, ticker)
+        )
+    """)
     conn.commit()
     conn.close()
 
@@ -179,6 +198,29 @@ def get_finviz_fundamental_only():
     r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
     df = pd.read_csv(StringIO(r.text))
     print(f"Temel filtresi geçti: {len(df)} hisse")
+    return df
+
+def get_finviz_52w_high():
+    """
+    52 Hafta Yüksek filtresi — sadece fiyat/hacim + 52W yeni yüksek:
+    - Fiyat > $10
+    - Hacim > 500K
+    - 52W yeni yüksek yapıyor (ta_highlow52w_nh)
+    """
+    filters = ",".join([
+        "sh_price_o10",
+        "sh_avgvol_o500",
+        "geo_usa",
+        "ind_stocksonly",
+        "ta_highlow52w_nh",
+    ])
+    url = (
+        f"https://elite.finviz.com/export.ashx?"
+        f"v=152&f={filters}&auth={FINVIZ_KEY}&ft=4"
+    )
+    r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
+    df = pd.read_csv(StringIO(r.text))
+    print(f"52W Yüksek filtresi geçti: {len(df)} hisse")
     return df
 
 # --- MA200 SLOPE KONTROLÜ (Kural 3) ---
@@ -465,8 +507,28 @@ def run_scan():
         except sqlite3.OperationalError:
             pass
 
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS minervini_52w_high (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            scan_date   TEXT NOT NULL,
+            ticker      TEXT NOT NULL,
+            company     TEXT,
+            sector      TEXT,
+            industry    TEXT,
+            price       REAL,
+            change_pct  TEXT,
+            volume      INTEGER,
+            market_cap  REAL,
+            ma200_slope REAL,
+            eps_qoq     REAL,
+            sales_qoq   REAL,
+            grade       TEXT,
+            UNIQUE(scan_date, ticker)
+        )
+    """)
+
     conn.commit()
-    
+
     scan_date = str(date.today())
     print(f"Tarih: {scan_date}")
 
@@ -824,6 +886,134 @@ def run_scan():
         print(f"   Cache'den alinan (hizli)  : {len(cached)}")
         print(f"   Yeni scraping yapilan     : {len(need_new_data)}")
         print(f"   Toplam kayit              : {saved_fund_only}")
+
+    # === 5. 52 HAFTA YÜKSEK TARAMA ===
+    print("\n=== 52 HAFTA YÜKSEK TARAMA BAŞLIYOR ===")
+    df_52w = get_finviz_52w_high()
+
+    if not df_52w.empty:
+        tickers_52w = df_52w["Ticker"].tolist()
+
+        # minervini_scans'da zaten olan tickerların verilerini al (tekrar çekme)
+        placeholders = ','.join('?' * len(tickers_52w))
+        c.execute(f"""
+            SELECT ticker, ma200_slope, eps_qoq, sales_qoq, grade
+            FROM minervini_scans
+            WHERE scan_date = ? AND ticker IN ({placeholders})
+        """, [scan_date] + tickers_52w)
+        cached_52w = {
+            row[0]: {"slope": row[1], "eps_qoq": row[2], "sales_qoq": row[3], "grade": row[4]}
+            for row in c.fetchall()
+        }
+
+        need_new_52w = [t for t in tickers_52w if t not in cached_52w]
+        print(f"  minervini_scans'dan alinan : {len(cached_52w)}")
+        print(f"  Yeni veri cekilecek        : {len(need_new_52w)}")
+
+        # Yeni tickerlar icin MA200 slope (yfinance batch)
+        fresh_slopes_52w = check_ma200_slope(need_new_52w) if need_new_52w else {}
+
+        # Yeni tickerlar icin Finviz EPS/Sales scraping
+        fresh_eps_52w = {}
+        if need_new_52w:
+            print(f"  Finviz EPS scraping: {len(need_new_52w)} ticker...")
+            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+            for i, ticker in enumerate(need_new_52w, 1):
+                if i % 25 == 0 or i == 1:
+                    print(f"    [{i}/{len(need_new_52w)}] {ticker}...")
+                try:
+                    url = f"https://finviz.com/quote.ashx?t={ticker}"
+                    response = requests.get(url, headers=headers, timeout=10)
+                    soup = BeautifulSoup(response.content, 'html.parser')
+
+                    eps_qoq = None
+                    sales_qoq = None
+
+                    eps_label = soup.find('td', string='EPS Q/Q')
+                    if eps_label:
+                        eps_value = eps_label.find_next_sibling('td')
+                        if eps_value:
+                            eps_text = eps_value.get_text().strip()
+                            if eps_text.endswith('%'):
+                                try:
+                                    eps_qoq = float(eps_text[:-1])
+                                except:
+                                    pass
+
+                    sales_label = soup.find('td', string='Sales Q/Q')
+                    if sales_label:
+                        sales_value = sales_label.find_next_sibling('td')
+                        if sales_value:
+                            sales_text = sales_value.get_text().strip()
+                            if sales_text.endswith('%'):
+                                try:
+                                    sales_qoq = float(sales_text[:-1])
+                                except:
+                                    pass
+
+                    grade = "D"
+                    if eps_qoq is not None and sales_qoq is not None:
+                        if eps_qoq > 40 and sales_qoq > 25:
+                            grade = "A"
+                        elif eps_qoq > 25 and sales_qoq > 15:
+                            grade = "B"
+                        elif eps_qoq > 20 and sales_qoq > 10:
+                            grade = "C"
+
+                    fresh_eps_52w[ticker] = {"eps_qoq": eps_qoq, "sales_qoq": sales_qoq, "grade": grade}
+                    time.sleep(0.5)
+                except Exception as e:
+                    print(f"  Scraping hatasi {ticker}: {e}")
+                    fresh_eps_52w[ticker] = {"eps_qoq": None, "sales_qoq": None, "grade": "D"}
+
+        # INSERT — tum veriyle
+        saved_52w = 0
+        for _, row in df_52w.iterrows():
+            ticker = row["Ticker"]
+            if ticker in cached_52w:
+                slope     = cached_52w[ticker]["slope"]
+                eps_qoq   = cached_52w[ticker]["eps_qoq"]
+                sales_qoq = cached_52w[ticker]["sales_qoq"]
+                grade     = cached_52w[ticker]["grade"]
+            else:
+                slope     = fresh_slopes_52w.get(ticker)
+                eps_data  = fresh_eps_52w.get(ticker, {})
+                eps_qoq   = eps_data.get("eps_qoq")
+                sales_qoq = eps_data.get("sales_qoq")
+                grade     = eps_data.get("grade", "D")
+
+            try:
+                c.execute("""
+                    INSERT OR REPLACE INTO minervini_52w_high
+                    (scan_date, ticker, company, sector, industry,
+                     price, change_pct, volume, market_cap,
+                     ma200_slope, eps_qoq, sales_qoq, grade)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+                """, (
+                    scan_date,
+                    ticker,
+                    row.get("Company", ""),
+                    row.get("Sector", ""),
+                    row.get("Industry", ""),
+                    row.get("Price", 0),
+                    row.get("Change", ""),
+                    row.get("Volume", 0),
+                    row.get("Market Cap", 0),
+                    slope,
+                    eps_qoq,
+                    sales_qoq,
+                    grade,
+                ))
+                saved_52w += 1
+            except Exception as e:
+                print(f"  Kayit hatasi {ticker}: {e}")
+
+        conn.commit()
+        print(f"\n[OK] 52 HAFTA YÜKSEK TARAMA TAMAMLANDI!")
+        print(f"   52W filtresi gecen         : {len(df_52w)}")
+        print(f"   Cache'den alinan (hizli)   : {len(cached_52w)}")
+        print(f"   Yeni scraping yapilan      : {len(need_new_52w)}")
+        print(f"   Toplam kayit               : {saved_52w}")
 
     conn.close()
 
