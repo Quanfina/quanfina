@@ -11,7 +11,8 @@
       "Bash(python -c \"import ast, sys; ast.parse\\(open\\('pages/3_Minervini.py'\\).read\\(\\)\\); print\\('3_Minervini.py OK'\\)\")",
       "Bash(python -c \"import ast; ast.parse\\(open\\('scanner.py', encoding='utf-8'\\).read\\(\\)\\); print\\('scanner.py OK'\\)\")",
       "Bash(python -c \"import ast; ast.parse\\(open\\('pages/3_Minervini.py', encoding='utf-8'\\).read\\(\\)\\); print\\('3_Minervini.py OK'\\)\")",
-      "Bash(python -c \"import ast; ast.parse\\(open\\('pages/3_Minervini.py', encoding='utf-8'\\).read\\(\\)\\); print\\('OK'\\)\")"
+      "Bash(python -c \"import ast; ast.parse\\(open\\('pages/3_Minervini.py', encoding='utf-8'\\).read\\(\\)\\); print\\('OK'\\)\")",
+      "Bash(streamlit run *)"
     ]
   }
 }

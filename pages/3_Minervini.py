@@ -72,6 +72,17 @@ def get_watchlist_tickers():
     conn.close()
     return df["ticker"].tolist()
 
+def add_tickers_to_watchlist(tickers):
+    conn = sqlite3.connect(DB_PATH)
+    today = str(date.today())
+    for ticker in tickers:
+        conn.execute(
+            "INSERT OR IGNORE INTO minervini_watchlist (ticker, added_date) VALUES (?, ?)",
+            (ticker, today),
+        )
+    conn.commit()
+    conn.close()
+
 def save_watchlist(selected_tickers):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -200,12 +211,59 @@ st.caption(
     f"Watch List **{len(df_wl_f)}/{len(df_wl)}**"
 )
 
+def add_link_columns(df):
+    df = df.copy()
+    df["tv_url"] = df["ticker"].apply(
+        lambda t: f"https://www.tradingview.com/chart/?symbol={t}"
+    )
+    df["fv_url"] = df["ticker"].apply(
+        lambda t: f"https://finviz.com/quote.ashx?t={t}"
+    )
+    return df
+
+_GRADE_CSS = {
+    "A": "background-color: #d1fae5; color: black",
+    "B": "background-color: #fef3c7; color: black",
+    "C": "background-color: #fed7aa; color: black",
+    "D": "background-color: #e5e7eb; color: black",
+}
+
+def style_grade(df):
+    def _row(row):
+        css = _GRADE_CSS.get(str(row["GRADE"]), "")
+        return [css] * len(row)
+    return df.style.apply(_row, axis=1)
+
+def table_height(df):
+    return min(len(df) * 35 + 50, 800)
+
+def add_to_watchlist_button(df_filtered, key):
+    event = st.dataframe(
+        style_grade(add_link_columns(df_filtered)[show_cols].rename(columns=col_rename)),
+        hide_index=True,
+        use_container_width=True,
+        column_config=col_config,
+        height=table_height(df_filtered),
+        selection_mode="multi-row",
+        on_select="rerun",
+        key=key,
+    )
+    selected_rows = event.selection.rows
+    tickers = df_filtered.iloc[selected_rows]["ticker"].tolist() if selected_rows else []
+    label = f"⭐ Seçili hisseleri Watch List'e ekle ({len(tickers)})" if tickers else "⭐ Watch List'e ekle"
+    if st.button(label, key=f"{key}_btn", disabled=not tickers):
+        add_tickers_to_watchlist(tickers)
+        load_watchlist_data.clear()
+        st.success(f"{len(tickers)} hisse Watch List'e eklendi.")
+        st.rerun()
+
 col_rename = {
     "ticker": "TICKER", "company": "ŞİRKET", "sector": "SEKTÖR",
     "industry": "SEKTÖR ALTI", "price": "FİYAT", "change_pct": "DEĞİŞİM",
     "volume": "HACİM", "market_cap": "PİYASA DEĞERİ (M)",
     "ma200_slope": "MA200 SLOPE", "eps_qoq": "EPS Q/Q",
-    "sales_qoq": "SALES Q/Q", "grade": "GRADE"
+    "sales_qoq": "SALES Q/Q", "grade": "GRADE",
+    "tv_url": "📊 TV", "fv_url": "📈 FV",
 }
 
 col_config = {
@@ -214,10 +272,13 @@ col_config = {
     "HACİM": st.column_config.NumberColumn(format="%d"),
     "EPS Q/Q": st.column_config.NumberColumn(format="%.1f"),
     "SALES Q/Q": st.column_config.NumberColumn(format="%.1f"),
+    "📊 TV": st.column_config.LinkColumn(display_text="🔗 Aç"),
+    "📈 FV": st.column_config.LinkColumn(display_text="🔗 Aç"),
 }
 
 show_cols = ["ticker", "company", "sector", "industry", "price", "change_pct",
-             "volume", "market_cap", "ma200_slope", "eps_qoq", "sales_qoq", "grade"]
+             "volume", "market_cap", "ma200_slope", "eps_qoq", "sales_qoq", "grade",
+             "tv_url", "fv_url"]
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "🌟 Süper Performans",
@@ -236,12 +297,7 @@ with tab1:
         f1, f2 = st.columns(2)
         f1.metric("Süper Performans Adayı", len(df_fund_f))
         f2.metric("Teknik Listeden Oranı", f"{len(df_fund)/len(df)*100:.1f}%")
-        st.dataframe(
-            df_fund_f[show_cols].rename(columns=col_rename),
-            hide_index=True,
-            use_container_width=True,
-            column_config=col_config
-        )
+        add_to_watchlist_button(df_fund_f, "tab1")
 
 with tab2:
     st.subheader("🚀 52 Hafta Yüksek (Yeni Liderler)")
@@ -252,12 +308,7 @@ with tab2:
         hw1, hw2 = st.columns(2)
         hw1.metric("52H Yüksek Adayı", len(df_52w_f))
         hw2.metric("Trend Template'e Oranı", f"{len(df_52w)/len(df)*100:.1f}%")
-        st.dataframe(
-            df_52w_f[show_cols].rename(columns=col_rename),
-            hide_index=True,
-            use_container_width=True,
-            column_config=col_config
-        )
+        add_to_watchlist_button(df_52w_f, "tab2")
 
 with tab3:
     st.subheader("✅ Trend Template 8/8 — TAM UYUM")
@@ -269,22 +320,12 @@ with tab3:
     m3.metric("MA200 Slope Bekliyor", len(df_partial_f))
     m4.metric("Geçme Oranı", f"{len(df[df['passed']==1])/len(df)*100:.1f}%")
     if not df_pass_f.empty:
-        st.dataframe(
-            df_pass_f[show_cols].rename(columns=col_rename),
-            hide_index=True,
-            use_container_width=True,
-            column_config=col_config
-        )
+        add_to_watchlist_button(df_pass_f, "tab3_pass")
     else:
         st.warning("Bu tarihte 8/8 geçen hisse yok.")
     if show_all and not df_partial_f.empty:
         st.subheader("⚠️ MA200 Slope Geçemeyen (7/8)")
-        st.dataframe(
-            df_partial_f[show_cols].rename(columns=col_rename),
-            hide_index=True,
-            use_container_width=True,
-            column_config=col_config
-        )
+        add_to_watchlist_button(df_partial_f, "tab3_partial")
 
 with tab4:
     st.subheader("📊 Sadece Temel Kriterler (Teknik Filtresiz)")
@@ -295,12 +336,7 @@ with tab4:
         fo1, fo2 = st.columns(2)
         fo1.metric("Temel Kriter Geçen", len(df_fund_only_f))
         fo2.metric("Teknik Listeye Oranı", f"{len(df_fund_only)/len(df)*100:.1f}%")
-        st.dataframe(
-            df_fund_only_f[show_cols].rename(columns=col_rename),
-            hide_index=True,
-            use_container_width=True,
-            column_config=col_config
-        )
+        add_to_watchlist_button(df_fund_only_f, "tab4")
 
 with tab5:
     st.subheader("⭐ Watch List")
@@ -329,9 +365,4 @@ with tab5:
         wl1, wl2 = st.columns(2)
         wl1.metric("Filtrelenmiş", len(df_wl_f))
         wl2.metric("Toplam Takip", len(df_wl))
-        st.dataframe(
-            df_wl_f[show_cols].rename(columns=col_rename),
-            hide_index=True,
-            use_container_width=True,
-            column_config=col_config
-        )
+        add_to_watchlist_button(df_wl_f, "tab5")
