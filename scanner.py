@@ -65,6 +65,16 @@ def init_db():
             c.execute(col_sql)
         except sqlite3.OperationalError:
             pass
+    for col_sql in [
+        "ALTER TABLE minervini_fundamental_only ADD COLUMN ma200_slope REAL",
+        "ALTER TABLE minervini_fundamental_only ADD COLUMN eps_qoq TEXT",
+        "ALTER TABLE minervini_fundamental_only ADD COLUMN sales_qoq TEXT",
+        "ALTER TABLE minervini_fundamental_only ADD COLUMN grade TEXT",
+    ]:
+        try:
+            c.execute(col_sql)
+        except sqlite3.OperationalError:
+            pass
     conn.commit()
     conn.close()
 
@@ -217,11 +227,22 @@ def save_results(df_finviz, slopes, scan_date):
         
         try:
             c.execute("""
-                INSERT OR REPLACE INTO minervini_scans
+                INSERT INTO minervini_scans
                 (scan_date, ticker, company, sector, industry,
                  price, change_pct, volume, market_cap, pe,
                  ma200_slope, passed)
                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                ON CONFLICT(scan_date, ticker) DO UPDATE SET
+                    company     = excluded.company,
+                    sector      = excluded.sector,
+                    industry    = excluded.industry,
+                    price       = excluded.price,
+                    change_pct  = excluded.change_pct,
+                    volume      = excluded.volume,
+                    market_cap  = excluded.market_cap,
+                    pe          = excluded.pe,
+                    ma200_slope = excluded.ma200_slope,
+                    passed      = excluded.passed
             """, (
                 scan_date,
                 ticker,
@@ -433,7 +454,17 @@ def run_scan():
             UNIQUE(scan_date, ticker)
         )
     """)
-    
+    for col_sql in [
+        "ALTER TABLE minervini_fundamental_only ADD COLUMN ma200_slope REAL",
+        "ALTER TABLE minervini_fundamental_only ADD COLUMN eps_qoq TEXT",
+        "ALTER TABLE minervini_fundamental_only ADD COLUMN sales_qoq TEXT",
+        "ALTER TABLE minervini_fundamental_only ADD COLUMN grade TEXT",
+    ]:
+        try:
+            c.execute(col_sql)
+        except sqlite3.OperationalError:
+            pass
+
     conn.commit()
     
     scan_date = str(date.today())
@@ -467,11 +498,22 @@ def run_scan():
         
         try:
             c.execute("""
-                INSERT OR REPLACE INTO minervini_scans
+                INSERT INTO minervini_scans
                 (scan_date, ticker, company, sector, industry,
                  price, change_pct, volume, market_cap, pe,
                  ma200_slope, passed)
                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                ON CONFLICT(scan_date, ticker) DO UPDATE SET
+                    company     = excluded.company,
+                    sector      = excluded.sector,
+                    industry    = excluded.industry,
+                    price       = excluded.price,
+                    change_pct  = excluded.change_pct,
+                    volume      = excluded.volume,
+                    market_cap  = excluded.market_cap,
+                    pe          = excluded.pe,
+                    ma200_slope = excluded.ma200_slope,
+                    passed      = excluded.passed
             """, (
                 scan_date,
                 ticker,
@@ -659,18 +701,106 @@ def run_scan():
     df_fund_only = get_finviz_fundamental_only()
 
     if not df_fund_only.empty:
+        tickers_fo = df_fund_only["Ticker"].tolist()
+
+        # minervini_scans'da zaten olan tickerların verilerini al (tekrar çekme)
+        placeholders = ','.join('?' * len(tickers_fo))
+        c.execute(f"""
+            SELECT ticker, ma200_slope, eps_qoq, sales_qoq, grade
+            FROM minervini_scans
+            WHERE scan_date = ? AND ticker IN ({placeholders})
+        """, [scan_date] + tickers_fo)
+        cached = {
+            row[0]: {"slope": row[1], "eps_qoq": row[2], "sales_qoq": row[3], "grade": row[4]}
+            for row in c.fetchall()
+        }
+
+        need_new_data = [t for t in tickers_fo if t not in cached]
+        print(f"  minervini_scans'dan alinan : {len(cached)}")
+        print(f"  Yeni veri cekilecek        : {len(need_new_data)}")
+
+        # Yeni tickerlar icin MA200 slope (yfinance batch)
+        fresh_slopes = check_ma200_slope(need_new_data) if need_new_data else {}
+
+        # Yeni tickerlar icin Finviz EPS/Sales scraping
+        fresh_eps = {}
+        if need_new_data:
+            print(f"  Finviz EPS scraping: {len(need_new_data)} ticker...")
+            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+            for i, ticker in enumerate(need_new_data, 1):
+                if i % 25 == 0 or i == 1:
+                    print(f"    [{i}/{len(need_new_data)}] {ticker}...")
+                try:
+                    url = f"https://finviz.com/quote.ashx?t={ticker}"
+                    response = requests.get(url, headers=headers, timeout=10)
+                    soup = BeautifulSoup(response.content, 'html.parser')
+
+                    eps_qoq = None
+                    sales_qoq = None
+
+                    eps_label = soup.find('td', string='EPS Q/Q')
+                    if eps_label:
+                        eps_value = eps_label.find_next_sibling('td')
+                        if eps_value:
+                            eps_text = eps_value.get_text().strip()
+                            if eps_text.endswith('%'):
+                                try:
+                                    eps_qoq = float(eps_text[:-1])
+                                except:
+                                    pass
+
+                    sales_label = soup.find('td', string='Sales Q/Q')
+                    if sales_label:
+                        sales_value = sales_label.find_next_sibling('td')
+                        if sales_value:
+                            sales_text = sales_value.get_text().strip()
+                            if sales_text.endswith('%'):
+                                try:
+                                    sales_qoq = float(sales_text[:-1])
+                                except:
+                                    pass
+
+                    grade = "D"
+                    if eps_qoq is not None and sales_qoq is not None:
+                        if eps_qoq > 40 and sales_qoq > 25:
+                            grade = "A"
+                        elif eps_qoq > 25 and sales_qoq > 15:
+                            grade = "B"
+                        elif eps_qoq > 20 and sales_qoq > 10:
+                            grade = "C"
+
+                    fresh_eps[ticker] = {"eps_qoq": eps_qoq, "sales_qoq": sales_qoq, "grade": grade}
+                    time.sleep(0.5)
+                except Exception as e:
+                    print(f"  Scraping hatasi {ticker}: {e}")
+                    fresh_eps[ticker] = {"eps_qoq": None, "sales_qoq": None, "grade": "D"}
+
+        # INSERT — tum veriyle
         saved_fund_only = 0
-        
         for _, row in df_fund_only.iterrows():
+            ticker = row["Ticker"]
+            if ticker in cached:
+                slope    = cached[ticker]["slope"]
+                eps_qoq  = cached[ticker]["eps_qoq"]
+                sales_qoq = cached[ticker]["sales_qoq"]
+                grade    = cached[ticker]["grade"]
+            else:
+                slope    = fresh_slopes.get(ticker)
+                eps_data = fresh_eps.get(ticker, {})
+                eps_qoq  = eps_data.get("eps_qoq")
+                sales_qoq = eps_data.get("sales_qoq")
+                grade    = eps_data.get("grade", "D")
+
             try:
                 c.execute("""
                     INSERT OR REPLACE INTO minervini_fundamental_only
                     (scan_date, ticker, company, sector, industry,
-                     price, change_pct, volume, market_cap, pe)
-                    VALUES (?,?,?,?,?,?,?,?,?,?)
+                     price, change_pct, volume, market_cap, pe,
+                     ma200_slope, eps_qoq, sales_qoq, grade)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """, (
                     scan_date,
-                    row["Ticker"],
+                    ticker,
                     row.get("Company", ""),
                     row.get("Sector", ""),
                     row.get("Industry", ""),
@@ -679,15 +809,21 @@ def run_scan():
                     row.get("Volume", 0),
                     row.get("Market Cap", 0),
                     row.get("P/E", 0),
+                    slope,
+                    eps_qoq,
+                    sales_qoq,
+                    grade,
                 ))
                 saved_fund_only += 1
             except Exception as e:
-                print(f"  Kayıt hatası {row['Ticker']}: {e}")
-        
+                print(f"  Kayit hatasi {ticker}: {e}")
+
         conn.commit()
         print(f"\n[OK] TEMEL TARAMA TAMAMLANDI!")
-        print(f"   Temel filtresi geçen : {len(df_fund_only)}")
-        print(f"   Toplam kayıt         : {saved_fund_only}")
+        print(f"   Temel filtresi gecen      : {len(df_fund_only)}")
+        print(f"   Cache'den alinan (hizli)  : {len(cached)}")
+        print(f"   Yeni scraping yapilan     : {len(need_new_data)}")
+        print(f"   Toplam kayit              : {saved_fund_only}")
 
     conn.close()
 
