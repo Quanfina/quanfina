@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c ' *)",
+      "Bash(dir /s /b c:\\\\Projeler\\\\Quanfina\\\\*.py)",
+      "WebFetch(domain:finviz.com)",
+      "Bash(python scanner.py)",
+      "Bash(Get-Content \"C:\\\\Users\\\\Ferit\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Projeler-Quanfina\\\\05a10dcf-2b7a-489b-9255-6622d3156f44\\\\tasks\\\\bpygyiogv.output\" -Tail 60)"
+    ]
+  }
+}

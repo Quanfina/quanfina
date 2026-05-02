@@ -1,15 +1,35 @@
 import os
 import sqlite3
+import time
 import requests
 import pandas as pd
 import yfinance as yf
 from io import StringIO
 from dotenv import load_dotenv
-from datetime import date
+from datetime import date, datetime, timedelta
+from bs4 import BeautifulSoup
 
 load_dotenv()
 FINVIZ_KEY = os.getenv("FINVIZ_API_KEY")
 DB_PATH = os.path.join(os.path.dirname(__file__), "quanfina.db")
+
+def parse_earnings_date(raw: str):
+    """'Apr 30 AMC' gibi Finviz earnings stringini date nesnesine çevirir."""
+    if not raw or raw in ('-', 'N/A', ''):
+        return None
+    parts = raw.split()
+    if len(parts) < 2:
+        return None
+    today = date.today()
+    for year in [today.year, today.year + 1]:
+        try:
+            d = datetime.strptime(f"{parts[0]} {parts[1]} {year}", "%b %d %Y").date()
+            if d >= today - timedelta(days=180):
+                return d
+        except ValueError:
+            continue
+    return None
+
 
 # --- VERİTABANI KURULUM ---
 def init_db():
@@ -32,9 +52,19 @@ def init_db():
             sales_qoq     TEXT,
             ma200_slope   REAL,
             passed        INTEGER DEFAULT 1,
+            grade         TEXT,
             UNIQUE(scan_date, ticker)
         )
     """)
+    for col_sql in [
+        "ALTER TABLE minervini_scans ADD COLUMN earnings_date TEXT",
+        "ALTER TABLE minervini_scans ADD COLUMN eps_last_updated TEXT",
+        "ALTER TABLE minervini_scans ADD COLUMN sales_last_updated TEXT",
+    ]:
+        try:
+            c.execute(col_sql)
+        except sqlite3.OperationalError:
+            pass
     conn.commit()
     conn.close()
 
@@ -63,6 +93,9 @@ def get_finviz_screener():
         "ta_sma150_sa200",
         "ta_highlow52w_a25h",
         "ta_highlow52w_b75l",
+        "sec_etf_false",
+        "geo_usa",
+        "ind_stocksonly",
     ])
     
     url = (
@@ -73,6 +106,69 @@ def get_finviz_screener():
     r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
     df = pd.read_csv(StringIO(r.text))
     print(f"Finviz filtresi geçti: {len(df)} hisse")
+    return df
+
+def get_finviz_fundamental():
+    """
+    Teknik + Temel filtreler:
+    - Trend Template (7 teknik kural)
+    - EPS Q/Q > %25
+    - Sales Q/Q > %25
+    - Fiyat > $10, Hacim > 500K
+    """
+    filters = ",".join([
+        "sh_price_o10",
+        "sh_avgvol_o500",
+        "ta_sma50_pa",
+        "ta_sma200_pa",
+        "ta_sma50_sa150",
+        "ta_sma50_sa200",
+        "ta_sma150_sa200",
+        "ta_highlow52w_a25h",
+        "ta_highlow52w_b75l",
+        "fa_epsqoq_o25",
+        "fa_salesqoq_o25",
+        "sec_etf_false",
+        "geo_usa",
+        "ind_stocksonly",
+    ])
+
+    url = (
+        f"https://elite.finviz.com/export.ashx?"
+        f"v=152&f={filters}&auth={FINVIZ_KEY}&ft=4"
+    )
+
+    r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
+    df = pd.read_csv(StringIO(r.text))
+    print(f"Fundamental filtresi geçti: {len(df)} hisse")
+    return df
+
+def get_finviz_fundamental_only():
+    """
+    Sadece temel filtreler — teknik kural YOK:
+    - Fiyat > $10
+    - Hacim > 500K
+    - EPS Q/Q > %25
+    - Sales Q/Q > %25
+    """
+    filters = ",".join([
+        "sh_price_o10",
+        "sh_avgvol_o500",
+        "fa_epsqoq_o25",
+        "fa_salesqoq_o25",
+        "sec_etf_false",
+        "geo_usa",
+        "ind_stocksonly",
+    ])
+
+    url = (
+        f"https://elite.finviz.com/export.ashx?"
+        f"v=152&f={filters}&auth={FINVIZ_KEY}&ft=4"
+    )
+
+    r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
+    df = pd.read_csv(StringIO(r.text))
+    print(f"Temel filtresi geçti: {len(df)} hisse")
     return df
 
 # --- MA200 SLOPE KONTROLÜ (Kural 3) ---
@@ -149,71 +245,160 @@ def save_results(df_finviz, slopes, scan_date):
     conn.close()
     return saved
 
+# --- EPS/SALES Q/Q SCRAPING VE GRADE HESAPLAMA ---
+def scrape_eps_sales_and_grade(scan_date):
+    """
+    minervini_scans tablosundaki her ticker için Finviz'den EPS Q/Q, Sales Q/Q ve
+    Earnings date çeker; akıllı skip mantığıyla gereksiz istekleri atlar.
+    """
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+
+    c.execute("""
+        SELECT ticker, earnings_date, eps_last_updated
+        FROM minervini_scans WHERE scan_date = ?
+    """, (scan_date,))
+    tickers_data = c.fetchall()
+
+    print(f"EPS/Sales scraping: {len(tickers_data)} hisse kontrol ediliyor...")
+
+    stats = {"skipped": 0, "scraped": 0, "post_earnings": 0}
+    today = date.today()
+
+    for i, (ticker, stored_earnings_date, eps_last_updated) in enumerate(tickers_data, 1):
+        reason = "scrape"
+
+        if eps_last_updated:
+            last_upd = date.fromisoformat(eps_last_updated)
+            days_old = (today - last_upd).days
+            ed = parse_earnings_date(stored_earnings_date)
+
+            if ed is None:
+                if days_old < 30:
+                    stats["skipped"] += 1
+                    continue
+            elif today < ed + timedelta(days=2):
+                if days_old < 30:
+                    stats["skipped"] += 1
+                    continue
+            else:
+                reason = "post_earnings"
+
+        if i % 50 == 0 or i == 1:
+            print(f"  [{i}/{len(tickers_data)}] {ticker} scraping...")
+        try:
+            url = f"https://finviz.com/quote.ashx?t={ticker}"
+            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+
+            response = requests.get(url, headers=headers, timeout=10)
+            soup = BeautifulSoup(response.content, 'html.parser')
+
+            eps_qoq = None
+            sales_qoq = None
+            earnings_date_raw = None
+
+            eps_label = soup.find('td', string='EPS Q/Q')
+            if eps_label:
+                eps_value = eps_label.find_next_sibling('td')
+                if eps_value:
+                    eps_text = eps_value.get_text().strip()
+                    if eps_text.endswith('%'):
+                        try:
+                            eps_qoq = float(eps_text[:-1])
+                        except:
+                            eps_qoq = None
+
+            sales_label = soup.find('td', string='Sales Q/Q')
+            if sales_label:
+                sales_value = sales_label.find_next_sibling('td')
+                if sales_value:
+                    sales_text = sales_value.get_text().strip()
+                    if sales_text.endswith('%'):
+                        try:
+                            sales_qoq = float(sales_text[:-1])
+                        except:
+                            sales_qoq = None
+
+            earnings_label = soup.find('td', string='Earnings')
+            if earnings_label:
+                earnings_value = earnings_label.find_next_sibling('td')
+                if earnings_value:
+                    earnings_date_raw = earnings_value.get_text().strip()
+
+            grade = "D"
+            if eps_qoq is not None and sales_qoq is not None:
+                if eps_qoq > 40 and sales_qoq > 25:
+                    grade = "A"
+                elif eps_qoq > 25 and sales_qoq > 15:
+                    grade = "B"
+                elif eps_qoq > 20 and sales_qoq > 10:
+                    grade = "C"
+
+            today_str = str(today)
+            c.execute("""
+                UPDATE minervini_scans
+                SET eps_qoq = ?, sales_qoq = ?, grade = ?,
+                    earnings_date = ?, eps_last_updated = ?, sales_last_updated = ?
+                WHERE scan_date = ? AND ticker = ?
+            """, (eps_qoq, sales_qoq, grade, earnings_date_raw, today_str, today_str, scan_date, ticker))
+
+            stats["scraped"] += 1
+            if reason == "post_earnings":
+                stats["post_earnings"] += 1
+            time.sleep(0.5)
+
+        except Exception as e:
+            print(f"  Scraping hatası {ticker}: {e}")
+            continue
+
+    conn.commit()
+    conn.close()
+    print(f"\n--- Scraping İstatistikleri ---")
+    print(f"   Atlanan (güncel veri)     : {stats['skipped']}")
+    print(f"   Scraping yapılan          : {stats['scraped']}")
+    print(f"   Bilanço sonrası güncelle  : {stats['post_earnings']}")
+    return stats["scraped"]
+
 # --- ANA AKIŞ ---
 def run_scan():
     print("=== QUANFINA SCANNER v2 (Hızlı) ===")
-    init_db()
     
-    scan_date = str(date.today())
-    print(f"Tarih: {scan_date}")
-
-    # 1. Finviz filtresi
-    print("\n1. Finviz Elite filtresi çalışıyor...")
-    df = get_finviz_screener()
-    
-    if df.empty:
-        print("Hiç hisse bulunamadı.")
-        return
-    
-    tickers = df["Ticker"].tolist()
-
-    # 2. Sadece geçenler için MA200 slope
-    print("\n2. MA200 slope kontrolü (yfinance toplu indirme)...")
-    slopes = check_ma200_slope(tickers)
-
-    # 3. Kaydet
-    print("\n3. Veritabanına kaydediliyor...")
-    saved = save_results(df, slopes, scan_date)
-
-    passed = sum(1 for s in slopes.values() if s is not None and s > 0)
-    
-    print(f"\n✅ TARAMA TAMAMLANDI!")
-    print(f"   Finviz filtresi geçen : {len(tickers)}")
-    print(f"   MA200 slope geçen     : {passed}")
-    print(f"   Toplam kayıt          : {saved}")
-    print(f"   Tarih                 : {scan_date}")
-
-    # --- FUNDAMENTAL TARAMA ---
-    print("\n=== FUNDAMENTAL TARAMA BAŞLIYOR ===")
-    init_fundamental_table()
-    df_fund = get_finviz_fundamental()
-
-    if not df_fund.empty:
-        tickers_fund = df_fund["Ticker"].tolist()
-        print(f"MA200 slope kontrolü: {len(tickers_fund)} hisse...")
-        slopes_fund = check_ma200_slope(tickers_fund)
-        saved_fund = save_fundamental_results(df_fund, slopes_fund, scan_date)
-        passed_fund = sum(1 for s in slopes_fund.values() if s is not None and s > 0)
-        print(f"\n✅ FUNDAMENTAL TARAMA TAMAMLANDI!")
-        print(f"   Finviz filtresi geçen : {len(tickers_fund)}")
-        print(f"   MA200 slope geçen     : {passed_fund}")
-        print(f"   Toplam kayıt          : {saved_fund}")
-
-    # --- SADECE TEMEL TARAMA ---
-    print("\n=== SADECE TEMEL TARAMA BAŞLIYOR ===")
-    init_fundamental_only_table()
-    df_fund_only = get_finviz_fundamental_only()
-
-    if not df_fund_only.empty:
-        saved_fund_only = save_fundamental_only(df_fund_only, scan_date)
-        print(f"\n✅ TEMEL TARAMA TAMAMLANDI!")
-        print(f"   Temel filtresi geçen : {len(df_fund_only)}")
-        print(f"   Toplam kayıt         : {saved_fund_only}")
-
-# --- TEMEL KRİTERLER TABLOSU ---
-def init_fundamental_table():
+    # Tek bağlantı kullan - database lock önle
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
+    
+    # Tabloları oluştur
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS minervini_scans (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            scan_date     TEXT NOT NULL,
+            ticker        TEXT NOT NULL,
+            company       TEXT,
+            sector        TEXT,
+            industry      TEXT,
+            price         REAL,
+            change_pct    TEXT,
+            volume        INTEGER,
+            market_cap    REAL,
+            pe            REAL,
+            eps_qoq       TEXT,
+            sales_qoq     TEXT,
+            ma200_slope   REAL,
+            passed        INTEGER DEFAULT 1,
+            grade         TEXT,
+            UNIQUE(scan_date, ticker)
+        )
+    """)
+    for col_sql in [
+        "ALTER TABLE minervini_scans ADD COLUMN earnings_date TEXT",
+        "ALTER TABLE minervini_scans ADD COLUMN eps_last_updated TEXT",
+        "ALTER TABLE minervini_scans ADD COLUMN sales_last_updated TEXT",
+    ]:
+        try:
+            c.execute(col_sql)
+        except sqlite3.OperationalError:
+            pass
+
     c.execute("""
         CREATE TABLE IF NOT EXISTS minervini_fundamental_scans (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -231,84 +416,7 @@ def init_fundamental_table():
             UNIQUE(scan_date, ticker)
         )
     """)
-    conn.commit()
-    conn.close()
-
-def get_finviz_fundamental():
-    """
-    Teknik + Temel filtreler:
-    - Trend Template (7 teknik kural)
-    - EPS Q/Q > %25
-    - Sales Q/Q > %25
-    - Fiyat > $10, Hacim > 500K
-    """
-    filters = ",".join([
-        "sh_price_o10",
-        "sh_avgvol_o500",
-        "ta_sma50_pa",
-        "ta_sma200_pa",
-        "ta_sma50_sa150",
-        "ta_sma50_sa200",
-        "ta_sma150_sa200",
-        "ta_highlow52w_a25h",
-        "ta_highlow52w_b75l",
-        "fa_epsqoq_o25",
-        "fa_salesqoq_o25",
-    ])
-
-    url = (
-        f"https://elite.finviz.com/export.ashx?"
-        f"v=152&f={filters}&auth={FINVIZ_KEY}&ft=4"
-    )
-
-    r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
-    df = pd.read_csv(StringIO(r.text))
-    print(f"Fundamental filtresi geçti: {len(df)} hisse")
-    return df
-
-def save_fundamental_results(df_finviz, slopes, scan_date):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    saved = 0
-
-    for _, row in df_finviz.iterrows():
-        ticker = row["Ticker"]
-        slope  = slopes.get(ticker, None)
-        passed = 1 if slope is not None and slope > 0 else 0
-
-        if passed == 0:
-            continue  # MA200 slope geçemeyenleri kaydetme
-
-        try:
-            c.execute("""
-                INSERT OR REPLACE INTO minervini_fundamental_scans
-                (scan_date, ticker, company, sector, industry,
-                 price, change_pct, volume, market_cap, pe, ma200_slope)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?)
-            """, (
-                scan_date,
-                ticker,
-                row.get("Company", ""),
-                row.get("Sector", ""),
-                row.get("Industry", ""),
-                row.get("Price", 0),
-                row.get("Change", ""),
-                row.get("Volume", 0),
-                row.get("Market Cap", 0),
-                row.get("P/E", 0),
-                slope,
-            ))
-            saved += 1
-        except Exception as e:
-            print(f"  Kayıt hatası {ticker}: {e}")
-
-    conn.commit()
-    conn.close()
-    return saved
-
-def init_fundamental_only_table():
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
+    
     c.execute("""
         CREATE TABLE IF NOT EXISTS minervini_fundamental_only (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -325,49 +433,48 @@ def init_fundamental_only_table():
             UNIQUE(scan_date, ticker)
         )
     """)
+    
     conn.commit()
-    conn.close()
+    
+    scan_date = str(date.today())
+    print(f"Tarih: {scan_date}")
 
-def get_finviz_fundamental_only():
-    """
-    Sadece temel filtreler — teknik kural YOK:
-    - Fiyat > $10
-    - Hacim > 500K
-    - EPS Q/Q > %25
-    - Sales Q/Q > %25
-    """
-    filters = ",".join([
-        "sh_price_o10",
-        "sh_avgvol_o500",
-        "fa_epsqoq_o25",
-        "fa_salesqoq_o25",
-    ])
+    # 1. Finviz filtresi
+    print("\n1. Finviz Elite filtresi çalışıyor...")
+    df = get_finviz_screener()
+    
+    if df.empty:
+        print("Hiç hisse bulunamadı.")
+        conn.close()
+        return
+    
+    tickers = df["Ticker"].tolist()
 
-    url = (
-        f"https://elite.finviz.com/export.ashx?"
-        f"v=152&f={filters}&auth={FINVIZ_KEY}&ft=4"
-    )
+    # 2. Sadece geçenler için MA200 slope
+    print("\n2. MA200 slope kontrolü (yfinance toplu indirme)...")
+    slopes = check_ma200_slope(tickers)
 
-    r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
-    df = pd.read_csv(StringIO(r.text))
-    print(f"Temel filtresi geçti: {len(df)} hisse")
-    return df
-
-def save_fundamental_only(df_finviz, scan_date):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
+    # 3. Kaydet
+    print("\n3. Veritabanına kaydediliyor...")
     saved = 0
-
-    for _, row in df_finviz.iterrows():
+    
+    for _, row in df.iterrows():
+        ticker = row["Ticker"]
+        slope  = slopes.get(ticker, None)
+        
+        # Kural 3: MA200 yükselişte (slope > 0)
+        passed = 1 if slope is not None and slope > 0 else 0
+        
         try:
             c.execute("""
-                INSERT OR REPLACE INTO minervini_fundamental_only
+                INSERT OR REPLACE INTO minervini_scans
                 (scan_date, ticker, company, sector, industry,
-                 price, change_pct, volume, market_cap, pe)
-                VALUES (?,?,?,?,?,?,?,?,?,?)
+                 price, change_pct, volume, market_cap, pe,
+                 ma200_slope, passed)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
             """, (
                 scan_date,
-                row["Ticker"],
+                ticker,
                 row.get("Company", ""),
                 row.get("Sector", ""),
                 row.get("Industry", ""),
@@ -376,14 +483,213 @@ def save_fundamental_only(df_finviz, scan_date):
                 row.get("Volume", 0),
                 row.get("Market Cap", 0),
                 row.get("P/E", 0),
+                slope,
+                passed
             ))
             saved += 1
         except Exception as e:
-            print(f"  Kayıt hatası {row['Ticker']}: {e}")
+            print(f"  Kayıt hatası {ticker}: {e}")
+            break  # ilk hatada dur
+    
+    conn.commit()
+
+    passed = sum(1 for s in slopes.values() if s is not None and s > 0)
+    
+    print(f"\n[OK] TARAMA TAMAMLANDI!")
+    print(f"   Finviz filtresi geçen : {len(tickers)}")
+    print(f"   MA200 slope geçen     : {passed}")
+    print(f"   Toplam kayıt          : {saved}")
+    print(f"   Tarih                 : {scan_date}")
+
+    # --- EPS/SALES SCRAPING VE GRADE ---
+    print("\n4. EPS/Sales Q/Q scraping ve grade hesaplaması...")
+    c.execute("""
+        SELECT ticker, earnings_date, eps_last_updated
+        FROM minervini_scans WHERE scan_date = ?
+    """, (scan_date,))
+    tickers_data = c.fetchall()
+
+    print(f"EPS/Sales scraping: {len(tickers_data)} hisse kontrol ediliyor...")
+
+    stats = {"skipped": 0, "scraped": 0, "post_earnings": 0}
+    today = date.today()
+
+    for i, (ticker, stored_earnings_date, eps_last_updated) in enumerate(tickers_data, 1):
+        reason = "scrape"
+
+        if eps_last_updated:
+            last_upd = date.fromisoformat(eps_last_updated)
+            days_old = (today - last_upd).days
+            ed = parse_earnings_date(stored_earnings_date)
+
+            if ed is None:
+                if days_old < 30:
+                    stats["skipped"] += 1
+                    continue
+            elif today < ed + timedelta(days=2):
+                if days_old < 30:
+                    stats["skipped"] += 1
+                    continue
+            else:
+                reason = "post_earnings"
+
+        if i % 50 == 0 or i == 1:
+            print(f"  [{i}/{len(tickers_data)}] {ticker} scraping...")
+        try:
+            url = f"https://finviz.com/quote.ashx?t={ticker}"
+            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+
+            response = requests.get(url, headers=headers, timeout=10)
+            soup = BeautifulSoup(response.content, 'html.parser')
+
+            eps_qoq = None
+            sales_qoq = None
+            earnings_date_raw = None
+
+            eps_label = soup.find('td', string='EPS Q/Q')
+            if eps_label:
+                eps_value = eps_label.find_next_sibling('td')
+                if eps_value:
+                    eps_text = eps_value.get_text().strip()
+                    if eps_text.endswith('%'):
+                        try:
+                            eps_qoq = float(eps_text[:-1])
+                        except:
+                            eps_qoq = None
+
+            sales_label = soup.find('td', string='Sales Q/Q')
+            if sales_label:
+                sales_value = sales_label.find_next_sibling('td')
+                if sales_value:
+                    sales_text = sales_value.get_text().strip()
+                    if sales_text.endswith('%'):
+                        try:
+                            sales_qoq = float(sales_text[:-1])
+                        except:
+                            sales_qoq = None
+
+            earnings_label = soup.find('td', string='Earnings')
+            if earnings_label:
+                earnings_value = earnings_label.find_next_sibling('td')
+                if earnings_value:
+                    earnings_date_raw = earnings_value.get_text().strip()
+
+            grade = "D"
+            if eps_qoq is not None and sales_qoq is not None:
+                if eps_qoq > 40 and sales_qoq > 25:
+                    grade = "A"
+                elif eps_qoq > 25 and sales_qoq > 15:
+                    grade = "B"
+                elif eps_qoq > 20 and sales_qoq > 10:
+                    grade = "C"
+
+            today_str = str(today)
+            c.execute("""
+                UPDATE minervini_scans
+                SET eps_qoq = ?, sales_qoq = ?, grade = ?,
+                    earnings_date = ?, eps_last_updated = ?, sales_last_updated = ?
+                WHERE scan_date = ? AND ticker = ?
+            """, (eps_qoq, sales_qoq, grade, earnings_date_raw, today_str, today_str, scan_date, ticker))
+
+            stats["scraped"] += 1
+            if reason == "post_earnings":
+                stats["post_earnings"] += 1
+            time.sleep(0.5)
+
+        except Exception as e:
+            print(f"  Scraping hatası {ticker}: {e}")
+            continue
 
     conn.commit()
+    print(f"\n--- Scraping İstatistikleri ---")
+    print(f"   Atlanan (güncel veri)     : {stats['skipped']}")
+    print(f"   Scraping yapılan          : {stats['scraped']}")
+    print(f"   Bilanço sonrası güncelle  : {stats['post_earnings']}")
+
+    # --- FUNDAMENTAL TARAMA ---
+    print("\n=== FUNDAMENTAL TARAMA BAŞLIYOR ===")
+    df_fund = get_finviz_fundamental()
+
+    if not df_fund.empty:
+        tickers_fund = df_fund["Ticker"].tolist()
+        print(f"MA200 slope kontrolü: {len(tickers_fund)} hisse...")
+        slopes_fund = check_ma200_slope(tickers_fund)
+        saved_fund = 0
+        
+        for _, row in df_fund.iterrows():
+            ticker = row["Ticker"]
+            slope  = slopes_fund.get(ticker, None)
+            passed = 1 if slope is not None and slope > 0 else 0
+
+            if passed == 0:
+                continue  # MA200 slope geçemeyenleri kaydetme
+
+            try:
+                c.execute("""
+                    INSERT OR REPLACE INTO minervini_fundamental_scans
+                    (scan_date, ticker, company, sector, industry,
+                     price, change_pct, volume, market_cap, pe, ma200_slope)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?)
+                """, (
+                    scan_date,
+                    ticker,
+                    row.get("Company", ""),
+                    row.get("Sector", ""),
+                    row.get("Industry", ""),
+                    row.get("Price", 0),
+                    row.get("Change", ""),
+                    row.get("Volume", 0),
+                    row.get("Market Cap", 0),
+                    row.get("P/E", 0),
+                    slope,
+                ))
+                saved_fund += 1
+            except Exception as e:
+                print(f"  Kayıt hatası {ticker}: {e}")
+        
+        conn.commit()
+        passed_fund = sum(1 for s in slopes_fund.values() if s is not None and s > 0)
+        print(f"\n[OK] FUNDAMENTAL TARAMA TAMAMLANDI!")
+        print(f"   Finviz filtresi geçen : {len(tickers_fund)}")
+        print(f"   MA200 slope geçen     : {passed_fund}")
+        print(f"   Toplam kayıt          : {saved_fund}")
+
+    # --- SADECE TEMEL TARAMA ---
+    print("\n=== SADECE TEMEL TARAMA BAŞLIYOR ===")
+    df_fund_only = get_finviz_fundamental_only()
+
+    if not df_fund_only.empty:
+        saved_fund_only = 0
+        
+        for _, row in df_fund_only.iterrows():
+            try:
+                c.execute("""
+                    INSERT OR REPLACE INTO minervini_fundamental_only
+                    (scan_date, ticker, company, sector, industry,
+                     price, change_pct, volume, market_cap, pe)
+                    VALUES (?,?,?,?,?,?,?,?,?,?)
+                """, (
+                    scan_date,
+                    row["Ticker"],
+                    row.get("Company", ""),
+                    row.get("Sector", ""),
+                    row.get("Industry", ""),
+                    row.get("Price", 0),
+                    row.get("Change", ""),
+                    row.get("Volume", 0),
+                    row.get("Market Cap", 0),
+                    row.get("P/E", 0),
+                ))
+                saved_fund_only += 1
+            except Exception as e:
+                print(f"  Kayıt hatası {row['Ticker']}: {e}")
+        
+        conn.commit()
+        print(f"\n[OK] TEMEL TARAMA TAMAMLANDI!")
+        print(f"   Temel filtresi geçen : {len(df_fund_only)}")
+        print(f"   Toplam kayıt         : {saved_fund_only}")
+
     conn.close()
-    return saved
 
 if __name__ == "__main__":
     run_scan()
