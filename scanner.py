@@ -60,6 +60,10 @@ def init_db():
         "ALTER TABLE minervini_scans ADD COLUMN earnings_date TEXT",
         "ALTER TABLE minervini_scans ADD COLUMN eps_last_updated TEXT",
         "ALTER TABLE minervini_scans ADD COLUMN sales_last_updated TEXT",
+        "ALTER TABLE minervini_scans ADD COLUMN high52 REAL",
+        "ALTER TABLE minervini_52w_high ADD COLUMN high52 REAL",
+        "ALTER TABLE minervini_fundamental_only ADD COLUMN high52 REAL",
+        "ALTER TABLE minervini_fundamental_scans ADD COLUMN high52 REAL",
     ]:
         try:
             c.execute(col_sql)
@@ -230,35 +234,211 @@ def get_finviz_52w_high():
     print(f"52W Yüksek filtresi geçti: {len(df)} hisse")
     return df
 
+# --- TEKNİK SİNYAL TESPİTİ ---
+def detect_signals(ohlcv_df):
+    """Son günün OHLCV'sinden teknik sinyal tespiti. En az 55 satır gerekli."""
+    if len(ohlcv_df) < 55:
+        return [], []
+
+    confirmations = []
+    violations    = []
+
+    today     = ohlcv_df.iloc[-1]
+    yesterday = ohlcv_df.iloc[-2]
+
+    vol_sma50   = ohlcv_df["Volume"].iloc[-51:-1].mean()
+    close_sma10 = ohlcv_df["Close"].iloc[-11:-1].mean()
+
+    # CONFIRMATIONS
+    if today["High"] < yesterday["High"] and today["Low"] > yesterday["Low"]:
+        confirmations.append("Inside Day")
+
+    if today["High"] >= ohlcv_df["High"].iloc[-5:].max() and \
+       today["High"] > ohlcv_df["High"].iloc[-5:-1].max():
+        confirmations.append("Higher High")
+
+    if vol_sma50 > 0 and today["Volume"] > vol_sma50 * 1.5 and today["Close"] > today["Open"]:
+        confirmations.append("Volume Surge")
+
+    if today["Close"] > today["Open"] and vol_sma50 > 0 and today["Volume"] > vol_sma50:
+        confirmations.append("Up on Volume")
+
+    last_10   = ohlcv_df.iloc[-11:-1]
+    down_days = last_10[last_10["Close"] < last_10["Open"]]
+    if today["Close"] > today["Open"] and \
+       (down_days.empty or today["Volume"] > down_days["Volume"].max()):
+        confirmations.append("Pocket Pivot")
+
+    # VIOLATIONS
+    pct = ohlcv_df["Close"].pct_change().iloc[-30:]
+    today_pct = pct.iloc[-1]
+    if today_pct < 0 and today_pct <= pct.min():
+        violations.append("Largest Down")
+
+    if today["Close"] < today["Open"] and vol_sma50 > 0 and today["Volume"] > vol_sma50 * 1.2:
+        violations.append("Down on Volume")
+
+    if today["Open"] < yesterday["Close"] * 0.99:
+        violations.append("Gap Down")
+
+    if today["Close"] < close_sma10:
+        violations.append("Below 10-MA")
+
+    if today["Low"] <= ohlcv_df["Low"].iloc[-5:].min():
+        violations.append("Lower Low")
+
+    return confirmations, violations
+
+# --- RS RATING HESAPLAMA ---
+def calculate_rs_ratings(closes, spy_close):
+    """
+    closes    : {ticker: pd.Series close}
+    spy_close : pd.Series SPY close (veya None)
+    Döndürür  : {ticker: {rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mansfield}}
+    """
+    raw = {}
+
+    for ticker, close in closes.items():
+        close = close.dropna()
+        n = len(close)
+        if n < 20:
+            continue
+
+        p3  = float(close.iloc[-1] / close.iloc[-63]  - 1) if n >= 63  else None
+        p6  = float(close.iloc[-1] / close.iloc[-126] - 1) if n >= 126 else None
+        p9  = float(close.iloc[-1] / close.iloc[-189] - 1) if n >= 189 else None
+        p12 = float(close.iloc[-1] / close.iloc[-252] - 1) if n >= 252 else None
+
+        ibd_raw = (0.4 * p3 + 0.2 * p6 + 0.2 * p9 + 0.2 * p12
+                   if all(x is not None for x in [p3, p6, p9, p12]) else None)
+
+        rs_20d_raw = rs_50d_raw = rs_200d_raw = mansfield = None
+        if spy_close is not None:
+            spy    = spy_close.dropna()
+            common = close.index.intersection(spy.index)
+            tc     = close.loc[common]
+            sc     = spy.loc[common]
+            nc     = len(common)
+
+            def rel(n_):
+                if nc >= n_:
+                    return float(tc.iloc[-1] / tc.iloc[-n_] - 1) - float(sc.iloc[-1] / sc.iloc[-n_] - 1)
+                return None
+
+            rs_20d_raw  = rel(20)
+            rs_50d_raw  = rel(50)
+            rs_200d_raw = rel(200)
+
+            try:
+                ratio = (tc / sc).dropna()
+                if len(ratio) >= 252:
+                    sma = ratio.rolling(252).mean()
+                    mansfield = round(float(ratio.iloc[-1] / sma.iloc[-1]) - 1, 4)
+            except Exception:
+                pass
+
+        raw[ticker] = {
+            "ibd_raw":     ibd_raw,
+            "p12":         p12,
+            "rs_20d_raw":  rs_20d_raw,
+            "rs_50d_raw":  rs_50d_raw,
+            "rs_200d_raw": rs_200d_raw,
+            "mansfield":   mansfield,
+        }
+
+    print(f"  [RS] closes count: {len(closes)}")
+    print(f"  [RS] spy_close available: {spy_close is not None}")
+    print(f"  [RS] sample raw values: {list(raw.items())[:3]}")
+
+    def rank_1_99(field):
+        pairs = [(t, v[field]) for t, v in raw.items() if v.get(field) is not None]
+        if not pairs:
+            return {}
+        pairs.sort(key=lambda x: x[1])
+        n = len(pairs)
+        return {t: max(1, min(99, round((i + 1) / n * 99))) for i, (t, _) in enumerate(pairs)}
+
+    ibd_r  = rank_1_99("ibd_raw")
+    p12_r  = rank_1_99("p12")
+    r20_r  = rank_1_99("rs_20d_raw")
+    r50_r  = rank_1_99("rs_50d_raw")
+    r200_r = rank_1_99("rs_200d_raw")
+
+    result = {}
+    for ticker in closes:
+        result[ticker] = {
+            "rs_ibd":       ibd_r.get(ticker),
+            "rs_12m":       p12_r.get(ticker),
+            "rs_20d":       r20_r.get(ticker),
+            "rs_50d":       r50_r.get(ticker),
+            "rs_200d":      r200_r.get(ticker),
+            "rs_mansfield": raw.get(ticker, {}).get("mansfield"),
+        }
+    return result
+
 # --- MA200 SLOPE KONTROLÜ (Kural 3) ---
 def check_ma200_slope(tickers):
     """
-    Tek kalan kural: MA200 en az 1 aydır yükselişte.
-    Sadece geçen hisseler için yfinance'a bakıyoruz.
+    MA200 slope, high52, sinyaller ve RS rating hesabı.
+    SPY her zaman download'a eklenir (RS için referans).
     """
     results = {}
+    closes  = {}
     print(f"MA200 slope kontrolü: {len(tickers)} hisse...")
-    
-    # Toplu indirme - çok daha hızlı!
+
+    _null_rs = {"rs_ibd": None, "rs_12m": None, "rs_20d": None,
+                "rs_50d": None, "rs_200d": None, "rs_mansfield": None}
+
+    tickers_dl = list(set(list(tickers) + ["SPY"]))
+
     try:
-        data = yf.download(tickers, period="1y", progress=False, auto_adjust=True, group_by="ticker")
-        
+        # 420 takvim günü ≈ 300 işlem günü → p12 (252 gün) için yeterli tampon
+        start_str = str(date.today() - timedelta(days=420))
+        data = yf.download(tickers_dl, start=start_str, progress=False, auto_adjust=True, group_by="ticker")
+
         for ticker in tickers:
             try:
-                if len(tickers) == 1:
-                    close = data["Close"].squeeze()
-                else:
-                    close = data[ticker]["Close"].squeeze()
-                
+                close  = data[ticker]["Close"].squeeze()
+                high   = data[ticker]["High"].squeeze()
+                open_  = data[ticker]["Open"].squeeze()
+                low    = data[ticker]["Low"].squeeze()
+                volume = data[ticker]["Volume"].squeeze()
+
+                closes[ticker] = close
+
                 ma200_today = float(close.rolling(200).mean().iloc[-1])
                 ma200_1m    = float(close.rolling(200).mean().iloc[-21])
                 slope       = round(ma200_today - ma200_1m, 4)
-                results[ticker] = slope
+                high52      = round(float(high.max()), 4)
+                ohlcv = pd.DataFrame({
+                    "Open": open_, "High": high, "Low": low,
+                    "Close": close, "Volume": volume,
+                }).dropna()
+                confs, viols = detect_signals(ohlcv)
+                results[ticker] = {
+                    "slope":         slope,
+                    "high52":        high52,
+                    "confirmations": ",".join(confs),
+                    "violations":    ",".join(viols),
+                }
             except:
-                results[ticker] = None
+                results[ticker] = {"slope": None, "high52": None,
+                                   "confirmations": "", "violations": "", **_null_rs}
+
+        try:
+            spy_close = data["SPY"]["Close"].squeeze().dropna()
+        except Exception:
+            spy_close = None
+
+        rs_ratings = calculate_rs_ratings(closes, spy_close)
+
+        for ticker, info in results.items():
+            if info.get("slope") is not None:
+                info.update(rs_ratings.get(ticker, _null_rs))
+
     except Exception as e:
         print(f"Toplu indirme hatası: {e}")
-    
+
     return results
 
 # --- VERİTABANINA KAYDET ---
@@ -268,49 +448,63 @@ def save_results(df_finviz, slopes, scan_date):
     saved = 0
     
     for _, row in df_finviz.iterrows():
-        ticker = row["Ticker"]
-        slope  = slopes.get(ticker, None)
-        
+        ticker     = row["Ticker"]
+        slope_info = slopes.get(ticker) or {}
+        slope      = slope_info.get("slope")
+        high52     = slope_info.get("high52")
+        confs      = slope_info.get("confirmations", "")
+        viols      = slope_info.get("violations", "")
+        rs_ibd     = slope_info.get("rs_ibd")
+        rs_12m     = slope_info.get("rs_12m")
+        rs_20d     = slope_info.get("rs_20d")
+        rs_50d     = slope_info.get("rs_50d")
+        rs_200d    = slope_info.get("rs_200d")
+        rs_mf      = slope_info.get("rs_mansfield")
+
         # Kural 3: MA200 yükselişte (slope > 0)
         passed = 1 if slope is not None and slope > 0 else 0
-        
+
         try:
             c.execute("""
                 INSERT INTO minervini_scans
                 (scan_date, ticker, company, sector, industry,
                  price, change_pct, volume, market_cap, pe,
-                 ma200_slope, passed)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                 ma200_slope, passed, high52, confirmations, violations,
+                 rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mansfield)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 ON CONFLICT(scan_date, ticker) DO UPDATE SET
-                    company     = excluded.company,
-                    sector      = excluded.sector,
-                    industry    = excluded.industry,
-                    price       = excluded.price,
-                    change_pct  = excluded.change_pct,
-                    volume      = excluded.volume,
-                    market_cap  = excluded.market_cap,
-                    pe          = excluded.pe,
-                    ma200_slope = excluded.ma200_slope,
-                    passed      = excluded.passed
+                    company       = excluded.company,
+                    sector        = excluded.sector,
+                    industry      = excluded.industry,
+                    price         = excluded.price,
+                    change_pct    = excluded.change_pct,
+                    volume        = excluded.volume,
+                    market_cap    = excluded.market_cap,
+                    pe            = excluded.pe,
+                    ma200_slope   = excluded.ma200_slope,
+                    passed        = excluded.passed,
+                    high52        = excluded.high52,
+                    confirmations = excluded.confirmations,
+                    violations    = excluded.violations,
+                    rs_ibd        = excluded.rs_ibd,
+                    rs_12m        = excluded.rs_12m,
+                    rs_20d        = excluded.rs_20d,
+                    rs_50d        = excluded.rs_50d,
+                    rs_200d       = excluded.rs_200d,
+                    rs_mansfield  = excluded.rs_mansfield
             """, (
-                scan_date,
-                ticker,
-                row.get("Company", ""),
-                row.get("Sector", ""),
-                row.get("Industry", ""),
-                row.get("Price", 0),
-                row.get("Change", ""),
-                row.get("Volume", 0),
-                row.get("Market Cap", 0),
-                row.get("P/E", 0),
-                slope,
-                passed
+                scan_date, ticker,
+                row.get("Company", ""), row.get("Sector", ""), row.get("Industry", ""),
+                row.get("Price", 0), row.get("Change", ""), row.get("Volume", 0),
+                row.get("Market Cap", 0), row.get("P/E", 0),
+                slope, passed, high52, confs, viols,
+                rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mf,
             ))
             saved += 1
         except Exception as e:
             print(f"  Kayıt hatası {ticker}: {e}")
             break  # ilk hatada dur
-    
+
     conn.commit()
     conn.close()
     return saved
@@ -463,6 +657,42 @@ def run_scan():
         "ALTER TABLE minervini_scans ADD COLUMN earnings_date TEXT",
         "ALTER TABLE minervini_scans ADD COLUMN eps_last_updated TEXT",
         "ALTER TABLE minervini_scans ADD COLUMN sales_last_updated TEXT",
+        "ALTER TABLE minervini_scans ADD COLUMN high52 REAL",
+        "ALTER TABLE minervini_52w_high ADD COLUMN high52 REAL",
+        "ALTER TABLE minervini_fundamental_only ADD COLUMN high52 REAL",
+        "ALTER TABLE minervini_fundamental_scans ADD COLUMN high52 REAL",
+        "ALTER TABLE minervini_scans ADD COLUMN confirmations TEXT",
+        "ALTER TABLE minervini_scans ADD COLUMN violations TEXT",
+        "ALTER TABLE minervini_52w_high ADD COLUMN confirmations TEXT",
+        "ALTER TABLE minervini_52w_high ADD COLUMN violations TEXT",
+        "ALTER TABLE minervini_fundamental_only ADD COLUMN confirmations TEXT",
+        "ALTER TABLE minervini_fundamental_only ADD COLUMN violations TEXT",
+        "ALTER TABLE minervini_fundamental_scans ADD COLUMN confirmations TEXT",
+        "ALTER TABLE minervini_fundamental_scans ADD COLUMN violations TEXT",
+        "ALTER TABLE minervini_scans ADD COLUMN rs_ibd REAL",
+        "ALTER TABLE minervini_scans ADD COLUMN rs_12m REAL",
+        "ALTER TABLE minervini_scans ADD COLUMN rs_20d REAL",
+        "ALTER TABLE minervini_scans ADD COLUMN rs_50d REAL",
+        "ALTER TABLE minervini_scans ADD COLUMN rs_200d REAL",
+        "ALTER TABLE minervini_scans ADD COLUMN rs_mansfield REAL",
+        "ALTER TABLE minervini_52w_high ADD COLUMN rs_ibd REAL",
+        "ALTER TABLE minervini_52w_high ADD COLUMN rs_12m REAL",
+        "ALTER TABLE minervini_52w_high ADD COLUMN rs_20d REAL",
+        "ALTER TABLE minervini_52w_high ADD COLUMN rs_50d REAL",
+        "ALTER TABLE minervini_52w_high ADD COLUMN rs_200d REAL",
+        "ALTER TABLE minervini_52w_high ADD COLUMN rs_mansfield REAL",
+        "ALTER TABLE minervini_fundamental_only ADD COLUMN rs_ibd REAL",
+        "ALTER TABLE minervini_fundamental_only ADD COLUMN rs_12m REAL",
+        "ALTER TABLE minervini_fundamental_only ADD COLUMN rs_20d REAL",
+        "ALTER TABLE minervini_fundamental_only ADD COLUMN rs_50d REAL",
+        "ALTER TABLE minervini_fundamental_only ADD COLUMN rs_200d REAL",
+        "ALTER TABLE minervini_fundamental_only ADD COLUMN rs_mansfield REAL",
+        "ALTER TABLE minervini_fundamental_scans ADD COLUMN rs_ibd REAL",
+        "ALTER TABLE minervini_fundamental_scans ADD COLUMN rs_12m REAL",
+        "ALTER TABLE minervini_fundamental_scans ADD COLUMN rs_20d REAL",
+        "ALTER TABLE minervini_fundamental_scans ADD COLUMN rs_50d REAL",
+        "ALTER TABLE minervini_fundamental_scans ADD COLUMN rs_200d REAL",
+        "ALTER TABLE minervini_fundamental_scans ADD COLUMN rs_mansfield REAL",
     ]:
         try:
             c.execute(col_sql)
@@ -483,6 +713,7 @@ def run_scan():
             market_cap  REAL,
             pe          REAL,
             ma200_slope REAL,
+            high52      REAL,
             UNIQUE(scan_date, ticker)
         )
     """)
@@ -559,52 +790,66 @@ def run_scan():
     saved = 0
     
     for _, row in df.iterrows():
-        ticker = row["Ticker"]
-        slope  = slopes.get(ticker, None)
-        
+        ticker     = row["Ticker"]
+        slope_info = slopes.get(ticker) or {}
+        slope      = slope_info.get("slope")
+        high52     = slope_info.get("high52")
+        confs      = slope_info.get("confirmations", "")
+        viols      = slope_info.get("violations", "")
+        rs_ibd     = slope_info.get("rs_ibd")
+        rs_12m     = slope_info.get("rs_12m")
+        rs_20d     = slope_info.get("rs_20d")
+        rs_50d     = slope_info.get("rs_50d")
+        rs_200d    = slope_info.get("rs_200d")
+        rs_mf      = slope_info.get("rs_mansfield")
+
         # Kural 3: MA200 yükselişte (slope > 0)
         passed = 1 if slope is not None and slope > 0 else 0
-        
+
         try:
             c.execute("""
                 INSERT INTO minervini_scans
                 (scan_date, ticker, company, sector, industry,
                  price, change_pct, volume, market_cap, pe,
-                 ma200_slope, passed)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                 ma200_slope, passed, high52, confirmations, violations,
+                 rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mansfield)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 ON CONFLICT(scan_date, ticker) DO UPDATE SET
-                    company     = excluded.company,
-                    sector      = excluded.sector,
-                    industry    = excluded.industry,
-                    price       = excluded.price,
-                    change_pct  = excluded.change_pct,
-                    volume      = excluded.volume,
-                    market_cap  = excluded.market_cap,
-                    pe          = excluded.pe,
-                    ma200_slope = excluded.ma200_slope,
-                    passed      = excluded.passed
+                    company       = excluded.company,
+                    sector        = excluded.sector,
+                    industry      = excluded.industry,
+                    price         = excluded.price,
+                    change_pct    = excluded.change_pct,
+                    volume        = excluded.volume,
+                    market_cap    = excluded.market_cap,
+                    pe            = excluded.pe,
+                    ma200_slope   = excluded.ma200_slope,
+                    passed        = excluded.passed,
+                    high52        = excluded.high52,
+                    confirmations = excluded.confirmations,
+                    violations    = excluded.violations,
+                    rs_ibd        = excluded.rs_ibd,
+                    rs_12m        = excluded.rs_12m,
+                    rs_20d        = excluded.rs_20d,
+                    rs_50d        = excluded.rs_50d,
+                    rs_200d       = excluded.rs_200d,
+                    rs_mansfield  = excluded.rs_mansfield
             """, (
-                scan_date,
-                ticker,
-                row.get("Company", ""),
-                row.get("Sector", ""),
-                row.get("Industry", ""),
-                row.get("Price", 0),
-                row.get("Change", ""),
-                row.get("Volume", 0),
-                row.get("Market Cap", 0),
-                row.get("P/E", 0),
-                slope,
-                passed
+                scan_date, ticker,
+                row.get("Company", ""), row.get("Sector", ""), row.get("Industry", ""),
+                row.get("Price", 0), row.get("Change", ""), row.get("Volume", 0),
+                row.get("Market Cap", 0), row.get("P/E", 0),
+                slope, passed, high52, confs, viols,
+                rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mf,
             ))
             saved += 1
         except Exception as e:
             print(f"  Kayıt hatası {ticker}: {e}")
             break  # ilk hatada dur
-    
+
     conn.commit()
 
-    passed = sum(1 for s in slopes.values() if s is not None and s > 0)
+    passed = sum(1 for s in slopes.values() if s and s.get("slope") is not None and s.get("slope") > 0)
     
     print(f"\n[OK] TARAMA TAMAMLANDI!")
     print(f"   Finviz filtresi geçen : {len(tickers)}")
@@ -728,9 +973,10 @@ def run_scan():
         saved_fund = 0
         
         for _, row in df_fund.iterrows():
-            ticker = row["Ticker"]
-            slope  = slopes_fund.get(ticker, None)
-            passed = 1 if slope is not None and slope > 0 else 0
+            ticker     = row["Ticker"]
+            slope_info = slopes_fund.get(ticker) or {}
+            slope      = slope_info.get("slope")
+            passed     = 1 if slope is not None and slope > 0 else 0
 
             if passed == 0:
                 continue  # MA200 slope geçemeyenleri kaydetme
@@ -739,27 +985,27 @@ def run_scan():
                 c.execute("""
                     INSERT OR REPLACE INTO minervini_fundamental_scans
                     (scan_date, ticker, company, sector, industry,
-                     price, change_pct, volume, market_cap, pe, ma200_slope)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?)
+                     price, change_pct, volume, market_cap, pe, ma200_slope, high52,
+                     confirmations, violations,
+                     rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mansfield)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """, (
-                    scan_date,
-                    ticker,
-                    row.get("Company", ""),
-                    row.get("Sector", ""),
-                    row.get("Industry", ""),
-                    row.get("Price", 0),
-                    row.get("Change", ""),
-                    row.get("Volume", 0),
-                    row.get("Market Cap", 0),
-                    row.get("P/E", 0),
-                    slope,
+                    scan_date, ticker,
+                    row.get("Company", ""), row.get("Sector", ""), row.get("Industry", ""),
+                    row.get("Price", 0), row.get("Change", ""), row.get("Volume", 0),
+                    row.get("Market Cap", 0), row.get("P/E", 0),
+                    slope, slope_info.get("high52"),
+                    slope_info.get("confirmations", ""), slope_info.get("violations", ""),
+                    slope_info.get("rs_ibd"), slope_info.get("rs_12m"),
+                    slope_info.get("rs_20d"), slope_info.get("rs_50d"),
+                    slope_info.get("rs_200d"), slope_info.get("rs_mansfield"),
                 ))
                 saved_fund += 1
             except Exception as e:
                 print(f"  Kayıt hatası {ticker}: {e}")
         
         conn.commit()
-        passed_fund = sum(1 for s in slopes_fund.values() if s is not None and s > 0)
+        passed_fund = sum(1 for s in slopes_fund.values() if s and s.get("slope") is not None and s["slope"] > 0)
         print(f"\n[OK] FUNDAMENTAL TARAMA TAMAMLANDI!")
         print(f"   Finviz filtresi geçen : {len(tickers_fund)}")
         print(f"   MA200 slope geçen     : {passed_fund}")
@@ -775,12 +1021,17 @@ def run_scan():
         # minervini_scans'da zaten olan tickerların verilerini al (tekrar çekme)
         placeholders = ','.join('?' * len(tickers_fo))
         c.execute(f"""
-            SELECT ticker, ma200_slope, eps_qoq, sales_qoq, grade
+            SELECT ticker, ma200_slope, high52, eps_qoq, sales_qoq, grade,
+                   confirmations, violations,
+                   rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mansfield
             FROM minervini_scans
             WHERE scan_date = ? AND ticker IN ({placeholders})
         """, [scan_date] + tickers_fo)
         cached = {
-            row[0]: {"slope": row[1], "eps_qoq": row[2], "sales_qoq": row[3], "grade": row[4]}
+            row[0]: {"slope": row[1], "high52": row[2], "eps_qoq": row[3], "sales_qoq": row[4],
+                     "grade": row[5], "confirmations": row[6] or "", "violations": row[7] or "",
+                     "rs_ibd": row[8], "rs_12m": row[9], "rs_20d": row[10],
+                     "rs_50d": row[11], "rs_200d": row[12], "rs_mansfield": row[13]}
             for row in c.fetchall()
         }
 
@@ -849,39 +1100,52 @@ def run_scan():
         for _, row in df_fund_only.iterrows():
             ticker = row["Ticker"]
             if ticker in cached:
-                slope    = cached[ticker]["slope"]
-                eps_qoq  = cached[ticker]["eps_qoq"]
+                slope     = cached[ticker]["slope"]
+                high52    = cached[ticker].get("high52")
+                eps_qoq   = cached[ticker]["eps_qoq"]
                 sales_qoq = cached[ticker]["sales_qoq"]
-                grade    = cached[ticker]["grade"]
+                grade     = cached[ticker]["grade"]
+                confs     = cached[ticker].get("confirmations", "")
+                viols     = cached[ticker].get("violations", "")
+                rs_ibd    = cached[ticker].get("rs_ibd")
+                rs_12m    = cached[ticker].get("rs_12m")
+                rs_20d    = cached[ticker].get("rs_20d")
+                rs_50d    = cached[ticker].get("rs_50d")
+                rs_200d   = cached[ticker].get("rs_200d")
+                rs_mf     = cached[ticker].get("rs_mansfield")
             else:
-                slope    = fresh_slopes.get(ticker)
-                eps_data = fresh_eps.get(ticker, {})
-                eps_qoq  = eps_data.get("eps_qoq")
-                sales_qoq = eps_data.get("sales_qoq")
-                grade    = eps_data.get("grade", "D")
+                fresh_info = fresh_slopes.get(ticker) or {}
+                slope      = fresh_info.get("slope")
+                high52     = fresh_info.get("high52")
+                confs      = fresh_info.get("confirmations", "")
+                viols      = fresh_info.get("violations", "")
+                rs_ibd     = fresh_info.get("rs_ibd")
+                rs_12m     = fresh_info.get("rs_12m")
+                rs_20d     = fresh_info.get("rs_20d")
+                rs_50d     = fresh_info.get("rs_50d")
+                rs_200d    = fresh_info.get("rs_200d")
+                rs_mf      = fresh_info.get("rs_mansfield")
+                eps_data   = fresh_eps.get(ticker, {})
+                eps_qoq    = eps_data.get("eps_qoq")
+                sales_qoq  = eps_data.get("sales_qoq")
+                grade      = eps_data.get("grade", "D")
 
             try:
                 c.execute("""
                     INSERT OR REPLACE INTO minervini_fundamental_only
                     (scan_date, ticker, company, sector, industry,
                      price, change_pct, volume, market_cap, pe,
-                     ma200_slope, eps_qoq, sales_qoq, grade)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                     ma200_slope, eps_qoq, sales_qoq, grade, high52,
+                     confirmations, violations,
+                     rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mansfield)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """, (
-                    scan_date,
-                    ticker,
-                    row.get("Company", ""),
-                    row.get("Sector", ""),
-                    row.get("Industry", ""),
-                    row.get("Price", 0),
-                    row.get("Change", ""),
-                    row.get("Volume", 0),
-                    row.get("Market Cap", 0),
-                    row.get("P/E", 0),
-                    slope,
-                    eps_qoq,
-                    sales_qoq,
-                    grade,
+                    scan_date, ticker,
+                    row.get("Company", ""), row.get("Sector", ""), row.get("Industry", ""),
+                    row.get("Price", 0), row.get("Change", ""), row.get("Volume", 0),
+                    row.get("Market Cap", 0), row.get("P/E", 0),
+                    slope, eps_qoq, sales_qoq, grade, high52, confs, viols,
+                    rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mf,
                 ))
                 saved_fund_only += 1
             except Exception as e:
@@ -904,12 +1168,17 @@ def run_scan():
         # minervini_scans'da zaten olan tickerların verilerini al (tekrar çekme)
         placeholders = ','.join('?' * len(tickers_52w))
         c.execute(f"""
-            SELECT ticker, ma200_slope, eps_qoq, sales_qoq, grade
+            SELECT ticker, ma200_slope, high52, eps_qoq, sales_qoq, grade,
+                   confirmations, violations,
+                   rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mansfield
             FROM minervini_scans
             WHERE scan_date = ? AND ticker IN ({placeholders})
         """, [scan_date] + tickers_52w)
         cached_52w = {
-            row[0]: {"slope": row[1], "eps_qoq": row[2], "sales_qoq": row[3], "grade": row[4]}
+            row[0]: {"slope": row[1], "high52": row[2], "eps_qoq": row[3], "sales_qoq": row[4],
+                     "grade": row[5], "confirmations": row[6] or "", "violations": row[7] or "",
+                     "rs_ibd": row[8], "rs_12m": row[9], "rs_20d": row[10],
+                     "rs_50d": row[11], "rs_200d": row[12], "rs_mansfield": row[13]}
             for row in c.fetchall()
         }
 
@@ -979,11 +1248,30 @@ def run_scan():
             ticker = row["Ticker"]
             if ticker in cached_52w:
                 slope     = cached_52w[ticker]["slope"]
+                high52    = cached_52w[ticker].get("high52")
                 eps_qoq   = cached_52w[ticker]["eps_qoq"]
                 sales_qoq = cached_52w[ticker]["sales_qoq"]
                 grade     = cached_52w[ticker]["grade"]
+                confs     = cached_52w[ticker].get("confirmations", "")
+                viols     = cached_52w[ticker].get("violations", "")
+                rs_ibd    = cached_52w[ticker].get("rs_ibd")
+                rs_12m    = cached_52w[ticker].get("rs_12m")
+                rs_20d    = cached_52w[ticker].get("rs_20d")
+                rs_50d    = cached_52w[ticker].get("rs_50d")
+                rs_200d   = cached_52w[ticker].get("rs_200d")
+                rs_mf     = cached_52w[ticker].get("rs_mansfield")
             else:
-                slope     = fresh_slopes_52w.get(ticker)
+                fresh_info_52w = fresh_slopes_52w.get(ticker) or {}
+                slope     = fresh_info_52w.get("slope")
+                high52    = fresh_info_52w.get("high52")
+                confs     = fresh_info_52w.get("confirmations", "")
+                viols     = fresh_info_52w.get("violations", "")
+                rs_ibd    = fresh_info_52w.get("rs_ibd")
+                rs_12m    = fresh_info_52w.get("rs_12m")
+                rs_20d    = fresh_info_52w.get("rs_20d")
+                rs_50d    = fresh_info_52w.get("rs_50d")
+                rs_200d   = fresh_info_52w.get("rs_200d")
+                rs_mf     = fresh_info_52w.get("rs_mansfield")
                 eps_data  = fresh_eps_52w.get(ticker, {})
                 eps_qoq   = eps_data.get("eps_qoq")
                 sales_qoq = eps_data.get("sales_qoq")
@@ -994,22 +1282,17 @@ def run_scan():
                     INSERT OR REPLACE INTO minervini_52w_high
                     (scan_date, ticker, company, sector, industry,
                      price, change_pct, volume, market_cap,
-                     ma200_slope, eps_qoq, sales_qoq, grade)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+                     ma200_slope, eps_qoq, sales_qoq, grade, high52,
+                     confirmations, violations,
+                     rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mansfield)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """, (
-                    scan_date,
-                    ticker,
-                    row.get("Company", ""),
-                    row.get("Sector", ""),
-                    row.get("Industry", ""),
-                    row.get("Price", 0),
-                    row.get("Change", ""),
-                    row.get("Volume", 0),
+                    scan_date, ticker,
+                    row.get("Company", ""), row.get("Sector", ""), row.get("Industry", ""),
+                    row.get("Price", 0), row.get("Change", ""), row.get("Volume", 0),
                     row.get("Market Cap", 0),
-                    slope,
-                    eps_qoq,
-                    sales_qoq,
-                    grade,
+                    slope, eps_qoq, sales_qoq, grade, high52, confs, viols,
+                    rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mf,
                 ))
                 saved_52w += 1
             except Exception as e:
