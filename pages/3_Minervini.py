@@ -1,10 +1,17 @@
 import streamlit as st
 import pandas as pd
-import sqlite3
 import os
+import sys
 from datetime import date, datetime, timedelta
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from db_connection import get_connection, get_engine
+
 st.set_page_config(page_title="Minervini Trend Template", layout="wide")
+
+@st.cache_resource
+def _get_engine():
+    return get_engine()
 
 
 def parse_earnings_date(raw: str):
@@ -32,30 +39,23 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "..", "quanfina.db")
-
 @st.cache_data(ttl=300)
 def load_scan(scan_date):
-    conn = sqlite3.connect(DB_PATH)
     df = pd.read_sql_query(
-        "SELECT * FROM minervini_scans WHERE scan_date = ? ORDER BY ma200_slope DESC",
-        conn, params=(scan_date,)
+        "SELECT * FROM minervini_scans WHERE scan_date = %s ORDER BY ma200_slope DESC",
+        _get_engine(), params=(scan_date,)
     )
-    conn.close()
     return df
 
 def get_available_dates():
-    conn = sqlite3.connect(DB_PATH)
     dates = pd.read_sql_query(
         "SELECT DISTINCT scan_date FROM minervini_scans ORDER BY scan_date DESC",
-        conn
+        _get_engine()
     )
-    conn.close()
     return dates["scan_date"].tolist()
 
 @st.cache_data(ttl=300)
 def load_fundamental_scan(scan_date):
-    conn = sqlite3.connect(DB_PATH)
     df = pd.read_sql_query("""
         SELECT
             f.ticker, f.company, f.sector, f.industry,
@@ -70,66 +70,62 @@ def load_fundamental_scan(scan_date):
             COALESCE(f.rs_mansfield, s.rs_mansfield) AS rs_mansfield
         FROM minervini_fundamental_scans f
         LEFT JOIN minervini_scans s ON f.ticker = s.ticker AND f.scan_date = s.scan_date
-        WHERE f.scan_date = ?
-        ORDER BY COALESCE(f.rs_ibd, s.rs_ibd) DESC
-    """, conn, params=(scan_date,))
-    conn.close()
+        WHERE f.scan_date = %s
+        ORDER BY COALESCE(f.rs_ibd, s.rs_ibd) DESC NULLS LAST
+    """, _get_engine(), params=(scan_date,))
     return df
 
 @st.cache_data(ttl=300)
 def load_fundamental_only(scan_date):
-    conn = sqlite3.connect(DB_PATH)
     df = pd.read_sql_query("""
         SELECT f.*, s.earnings_date
         FROM minervini_fundamental_only f
         LEFT JOIN minervini_scans s ON f.ticker = s.ticker AND f.scan_date = s.scan_date
-        WHERE f.scan_date = ?
-        ORDER BY f.market_cap DESC
-    """, conn, params=(scan_date,))
-    conn.close()
+        WHERE f.scan_date = %s
+        ORDER BY f.market_cap DESC NULLS LAST
+    """, _get_engine(), params=(scan_date,))
     return df
 
 @st.cache_data(ttl=300)
 def load_52w_high(scan_date):
-    conn = sqlite3.connect(DB_PATH)
     df = pd.read_sql_query("""
         SELECT f.*, s.earnings_date
         FROM minervini_52w_high f
         LEFT JOIN minervini_scans s ON f.ticker = s.ticker AND f.scan_date = s.scan_date
-        WHERE f.scan_date = ?
-        ORDER BY f.ma200_slope DESC
-    """, conn, params=(scan_date,))
-    conn.close()
+        WHERE f.scan_date = %s
+        ORDER BY f.ma200_slope DESC NULLS LAST
+    """, _get_engine(), params=(scan_date,))
     return df
 
 def get_watchlist_tickers():
-    conn = sqlite3.connect(DB_PATH)
-    df = pd.read_sql_query("SELECT ticker FROM minervini_watchlist ORDER BY ticker", conn)
-    conn.close()
+    df = pd.read_sql_query("SELECT ticker FROM minervini_watchlist ORDER BY ticker", _get_engine())
     return df["ticker"].tolist()
 
 def add_tickers_to_watchlist(tickers):
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_connection()
+    c = conn.cursor()
     today = str(date.today())
     for ticker in tickers:
-        conn.execute(
-            "INSERT OR IGNORE INTO minervini_watchlist (ticker, added_date) VALUES (?, ?)",
+        c.execute(
+            "INSERT INTO minervini_watchlist (ticker, added_date) VALUES (%s, %s) ON CONFLICT DO NOTHING",
             (ticker, today),
         )
     conn.commit()
     conn.close()
 
 def save_watchlist(selected_tickers):
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_connection()
     c = conn.cursor()
     today = str(date.today())
     if selected_tickers:
-        placeholders = ','.join('?' * len(selected_tickers))
+        placeholders = ','.join(['%s'] * len(selected_tickers))
         c.execute(f"DELETE FROM minervini_watchlist WHERE ticker NOT IN ({placeholders})",
                   selected_tickers)
         for ticker in selected_tickers:
-            c.execute("INSERT OR IGNORE INTO minervini_watchlist (ticker, added_date) VALUES (?,?)",
-                      (ticker, today))
+            c.execute(
+                "INSERT INTO minervini_watchlist (ticker, added_date) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+                (ticker, today),
+            )
     else:
         c.execute("DELETE FROM minervini_watchlist")
     conn.commit()
@@ -137,7 +133,6 @@ def save_watchlist(selected_tickers):
 
 @st.cache_data(ttl=60)
 def load_watchlist_data(scan_date):
-    conn = sqlite3.connect(DB_PATH)
     df = pd.read_sql_query("""
         SELECT
             w.ticker,
@@ -164,23 +159,22 @@ def load_watchlist_data(scan_date):
             COALESCE(s.rs_mansfield,   h.rs_mansfield,   f.rs_mansfield)   AS rs_mansfield
         FROM minervini_watchlist w
         LEFT JOIN minervini_scans s
-            ON s.ticker = w.ticker AND s.scan_date = ?
+            ON s.ticker = w.ticker AND s.scan_date = %s
         LEFT JOIN minervini_52w_high h
-            ON h.ticker = w.ticker AND h.scan_date = ?
+            ON h.ticker = w.ticker AND h.scan_date = %s
         LEFT JOIN minervini_fundamental_only f
-            ON f.ticker = w.ticker AND f.scan_date = ?
+            ON f.ticker = w.ticker AND f.scan_date = %s
         ORDER BY w.ticker
-    """, conn, params=(scan_date, scan_date, scan_date))
-    conn.close()
+    """, _get_engine(), params=(scan_date, scan_date, scan_date))
     return df
 
 @st.cache_data(ttl=300)
 def load_grade_changes(scan_date):
     _GRADE_VALUE = {"D": 1, "C": 2, "B": 3, "A": 4}
-    conn = sqlite3.connect(DB_PATH)
+    engine = _get_engine()
     prev_row = pd.read_sql_query(
-        "SELECT DISTINCT scan_date FROM minervini_scans WHERE scan_date < ? ORDER BY scan_date DESC LIMIT 1",
-        conn, params=(scan_date,)
+        "SELECT DISTINCT scan_date FROM minervini_scans WHERE scan_date < %s ORDER BY scan_date DESC LIMIT 1",
+        engine, params=(scan_date,)
     )
     _EMPTY_COLS = [
         "ticker", "company", "sector", "industry", "price", "change_pct",
@@ -188,7 +182,6 @@ def load_grade_changes(scan_date):
         "grade", "confirmations", "violations", "grade_change", "jump_size",
     ]
     if prev_row.empty:
-        conn.close()
         return pd.DataFrame(columns=_EMPTY_COLS)
     prev_date = prev_row["scan_date"].iloc[0]
     df = pd.read_sql_query("""
@@ -200,12 +193,11 @@ def load_grade_changes(scan_date):
             curr.earnings_date, curr.confirmations, curr.violations
         FROM minervini_scans curr
         JOIN minervini_scans prev
-            ON curr.ticker = prev.ticker AND prev.scan_date = ?
-        WHERE curr.scan_date = ?
+            ON curr.ticker = prev.ticker AND prev.scan_date = %s
+        WHERE curr.scan_date = %s
           AND curr.grade IS NOT NULL
           AND prev.grade IS NOT NULL
-    """, conn, params=(prev_date, scan_date))
-    conn.close()
+    """, engine, params=(prev_date, scan_date))
     if df.empty:
         return pd.DataFrame(columns=_EMPTY_COLS)
     df["curr_value"]  = df["curr_grade"].map(_GRADE_VALUE)
@@ -218,14 +210,48 @@ def load_grade_changes(scan_date):
     df["grade"] = df["curr_grade"]
     return df.sort_values(["jump_size", "curr_value"], ascending=[False, False]).reset_index(drop=True)
 
+def _enrich(engine, tickers, scan_date):
+    if not tickers:
+        return pd.DataFrame()
+    ph = ",".join(["%s"] * len(tickers))
+    params = tuple([scan_date] + list(tickers))
+    return pd.read_sql_query(
+        f"SELECT * FROM minervini_scans WHERE scan_date=%s AND ticker IN ({ph}) ORDER BY rs_ibd DESC",
+        engine, params=params
+    )
+
+@st.cache_data(ttl=300)
+def load_changes(scan_date):
+    engine = _get_engine()
+    prev_row = pd.read_sql_query(
+        "SELECT DISTINCT scan_date FROM minervini_scans WHERE scan_date < %s ORDER BY scan_date DESC LIMIT 1",
+        engine, params=(scan_date,)
+    )
+    if prev_row.empty:
+        return None, None
+    prev_date = prev_row["scan_date"].iloc[0]
+    table_map = {
+        "super":     "minervini_fundamental_scans",
+        "52w":       "minervini_52w_high",
+        "trend":     "minervini_scans",
+        "fund_only": "minervini_fundamental_only",
+    }
+    changes = {}
+    for key, tbl in table_map.items():
+        curr_set = set(pd.read_sql_query(f"SELECT ticker FROM {tbl} WHERE scan_date=%s", engine, params=(scan_date,))["ticker"])
+        prev_set = set(pd.read_sql_query(f"SELECT ticker FROM {tbl} WHERE scan_date=%s", engine, params=(prev_date,))["ticker"])
+        changes[key] = {
+            "new":     _enrich(engine, curr_set - prev_set, scan_date),
+            "removed": _enrich(engine, prev_set - curr_set, prev_date),
+        }
+    return prev_date, changes
+
 @st.cache_data(ttl=300)
 def compute_sector_leaders(scan_date):
-    conn = sqlite3.connect(DB_PATH)
     raw = pd.read_sql_query(
-        "SELECT sector, grade FROM minervini_scans WHERE scan_date = ?",
-        conn, params=(scan_date,)
+        "SELECT sector, grade FROM minervini_scans WHERE scan_date = %s",
+        _get_engine(), params=(scan_date,)
     )
-    conn.close()
     if raw.empty:
         return pd.DataFrame(columns=["Sektör", "A", "B", "C", "D", "Toplam", "Skor"])
     grp = raw.groupby("sector")["grade"].value_counts().unstack(fill_value=0)
@@ -281,6 +307,10 @@ def apply_filters(data, sektor, grade_list, siralama, arama, table_type="super",
     cols = [c for c, _ in sort_keys if c in d.columns]
     ascs = [a for c, a in sort_keys if c in d.columns]
     if cols:
+        for col in cols:
+            if col in ("eps_qoq", "sales_qoq", "change_pct") and d[col].dtype == object:
+                d = d.copy()
+                d[col] = pd.to_numeric(d[col], errors="coerce")
         d = d.sort_values(cols, ascending=ascs, na_position="last")
     return d
 
@@ -303,6 +333,21 @@ df_52w       = load_52w_high(selected_date)
 wl_tickers   = get_watchlist_tickers()
 df_wl        = load_watchlist_data(selected_date)
 df_grade_up  = load_grade_changes(selected_date)
+prev_date, changes = load_changes(selected_date)
+
+if changes:
+    for _ch_dfs in changes.values():
+        for _df in (_ch_dfs["new"], _ch_dfs["removed"]):
+            if not _df.empty:
+                if "high52" in _df.columns:
+                    _df["pct_from_high"] = ((_df["price"] - _df["high52"]) / _df["high52"] * 100).where(_df["high52"] > 0)
+                if "earnings_date" in _df.columns:
+                    _df["days_to_earnings"] = _df["earnings_date"].apply(
+                        lambda x: (parse_earnings_date(x) - date.today()).days if parse_earnings_date(x) else None
+                    )
+                for _sig_col in ["confirmations", "violations"]:
+                    if _sig_col in _df.columns:
+                        _df[_sig_col] = _df[_sig_col].fillna("").str.replace(",", " · ")
 
 for _df in [df, df_fund, df_fund_only, df_52w, df_wl, df_grade_up]:
     if "high52" in _df.columns:
@@ -416,6 +461,8 @@ with st.expander("🏆 Sektör Liderleri", expanded=False):
             },
         )
 
+_total_new_ch = sum(len(v["new"]) for v in changes.values()) if changes else 0
+_total_rem_ch = sum(len(v["removed"]) for v in changes.values()) if changes else 0
 st.caption(
     f"📊 Filtreli sonuçlar: "
     f"Süper Performans **{len(df_fund_f)}/{len(df_fund)}** · "
@@ -423,7 +470,8 @@ st.caption(
     f"TPR Moving Up **{len(df_grade_up_f)}/{len(df_grade_up)}** · "
     f"Trend Template **{len(df_pass_f)}/{len(df[df['passed']==1])}** · "
     f"Sadece Temel **{len(df_fund_only_f)}/{len(df_fund_only)}** · "
-    f"Watch List **{len(df_wl_f)}/{len(df_wl)}**"
+    f"Watch List **{len(df_wl_f)}/{len(df_wl)}** · "
+    f"Değişimler: **+{_total_new_ch} / -{_total_rem_ch}**"
 )
 
 def add_link_columns(df):
@@ -475,29 +523,38 @@ def add_rs_styling(styled, cols):
 def table_height(df):
     return min(len(df) * 35 + 50, 800)
 
-def add_to_watchlist_button(df_filtered, key):
+def add_to_watchlist_button(df_filtered, key, show_add_button=True):
     available = set(df_filtered.columns) | {"tv_url", "fv_url"}
     safe_cols = [c for c in show_cols if c in available]
     df_display = add_link_columns(df_filtered)[safe_cols].rename(columns=col_rename)
     styled = add_rs_styling(style_grade(df_display), list(df_display.columns))
-    event = st.dataframe(
-        styled,
-        hide_index=True,
-        use_container_width=True,
-        column_config=col_config,
-        height=table_height(df_filtered),
-        selection_mode="multi-row",
-        on_select="rerun",
-        key=key,
-    )
-    selected_rows = event.selection.rows
-    tickers = df_filtered.iloc[selected_rows]["ticker"].tolist() if selected_rows else []
-    label = f"⭐ Seçili hisseleri Watch List'e ekle ({len(tickers)})" if tickers else "⭐ Watch List'e ekle"
-    if st.button(label, key=f"{key}_btn", disabled=not tickers):
-        add_tickers_to_watchlist(tickers)
-        load_watchlist_data.clear()
-        st.success(f"{len(tickers)} hisse Watch List'e eklendi.")
-        st.rerun()
+    if show_add_button:
+        event = st.dataframe(
+            styled,
+            hide_index=True,
+            use_container_width=True,
+            column_config=col_config,
+            height=table_height(df_filtered),
+            selection_mode="multi-row",
+            on_select="rerun",
+            key=key,
+        )
+        selected_rows = event.selection.rows
+        tickers = df_filtered.iloc[selected_rows]["ticker"].tolist() if selected_rows else []
+        label = f"⭐ Seçili hisseleri Watch List'e ekle ({len(tickers)})" if tickers else "⭐ Watch List'e ekle"
+        if st.button(label, key=f"{key}_btn", disabled=not tickers):
+            add_tickers_to_watchlist(tickers)
+            load_watchlist_data.clear()
+            st.success(f"{len(tickers)} hisse Watch List'e eklendi.")
+            st.rerun()
+    else:
+        st.dataframe(
+            styled,
+            hide_index=True,
+            use_container_width=True,
+            column_config=col_config,
+            height=table_height(df_filtered),
+        )
 
 col_rename = {
     "ticker": "TICKER", "company": "ŞİRKET", "sector": "SEKTÖR",
@@ -544,10 +601,11 @@ show_cols = (
     + ["confirmations", "violations", "grade_change", "tv_url", "fv_url"]
 )
 
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+tab1, tab2, tab3, tab_ch, tab4, tab5, tab6 = st.tabs([
     "🌟 Süper Performans",
     "🚀 52 Hafta Yüksek",
     "📈 TPR Moving Up",
+    "🔄 Değişimler",
     "✅ Trend Template 8/8",
     "📊 Sadece Temel",
     "⭐ Watch List",
@@ -586,6 +644,82 @@ with tab3:
         g2.metric("+1 Grade", len(df_grade_up_f[df_grade_up_f["jump_size"] == 1]))
         g3.metric("+2 ve Üzeri", len(df_grade_up_f[df_grade_up_f["jump_size"] >= 2]))
         add_to_watchlist_button(df_grade_up_f, "tab3_grade_up")
+
+with tab_ch:
+    st.subheader("🔄 Tarih Karşılaştırma")
+    if prev_date is None or changes is None:
+        st.info("Karşılaştırma için önceki taramaya ihtiyaç var.")
+    else:
+        st.caption(f"Karşılaştırılan tarihler: **{prev_date}** → **{selected_date}**")
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Toplam Yeni Giren",     _total_new_ch)
+        m2.metric("Toplam Çıkan",           _total_rem_ch)
+        m3.metric("Yeni Süper Performans",  len(changes["super"]["new"]))
+        m4.metric("Çıkan Süper Performans", len(changes["super"]["removed"]))
+
+        ch_super_new_f = apply_filters(changes["super"]["new"],        secim_sektor, secim_grade, secim_siralama, secim_arama, table_type="super",     rs_min=secim_rs_min, rs_kolonu=secim_rs_col)
+        ch_super_rem_f = apply_filters(changes["super"]["removed"],     secim_sektor, secim_grade, secim_siralama, secim_arama, table_type="super",     rs_min=secim_rs_min, rs_kolonu=secim_rs_col)
+        ch_52w_new_f   = apply_filters(changes["52w"]["new"],           secim_sektor, secim_grade, secim_siralama, secim_arama, table_type="52w",       rs_min=secim_rs_min, rs_kolonu=secim_rs_col)
+        ch_52w_rem_f   = apply_filters(changes["52w"]["removed"],       secim_sektor, secim_grade, secim_siralama, secim_arama, table_type="52w",       rs_min=secim_rs_min, rs_kolonu=secim_rs_col)
+        ch_trend_new_f = apply_filters(changes["trend"]["new"],         secim_sektor, secim_grade, secim_siralama, secim_arama, table_type="trend",     rs_min=secim_rs_min, rs_kolonu=secim_rs_col)
+        ch_trend_rem_f = apply_filters(changes["trend"]["removed"],     secim_sektor, secim_grade, secim_siralama, secim_arama, table_type="trend",     rs_min=secim_rs_min, rs_kolonu=secim_rs_col)
+        ch_fund_new_f  = apply_filters(changes["fund_only"]["new"],     secim_sektor, secim_grade, secim_siralama, secim_arama, table_type="fund_only", rs_min=secim_rs_min, rs_kolonu=secim_rs_col)
+        ch_fund_rem_f  = apply_filters(changes["fund_only"]["removed"], secim_sektor, secim_grade, secim_siralama, secim_arama, table_type="fund_only", rs_min=secim_rs_min, rs_kolonu=secim_rs_col)
+
+        st_super, st_52w, st_trend, st_fund = st.tabs([
+            "🌟 Süper Değişim",
+            "🚀 52H Değişim",
+            "✅ Trend Değişim",
+            "📊 Temel Değişim",
+        ])
+
+        with st_super:
+            with st.expander(f"🆕 Yeni Girenler ({len(ch_super_new_f)})", expanded=True):
+                if ch_super_new_f.empty:
+                    st.info("Yeni giren yok.")
+                else:
+                    add_to_watchlist_button(ch_super_new_f, "ch_super_new")
+            with st.expander(f"🚪 Çıkanlar ({len(ch_super_rem_f)})", expanded=True):
+                if ch_super_rem_f.empty:
+                    st.info("Çıkan yok.")
+                else:
+                    add_to_watchlist_button(ch_super_rem_f, "ch_super_rem", show_add_button=False)
+
+        with st_52w:
+            with st.expander(f"🆕 Yeni Girenler ({len(ch_52w_new_f)})", expanded=True):
+                if ch_52w_new_f.empty:
+                    st.info("Yeni giren yok.")
+                else:
+                    add_to_watchlist_button(ch_52w_new_f, "ch_52w_new")
+            with st.expander(f"🚪 Çıkanlar ({len(ch_52w_rem_f)})", expanded=True):
+                if ch_52w_rem_f.empty:
+                    st.info("Çıkan yok.")
+                else:
+                    add_to_watchlist_button(ch_52w_rem_f, "ch_52w_rem", show_add_button=False)
+
+        with st_trend:
+            with st.expander(f"🆕 Yeni Girenler ({len(ch_trend_new_f)})", expanded=True):
+                if ch_trend_new_f.empty:
+                    st.info("Yeni giren yok.")
+                else:
+                    add_to_watchlist_button(ch_trend_new_f, "ch_trend_new")
+            with st.expander(f"🚪 Çıkanlar ({len(ch_trend_rem_f)})", expanded=True):
+                if ch_trend_rem_f.empty:
+                    st.info("Çıkan yok.")
+                else:
+                    add_to_watchlist_button(ch_trend_rem_f, "ch_trend_rem", show_add_button=False)
+
+        with st_fund:
+            with st.expander(f"🆕 Yeni Girenler ({len(ch_fund_new_f)})", expanded=True):
+                if ch_fund_new_f.empty:
+                    st.info("Yeni giren yok.")
+                else:
+                    add_to_watchlist_button(ch_fund_new_f, "ch_fund_new")
+            with st.expander(f"🚪 Çıkanlar ({len(ch_fund_rem_f)})", expanded=True):
+                if ch_fund_rem_f.empty:
+                    st.info("Çıkan yok.")
+                else:
+                    add_to_watchlist_button(ch_fund_rem_f, "ch_fund_rem", show_add_button=False)
 
 with tab4:
     st.subheader("✅ Trend Template 8/8 — TAM UYUM")

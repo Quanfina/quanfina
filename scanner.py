@@ -1,5 +1,5 @@
 import os
-import sqlite3
+import sys
 import time
 import requests
 import pandas as pd
@@ -9,9 +9,10 @@ from dotenv import load_dotenv
 from datetime import date, datetime, timedelta
 from bs4 import BeautifulSoup
 
+from db_connection import get_connection
+
 load_dotenv()
 FINVIZ_KEY = os.getenv("FINVIZ_API_KEY")
-DB_PATH = os.path.join(os.path.dirname(__file__), "quanfina.db")
 
 def parse_earnings_date(raw: str):
     """'Apr 30 AMC' gibi Finviz earnings stringini date nesnesine çevirir."""
@@ -33,74 +34,65 @@ def parse_earnings_date(raw: str):
 
 # --- VERİTABANI KURULUM ---
 def init_db():
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_connection()
     c = conn.cursor()
     c.execute("""
         CREATE TABLE IF NOT EXISTS minervini_scans (
-            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            id            SERIAL PRIMARY KEY,
             scan_date     TEXT NOT NULL,
             ticker        TEXT NOT NULL,
             company       TEXT,
             sector        TEXT,
             industry      TEXT,
-            price         REAL,
+            price         DOUBLE PRECISION,
             change_pct    TEXT,
             volume        INTEGER,
-            market_cap    REAL,
-            pe            REAL,
+            market_cap    DOUBLE PRECISION,
+            pe            DOUBLE PRECISION,
             eps_qoq       TEXT,
             sales_qoq     TEXT,
-            ma200_slope   REAL,
+            ma200_slope   DOUBLE PRECISION,
             passed        INTEGER DEFAULT 1,
             grade         TEXT,
             UNIQUE(scan_date, ticker)
         )
     """)
     for col_sql in [
-        "ALTER TABLE minervini_scans ADD COLUMN earnings_date TEXT",
-        "ALTER TABLE minervini_scans ADD COLUMN eps_last_updated TEXT",
-        "ALTER TABLE minervini_scans ADD COLUMN sales_last_updated TEXT",
-        "ALTER TABLE minervini_scans ADD COLUMN high52 REAL",
-        "ALTER TABLE minervini_52w_high ADD COLUMN high52 REAL",
-        "ALTER TABLE minervini_fundamental_only ADD COLUMN high52 REAL",
-        "ALTER TABLE minervini_fundamental_scans ADD COLUMN high52 REAL",
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS earnings_date TEXT",
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS eps_last_updated TEXT",
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS sales_last_updated TEXT",
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS high52 DOUBLE PRECISION",
+        "ALTER TABLE minervini_52w_high ADD COLUMN IF NOT EXISTS high52 DOUBLE PRECISION",
+        "ALTER TABLE minervini_fundamental_only ADD COLUMN IF NOT EXISTS high52 DOUBLE PRECISION",
+        "ALTER TABLE minervini_fundamental_scans ADD COLUMN IF NOT EXISTS high52 DOUBLE PRECISION",
+        "ALTER TABLE minervini_fundamental_only ADD COLUMN IF NOT EXISTS ma200_slope DOUBLE PRECISION",
+        "ALTER TABLE minervini_fundamental_only ADD COLUMN IF NOT EXISTS eps_qoq TEXT",
+        "ALTER TABLE minervini_fundamental_only ADD COLUMN IF NOT EXISTS sales_qoq TEXT",
+        "ALTER TABLE minervini_fundamental_only ADD COLUMN IF NOT EXISTS grade TEXT",
     ]:
-        try:
-            c.execute(col_sql)
-        except sqlite3.OperationalError:
-            pass
-    for col_sql in [
-        "ALTER TABLE minervini_fundamental_only ADD COLUMN ma200_slope REAL",
-        "ALTER TABLE minervini_fundamental_only ADD COLUMN eps_qoq TEXT",
-        "ALTER TABLE minervini_fundamental_only ADD COLUMN sales_qoq TEXT",
-        "ALTER TABLE minervini_fundamental_only ADD COLUMN grade TEXT",
-    ]:
-        try:
-            c.execute(col_sql)
-        except sqlite3.OperationalError:
-            pass
+        c.execute(col_sql)
     c.execute("""
         CREATE TABLE IF NOT EXISTS minervini_52w_high (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            id          SERIAL PRIMARY KEY,
             scan_date   TEXT NOT NULL,
             ticker      TEXT NOT NULL,
             company     TEXT,
             sector      TEXT,
             industry    TEXT,
-            price       REAL,
+            price       DOUBLE PRECISION,
             change_pct  TEXT,
             volume      INTEGER,
-            market_cap  REAL,
-            ma200_slope REAL,
-            eps_qoq     REAL,
-            sales_qoq   REAL,
+            market_cap  DOUBLE PRECISION,
+            ma200_slope DOUBLE PRECISION,
+            eps_qoq     DOUBLE PRECISION,
+            sales_qoq   DOUBLE PRECISION,
             grade       TEXT,
             UNIQUE(scan_date, ticker)
         )
     """)
     c.execute("""
         CREATE TABLE IF NOT EXISTS minervini_watchlist (
-            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            id         SERIAL PRIMARY KEY,
             ticker     TEXT NOT NULL UNIQUE,
             added_date TEXT NOT NULL
         )
@@ -430,6 +422,8 @@ def check_ma200_slope(tickers):
         except Exception:
             spy_close = None
 
+        spy_actual_date = str(spy_close.index[-1].date()) if spy_close is not None and len(spy_close) > 0 else None
+
         rs_ratings = calculate_rs_ratings(closes, spy_close)
 
         for ticker, info in results.items():
@@ -438,12 +432,13 @@ def check_ma200_slope(tickers):
 
     except Exception as e:
         print(f"Toplu indirme hatası: {e}")
+        return results, None
 
-    return results
+    return results, spy_actual_date
 
 # --- VERİTABANINA KAYDET ---
 def save_results(df_finviz, slopes, scan_date):
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_connection()
     c = conn.cursor()
     saved = 0
     
@@ -471,27 +466,27 @@ def save_results(df_finviz, slopes, scan_date):
                  price, change_pct, volume, market_cap, pe,
                  ma200_slope, passed, high52, confirmations, violations,
                  rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mansfield)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 ON CONFLICT(scan_date, ticker) DO UPDATE SET
-                    company       = excluded.company,
-                    sector        = excluded.sector,
-                    industry      = excluded.industry,
-                    price         = excluded.price,
-                    change_pct    = excluded.change_pct,
-                    volume        = excluded.volume,
-                    market_cap    = excluded.market_cap,
-                    pe            = excluded.pe,
-                    ma200_slope   = excluded.ma200_slope,
-                    passed        = excluded.passed,
-                    high52        = excluded.high52,
-                    confirmations = excluded.confirmations,
-                    violations    = excluded.violations,
-                    rs_ibd        = excluded.rs_ibd,
-                    rs_12m        = excluded.rs_12m,
-                    rs_20d        = excluded.rs_20d,
-                    rs_50d        = excluded.rs_50d,
-                    rs_200d       = excluded.rs_200d,
-                    rs_mansfield  = excluded.rs_mansfield
+                    company       = EXCLUDED.company,
+                    sector        = EXCLUDED.sector,
+                    industry      = EXCLUDED.industry,
+                    price         = EXCLUDED.price,
+                    change_pct    = EXCLUDED.change_pct,
+                    volume        = EXCLUDED.volume,
+                    market_cap    = EXCLUDED.market_cap,
+                    pe            = EXCLUDED.pe,
+                    ma200_slope   = EXCLUDED.ma200_slope,
+                    passed        = EXCLUDED.passed,
+                    high52        = EXCLUDED.high52,
+                    confirmations = EXCLUDED.confirmations,
+                    violations    = EXCLUDED.violations,
+                    rs_ibd        = EXCLUDED.rs_ibd,
+                    rs_12m        = EXCLUDED.rs_12m,
+                    rs_20d        = EXCLUDED.rs_20d,
+                    rs_50d        = EXCLUDED.rs_50d,
+                    rs_200d       = EXCLUDED.rs_200d,
+                    rs_mansfield  = EXCLUDED.rs_mansfield
             """, (
                 scan_date, ticker,
                 row.get("Company", ""), row.get("Sector", ""), row.get("Industry", ""),
@@ -515,12 +510,12 @@ def scrape_eps_sales_and_grade(scan_date):
     minervini_scans tablosundaki her ticker için Finviz'den EPS Q/Q, Sales Q/Q ve
     Earnings date çeker; akıllı skip mantığıyla gereksiz istekleri atlar.
     """
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_connection()
     c = conn.cursor()
 
     c.execute("""
         SELECT ticker, earnings_date, eps_last_updated
-        FROM minervini_scans WHERE scan_date = ?
+        FROM minervini_scans WHERE scan_date = %s
     """, (scan_date,))
     tickers_data = c.fetchall()
 
@@ -601,9 +596,9 @@ def scrape_eps_sales_and_grade(scan_date):
             today_str = str(today)
             c.execute("""
                 UPDATE minervini_scans
-                SET eps_qoq = ?, sales_qoq = ?, grade = ?,
-                    earnings_date = ?, eps_last_updated = ?, sales_last_updated = ?
-                WHERE scan_date = ? AND ticker = ?
+                SET eps_qoq = %s, sales_qoq = %s, grade = %s,
+                    earnings_date = %s, eps_last_updated = %s, sales_last_updated = %s
+                WHERE scan_date = %s AND ticker = %s
             """, (eps_qoq, sales_qoq, grade, earnings_date_raw, today_str, today_str, scan_date, ticker))
 
             stats["scraped"] += 1
@@ -625,150 +620,178 @@ def scrape_eps_sales_and_grade(scan_date):
 
 # --- ANA AKIŞ ---
 def run_scan():
+    today = date.today()
+    if today.weekday() == 5:
+        scan_date = str(today - timedelta(days=1))
+    elif today.weekday() == 6:
+        scan_date = str(today - timedelta(days=2))
+    else:
+        scan_date = str(today)
+
     print("=== QUANFINA SCANNER v2 (Hızlı) ===")
-    
+    print(f"Tarih: {scan_date}")
+
     # Tek bağlantı kullan - database lock önle
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_connection()
     c = conn.cursor()
-    
+
+    # Aynı tarih kontrolü
+    c.execute(
+        "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'minervini_scans'"
+    )
+    if c.fetchone()[0]:
+        c.execute("SELECT COUNT(*) FROM minervini_scans WHERE scan_date = %s", (scan_date,))
+        count = c.fetchone()[0]
+        if count > 0:
+            print(f"\n[!] Bugün ({scan_date}) zaten {count} kayıt mevcut.")
+            noninteractive = os.getenv("QUANFINA_NONINTERACTIVE", "")
+            if noninteractive == "force":
+                answer = "e"
+            elif noninteractive:
+                answer = "h"
+            else:
+                answer = input("Yeniden tara? (e/h, varsayılan: h): ").strip().lower()
+            if answer != "e":
+                print("Tarama iptal edildi. Mevcut veriler kullanılabilir.")
+                conn.close()
+                sys.exit(0)
+            else:
+                print("Mevcut kayıtlar siliniyor...")
+                for tbl in ["minervini_scans", "minervini_52w_high",
+                            "minervini_fundamental_scans", "minervini_fundamental_only"]:
+                    c.execute(f"DELETE FROM {tbl} WHERE scan_date = %s", (scan_date,))
+                conn.commit()
+                print("Silindi. Tarama başlıyor...\n")
+
     # Tabloları oluştur
     c.execute("""
         CREATE TABLE IF NOT EXISTS minervini_scans (
-            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            id            SERIAL PRIMARY KEY,
             scan_date     TEXT NOT NULL,
             ticker        TEXT NOT NULL,
             company       TEXT,
             sector        TEXT,
             industry      TEXT,
-            price         REAL,
+            price         DOUBLE PRECISION,
             change_pct    TEXT,
             volume        INTEGER,
-            market_cap    REAL,
-            pe            REAL,
+            market_cap    DOUBLE PRECISION,
+            pe            DOUBLE PRECISION,
             eps_qoq       TEXT,
             sales_qoq     TEXT,
-            ma200_slope   REAL,
+            ma200_slope   DOUBLE PRECISION,
             passed        INTEGER DEFAULT 1,
             grade         TEXT,
             UNIQUE(scan_date, ticker)
         )
     """)
     for col_sql in [
-        "ALTER TABLE minervini_scans ADD COLUMN earnings_date TEXT",
-        "ALTER TABLE minervini_scans ADD COLUMN eps_last_updated TEXT",
-        "ALTER TABLE minervini_scans ADD COLUMN sales_last_updated TEXT",
-        "ALTER TABLE minervini_scans ADD COLUMN high52 REAL",
-        "ALTER TABLE minervini_52w_high ADD COLUMN high52 REAL",
-        "ALTER TABLE minervini_fundamental_only ADD COLUMN high52 REAL",
-        "ALTER TABLE minervini_fundamental_scans ADD COLUMN high52 REAL",
-        "ALTER TABLE minervini_scans ADD COLUMN confirmations TEXT",
-        "ALTER TABLE minervini_scans ADD COLUMN violations TEXT",
-        "ALTER TABLE minervini_52w_high ADD COLUMN confirmations TEXT",
-        "ALTER TABLE minervini_52w_high ADD COLUMN violations TEXT",
-        "ALTER TABLE minervini_fundamental_only ADD COLUMN confirmations TEXT",
-        "ALTER TABLE minervini_fundamental_only ADD COLUMN violations TEXT",
-        "ALTER TABLE minervini_fundamental_scans ADD COLUMN confirmations TEXT",
-        "ALTER TABLE minervini_fundamental_scans ADD COLUMN violations TEXT",
-        "ALTER TABLE minervini_scans ADD COLUMN rs_ibd REAL",
-        "ALTER TABLE minervini_scans ADD COLUMN rs_12m REAL",
-        "ALTER TABLE minervini_scans ADD COLUMN rs_20d REAL",
-        "ALTER TABLE minervini_scans ADD COLUMN rs_50d REAL",
-        "ALTER TABLE minervini_scans ADD COLUMN rs_200d REAL",
-        "ALTER TABLE minervini_scans ADD COLUMN rs_mansfield REAL",
-        "ALTER TABLE minervini_52w_high ADD COLUMN rs_ibd REAL",
-        "ALTER TABLE minervini_52w_high ADD COLUMN rs_12m REAL",
-        "ALTER TABLE minervini_52w_high ADD COLUMN rs_20d REAL",
-        "ALTER TABLE minervini_52w_high ADD COLUMN rs_50d REAL",
-        "ALTER TABLE minervini_52w_high ADD COLUMN rs_200d REAL",
-        "ALTER TABLE minervini_52w_high ADD COLUMN rs_mansfield REAL",
-        "ALTER TABLE minervini_fundamental_only ADD COLUMN rs_ibd REAL",
-        "ALTER TABLE minervini_fundamental_only ADD COLUMN rs_12m REAL",
-        "ALTER TABLE minervini_fundamental_only ADD COLUMN rs_20d REAL",
-        "ALTER TABLE minervini_fundamental_only ADD COLUMN rs_50d REAL",
-        "ALTER TABLE minervini_fundamental_only ADD COLUMN rs_200d REAL",
-        "ALTER TABLE minervini_fundamental_only ADD COLUMN rs_mansfield REAL",
-        "ALTER TABLE minervini_fundamental_scans ADD COLUMN rs_ibd REAL",
-        "ALTER TABLE minervini_fundamental_scans ADD COLUMN rs_12m REAL",
-        "ALTER TABLE minervini_fundamental_scans ADD COLUMN rs_20d REAL",
-        "ALTER TABLE minervini_fundamental_scans ADD COLUMN rs_50d REAL",
-        "ALTER TABLE minervini_fundamental_scans ADD COLUMN rs_200d REAL",
-        "ALTER TABLE minervini_fundamental_scans ADD COLUMN rs_mansfield REAL",
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS earnings_date TEXT",
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS eps_last_updated TEXT",
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS sales_last_updated TEXT",
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS high52 DOUBLE PRECISION",
+        "ALTER TABLE minervini_52w_high ADD COLUMN IF NOT EXISTS high52 DOUBLE PRECISION",
+        "ALTER TABLE minervini_fundamental_only ADD COLUMN IF NOT EXISTS high52 DOUBLE PRECISION",
+        "ALTER TABLE minervini_fundamental_scans ADD COLUMN IF NOT EXISTS high52 DOUBLE PRECISION",
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS confirmations TEXT",
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS violations TEXT",
+        "ALTER TABLE minervini_52w_high ADD COLUMN IF NOT EXISTS confirmations TEXT",
+        "ALTER TABLE minervini_52w_high ADD COLUMN IF NOT EXISTS violations TEXT",
+        "ALTER TABLE minervini_fundamental_only ADD COLUMN IF NOT EXISTS confirmations TEXT",
+        "ALTER TABLE minervini_fundamental_only ADD COLUMN IF NOT EXISTS violations TEXT",
+        "ALTER TABLE minervini_fundamental_scans ADD COLUMN IF NOT EXISTS confirmations TEXT",
+        "ALTER TABLE minervini_fundamental_scans ADD COLUMN IF NOT EXISTS violations TEXT",
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS rs_ibd DOUBLE PRECISION",
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS rs_12m DOUBLE PRECISION",
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS rs_20d DOUBLE PRECISION",
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS rs_50d DOUBLE PRECISION",
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS rs_200d DOUBLE PRECISION",
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS rs_mansfield DOUBLE PRECISION",
+        "ALTER TABLE minervini_52w_high ADD COLUMN IF NOT EXISTS rs_ibd DOUBLE PRECISION",
+        "ALTER TABLE minervini_52w_high ADD COLUMN IF NOT EXISTS rs_12m DOUBLE PRECISION",
+        "ALTER TABLE minervini_52w_high ADD COLUMN IF NOT EXISTS rs_20d DOUBLE PRECISION",
+        "ALTER TABLE minervini_52w_high ADD COLUMN IF NOT EXISTS rs_50d DOUBLE PRECISION",
+        "ALTER TABLE minervini_52w_high ADD COLUMN IF NOT EXISTS rs_200d DOUBLE PRECISION",
+        "ALTER TABLE minervini_52w_high ADD COLUMN IF NOT EXISTS rs_mansfield DOUBLE PRECISION",
+        "ALTER TABLE minervini_fundamental_only ADD COLUMN IF NOT EXISTS rs_ibd DOUBLE PRECISION",
+        "ALTER TABLE minervini_fundamental_only ADD COLUMN IF NOT EXISTS rs_12m DOUBLE PRECISION",
+        "ALTER TABLE minervini_fundamental_only ADD COLUMN IF NOT EXISTS rs_20d DOUBLE PRECISION",
+        "ALTER TABLE minervini_fundamental_only ADD COLUMN IF NOT EXISTS rs_50d DOUBLE PRECISION",
+        "ALTER TABLE minervini_fundamental_only ADD COLUMN IF NOT EXISTS rs_200d DOUBLE PRECISION",
+        "ALTER TABLE minervini_fundamental_only ADD COLUMN IF NOT EXISTS rs_mansfield DOUBLE PRECISION",
+        "ALTER TABLE minervini_fundamental_scans ADD COLUMN IF NOT EXISTS rs_ibd DOUBLE PRECISION",
+        "ALTER TABLE minervini_fundamental_scans ADD COLUMN IF NOT EXISTS rs_12m DOUBLE PRECISION",
+        "ALTER TABLE minervini_fundamental_scans ADD COLUMN IF NOT EXISTS rs_20d DOUBLE PRECISION",
+        "ALTER TABLE minervini_fundamental_scans ADD COLUMN IF NOT EXISTS rs_50d DOUBLE PRECISION",
+        "ALTER TABLE minervini_fundamental_scans ADD COLUMN IF NOT EXISTS rs_200d DOUBLE PRECISION",
+        "ALTER TABLE minervini_fundamental_scans ADD COLUMN IF NOT EXISTS rs_mansfield DOUBLE PRECISION",
     ]:
-        try:
-            c.execute(col_sql)
-        except sqlite3.OperationalError:
-            pass
+        c.execute(col_sql)
 
     c.execute("""
         CREATE TABLE IF NOT EXISTS minervini_fundamental_scans (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            id          SERIAL PRIMARY KEY,
             scan_date   TEXT NOT NULL,
             ticker      TEXT NOT NULL,
             company     TEXT,
             sector      TEXT,
             industry    TEXT,
-            price       REAL,
+            price       DOUBLE PRECISION,
             change_pct  TEXT,
             volume      INTEGER,
-            market_cap  REAL,
-            pe          REAL,
-            ma200_slope REAL,
-            high52      REAL,
+            market_cap  DOUBLE PRECISION,
+            pe          DOUBLE PRECISION,
+            ma200_slope DOUBLE PRECISION,
+            high52      DOUBLE PRECISION,
             UNIQUE(scan_date, ticker)
         )
     """)
-    
+
     c.execute("""
         CREATE TABLE IF NOT EXISTS minervini_fundamental_only (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            id          SERIAL PRIMARY KEY,
             scan_date   TEXT NOT NULL,
             ticker      TEXT NOT NULL,
             company     TEXT,
             sector      TEXT,
             industry    TEXT,
-            price       REAL,
+            price       DOUBLE PRECISION,
             change_pct  TEXT,
             volume      INTEGER,
-            market_cap  REAL,
-            pe          REAL,
+            market_cap  DOUBLE PRECISION,
+            pe          DOUBLE PRECISION,
             UNIQUE(scan_date, ticker)
         )
     """)
     for col_sql in [
-        "ALTER TABLE minervini_fundamental_only ADD COLUMN ma200_slope REAL",
-        "ALTER TABLE minervini_fundamental_only ADD COLUMN eps_qoq TEXT",
-        "ALTER TABLE minervini_fundamental_only ADD COLUMN sales_qoq TEXT",
-        "ALTER TABLE minervini_fundamental_only ADD COLUMN grade TEXT",
+        "ALTER TABLE minervini_fundamental_only ADD COLUMN IF NOT EXISTS ma200_slope DOUBLE PRECISION",
+        "ALTER TABLE minervini_fundamental_only ADD COLUMN IF NOT EXISTS eps_qoq TEXT",
+        "ALTER TABLE minervini_fundamental_only ADD COLUMN IF NOT EXISTS sales_qoq TEXT",
+        "ALTER TABLE minervini_fundamental_only ADD COLUMN IF NOT EXISTS grade TEXT",
     ]:
-        try:
-            c.execute(col_sql)
-        except sqlite3.OperationalError:
-            pass
+        c.execute(col_sql)
 
     c.execute("""
         CREATE TABLE IF NOT EXISTS minervini_52w_high (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            id          SERIAL PRIMARY KEY,
             scan_date   TEXT NOT NULL,
             ticker      TEXT NOT NULL,
             company     TEXT,
             sector      TEXT,
             industry    TEXT,
-            price       REAL,
+            price       DOUBLE PRECISION,
             change_pct  TEXT,
             volume      INTEGER,
-            market_cap  REAL,
-            ma200_slope REAL,
-            eps_qoq     REAL,
-            sales_qoq   REAL,
+            market_cap  DOUBLE PRECISION,
+            ma200_slope DOUBLE PRECISION,
+            eps_qoq     DOUBLE PRECISION,
+            sales_qoq   DOUBLE PRECISION,
             grade       TEXT,
             UNIQUE(scan_date, ticker)
         )
     """)
 
     conn.commit()
-
-    scan_date = str(date.today())
-    print(f"Tarih: {scan_date}")
 
     # 1. Finviz filtresi
     print("\n1. Finviz Elite filtresi çalışıyor...")
@@ -783,7 +806,33 @@ def run_scan():
 
     # 2. Sadece geçenler için MA200 slope
     print("\n2. MA200 slope kontrolü (yfinance toplu indirme)...")
-    slopes = check_ma200_slope(tickers)
+    slopes, spy_actual_date = check_ma200_slope(tickers)
+
+    if spy_actual_date and spy_actual_date != scan_date:
+        print(f"[!] Manuel tarih: {scan_date} → Gerçek piyasa günü: {spy_actual_date} (tatil/hafta sonu)")
+        scan_date = spy_actual_date
+        c.execute("SELECT COUNT(*) FROM minervini_scans WHERE scan_date = %s", (scan_date,))
+        count2 = c.fetchone()[0]
+        if count2 > 0:
+            print(f"\n[!] {scan_date} için zaten {count2} kayıt mevcut.")
+            noninteractive = os.getenv("QUANFINA_NONINTERACTIVE", "")
+            if noninteractive == "force":
+                answer = "e"
+            elif noninteractive:
+                answer = "h"
+            else:
+                answer = input("Yeniden tara? (e/h, varsayılan: h): ").strip().lower()
+            if answer != "e":
+                print("Tarama iptal edildi. Mevcut veriler kullanılabilir.")
+                conn.close()
+                sys.exit(0)
+            else:
+                print("Mevcut kayıtlar siliniyor...")
+                for tbl in ["minervini_scans", "minervini_52w_high",
+                            "minervini_fundamental_scans", "minervini_fundamental_only"]:
+                    c.execute(f"DELETE FROM {tbl} WHERE scan_date = %s", (scan_date,))
+                conn.commit()
+                print("Silindi. Tarama başlıyor...\n")
 
     # 3. Kaydet
     print("\n3. Veritabanına kaydediliyor...")
@@ -813,27 +862,27 @@ def run_scan():
                  price, change_pct, volume, market_cap, pe,
                  ma200_slope, passed, high52, confirmations, violations,
                  rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mansfield)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 ON CONFLICT(scan_date, ticker) DO UPDATE SET
-                    company       = excluded.company,
-                    sector        = excluded.sector,
-                    industry      = excluded.industry,
-                    price         = excluded.price,
-                    change_pct    = excluded.change_pct,
-                    volume        = excluded.volume,
-                    market_cap    = excluded.market_cap,
-                    pe            = excluded.pe,
-                    ma200_slope   = excluded.ma200_slope,
-                    passed        = excluded.passed,
-                    high52        = excluded.high52,
-                    confirmations = excluded.confirmations,
-                    violations    = excluded.violations,
-                    rs_ibd        = excluded.rs_ibd,
-                    rs_12m        = excluded.rs_12m,
-                    rs_20d        = excluded.rs_20d,
-                    rs_50d        = excluded.rs_50d,
-                    rs_200d       = excluded.rs_200d,
-                    rs_mansfield  = excluded.rs_mansfield
+                    company       = EXCLUDED.company,
+                    sector        = EXCLUDED.sector,
+                    industry      = EXCLUDED.industry,
+                    price         = EXCLUDED.price,
+                    change_pct    = EXCLUDED.change_pct,
+                    volume        = EXCLUDED.volume,
+                    market_cap    = EXCLUDED.market_cap,
+                    pe            = EXCLUDED.pe,
+                    ma200_slope   = EXCLUDED.ma200_slope,
+                    passed        = EXCLUDED.passed,
+                    high52        = EXCLUDED.high52,
+                    confirmations = EXCLUDED.confirmations,
+                    violations    = EXCLUDED.violations,
+                    rs_ibd        = EXCLUDED.rs_ibd,
+                    rs_12m        = EXCLUDED.rs_12m,
+                    rs_20d        = EXCLUDED.rs_20d,
+                    rs_50d        = EXCLUDED.rs_50d,
+                    rs_200d       = EXCLUDED.rs_200d,
+                    rs_mansfield  = EXCLUDED.rs_mansfield
             """, (
                 scan_date, ticker,
                 row.get("Company", ""), row.get("Sector", ""), row.get("Industry", ""),
@@ -942,9 +991,9 @@ def run_scan():
             today_str = str(today)
             c.execute("""
                 UPDATE minervini_scans
-                SET eps_qoq = ?, sales_qoq = ?, grade = ?,
-                    earnings_date = ?, eps_last_updated = ?, sales_last_updated = ?
-                WHERE scan_date = ? AND ticker = ?
+                SET eps_qoq = %s, sales_qoq = %s, grade = %s,
+                    earnings_date = %s, eps_last_updated = %s, sales_last_updated = %s
+                WHERE scan_date = %s AND ticker = %s
             """, (eps_qoq, sales_qoq, grade, earnings_date_raw, today_str, today_str, scan_date, ticker))
 
             stats["scraped"] += 1
@@ -969,7 +1018,7 @@ def run_scan():
     if not df_fund.empty:
         tickers_fund = df_fund["Ticker"].tolist()
         print(f"MA200 slope kontrolü: {len(tickers_fund)} hisse...")
-        slopes_fund = check_ma200_slope(tickers_fund)
+        slopes_fund, _ = check_ma200_slope(tickers_fund)
         saved_fund = 0
         
         for _, row in df_fund.iterrows():
@@ -983,12 +1032,31 @@ def run_scan():
 
             try:
                 c.execute("""
-                    INSERT OR REPLACE INTO minervini_fundamental_scans
+                    INSERT INTO minervini_fundamental_scans
                     (scan_date, ticker, company, sector, industry,
                      price, change_pct, volume, market_cap, pe, ma200_slope, high52,
                      confirmations, violations,
                      rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mansfield)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    ON CONFLICT (scan_date, ticker) DO UPDATE SET
+                        company       = EXCLUDED.company,
+                        sector        = EXCLUDED.sector,
+                        industry      = EXCLUDED.industry,
+                        price         = EXCLUDED.price,
+                        change_pct    = EXCLUDED.change_pct,
+                        volume        = EXCLUDED.volume,
+                        market_cap    = EXCLUDED.market_cap,
+                        pe            = EXCLUDED.pe,
+                        ma200_slope   = EXCLUDED.ma200_slope,
+                        high52        = EXCLUDED.high52,
+                        confirmations = EXCLUDED.confirmations,
+                        violations    = EXCLUDED.violations,
+                        rs_ibd        = EXCLUDED.rs_ibd,
+                        rs_12m        = EXCLUDED.rs_12m,
+                        rs_20d        = EXCLUDED.rs_20d,
+                        rs_50d        = EXCLUDED.rs_50d,
+                        rs_200d       = EXCLUDED.rs_200d,
+                        rs_mansfield  = EXCLUDED.rs_mansfield
                 """, (
                     scan_date, ticker,
                     row.get("Company", ""), row.get("Sector", ""), row.get("Industry", ""),
@@ -1019,13 +1087,13 @@ def run_scan():
         tickers_fo = df_fund_only["Ticker"].tolist()
 
         # minervini_scans'da zaten olan tickerların verilerini al (tekrar çekme)
-        placeholders = ','.join('?' * len(tickers_fo))
+        placeholders = ','.join(['%s'] * len(tickers_fo))
         c.execute(f"""
             SELECT ticker, ma200_slope, high52, eps_qoq, sales_qoq, grade,
                    confirmations, violations,
                    rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mansfield
             FROM minervini_scans
-            WHERE scan_date = ? AND ticker IN ({placeholders})
+            WHERE scan_date = %s AND ticker IN ({placeholders})
         """, [scan_date] + tickers_fo)
         cached = {
             row[0]: {"slope": row[1], "high52": row[2], "eps_qoq": row[3], "sales_qoq": row[4],
@@ -1040,7 +1108,7 @@ def run_scan():
         print(f"  Yeni veri cekilecek        : {len(need_new_data)}")
 
         # Yeni tickerlar icin MA200 slope (yfinance batch)
-        fresh_slopes = check_ma200_slope(need_new_data) if need_new_data else {}
+        fresh_slopes, _ = check_ma200_slope(need_new_data) if need_new_data else ({}, None)
 
         # Yeni tickerlar icin Finviz EPS/Sales scraping
         fresh_eps = {}
@@ -1132,13 +1200,35 @@ def run_scan():
 
             try:
                 c.execute("""
-                    INSERT OR REPLACE INTO minervini_fundamental_only
+                    INSERT INTO minervini_fundamental_only
                     (scan_date, ticker, company, sector, industry,
                      price, change_pct, volume, market_cap, pe,
                      ma200_slope, eps_qoq, sales_qoq, grade, high52,
                      confirmations, violations,
                      rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mansfield)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    ON CONFLICT (scan_date, ticker) DO UPDATE SET
+                        company       = EXCLUDED.company,
+                        sector        = EXCLUDED.sector,
+                        industry      = EXCLUDED.industry,
+                        price         = EXCLUDED.price,
+                        change_pct    = EXCLUDED.change_pct,
+                        volume        = EXCLUDED.volume,
+                        market_cap    = EXCLUDED.market_cap,
+                        pe            = EXCLUDED.pe,
+                        ma200_slope   = EXCLUDED.ma200_slope,
+                        eps_qoq       = EXCLUDED.eps_qoq,
+                        sales_qoq     = EXCLUDED.sales_qoq,
+                        grade         = EXCLUDED.grade,
+                        high52        = EXCLUDED.high52,
+                        confirmations = EXCLUDED.confirmations,
+                        violations    = EXCLUDED.violations,
+                        rs_ibd        = EXCLUDED.rs_ibd,
+                        rs_12m        = EXCLUDED.rs_12m,
+                        rs_20d        = EXCLUDED.rs_20d,
+                        rs_50d        = EXCLUDED.rs_50d,
+                        rs_200d       = EXCLUDED.rs_200d,
+                        rs_mansfield  = EXCLUDED.rs_mansfield
                 """, (
                     scan_date, ticker,
                     row.get("Company", ""), row.get("Sector", ""), row.get("Industry", ""),
@@ -1166,13 +1256,13 @@ def run_scan():
         tickers_52w = df_52w["Ticker"].tolist()
 
         # minervini_scans'da zaten olan tickerların verilerini al (tekrar çekme)
-        placeholders = ','.join('?' * len(tickers_52w))
+        placeholders = ','.join(['%s'] * len(tickers_52w))
         c.execute(f"""
             SELECT ticker, ma200_slope, high52, eps_qoq, sales_qoq, grade,
                    confirmations, violations,
                    rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mansfield
             FROM minervini_scans
-            WHERE scan_date = ? AND ticker IN ({placeholders})
+            WHERE scan_date = %s AND ticker IN ({placeholders})
         """, [scan_date] + tickers_52w)
         cached_52w = {
             row[0]: {"slope": row[1], "high52": row[2], "eps_qoq": row[3], "sales_qoq": row[4],
@@ -1187,7 +1277,7 @@ def run_scan():
         print(f"  Yeni veri cekilecek        : {len(need_new_52w)}")
 
         # Yeni tickerlar icin MA200 slope (yfinance batch)
-        fresh_slopes_52w = check_ma200_slope(need_new_52w) if need_new_52w else {}
+        fresh_slopes_52w, _ = check_ma200_slope(need_new_52w) if need_new_52w else ({}, None)
 
         # Yeni tickerlar icin Finviz EPS/Sales scraping
         fresh_eps_52w = {}
@@ -1279,13 +1369,34 @@ def run_scan():
 
             try:
                 c.execute("""
-                    INSERT OR REPLACE INTO minervini_52w_high
+                    INSERT INTO minervini_52w_high
                     (scan_date, ticker, company, sector, industry,
                      price, change_pct, volume, market_cap,
                      ma200_slope, eps_qoq, sales_qoq, grade, high52,
                      confirmations, violations,
                      rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mansfield)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    ON CONFLICT (scan_date, ticker) DO UPDATE SET
+                        company       = EXCLUDED.company,
+                        sector        = EXCLUDED.sector,
+                        industry      = EXCLUDED.industry,
+                        price         = EXCLUDED.price,
+                        change_pct    = EXCLUDED.change_pct,
+                        volume        = EXCLUDED.volume,
+                        market_cap    = EXCLUDED.market_cap,
+                        ma200_slope   = EXCLUDED.ma200_slope,
+                        eps_qoq       = EXCLUDED.eps_qoq,
+                        sales_qoq     = EXCLUDED.sales_qoq,
+                        grade         = EXCLUDED.grade,
+                        high52        = EXCLUDED.high52,
+                        confirmations = EXCLUDED.confirmations,
+                        violations    = EXCLUDED.violations,
+                        rs_ibd        = EXCLUDED.rs_ibd,
+                        rs_12m        = EXCLUDED.rs_12m,
+                        rs_20d        = EXCLUDED.rs_20d,
+                        rs_50d        = EXCLUDED.rs_50d,
+                        rs_200d       = EXCLUDED.rs_200d,
+                        rs_mansfield  = EXCLUDED.rs_mansfield
                 """, (
                     scan_date, ticker,
                     row.get("Company", ""), row.get("Sector", ""), row.get("Industry", ""),

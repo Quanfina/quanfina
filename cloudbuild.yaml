@@ -1,0 +1,91 @@
+steps:
+  # --- Scanner image ---
+  - name: "gcr.io/cloud-builders/docker"
+    id: build-scanner
+    args:
+      - build
+      - -f
+      - Dockerfile.scanner
+      - -t
+      - "${_REGION}-docker.pkg.dev/${PROJECT_ID}/quanfina/scanner:${_TAG}"
+      - -t
+      - "${_REGION}-docker.pkg.dev/${PROJECT_ID}/quanfina/scanner:latest"
+      - .
+
+  - name: "gcr.io/cloud-builders/docker"
+    id: push-scanner
+    waitFor: [build-scanner]
+    args:
+      - push
+      - --all-tags
+      - "${_REGION}-docker.pkg.dev/${PROJECT_ID}/quanfina/scanner"
+
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
+    id: deploy-scanner
+    waitFor: [push-scanner]
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - quanfina-scanner
+      - --image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/quanfina/scanner:${_TAG}
+      - --region=${_REGION}
+      - --platform=managed
+      - --no-allow-unauthenticated
+      - --timeout=3600
+      - --memory=1Gi
+      - --cpu=1
+      - --min-instances=0
+      - --max-instances=1
+      - --set-secrets=PG_HOST=PG_HOST:latest,PG_PORT=PG_PORT:latest,PG_DATABASE=PG_DATABASE:latest,PG_USER=PG_USER:latest,PG_PASSWORD=PG_PASSWORD:latest,FINVIZ_API_KEY=FINVIZ_API_KEY:latest
+
+  # --- App image ---
+  - name: "gcr.io/cloud-builders/docker"
+    id: build-app
+    args:
+      - build
+      - -f
+      - Dockerfile.app
+      - -t
+      - "${_REGION}-docker.pkg.dev/${PROJECT_ID}/quanfina/app:${_TAG}"
+      - -t
+      - "${_REGION}-docker.pkg.dev/${PROJECT_ID}/quanfina/app:latest"
+      - .
+
+  - name: "gcr.io/cloud-builders/docker"
+    id: push-app
+    waitFor: [build-app]
+    args:
+      - push
+      - --all-tags
+      - "${_REGION}-docker.pkg.dev/${PROJECT_ID}/quanfina/app"
+
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
+    id: deploy-app
+    waitFor: [push-app]
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - quanfina-app
+      - --image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/quanfina/app:${_TAG}
+      - --region=${_REGION}
+      - --platform=managed
+      - --allow-unauthenticated
+      - --timeout=300
+      - --memory=1Gi
+      - --cpu=1
+      - --min-instances=0
+      - --max-instances=3
+      - --set-secrets=PG_HOST=PG_HOST:latest,PG_PORT=PG_PORT:latest,PG_DATABASE=PG_DATABASE:latest,PG_USER=PG_USER:latest,PG_PASSWORD=PG_PASSWORD:latest,FINVIZ_API_KEY=FINVIZ_API_KEY:latest
+
+substitutions:
+  _REGION: europe-west1
+  _TAG: latest
+
+images:
+  - "${_REGION}-docker.pkg.dev/${PROJECT_ID}/quanfina/scanner:${_TAG}"
+  - "${_REGION}-docker.pkg.dev/${PROJECT_ID}/quanfina/app:${_TAG}"
+
+options:
+  logging: CLOUD_LOGGING_ONLY
