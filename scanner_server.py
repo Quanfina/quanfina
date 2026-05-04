@@ -12,11 +12,23 @@ import threading
 import logging
 from datetime import date, timedelta
 from flask import Flask, jsonify, request
+from scanner import init_db
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
 
 app = Flask(__name__)
+
+# ============================================
+# Database initialization on container start
+# ============================================
+try:
+    log.info("Calling init_db() on container start...")
+    init_db()
+    log.info("init_db() completed successfully — all tables ensured")
+except Exception as e:
+    log.error("init_db() FAILED at startup: %s", e, exc_info=True)
+    # Don't crash the container — let /scan try again later
 
 _scan_lock = threading.Lock()
 _scan_running = False
