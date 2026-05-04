@@ -97,6 +97,23 @@ def init_db():
             added_date TEXT NOT NULL
         )
     """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS sector_rotation (
+            id          SERIAL PRIMARY KEY,
+            scan_date   DATE NOT NULL,
+            ticker      VARCHAR(10) NOT NULL,
+            sector_name VARCHAR(50) NOT NULL,
+            perf_1w     DOUBLE PRECISION,
+            perf_1m     DOUBLE PRECISION,
+            perf_3m     DOUBLE PRECISION,
+            perf_6m     DOUBLE PRECISION,
+            perf_1y     DOUBLE PRECISION,
+            rs_score    DOUBLE PRECISION,
+            rs_rank     INTEGER,
+            UNIQUE(scan_date, ticker)
+        )
+    """)
+    c.execute("ALTER TABLE sector_rotation ADD COLUMN IF NOT EXISTS perf_1w DOUBLE PRECISION")
     conn.commit()
     conn.close()
 
@@ -225,6 +242,157 @@ def get_finviz_52w_high():
     df = pd.read_csv(StringIO(r.text))
     print(f"52W Yüksek filtresi geçti: {len(df)} hisse")
     return df
+
+SECTOR_ETFS = {
+    "XLK":  "Technology",
+    "XLF":  "Financials",
+    "XLE":  "Energy",
+    "XLV":  "Health Care",
+    "XLI":  "Industrials",
+    "XLY":  "Consumer Discretionary",
+    "XLP":  "Consumer Staples",
+    "XLU":  "Utilities",
+    "XLB":  "Materials",
+    "XLRE": "Real Estate",
+    "XLC":  "Communication Services",
+}
+
+
+def scan_sectors(scan_date):
+    """
+    11 SPDR sektör ETF'i için Finviz'den performance verilerini çeker,
+    çoklu periyot ağırlıklı RS Score hesaplar ve sector_rotation tablosuna yazar.
+
+    RS Score = (perf_1m * 0.4) + (perf_3m * 0.2) + (perf_6m * 0.2) + (perf_1y * 0.2)
+    """
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS sector_rotation (
+                id          SERIAL PRIMARY KEY,
+                scan_date   DATE NOT NULL,
+                ticker      VARCHAR(10) NOT NULL,
+                sector_name VARCHAR(50) NOT NULL,
+                perf_1w     DOUBLE PRECISION,
+                perf_1m     DOUBLE PRECISION,
+                perf_3m     DOUBLE PRECISION,
+                perf_6m     DOUBLE PRECISION,
+                perf_1y     DOUBLE PRECISION,
+                rs_score    DOUBLE PRECISION,
+                rs_rank     INTEGER,
+                UNIQUE(scan_date, ticker)
+            )
+        """)
+        cursor.execute("ALTER TABLE sector_rotation ADD COLUMN IF NOT EXISTS perf_1w DOUBLE PRECISION")
+        conn.commit()
+    finally:
+        conn.close()
+
+    tickers = ",".join(SECTOR_ETFS.keys())
+    url = (
+        f"https://elite.finviz.com/export.ashx?"
+        f"v=152&t={tickers}&c=1,42,43,44,45,46&auth={FINVIZ_KEY}&ft=4"
+    )
+
+    try:
+        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=30)
+        r.raise_for_status()
+    except Exception as e:
+        print(f"Finviz API hatası (sektör): {e}")
+        return None
+
+    df = pd.read_csv(StringIO(r.text))
+
+    if df.empty:
+        print("Sektör API'den boş cevap")
+        return None
+
+    def parse_pct(val):
+        """'12.34%' -> 12.34, '-' veya boş -> None"""
+        if val is None or str(val).strip() in ("-", "", "nan"):
+            return None
+        try:
+            return float(str(val).replace("%", "").strip())
+        except (ValueError, AttributeError):
+            return None
+
+    sectors_data = []
+    for _, row in df.iterrows():
+        ticker = str(row.get("Ticker", "")).strip()
+        if ticker not in SECTOR_ETFS:
+            continue
+
+        perf_1w = parse_pct(row.get("Performance (Week)"))
+        perf_1m = parse_pct(row.get("Performance (Month)"))
+        perf_3m = parse_pct(row.get("Performance (Quarter)"))
+        perf_6m = parse_pct(row.get("Performance (Half Year)"))
+        perf_1y = parse_pct(row.get("Performance (Year)"))
+
+        rs_score = (
+            (perf_1m or 0) * 0.4 +
+            (perf_3m or 0) * 0.2 +
+            (perf_6m or 0) * 0.2 +
+            (perf_1y or 0) * 0.2
+        )
+
+        sectors_data.append({
+            "ticker":      ticker,
+            "sector_name": SECTOR_ETFS[ticker],
+            "perf_1w":     perf_1w,
+            "perf_1m":     perf_1m,
+            "perf_3m":     perf_3m,
+            "perf_6m":     perf_6m,
+            "perf_1y":     perf_1y,
+            "rs_score":    rs_score,
+        })
+
+    sectors_data.sort(key=lambda x: x["rs_score"], reverse=True)
+    for rank, s in enumerate(sectors_data, start=1):
+        s["rs_rank"] = rank
+
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        for s in sectors_data:
+            cursor.execute(
+                """
+                INSERT INTO sector_rotation
+                    (scan_date, ticker, sector_name, perf_1w, perf_1m, perf_3m, perf_6m, perf_1y, rs_score, rs_rank)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (scan_date, ticker) DO UPDATE SET
+                    sector_name = EXCLUDED.sector_name,
+                    perf_1w     = EXCLUDED.perf_1w,
+                    perf_1m     = EXCLUDED.perf_1m,
+                    perf_3m     = EXCLUDED.perf_3m,
+                    perf_6m     = EXCLUDED.perf_6m,
+                    perf_1y     = EXCLUDED.perf_1y,
+                    rs_score    = EXCLUDED.rs_score,
+                    rs_rank     = EXCLUDED.rs_rank
+                """,
+                (
+                    scan_date,
+                    s["ticker"],
+                    s["sector_name"],
+                    s["perf_1w"],
+                    s["perf_1m"],
+                    s["perf_3m"],
+                    s["perf_6m"],
+                    s["perf_1y"],
+                    s["rs_score"],
+                    s["rs_rank"],
+                ),
+            )
+        conn.commit()
+        print(f"Sektör rotasyonu kaydedildi: {len(sectors_data)} sektör, scan_date={scan_date}")
+        return len(sectors_data)
+    except Exception as e:
+        conn.rollback()
+        print(f"Sektör DB yazma hatası: {e}")
+        return None
+    finally:
+        conn.close()
+
 
 # --- TEKNİK SİNYAL TESPİTİ ---
 def detect_signals(ohlcv_df):
@@ -790,6 +958,24 @@ def run_scan():
             UNIQUE(scan_date, ticker)
         )
     """)
+
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS sector_rotation (
+            id          SERIAL PRIMARY KEY,
+            scan_date   DATE NOT NULL,
+            ticker      VARCHAR(10) NOT NULL,
+            sector_name VARCHAR(50) NOT NULL,
+            perf_1w     DOUBLE PRECISION,
+            perf_1m     DOUBLE PRECISION,
+            perf_3m     DOUBLE PRECISION,
+            perf_6m     DOUBLE PRECISION,
+            perf_1y     DOUBLE PRECISION,
+            rs_score    DOUBLE PRECISION,
+            rs_rank     INTEGER,
+            UNIQUE(scan_date, ticker)
+        )
+    """)
+    c.execute("ALTER TABLE sector_rotation ADD COLUMN IF NOT EXISTS perf_1w DOUBLE PRECISION")
 
     conn.commit()
 

@@ -53,43 +53,59 @@ def health():
 def scan():
     global _scan_running
 
+    from scanner import run_scan, scan_sectors
+
     force = request.args.get("force", "0") == "1"
     if request.is_json:
         force = force or bool(request.json.get("force", False))
 
     scan_date = _today_scan_date()
+    today = date.today()
+
+    # --- 1. Hisse taraması ---
+    stock_response = None
+    stock_http = 200
 
     if not force:
         count = _existing_count(scan_date)
         if count > 0:
             log.info("Scan skipped — %d records already exist for %s", count, scan_date)
-            return jsonify({
-                "status": "skipped",
-                "scan_date": scan_date,
-                "existing_records": count,
-            }), 200
+            stock_response = {"status": "skipped", "scan_date": scan_date, "existing_records": count}
 
-    with _scan_lock:
-        if _scan_running:
-            return jsonify({"status": "busy", "message": "Scan already in progress"}), 409
-        _scan_running = True
-
-    os.environ["QUANFINA_NONINTERACTIVE"] = "force" if force else "skip"
-
-    try:
-        log.info("Starting scan for %s (force=%s)", scan_date, force)
-        from scanner import run_scan
-        run_scan()
-        log.info("Scan completed for %s", scan_date)
-        return jsonify({"status": "ok", "scan_date": scan_date}), 200
-    except SystemExit:
-        return jsonify({"status": "skipped", "scan_date": scan_date}), 200
-    except Exception as e:
-        log.exception("Scan failed: %s", e)
-        return jsonify({"status": "error", "message": str(e)}), 500
-    finally:
+    if stock_response is None:
         with _scan_lock:
-            _scan_running = False
+            if _scan_running:
+                return jsonify({"status": "busy", "message": "Scan already in progress"}), 409
+            _scan_running = True
+
+        os.environ["QUANFINA_NONINTERACTIVE"] = "force" if force else "skip"
+
+        try:
+            log.info("Starting scan for %s (force=%s)", scan_date, force)
+            run_scan()
+            log.info("Scan completed for %s", scan_date)
+            stock_response = {"status": "ok", "scan_date": scan_date}
+        except SystemExit:
+            stock_response = {"status": "skipped", "scan_date": scan_date}
+        except Exception as e:
+            log.exception("Scan failed: %s", e)
+            stock_response = {"status": "error", "message": str(e)}
+            stock_http = 500
+        finally:
+            with _scan_lock:
+                _scan_running = False
+
+    # --- 2. Sektör taraması (her zaman çalışır, hisse sonucundan bağımsız) ---
+    try:
+        sector_count = scan_sectors(today)
+        sector_status = "ok" if sector_count else "failed"
+    except Exception as e:
+        log.error("Sektör tarama hatası: %s", e)
+        sector_count = None
+        sector_status = "error"
+
+    stock_response["sectors"] = {"status": sector_status, "count": sector_count}
+    return jsonify(stock_response), stock_http
 
 
 if __name__ == "__main__":
