@@ -1,5 +1,6 @@
 import os
 import logging
+from datetime import datetime, date
 import psycopg2
 import pandas as pd
 from sqlalchemy import create_engine
@@ -227,6 +228,9 @@ def update_trade(trade_id: int, data: dict) -> bool:
 
 def close_trade(trade_id: int, exit_price: float, exit_date,
                 exit_notes: str = None) -> bool:
+    # date objesi gelirse datetime'a çevir (00:00:00 saati ile)
+    if isinstance(exit_date, date) and not isinstance(exit_date, datetime):
+        exit_date = datetime.combine(exit_date, datetime.min.time())
     """
     Trade'i kapatır. P&L ve r_multiple otomatik hesaplanır.
 

@@ -5,7 +5,7 @@ Aksiyonlar: ✏️ Düzenle | 🚪 Kapat | 🗑️ Sil
 """
 import streamlit as st
 import pandas as pd
-from datetime import date, datetime
+from datetime import date, datetime, time
 from db_connection import (
     get_trades, get_portfolio,
     update_trade, close_trade, delete_trade,
@@ -168,7 +168,7 @@ else:
             entry_date_str = ''
             if row.get('entry_date'):
                 try:
-                    entry_date_str = pd.to_datetime(row['entry_date']).strftime('%Y-%m-%d')
+                    entry_date_str = pd.to_datetime(row['entry_date']).strftime('%Y-%m-%d %H:%M')
                 except Exception:
                     entry_date_str = str(row['entry_date'])
 
@@ -236,7 +236,7 @@ else:
         exit_date_str = ''
         if row.get('exit_date'):
             try:
-                exit_date_str = pd.to_datetime(row['exit_date']).strftime('%Y-%m-%d')
+                exit_date_str = pd.to_datetime(row['exit_date']).strftime('%Y-%m-%d %H:%M')
             except Exception:
                 exit_date_str = str(row['exit_date'])
 
@@ -333,7 +333,15 @@ if st.session_state['close_trade_id'] is not None:
                     step=0.01,
                     format="%.4f"
                 )
-                close_exit_date = st.date_input("Çıkış Tarihi", value=date.today())
+                ce1, ce2 = st.columns([2, 1])
+                with ce1:
+                    close_exit_date = st.date_input("Çıkış Tarihi", value=date.today())
+                with ce2:
+                    close_exit_time = st.time_input(
+                        "Çıkış Saati",
+                        value=datetime.now().time().replace(second=0, microsecond=0),
+                    )
+                close_exit_datetime = datetime.combine(close_exit_date, close_exit_time)
             with cc2:
                 # Live P&L preview
                 entry_p = float(trade['entry_price'])
@@ -360,7 +368,7 @@ if st.session_state['close_trade_id'] is not None:
             cancel_close = col_b.form_submit_button("❌ İptal", use_container_width=True)
 
             if submit_close:
-                if close_trade(tid, close_exit_price, close_exit_date, close_notes if close_notes else None):
+                if close_trade(tid, close_exit_price, close_exit_datetime, close_notes if close_notes else None):
                     st.success(f"✅ {trade['symbol']} pozisyonu kapatıldı. P&L: ${preview_pnl:,.2f}")
                     st.balloons()
                     _clear_action_state()

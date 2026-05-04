@@ -7,7 +7,7 @@ edit modal'ı ile güncellenebilir.
 """
 
 import streamlit as st
-from datetime import date
+from datetime import date, datetime, time
 from styles import (
     apply_styles, card_title,
     SUCCESS, DANGER, TEXT, TEXT_MUTED, SURFACE, BORDER
@@ -98,7 +98,16 @@ with col_form:
     # Form alanları
     col1, col2 = st.columns(2)
     with col1:
-        entry_date = st.date_input("Tarih", value=date.today())
+        et1, et2 = st.columns([2, 1])
+        with et1:
+            entry_date = st.date_input("Giriş Tarihi", value=date.today(), key="entry_date")
+        with et2:
+            entry_time = st.time_input(
+                "Giriş Saati",
+                value=datetime.now().time().replace(second=0, microsecond=0),
+                key="entry_time",
+            )
+        entry_datetime = datetime.combine(entry_date, entry_time)
         trade_type = st.radio(
             "Yön",
             options=["Long", "Short"],
@@ -258,7 +267,7 @@ if submit:
             "symbol":                symbol,
             "trade_type":            trade_type,
             "strategy":              strategy,
-            "entry_date":            entry_date,
+            "entry_date":            entry_datetime,
             "entry_price":           entry_price,
             "stop_loss":             stop_loss,
             "quantity":              quantity,

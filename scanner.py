@@ -120,7 +120,7 @@ def init_db():
             symbol            VARCHAR(20) NOT NULL,
             trade_type        VARCHAR(10) NOT NULL DEFAULT 'Long',
             strategy          VARCHAR(50),
-            entry_date        DATE NOT NULL,
+            entry_date        TIMESTAMP NOT NULL,
             entry_price       NUMERIC(12,4) NOT NULL,
             stop_loss         NUMERIC(12,4) NOT NULL,
             quantity          INTEGER NOT NULL,
@@ -133,7 +133,7 @@ def init_db():
             sbe_shares        INTEGER,
             r_multiple        NUMERIC(8,2),
             status            VARCHAR(20) DEFAULT 'Open',
-            exit_date         DATE,
+            exit_date         TIMESTAMP,
             exit_price        NUMERIC(12,4),
             profit_loss       NUMERIC(12,2),
             pnl_pct           NUMERIC(8,4),
@@ -146,6 +146,16 @@ def init_db():
         )
     """)
     c.execute("ALTER TABLE trades ADD COLUMN IF NOT EXISTS position_size_dollars NUMERIC(14,2)")
+    try:
+        c.execute("""
+            ALTER TABLE trades
+            ALTER COLUMN entry_date TYPE TIMESTAMP USING entry_date::timestamp,
+            ALTER COLUMN exit_date  TYPE TIMESTAMP USING exit_date::timestamp
+        """)
+        conn.commit()
+    except Exception as _e:
+        conn.rollback()
+        print(f"entry/exit_date already TIMESTAMP or alter skipped: {_e}", flush=True)
     c.execute("CREATE INDEX IF NOT EXISTS idx_trades_status     ON trades(status)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_trades_symbol     ON trades(symbol)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_trades_entry_date ON trades(entry_date)")
