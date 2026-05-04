@@ -19,19 +19,27 @@ log = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-# ============================================
-# Database initialization on container start
-# ============================================
-try:
-    log.info("Calling init_db() on container start...")
-    init_db()
-    log.info("init_db() completed successfully — all tables ensured")
-except Exception as e:
-    log.error("init_db() FAILED at startup: %s", e, exc_info=True)
-    # Don't crash the container — let /scan try again later
-
+_db_initialized = False
 _scan_lock = threading.Lock()
 _scan_running = False
+
+
+@app.before_request
+def _ensure_db_initialized():
+    global _db_initialized
+    if _db_initialized:
+        return
+    try:
+        print("=== _ensure_db_initialized: calling init_db() ===", flush=True)
+        log.info("Lazy init_db() triggered by first request")
+        init_db()
+        _db_initialized = True
+        print("=== init_db() OK, all tables ensured ===", flush=True)
+        log.info("init_db() completed successfully")
+    except Exception as e:
+        print(f"=== init_db() FAILED: {e} ===", flush=True)
+        log.error("init_db() FAILED: %s", e, exc_info=True)
+        # NOT crash — let the request continue
 
 
 def _today_scan_date():
@@ -58,7 +66,31 @@ def _existing_count(scan_date):
 
 @app.route("/health", methods=["GET"])
 def health():
-    return jsonify({"status": "ok"}), 200
+    """Container ve DB sağlık kontrolü."""
+    try:
+        from db_connection import get_connection
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT table_name FROM information_schema.tables
+            WHERE table_schema = 'public' AND table_name IN ('trades', 'journal_entries')
+            ORDER BY table_name
+        """)
+        tables = [r[0] for r in cur.fetchall()]
+        conn.close()
+        return jsonify({
+            "status": "ok",
+            "db_initialized": _db_initialized,
+            "tables_found": tables,
+            "expected_tables": ["journal_entries", "trades"],
+            "all_tables_present": set(tables) >= {"trades", "journal_entries"},
+        })
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "db_initialized": _db_initialized,
+            "error": str(e),
+        }), 500
 
 
 @app.route("/scan", methods=["POST"])
