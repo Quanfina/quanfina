@@ -1,12 +1,10 @@
 import streamlit as st
-import sqlite3
 from datetime import date
 import sys
 import os
 
-# Kök dizindeki database.py dosyasına ulaşabilmek için yolu ekliyoruz
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-import database as db
+from db_connection import insert_trade
 from styles import apply_styles
 
 st.set_page_config(page_title="Yeni Pozisyon | Quanfina", layout="wide")
@@ -64,16 +62,18 @@ if entry_price > 0 and stop_loss > 0 and entry_price > stop_loss:
         elif symbol == "":
             st.error("Lütfen bir hisse sembolü girin.")
         else:
-            # Veritabanına bağlanıp veriyi kaydediyoruz
             try:
-                conn = db.get_connection()
-                cursor = conn.cursor()
-                cursor.execute('''
-                    INSERT INTO trades (symbol, strategy, entry_date, entry_price, stop_loss, quantity, risk_amount, r_multiple, status)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (symbol, strategy, str(date.today()), entry_price, stop_loss, quantity, total_risk_amount, 1.0, 'Open'))
-                conn.commit()
-                conn.close()
+                insert_trade({
+                    "symbol": symbol,
+                    "strategy": strategy,
+                    "entry_date": date.today(),
+                    "entry_price": entry_price,
+                    "stop_loss": stop_loss,
+                    "quantity": quantity,
+                    "risk_amount": total_risk_amount,
+                    "r_multiple": 1.0,
+                    "status": "Open",
+                })
                 st.success(f"Tebrikler! {symbol} işlemi {quantity} adet olarak veritabanına kaydedildi.")
             except Exception as e:
                 st.error(f"Kayıt sırasında bir hata oluştu: {e}")

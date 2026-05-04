@@ -6,7 +6,7 @@ import os
 
 # Kök dizindeki database.py dosyasına ulaşabilmek için
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-import database as db
+from db_connection import get_trades
 from styles import apply_styles
 
 st.set_page_config(page_title="İstatistikler | Quanfina", layout="wide")
@@ -30,10 +30,7 @@ def veri_getir():
         return pd.DataFrame(data)
     else:
         # Gerçek veritabanından sadece KAPANMIŞ işlemleri çekiyoruz
-        conn = db.get_connection()
-        df = pd.read_sql_query("SELECT symbol, strategy, r_multiple FROM trades WHERE status = 'Closed'", conn)
-        conn.close()
-        return df
+        return get_trades(status="Closed")[["symbol", "strategy", "r_multiple"]]
 
 df_istatistik = veri_getir()
 

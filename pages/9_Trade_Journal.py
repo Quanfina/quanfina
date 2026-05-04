@@ -2,11 +2,9 @@ import streamlit as st
 from datetime import date
 import sys
 import os
-import pandas as pd
 
-# Kök dizindeki database.py dosyasına ulaşabilmek için
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-import database as db
+from db_connection import get_journal, insert_journal
 from styles import apply_styles
 
 st.set_page_config(page_title="Trade Journal | Quanfina", layout="wide")
@@ -37,15 +35,7 @@ with tab_gunluk:
             st.warning("Lütfen kaydetmeden önce bir şeyler yazın.")
         else:
             try:
-                conn = db.get_connection()
-                cursor = conn.cursor()
-                # 'journal' tablosuna 'Daily' kategorisiyle kaydediyoruz
-                cursor.execute('''
-                    INSERT INTO journal (date, category, content)
-                    VALUES (?, ?, ?)
-                ''', (str(date.today()), 'Daily', daily_note))
-                conn.commit()
-                conn.close()
+                insert_journal(date.today(), "Daily", daily_note)
                 st.success("Günlük notunuz başarıyla kaydedildi!")
             except Exception as e:
                 st.error(f"Kayıt hatası: {e}")
@@ -54,16 +44,15 @@ with tab_gunluk:
     st.markdown("### Geçmiş Günlük Notlar")
     # Kayıtlı notları veritabanından çekip gösterelim
     try:
-        conn = db.get_connection()
-        df_notes = pd.read_sql_query("SELECT date as Tarih, content as Not_İçeriği FROM journal WHERE category='Daily' ORDER BY id DESC", conn)
-        conn.close()
-        
+        df_raw = get_journal(category="Daily")
+        df_notes = df_raw[["date", "content"]].rename(columns={"date": "Tarih", "content": "Not_İçeriği"})
+
         if df_notes.empty:
             st.info("Henüz geçmiş bir not bulunmuyor.")
         else:
             st.dataframe(df_notes, use_container_width=True, hide_index=True)
-    except:
-        st.write("Notlar yüklenirken bir sorun oluştu.")
+    except Exception as e:
+        st.write(f"Notlar yüklenirken bir sorun oluştu: {e}")
 
 # --- DİĞER BÖLÜMLER (Şimdilik İskelet) ---
 with tab_trade:

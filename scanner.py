@@ -114,6 +114,49 @@ def init_db():
         )
     """)
     c.execute("ALTER TABLE sector_rotation ADD COLUMN IF NOT EXISTS perf_1w DOUBLE PRECISION")
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS trades (
+            id                SERIAL PRIMARY KEY,
+            symbol            VARCHAR(20) NOT NULL,
+            trade_type        VARCHAR(10) NOT NULL DEFAULT 'Long',
+            strategy          VARCHAR(50),
+            entry_date        DATE NOT NULL,
+            entry_price       NUMERIC(12,4) NOT NULL,
+            stop_loss         NUMERIC(12,4) NOT NULL,
+            quantity          INTEGER NOT NULL,
+            risk_amount       NUMERIC(12,2),
+            risk_pct          NUMERIC(8,4),
+            risk_equity_pct   NUMERIC(8,4),
+            position_size_pct NUMERIC(8,4),
+            breakeven         NUMERIC(12,4),
+            sbe_pct           NUMERIC(8,4),
+            sbe_shares        INTEGER,
+            r_multiple        NUMERIC(8,2),
+            status            VARCHAR(20) DEFAULT 'Open',
+            exit_date         DATE,
+            exit_price        NUMERIC(12,4),
+            profit_loss       NUMERIC(12,2),
+            pnl_pct           NUMERIC(8,4),
+            commission        NUMERIC(8,2) DEFAULT 0,
+            portfolio_id      INTEGER DEFAULT 1,
+            notes             TEXT,
+            created_at        TIMESTAMP DEFAULT NOW(),
+            updated_at        TIMESTAMP DEFAULT NOW()
+        )
+    """)
+    c.execute("CREATE INDEX IF NOT EXISTS idx_trades_status     ON trades(status)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_trades_symbol     ON trades(symbol)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_trades_entry_date ON trades(entry_date)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_trades_portfolio  ON trades(portfolio_id)")
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS journal_entries (
+            id               SERIAL PRIMARY KEY,
+            date             DATE NOT NULL,
+            category         TEXT,
+            content          TEXT,
+            linked_trade_id  INTEGER REFERENCES trades(id)
+        )
+    """)
     conn.commit()
     conn.close()
 
