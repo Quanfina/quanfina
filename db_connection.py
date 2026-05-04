@@ -1,9 +1,12 @@
 import os
+import logging
 import psycopg2
 import pandas as pd
 from sqlalchemy import create_engine
 from urllib.parse import quote_plus
 from dotenv import load_dotenv
+
+log = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -174,3 +177,138 @@ def insert_journal(date_val, category, content, linked_trade_id=None):
     """, (date_val, category, content, linked_trade_id))
     conn.commit()
     conn.close()
+
+
+# ──────────────────────────────────────────────────
+# Sprint 3C — Trade CRUD Helpers
+# ──────────────────────────────────────────────────
+
+def update_trade(trade_id: int, data: dict) -> bool:
+    """
+    Trade kaydını günceller. data dict'i sadece güncellenecek field'ları içerir.
+    Allowed fields: symbol, trade_type, strategy, entry_date, entry_price,
+                   stop_loss, quantity, commission, notes, risk_amount,
+                   risk_pct, risk_equity_pct, position_size_pct, breakeven,
+                   sbe_pct, sbe_shares, position_size_dollars
+    """
+    if not data:
+        return False
+
+    allowed = {
+        'symbol', 'trade_type', 'strategy', 'entry_date', 'entry_price',
+        'stop_loss', 'quantity', 'commission', 'notes', 'risk_amount',
+        'risk_pct', 'risk_equity_pct', 'position_size_pct', 'breakeven',
+        'sbe_pct', 'sbe_shares', 'position_size_dollars'
+    }
+    filtered = {k: v for k, v in data.items() if k in allowed}
+    if not filtered:
+        return False
+
+    set_clause = ', '.join(f"{k} = %({k})s" for k in filtered.keys())
+    filtered['trade_id'] = trade_id
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"UPDATE trades SET {set_clause}, updated_at = NOW() "
+                f"WHERE id = %(trade_id)s",
+                filtered
+            )
+            conn.commit()
+            return cur.rowcount > 0
+    except Exception as e:
+        conn.rollback()
+        log.error(f"update_trade error: {e}")
+        return False
+    finally:
+        conn.close()
+
+
+def close_trade(trade_id: int, exit_price: float, exit_date,
+                exit_notes: str = None) -> bool:
+    """
+    Trade'i kapatır. P&L ve r_multiple otomatik hesaplanır.
+
+    Long P&L:  (exit - entry) * quantity - commission
+    Short P&L: (entry - exit) * quantity - commission
+
+    r_multiple = profit_loss / risk_amount
+
+    Markets 360 aB() formülünün Python karşılığı.
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT trade_type, entry_price, quantity, commission, "
+                "risk_amount, notes FROM trades WHERE id = %s AND status = 'Open'",
+                (trade_id,)
+            )
+            row = cur.fetchone()
+            if not row:
+                log.warning(f"close_trade: trade {trade_id} not found or already closed")
+                return False
+
+            trade_type, entry_price, quantity, commission, risk_amount, current_notes = row
+
+            entry_p = float(entry_price)
+            exit_p  = float(exit_price)
+            qty     = float(quantity)
+            comm    = float(commission or 0)
+
+            if trade_type == 'Short':
+                profit_loss = (entry_p - exit_p) * qty - comm
+            else:  # Long
+                profit_loss = (exit_p - entry_p) * qty - comm
+
+            pnl_pct    = (profit_loss / (entry_p * qty)) * 100 if entry_p * qty > 0 else 0
+            r_multiple = profit_loss / float(risk_amount) if risk_amount and float(risk_amount) > 0 else 0
+
+            final_notes = current_notes or ''
+            if exit_notes:
+                final_notes = f"{final_notes}\n\n[Çıkış: {exit_date}] {exit_notes}".strip()
+
+            cur.execute(
+                "UPDATE trades SET status = 'Closed', exit_date = %s, exit_price = %s, "
+                "profit_loss = %s, pnl_pct = %s, r_multiple = %s, notes = %s, "
+                "updated_at = NOW() WHERE id = %s",
+                (exit_date, exit_price, profit_loss, pnl_pct, r_multiple,
+                 final_notes if exit_notes else current_notes, trade_id)
+            )
+            conn.commit()
+            log.info(f"close_trade: {trade_id} closed. P&L: {profit_loss:.2f} ({pnl_pct:.2f}%), R: {r_multiple:.2f}")
+            return cur.rowcount > 0
+    except Exception as e:
+        conn.rollback()
+        log.error(f"close_trade error: {e}")
+        return False
+    finally:
+        conn.close()
+
+
+def delete_trade(trade_id: int, soft: bool = True) -> bool:
+    """
+    Trade siler.
+    soft=True (default): status='Deleted' olarak işaretle (geri alınabilir)
+    soft=False: Tam DELETE (geri dönüşü yok)
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            if soft:
+                cur.execute(
+                    "UPDATE trades SET status = 'Deleted', updated_at = NOW() "
+                    "WHERE id = %s",
+                    (trade_id,)
+                )
+            else:
+                cur.execute("DELETE FROM trades WHERE id = %s", (trade_id,))
+            conn.commit()
+            return cur.rowcount > 0
+    except Exception as e:
+        conn.rollback()
+        log.error(f"delete_trade error: {e}")
+        return False
+    finally:
+        conn.close()
