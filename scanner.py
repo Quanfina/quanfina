@@ -145,6 +145,7 @@ def init_db():
             updated_at        TIMESTAMP DEFAULT NOW()
         )
     """)
+    c.execute("ALTER TABLE trades ADD COLUMN IF NOT EXISTS position_size_dollars NUMERIC(14,2)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_trades_status     ON trades(status)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_trades_symbol     ON trades(symbol)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_trades_entry_date ON trades(entry_date)")
