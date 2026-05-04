@@ -7,8 +7,10 @@ import os
 # Kök dizindeki database.py dosyasına ulaşabilmek için
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import database as db
+from styles import apply_styles
 
 st.set_page_config(page_title="İstatistikler | Quanfina", layout="wide")
+apply_styles()
 
 st.title("📈 İstatistikler ve Performans")
 st.write("Sistemin uzun vadeli beklentisi (Expectancy) ve R-Multiple analizleri.")

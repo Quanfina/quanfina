@@ -7,8 +7,10 @@ import os
 # Kök dizindeki database.py dosyasına ulaşabilmek için yolu ekliyoruz
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import database as db
+from styles import apply_styles
 
 st.set_page_config(page_title="Yeni Pozisyon | Quanfina", layout="wide")
+apply_styles()
 
 st.title("🎯 Yeni Pozisyon Ekle")
 st.write("Bu sayfa **Van K. Tharp**'ın R-Multiple mantığına göre pozisyon büyüklüğünü otomatik hesaplar.")

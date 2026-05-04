@@ -6,9 +6,11 @@ import os
 # Kök dizindeki database.py dosyasına ulaşabilmek için yol ayarı
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import database as db
+from styles import apply_styles
 
 # Sayfa ayarları (Bu hep en üstte olmalıdır)
 st.set_page_config(page_title="Genel Bakış | Quanfina", page_icon="📊", layout="wide")
+apply_styles()
 
 st.title("📊 Genel Bakış")
 st.write("Quanfina sistemine hoş geldin. İşte portföyünün ve piyasanın anlık özeti.")

@@ -6,8 +6,10 @@ from datetime import date, datetime, timedelta
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from db_connection import get_connection, get_engine
+from styles import apply_styles
 
 st.set_page_config(page_title="Minervini Trend Template", layout="wide")
+apply_styles()
 
 @st.cache_resource
 def _get_engine():

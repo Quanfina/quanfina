@@ -11,8 +11,10 @@ import plotly.express as px
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from db_connection import get_engine
+from styles import apply_styles
 
 st.set_page_config(page_title="Sektör Rotasyonu", page_icon="🔄", layout="wide")
+apply_styles()
 
 
 @st.cache_resource
