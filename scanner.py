@@ -137,9 +137,10 @@ def init_db():
             exit_price        NUMERIC(12,4),
             profit_loss       NUMERIC(12,2),
             pnl_pct           NUMERIC(8,4),
-            commission        NUMERIC(8,2) DEFAULT 0,
-            portfolio_id      INTEGER DEFAULT 1,
-            notes             TEXT,
+            commission            NUMERIC(8,2) DEFAULT 0,
+            portfolio_id          INTEGER DEFAULT 1,
+            position_size_dollars NUMERIC(14,2),
+            notes                 TEXT,
             created_at        TIMESTAMP DEFAULT NOW(),
             updated_at        TIMESTAMP DEFAULT NOW()
         )
@@ -148,6 +149,21 @@ def init_db():
     c.execute("CREATE INDEX IF NOT EXISTS idx_trades_symbol     ON trades(symbol)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_trades_entry_date ON trades(entry_date)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_trades_portfolio  ON trades(portfolio_id)")
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS portfolios (
+            id              SERIAL PRIMARY KEY,
+            name            VARCHAR(50) DEFAULT 'Main',
+            starting_value  NUMERIC(14,2) NOT NULL,
+            current_value   NUMERIC(14,2) NOT NULL,
+            created_at      TIMESTAMP DEFAULT NOW(),
+            updated_at      TIMESTAMP DEFAULT NOW()
+        )
+    """)
+    c.execute("""
+        INSERT INTO portfolios (id, name, starting_value, current_value)
+        VALUES (1, 'Main', 10000, 10000)
+        ON CONFLICT (id) DO NOTHING
+    """)
     c.execute("""
         CREATE TABLE IF NOT EXISTS journal_entries (
             id               SERIAL PRIMARY KEY,

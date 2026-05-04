@@ -71,12 +71,12 @@ def insert_trade(data: dict):
             symbol, trade_type, strategy, entry_date, entry_price, stop_loss,
             quantity, risk_amount, risk_pct, risk_equity_pct, position_size_pct,
             breakeven, sbe_pct, sbe_shares, r_multiple, status,
-            commission, portfolio_id, notes
+            commission, portfolio_id, position_size_dollars, notes
         ) VALUES (
             %s, %s, %s, %s, %s, %s,
             %s, %s, %s, %s, %s,
             %s, %s, %s, %s, %s,
-            %s, %s, %s
+            %s, %s, %s, %s
         )
     """, (
         data["symbol"],
@@ -97,10 +97,62 @@ def insert_trade(data: dict):
         data.get("status", "Open"),
         data.get("commission", 0),
         data.get("portfolio_id", 1),
+        data.get("position_size_dollars"),
         data.get("notes"),
     ))
     conn.commit()
     conn.close()
+
+
+def get_portfolio(portfolio_id: int = 1):
+    """Portföy bilgisini dict olarak döndür."""
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT id, name, starting_value, current_value,
+               created_at, updated_at
+        FROM portfolios WHERE id = %s
+    """, (portfolio_id,))
+    row = cur.fetchone()
+    conn.close()
+    if not row:
+        return None
+    return {
+        "id": row[0], "name": row[1],
+        "starting_value": float(row[2]),
+        "current_value": float(row[3]),
+        "created_at": row[4], "updated_at": row[5],
+    }
+
+
+def update_portfolio(portfolio_id: int, current_value: float) -> bool:
+    """Portföy current_value'sini güncelle."""
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        UPDATE portfolios
+        SET current_value = %s, updated_at = NOW()
+        WHERE id = %s
+    """, (current_value, portfolio_id))
+    affected = cur.rowcount
+    conn.commit()
+    conn.close()
+    return affected > 0
+
+
+def update_portfolio_starting(portfolio_id: int, starting_value: float) -> bool:
+    """Portföy starting_value'sini güncelle (YTD baseline)."""
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        UPDATE portfolios
+        SET starting_value = %s, updated_at = NOW()
+        WHERE id = %s
+    """, (starting_value, portfolio_id))
+    affected = cur.rowcount
+    conn.commit()
+    conn.close()
+    return affected > 0
 
 
 def get_journal(category=None):
