@@ -310,3 +310,119 @@ header[data-testid="stHeader"] {{
 def apply_styles():
     """Sayfanin basinda cagirin: Montserrat font + Minervini-tarzi koyu tema."""
     st.markdown(_CSS, unsafe_allow_html=True)
+
+
+# ============================================================
+# HELPER FONKSIYONLAR - Minervini tarzi pill, chip, status dot
+# ============================================================
+
+def tag(text: str, severity: str = "info") -> str:
+    """
+    Minervini Markets 360 tarzi pill etiket. Pastel BG + koyu text.
+
+    severity: "success" | "info" | "warn" | "danger" | "neutral"
+
+    Kullanim:
+        st.markdown(tag("Reversal Alert", "warn"), unsafe_allow_html=True)
+    """
+    palettes = {
+        "success": ("rgba(88,189,125,0.15)", "#9cd8b2"),
+        "info":    ("rgba(129,140,248,0.15)", "#a5b4fc"),
+        "warn":    ("rgba(251,146,60,0.15)", "#fb923c"),
+        "danger":  ("rgba(255,36,36,0.15)", "#ff6a6a"),
+        "neutral": (SURFACE_HOVER, TEXT_MUTED),
+    }
+    bg, fg = palettes.get(severity, palettes["info"])
+    return (
+        f'<span style="display:inline-flex; align-items:center; '
+        f'background:{bg}; color:{fg}; '
+        f'padding:4px 10px; border-radius:{RADIUS_PILL}; '
+        f'font-size:12px; font-weight:600; line-height:1; '
+        f'font-family:Montserrat,sans-serif;">{text}</span>'
+    )
+
+
+def chip_long(label: str = "L") -> str:
+    """Long pozisyon yesil chip. Minervini'nin tablodaki 'L' kutusu."""
+    return (
+        f'<span style="display:inline-flex; align-items:center; justify-content:center; '
+        f'background:rgba(88,189,125,0.2); color:#9cd8b2; '
+        f'min-width:24px; height:22px; padding:0 8px; '
+        f'border-radius:4px; font-size:11px; font-weight:700; '
+        f'font-family:Montserrat,sans-serif;">{label}</span>'
+    )
+
+
+def chip_short(label: str = "S") -> str:
+    """Short pozisyon kirmizi chip."""
+    return (
+        f'<span style="display:inline-flex; align-items:center; justify-content:center; '
+        f'background:rgba(255,36,36,0.2); color:#ff6a6a; '
+        f'min-width:24px; height:22px; padding:0 8px; '
+        f'border-radius:4px; font-size:11px; font-weight:700; '
+        f'font-family:Montserrat,sans-serif;">{label}</span>'
+    )
+
+
+def status_dot(label: str, status: str = "online") -> str:
+    """
+    Status indicator: yesil/kirmizi/sari nokta + label.
+
+    status: "online" | "offline" | "pending"
+    """
+    colors = {
+        "online":  SUCCESS,
+        "offline": DANGER,
+        "pending": WARNING,
+    }
+    color = colors.get(status, SUCCESS)
+    return (
+        f'<span style="display:inline-flex; align-items:center; gap:6px; '
+        f'font-size:11px; color:{TEXT_MUTED}; font-weight:500; '
+        f'text-transform:uppercase; letter-spacing:0.05em; '
+        f'font-family:Montserrat,sans-serif;">'
+        f'<span style="width:8px; height:8px; border-radius:50%; '
+        f'background:{color}; box-shadow:0 0 6px {color};"></span>'
+        f'{label}</span>'
+    )
+
+
+def colored_pct(value: float, decimals: int = 2) -> str:
+    """
+    Otomatik renkli yuzde gosterimi. Pozitif yesil, negatif kirmizi.
+
+    Kullanim:
+        st.markdown(colored_pct(-1.78), unsafe_allow_html=True)
+    """
+    if value > 0:
+        color = SUCCESS_TEXT
+        sign = "+"
+    elif value < 0:
+        color = "#ff5c5c"
+        sign = ""
+    else:
+        color = TEXT_MUTED
+        sign = ""
+    return (
+        f'<span style="color:{color}; font-weight:600; '
+        f'font-family:Montserrat,sans-serif;">'
+        f'{sign}{value:.{decimals}f}%</span>'
+    )
+
+
+def card_title(text: str, subtitle: str = None) -> str:
+    """
+    Minervini tarzi kart basligi: 20px kalin baslik + opsiyonel subtitle.
+    PrimeVue p-card-title ile birebir.
+    """
+    html = (
+        f'<div style="font-size:20px; line-height:30px; font-weight:600; '
+        f'color:{TEXT}; margin-bottom:4px; '
+        f'font-family:Montserrat,sans-serif;">{text}</div>'
+    )
+    if subtitle:
+        html += (
+            f'<div style="font-size:13px; color:{TEXT_MUTED}; '
+            f'margin-bottom:16px; font-family:Montserrat,sans-serif;">{subtitle}</div>'
+        )
+    return html

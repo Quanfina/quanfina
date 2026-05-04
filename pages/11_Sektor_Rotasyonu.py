@@ -11,7 +11,7 @@ import plotly.express as px
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from db_connection import get_engine
-from styles import apply_styles
+from styles import apply_styles, tag, colored_pct, card_title
 
 st.set_page_config(page_title="Sektör Rotasyonu", page_icon="🔄", layout="wide")
 apply_styles()
@@ -113,6 +113,62 @@ selected_date = st.selectbox(
 )
 
 df = load_sectors(selected_date)
+
+# === MINERVINI TARZI OZET BANDI (3 KOLON) ===
+if not df.empty:
+    lider = df.iloc[0]
+    zayif = df.iloc[-1]
+    ort_rs = df["rs_score"].mean()
+    sektor_sayisi = len(df)
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.markdown(card_title("Lider Sektor"), unsafe_allow_html=True)
+        st.markdown(
+            f'<div style="display:flex; align-items:baseline; gap:8px; margin-bottom:8px;">'
+            f'<span style="font-size:24px; font-weight:700;">{lider["ticker"]}</span>'
+            f'{tag(lider["sector_name"], "info")}'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f'<div style="font-size:14px;">RS: '
+            f'<span style="font-size:20px; font-weight:700; color:#9cd8b2;">{lider["rs_score"]:.2f}</span> '
+            f'· 1A {colored_pct(lider["perf_1m"], 1)}</div>',
+            unsafe_allow_html=True,
+        )
+
+    with col2:
+        st.markdown(card_title("Zayif Sektor"), unsafe_allow_html=True)
+        st.markdown(
+            f'<div style="display:flex; align-items:baseline; gap:8px; margin-bottom:8px;">'
+            f'<span style="font-size:24px; font-weight:700;">{zayif["ticker"]}</span>'
+            f'{tag(zayif["sector_name"], "danger")}'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f'<div style="font-size:14px;">RS: '
+            f'<span style="font-size:20px; font-weight:700; color:#ff6a6a;">{zayif["rs_score"]:.2f}</span> '
+            f'· 1A {colored_pct(zayif["perf_1m"], 1)}</div>',
+            unsafe_allow_html=True,
+        )
+
+    with col3:
+        st.markdown(card_title("Ortalama RS"), unsafe_allow_html=True)
+        st.markdown(
+            f'<div style="font-size:24px; font-weight:700; margin-bottom:8px;">'
+            f'{ort_rs:.2f}</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f'<div style="font-size:14px; color:#80808e;">'
+            f'{sektor_sayisi} sektor analiz ediliyor</div>',
+            unsafe_allow_html=True,
+        )
+
+    st.divider()
 
 st.info(
     "📊 **RS Score formülü:** (1A × 0.4) + (3A × 0.2) + (6A × 0.2) + (1Y × 0.2). "

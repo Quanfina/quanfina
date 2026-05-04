@@ -9,8 +9,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app.py database.py db_connection.py scanner.py ./
+COPY app.py database.py db_connection.py scanner.py styles.py ./
 COPY pages/ ./pages/
+COPY .streamlit/ ./.streamlit/
 
 ENV PYTHONUNBUFFERED=1
 
