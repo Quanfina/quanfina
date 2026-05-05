@@ -316,3 +316,132 @@ def delete_trade(trade_id: int, soft: bool = True) -> bool:
         return False
     finally:
         conn.close()
+
+
+# ──────────────────────────────────────────────────
+# Schema Migration — Trade Journal Tabloları
+# ──────────────────────────────────────────────────
+
+def init_trade_journal_tables() -> int:
+    """
+    Trade Journal mimarisinin PostgreSQL tablolarını oluşturur / günceller.
+    İdempotent — tekrar çalıştırılabilir, mevcut veriyi bozmaz.
+    Manuel çalıştırılır, uygulama başlangıcında otomatik çağrılmaz.
+
+    Döndürür: temizlenen orphan journal_entries satır sayısı.
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+
+            # ── 1. trades: 13 yeni kolon ───────────────────────────────────
+            for stmt in [
+                "ALTER TABLE trades ADD COLUMN IF NOT EXISTS invest_type         SMALLINT CHECK (invest_type IN (1, 2))",
+                "ALTER TABLE trades ADD COLUMN IF NOT EXISTS code                TEXT",
+                "ALTER TABLE trades ADD COLUMN IF NOT EXISTS entry_tpr_score     REAL",
+                "ALTER TABLE trades ADD COLUMN IF NOT EXISTS entry_rpr_score     REAL",
+                "ALTER TABLE trades ADD COLUMN IF NOT EXISTS entry_buyrisk_score REAL",
+                "ALTER TABLE trades ADD COLUMN IF NOT EXISTS entry_buyrisk_8w    REAL",
+                "ALTER TABLE trades ADD COLUMN IF NOT EXISTS entry_buyrisk_10w   REAL",
+                "ALTER TABLE trades ADD COLUMN IF NOT EXISTS entry_high_52wk     REAL",
+                "ALTER TABLE trades ADD COLUMN IF NOT EXISTS entry_sma_20        REAL",
+                "ALTER TABLE trades ADD COLUMN IF NOT EXISTS entry_avg_vol_50    BIGINT",
+                "ALTER TABLE trades ADD COLUMN IF NOT EXISTS manual_grade        TEXT",
+                "ALTER TABLE trades ADD COLUMN IF NOT EXISTS monalert_mode       TEXT DEFAULT 'off' CHECK (monalert_mode IN ('off', 'monitor', 'monitor_email'))",
+                "ALTER TABLE trades ADD COLUMN IF NOT EXISTS deleted_at          TIMESTAMP",
+            ]:
+                cur.execute(stmt)
+            log.info("init_trade_journal_tables: trades kolonları güncellendi")
+
+            # ── 2. trade_legs ──────────────────────────────────────────────
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS trade_legs (
+                    id         SERIAL PRIMARY KEY,
+                    trade_id   INTEGER NOT NULL REFERENCES trades(id) ON DELETE CASCADE,
+                    leg_idx    INTEGER NOT NULL,
+                    shares     NUMERIC NOT NULL,
+                    price      NUMERIC NOT NULL,
+                    leg_date   DATE NOT NULL,
+                    note       TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE (trade_id, leg_idx)
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_trade_legs_trade_id ON trade_legs(trade_id)")
+
+            # ── 3. trade_exits ─────────────────────────────────────────────
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS trade_exits (
+                    id         SERIAL PRIMARY KEY,
+                    leg_id     INTEGER NOT NULL REFERENCES trade_legs(id) ON DELETE CASCADE,
+                    shares     NUMERIC NOT NULL,
+                    price      NUMERIC NOT NULL,
+                    exit_date  DATE NOT NULL,
+                    reason     TEXT CHECK (reason IN ('sbe', 'stop', 'target', 'manual', 'trailing')),
+                    note       TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_trade_exits_leg_id ON trade_exits(leg_id)")
+
+            # ── 4. stop_history ────────────────────────────────────────────
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS stop_history (
+                    id         SERIAL PRIMARY KEY,
+                    trade_id   INTEGER NOT NULL REFERENCES trades(id) ON DELETE CASCADE,
+                    stop_price NUMERIC NOT NULL,
+                    set_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    reason     TEXT CHECK (reason IN ('initial', 'manual', 'trailing', 'sbe')),
+                    note       TEXT
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_stop_history_trade_id ON stop_history(trade_id)")
+
+            # ── 5. trades index'leri ───────────────────────────────────────
+            for idx_sql in [
+                "CREATE INDEX IF NOT EXISTS idx_trades_symbol     ON trades(symbol)",
+                "CREATE INDEX IF NOT EXISTS idx_trades_status     ON trades(status)",
+                "CREATE INDEX IF NOT EXISTS idx_trades_entry_date ON trades(entry_date)",
+                "CREATE INDEX IF NOT EXISTS idx_trades_portfolio  ON trades(portfolio_id)",
+            ]:
+                cur.execute(idx_sql)
+
+            # ── 6. journal_entries: orphan cleanup + FK constraint ─────────
+            cur.execute("""
+                UPDATE journal_entries
+                SET linked_trade_id = NULL
+                WHERE linked_trade_id IS NOT NULL
+                  AND linked_trade_id NOT IN (SELECT id FROM trades)
+            """)
+            orphan_count = cur.rowcount
+            if orphan_count:
+                log.warning(
+                    f"init_trade_journal_tables: {orphan_count} orphan "
+                    "journal_entries satırı NULL'a çekildi"
+                )
+
+            cur.execute("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.table_constraints
+                        WHERE constraint_name = 'fk_journal_trade'
+                          AND table_name = 'journal_entries'
+                    ) THEN
+                        ALTER TABLE journal_entries
+                        ADD CONSTRAINT fk_journal_trade
+                        FOREIGN KEY (linked_trade_id) REFERENCES trades(id) ON DELETE SET NULL;
+                    END IF;
+                END $$
+            """)
+
+            conn.commit()
+            log.info("init_trade_journal_tables: tamamlandı")
+            return orphan_count
+
+    except Exception as e:
+        conn.rollback()
+        log.error(f"init_trade_journal_tables error: {e}")
+        raise
+    finally:
+        conn.close()

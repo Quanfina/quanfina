@@ -1,0 +1,2 @@
+# Development dependencies — production'a girmez
+pytest>=8.0
