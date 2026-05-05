@@ -1166,7 +1166,7 @@ def run_scan():
     print("\n4. EPS/Sales Q/Q scraping ve grade hesaplaması...")
     c.execute("""
         SELECT ticker, earnings_date, eps_last_updated
-        FROM minervini_scans WHERE scan_date = ?
+        FROM minervini_scans WHERE scan_date = %s
     """, (scan_date,))
     tickers_data = c.fetchall()
 

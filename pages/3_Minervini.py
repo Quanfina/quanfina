@@ -285,8 +285,9 @@ def apply_filters(data, sektor, grade_list, siralama, arama, table_type="super",
     d = data.copy()
     if sektor != "Tümü":
         d = d[d["sector"] == sektor]
-    if grade_list:
-        d = d[d["grade"].isin(grade_list)]
+    if grade_list and set(grade_list) != {"A", "B", "C", "D"}:
+        # NULL grade'ler dahil edilir: scanner step 2 tamamlanmamış olabilir
+        d = d[d["grade"].isin(grade_list) | d["grade"].isna()]
     if arama:
         q = arama.strip().upper()
         mask = (d["ticker"].str.upper().str.contains(q, na=False) |
