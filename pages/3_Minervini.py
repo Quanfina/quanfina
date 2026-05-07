@@ -51,7 +51,14 @@ def load_scan(scan_date):
 
 def get_available_dates():
     dates = pd.read_sql_query(
-        "SELECT DISTINCT scan_date FROM minervini_scans ORDER BY scan_date DESC",
+        """
+        SELECT DISTINCT s.scan_date
+        FROM minervini_scans s
+        WHERE EXISTS (SELECT 1 FROM minervini_fundamental_scans f WHERE f.scan_date = s.scan_date)
+          AND EXISTS (SELECT 1 FROM minervini_52w_high h         WHERE h.scan_date = s.scan_date)
+          AND EXISTS (SELECT 1 FROM minervini_fundamental_only o WHERE o.scan_date = s.scan_date)
+        ORDER BY s.scan_date DESC
+        """,
         _get_engine()
     )
     return dates["scan_date"].tolist()
