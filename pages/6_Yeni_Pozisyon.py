@@ -266,6 +266,7 @@ if submit:
         data = {
             "symbol":                symbol,
             "trade_type":            trade_type,
+            "invest_type":           1 if trade_type == "Long" else 2,
             "strategy":              strategy,
             "entry_date":            entry_datetime,
             "entry_price":           entry_price,

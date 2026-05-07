@@ -73,19 +73,20 @@ def insert_trade(data: dict):
     cur = conn.cursor()
     cur.execute("""
         INSERT INTO trades (
-            symbol, trade_type, strategy, entry_date, entry_price, stop_loss,
+            symbol, trade_type, invest_type, strategy, entry_date, entry_price, stop_loss,
             quantity, risk_amount, risk_pct, risk_equity_pct, position_size_pct,
             breakeven, sbe_pct, sbe_shares, r_multiple, status,
             commission, portfolio_id, position_size_dollars, notes
         ) VALUES (
             %s, %s, %s, %s, %s, %s,
-            %s, %s, %s, %s, %s,
+            %s, %s, %s, %s, %s, %s,
             %s, %s, %s, %s, %s,
             %s, %s, %s, %s
         )
     """, (
         data["symbol"],
         data.get("trade_type", "Long"),
+        data.get("invest_type"),
         data.get("strategy"),
         data.get("entry_date"),
         data.get("entry_price"),
