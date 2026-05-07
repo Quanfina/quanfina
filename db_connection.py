@@ -274,9 +274,34 @@ def close_trade(trade_id: int, exit_price: float, exit_date,
                 (exit_date, exit_price, profit_loss, pnl_pct, r_multiple,
                  final_notes if exit_notes else current_notes, trade_id)
             )
+            closed_rows = cur.rowcount
+
+            # leg_exits: leg olan trade'lerde kalan payı kaydet
+            cur.execute(
+                "SELECT id, shares FROM trade_legs WHERE trade_id = %s ORDER BY leg_idx",
+                (trade_id,)
+            )
+            legs = cur.fetchall()
+            for leg_id, leg_shares in legs:
+                cur.execute(
+                    "SELECT COALESCE(SUM(shares), 0) FROM leg_exits WHERE leg_id = %s",
+                    (leg_id,)
+                )
+                already_exited = float(cur.fetchone()[0])
+                remaining = float(leg_shares) - already_exited
+                if remaining > 0:
+                    cur.execute(
+                        "INSERT INTO leg_exits (leg_id, exit_idx, shares, price, exit_date, reason) "
+                        "VALUES (%s, "
+                        "(SELECT COALESCE(MAX(exit_idx), 0) + 1 FROM leg_exits WHERE leg_id = %s), "
+                        "%s, %s, %s, 'manual')",
+                        (leg_id, leg_id, remaining, exit_price, exit_date)
+                    )
+                    log.info(f"close_trade: leg_exits INSERT leg_id={leg_id} shares={remaining}")
+
             conn.commit()
             log.info(f"close_trade: {trade_id} closed. P&L: {profit_loss:.2f} ({pnl_pct:.2f}%), R: {r_multiple:.2f}")
-            return cur.rowcount > 0
+            return closed_rows > 0
     except Exception as e:
         conn.rollback()
         log.error(f"close_trade error: {e}")
