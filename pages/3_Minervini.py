@@ -112,18 +112,55 @@ def render_list_tab(list_code: str) -> None:
     if len(df) == 0:
         st.info(
             "**Bu liste henuz bos.**\n\n"
-            "Sprint 4.{}'te bu liste populate edilecek. "
-            "Mevcut Watch verisi icin sayfayi degistir: 'Minervini Old' "
-            "(7+4 eski yapi paralel calisiyor).".format(meta["sort_order"] + 2)
+            "Sprint 4.3b'de test verisi eklenebilir:\n"
+            "`venv\\Scripts\\python.exe scripts\\seed_symbol_lists.py`"
         )
-        with st.expander("Bu liste icin hedef sutun yapisi (Sprint 4.{})".format(meta["sort_order"] + 2)):
-            st.write("**Sutun sayisi:** {} sutun".format(len(expected_cols)))
-            st.write("**Sutunlar:**")
+        with st.expander("Bu liste icin hedef sutun yapisi"):
             label_data = [{"DB Kolon": c, "Display Label": get_label(c)} for c in expected_cols]
             st.dataframe(pd.DataFrame(label_data), use_container_width=True, hide_index=True)
         return
 
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    # Liste tipine gore sutunlari filtrele
+    available_cols = [c for c in expected_cols if c in df.columns]
+    display_df = df[available_cols].copy()
+
+    # Sutun isimlerini Turkce label'a cevir
+    display_df.columns = [get_label(c) for c in available_cols]
+
+    column_config = {}
+    if "FIYAT" in display_df.columns:
+        column_config["FIYAT"] = st.column_config.NumberColumn(format="$%.2f")
+    if "DEGISIM" in display_df.columns:
+        column_config["DEGISIM"] = st.column_config.NumberColumn(format="%.2f%%")
+    if "RS (IBD)" in display_df.columns:
+        column_config["RS (IBD)"] = st.column_config.NumberColumn(format="%.0f")
+    if "RS (12A)" in display_df.columns:
+        column_config["RS (12A)"] = st.column_config.NumberColumn(format="%.0f")
+    if "MA200 SLOPE" in display_df.columns:
+        column_config["MA200 SLOPE"] = st.column_config.NumberColumn(format="%.2f")
+    if "% YUKSEK MESAFE" in display_df.columns:
+        column_config["% YUKSEK MESAFE"] = st.column_config.NumberColumn(format="%.1f%%")
+    if "HACIM" in display_df.columns:
+        column_config["HACIM"] = st.column_config.NumberColumn(format="%d")
+    if "PIYASA DEGERI (M)" in display_df.columns:
+        column_config["PIYASA DEGERI (M)"] = st.column_config.NumberColumn(format="$%.0fM")
+    if "EPS Q/Q" in display_df.columns:
+        column_config["EPS Q/Q"] = st.column_config.NumberColumn(format="%.1f%%")
+    if "SALES Q/Q" in display_df.columns:
+        column_config["SALES Q/Q"] = st.column_config.NumberColumn(format="%.1f%%")
+
+    st.dataframe(
+        display_df,
+        use_container_width=True,
+        hide_index=True,
+        column_config=column_config,
+    )
+
+    with st.expander("Liste metadata (id, eklenme tarihi, notlar, pivot, vb.)"):
+        meta_cols = ["id", "symbol", "day_added", "note", "pivot_price",
+                     "pullback_health", "tt_score"]
+        meta_available = [c for c in meta_cols if c in df.columns]
+        st.dataframe(df[meta_available], use_container_width=True, hide_index=True)
 
 
 # 4 dis tab
