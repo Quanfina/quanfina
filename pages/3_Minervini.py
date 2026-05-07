@@ -39,26 +39,52 @@ def get_user_id() -> int:
 
 @st.cache_data(ttl=60)
 def load_list_data(list_code: str, user_id: int) -> pd.DataFrame:
-    """symbol_lists tablosundan belirli bir liste icin hisseleri cek.
+    """symbol_lists tablosundan liste hisselerini cek + minervini_scans ile JOIN.
 
     Args:
         list_code: 'watch', 'on_deck', 'focus', veya 'buy'
         user_id: Kullanici ID'si
 
     Returns:
-        DataFrame: symbol_lists kolonu ile baslar
+        DataFrame: list metadata + scanner verisi (en son scan tarihi)
+        Sutunlar:
+        - symbol_lists: id, symbol, day_added, note, pivot_price, pullback_health, tt_score
+        - minervini_scans (LEFT JOIN, en son scan): company, sector, price, change_pct,
+          grade, rs_ibd, rs_12m, ma200_slope, pct_from_high, volume,
+          eps_qoq, sales_qoq, market_cap, days_to_earnings, confirmations, violations
     """
     conn = get_connection()
     cur = conn.cursor()
+
+    cur.execute("SELECT MAX(scan_date) FROM minervini_scans")
+    last_scan_date = cur.fetchone()[0]
+
     cur.execute(
-        "SELECT id, symbol, day_added, note, pivot_price, pullback_health, tt_score "
-        "FROM symbol_lists "
-        "WHERE user_id = %s AND list_type = %s AND strategy = 'minervini' "
-        "ORDER BY symbol",
-        (user_id, list_code)
+        "SELECT "
+        "    sl.id, sl.symbol, sl.day_added, sl.note, "
+        "    sl.pivot_price, sl.pullback_health, sl.tt_score, "
+        "    s.company, s.sector, s.price, s.change_pct, "
+        "    s.grade, s.rs_ibd, s.rs_12m, "
+        "    s.ma200_slope, s.pct_from_high, s.volume, "
+        "    s.eps_qoq, s.sales_qoq, s.market_cap, "
+        "    s.days_to_earnings, s.confirmations, s.violations "
+        "FROM symbol_lists sl "
+        "LEFT JOIN minervini_scans s "
+        "    ON s.ticker = sl.symbol AND s.scan_date = %s "
+        "WHERE sl.user_id = %s AND sl.list_type = %s AND sl.strategy = 'minervini' "
+        "ORDER BY sl.symbol",
+        (last_scan_date, user_id, list_code)
     )
     rows = cur.fetchall()
-    cols = ["id", "symbol", "day_added", "note", "pivot_price", "pullback_health", "tt_score"]
+    cols = [
+        "id", "symbol", "day_added", "note",
+        "pivot_price", "pullback_health", "tt_score",
+        "company", "sector", "price", "change_pct",
+        "grade", "rs_ibd", "rs_12m",
+        "ma200_slope", "pct_from_high", "volume",
+        "eps_qoq", "sales_qoq", "market_cap",
+        "days_to_earnings", "confirmations", "violations",
+    ]
     conn.close()
     return pd.DataFrame(rows, columns=cols)
 
