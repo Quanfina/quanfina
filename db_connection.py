@@ -599,6 +599,43 @@ def init_trade_journal_tables() -> int:
                 )
             """)
 
+            # ── 16. trades: Asama 2 kolonları ────────────────────────────
+            for stmt in [
+                "ALTER TABLE trades ADD COLUMN IF NOT EXISTS user_id              INTEGER REFERENCES users(id)",
+                "ALTER TABLE trades ADD COLUMN IF NOT EXISTS code_id              INTEGER REFERENCES trade_codes(id)",
+                "ALTER TABLE trades ADD COLUMN IF NOT EXISTS setup_type_id        INTEGER REFERENCES setup_types(id)",
+                "ALTER TABLE trades ADD COLUMN IF NOT EXISTS parked_at            TIMESTAMP",
+                "ALTER TABLE trades ADD COLUMN IF NOT EXISTS park_reason          TEXT",
+                "ALTER TABLE trades ADD COLUMN IF NOT EXISTS exit_reason          TEXT",
+                "ALTER TABLE trades ADD COLUMN IF NOT EXISTS lesson_learned       TEXT",
+                "ALTER TABLE trades ADD COLUMN IF NOT EXISTS chart_screenshot_url TEXT",
+                "ALTER TABLE trades ADD COLUMN IF NOT EXISTS mistake_type         TEXT CHECK (mistake_type IS NULL OR mistake_type IN ('execution', 'strategy', 'market_change', 'none'))",
+            ]:
+                cur.execute(stmt)
+
+            # ── 17. invest_type backfill ──────────────────────────────────
+            cur.execute("""
+                UPDATE trades
+                SET invest_type = CASE
+                    WHEN trade_type = 'Long'  THEN 1
+                    WHEN trade_type = 'Short' THEN 2
+                    ELSE invest_type
+                END
+                WHERE invest_type IS NULL
+            """)
+
+            # ── 18. user_id backfill ───────────────────────────────────────
+            cur.execute("""
+                UPDATE trades
+                SET user_id = (SELECT id FROM users WHERE email = 'ferit@quanfina.local' LIMIT 1)
+                WHERE user_id IS NULL
+            """)
+
+            # ── 19. trades: Asama 2 index'leri ───────────────────────────
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_trades_user_id       ON trades(user_id)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_trades_code_id       ON trades(code_id)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_trades_setup_type_id ON trades(setup_type_id)")
+
             conn.commit()
             log.info("init_trade_journal_tables: tamamlandı")
             return orphan_count
