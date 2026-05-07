@@ -6,6 +6,7 @@ import pandas as pd
 from sqlalchemy import create_engine
 from urllib.parse import quote_plus
 from dotenv import load_dotenv
+from quanfina_math import dollar_change, percent_change
 
 log = logging.getLogger(__name__)
 
@@ -228,24 +229,19 @@ def update_trade(trade_id: int, data: dict) -> bool:
 
 def close_trade(trade_id: int, exit_price: float, exit_date,
                 exit_notes: str = None) -> bool:
-    # date objesi gelirse datetime'a çevir (00:00:00 saati ile)
-    if isinstance(exit_date, date) and not isinstance(exit_date, datetime):
-        exit_date = datetime.combine(exit_date, datetime.min.time())
     """
     Trade'i kapatır. P&L ve r_multiple otomatik hesaplanır.
-
-    Long P&L:  (exit - entry) * quantity - commission
-    Short P&L: (entry - exit) * quantity - commission
-
-    r_multiple = profit_loss / risk_amount
-
-    Markets 360 aB() formülünün Python karşılığı.
+    invest_type NULL ise trade_type'tan türetilir (legacy kayıtlar için fallback).
+    pnl_pct fiyat bazlı (komisyon hariç); profit_loss komisyon dahil.
     """
+    if isinstance(exit_date, date) and not isinstance(exit_date, datetime):
+        exit_date = datetime.combine(exit_date, datetime.min.time())
+
     conn = get_connection()
     try:
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT trade_type, entry_price, quantity, commission, "
+                "SELECT trade_type, invest_type, entry_price, quantity, commission, "
                 "risk_amount, notes FROM trades WHERE id = %s AND status = 'Open'",
                 (trade_id,)
             )
@@ -254,20 +250,17 @@ def close_trade(trade_id: int, exit_price: float, exit_date,
                 log.warning(f"close_trade: trade {trade_id} not found or already closed")
                 return False
 
-            trade_type, entry_price, quantity, commission, risk_amount, current_notes = row
+            trade_type, invest_type_db, entry_price, quantity, commission, risk_amount, current_notes = row
+            invest_type = invest_type_db or (1 if trade_type == 'Long' else 2)
 
             entry_p = float(entry_price)
             exit_p  = float(exit_price)
             qty     = float(quantity)
             comm    = float(commission or 0)
 
-            if trade_type == 'Short':
-                profit_loss = (entry_p - exit_p) * qty - comm
-            else:  # Long
-                profit_loss = (exit_p - entry_p) * qty - comm
-
-            pnl_pct    = (profit_loss / (entry_p * qty)) * 100 if entry_p * qty > 0 else 0
-            r_multiple = profit_loss / float(risk_amount) if risk_amount and float(risk_amount) > 0 else 0
+            profit_loss = dollar_change(entry_p, exit_p, int(qty), invest_type) - comm
+            pnl_pct     = percent_change(entry_p, exit_p, invest_type)
+            r_multiple  = profit_loss / float(risk_amount) if risk_amount and float(risk_amount) > 0 else 0
 
             final_notes = current_notes or ''
             if exit_notes:
@@ -433,6 +426,177 @@ def init_trade_journal_tables() -> int:
                         FOREIGN KEY (linked_trade_id) REFERENCES trades(id) ON DELETE SET NULL;
                     END IF;
                 END $$
+            """)
+
+            # ── 7. trade_codes ────────────────────────────────────────────
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS trade_codes (
+                    id         SERIAL PRIMARY KEY,
+                    code       TEXT UNIQUE NOT NULL,
+                    label      TEXT NOT NULL,
+                    color      TEXT,
+                    sort_order INTEGER,
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            cur.execute("""
+                INSERT INTO trade_codes (code, label, color, sort_order) VALUES
+                ('PB', 'Perfect Buy',  '#10b981', 1),
+                ('EB', 'Early Buy',    '#f59e0b', 2),
+                ('LB', 'Late Buy',     '#ef4444', 3),
+                ('PS', 'Perfect Sell', '#10b981', 4),
+                ('ES', 'Early Sell',   '#f59e0b', 5),
+                ('LS', 'Late Sell',    '#ef4444', 6)
+                ON CONFLICT (code) DO NOTHING
+            """)
+
+            # ── 8. setup_types ────────────────────────────────────────────
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS setup_types (
+                    id          SERIAL PRIMARY KEY,
+                    name        TEXT UNIQUE NOT NULL,
+                    description TEXT,
+                    sort_order  INTEGER,
+                    created_at  TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            cur.execute("""
+                INSERT INTO setup_types (name, description, sort_order) VALUES
+                ('VCP',          'Volatility Contraction Pattern',          1),
+                ('CWH',          'Cup with Handle',                         2),
+                ('Power Play',   'High Tight Flag / HTF',                   3),
+                ('Cheat',        '3-C / Low Cheat / Mid Cheat / High Cheat',4),
+                ('Pocket Pivot', 'Kacher/Morales early entry',              5),
+                ('Other',        'Genel/sınıflandırılmamış',               99)
+                ON CONFLICT (name) DO NOTHING
+            """)
+
+            # ── 9. list_types ─────────────────────────────────────────────
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS list_types (
+                    code                 TEXT PRIMARY KEY,
+                    label                TEXT NOT NULL,
+                    default_column_count INTEGER NOT NULL,
+                    sort_order           INTEGER NOT NULL
+                )
+            """)
+            cur.execute("""
+                INSERT INTO list_types (code, label, default_column_count, sort_order) VALUES
+                ('watch',    'Watch (100+ hisse)',  7,  1),
+                ('on_deck',  'On Deck (30-40)',     10, 2),
+                ('focus',    'Focus (5-15)',         13, 3),
+                ('buy',      'Buy (3-5)',            17, 4)
+                ON CONFLICT (code) DO NOTHING
+            """)
+
+            # ── 10. users ─────────────────────────────────────────────────
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id            SERIAL PRIMARY KEY,
+                    email         TEXT UNIQUE NOT NULL,
+                    name          TEXT,
+                    timezone      TEXT DEFAULT 'Europe/Istanbul',
+                    preferences   JSONB DEFAULT '{}'::jsonb,
+                    created_at    TIMESTAMP DEFAULT NOW(),
+                    last_login_at TIMESTAMP
+                )
+            """)
+            cur.execute("""
+                INSERT INTO users (email, name)
+                VALUES ('ferit@quanfina.local', 'Sn. Ferit')
+                ON CONFLICT (email) DO NOTHING
+            """)
+
+            # ── 11. symbol_lists ──────────────────────────────────────────
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS symbol_lists (
+                    id              SERIAL PRIMARY KEY,
+                    user_id         INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                    symbol          TEXT NOT NULL,
+                    list_type       TEXT REFERENCES list_types(code),
+                    strategy        TEXT DEFAULT 'minervini',
+                    setup_type_id   INTEGER REFERENCES setup_types(id),
+                    pivot_price     NUMERIC,
+                    pullback_health NUMERIC,
+                    tt_score        TEXT,
+                    alarm_setup_at  TIMESTAMP,
+                    day_added       DATE NOT NULL DEFAULT CURRENT_DATE,
+                    note            TEXT,
+                    UNIQUE(user_id, symbol, list_type, strategy)
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_symbol_lists_user_list ON symbol_lists(user_id, list_type)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_symbol_lists_symbol    ON symbol_lists(symbol)")
+
+            # ── 12. user_column_preferences ───────────────────────────────
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS user_column_preferences (
+                    id              SERIAL PRIMARY KEY,
+                    user_id         INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                    list_name       TEXT REFERENCES list_types(code),
+                    strategy        TEXT DEFAULT 'minervini',
+                    visible_columns JSONB NOT NULL,
+                    column_order    INTEGER[] DEFAULT '{}',
+                    column_widths   JSONB DEFAULT '{}'::jsonb,
+                    updated_at      TIMESTAMP DEFAULT NOW(),
+                    UNIQUE(user_id, list_name, strategy)
+                )
+            """)
+
+            # ── 13. alert_events ──────────────────────────────────────────
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS alert_events (
+                    id               SERIAL PRIMARY KEY,
+                    user_id          INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                    symbol           TEXT NOT NULL,
+                    alert_name       TEXT NOT NULL,
+                    trigger_value    NUMERIC,
+                    actual_value     NUMERIC,
+                    triggered_at     TIMESTAMP DEFAULT NOW(),
+                    source           TEXT DEFAULT 'tv_webhook',
+                    raw_payload      JSONB,
+                    related_trade_id INTEGER REFERENCES trades(id) ON DELETE SET NULL,
+                    user_action_at   TIMESTAMP,
+                    delay_seconds    INTEGER GENERATED ALWAYS AS (
+                        EXTRACT(EPOCH FROM (user_action_at - triggered_at))::INTEGER
+                    ) STORED
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_alert_events_user_symbol ON alert_events(user_id, symbol)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_alert_events_triggered   ON alert_events(triggered_at DESC)")
+
+            # ── 14. trade_stop_losses ─────────────────────────────────────
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS trade_stop_losses (
+                    id           SERIAL PRIMARY KEY,
+                    trade_id     INTEGER REFERENCES trades(id) ON DELETE CASCADE,
+                    sl_idx       INTEGER NOT NULL,
+                    price        NUMERIC NOT NULL,
+                    prefix       TEXT CHECK (prefix IS NULL OR prefix = 'Sell half'),
+                    suffix       TEXT CHECK (suffix IS NULL OR suffix IN ('breakeven', 'buy to cover')),
+                    triggered_at TIMESTAMP,
+                    set_at       TIMESTAMP DEFAULT NOW(),
+                    note         TEXT,
+                    UNIQUE(trade_id, sl_idx)
+                )
+            """)
+
+            # ── 15. leg_exits ─────────────────────────────────────────────
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS leg_exits (
+                    id           SERIAL PRIMARY KEY,
+                    leg_id       INTEGER REFERENCES trade_legs(id) ON DELETE CASCADE,
+                    exit_idx     INTEGER NOT NULL,
+                    shares       NUMERIC NOT NULL,
+                    price        NUMERIC NOT NULL,
+                    exit_date    DATE NOT NULL,
+                    commission   NUMERIC DEFAULT 0,
+                    note         TEXT,
+                    action_label TEXT,
+                    reason       TEXT CHECK (reason IS NULL OR reason IN ('sbe', 'stop', 'target', 'manual', 'trailing')),
+                    created_at   TIMESTAMP DEFAULT NOW(),
+                    UNIQUE(leg_id, exit_idx)
+                )
             """)
 
             conn.commit()
