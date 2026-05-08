@@ -10,6 +10,7 @@ from db_connection import (
     get_trades, get_portfolio,
     update_trade, close_trade, delete_trade,
 )
+from quanfina_math import check_initial_stop
 from styles import (
     apply_styles, chip_long, chip_short, colored_pct, tag,
     card_title, status_dot,
@@ -156,6 +157,13 @@ else:
             qty = float(row['quantity'] or 0)
             risk = float(row['risk_amount'] or 0)
 
+            # Stop health badge
+            _invest_str = "LONG" if row.get('trade_type') == 'Long' else "SHORT"
+            _stop_rec = check_initial_stop(entry_p, stop_p, _invest_str) if entry_p > 0 and stop_p > 0 else None
+            _stop_icon = {"INFO": " 🔵", "WARNING": " 🟡", "CRITICAL": " 🔴"}.get(
+                _stop_rec.severity if _stop_rec else "", ""
+            )
+
             # DTS%: Long = (entry-stop)/entry, Short = (stop-entry)/entry
             if entry_p > 0 and stop_p > 0:
                 if row['trade_type'] == 'Long':
@@ -177,7 +185,7 @@ else:
             c[1].markdown(chip_long('L') if row['trade_type'] == 'Long' else chip_short('S'), unsafe_allow_html=True)
             c[2].markdown(f"{qty:,.0f}")
             c[3].markdown(f"${entry_p:,.2f}")
-            c[4].markdown(f"${stop_p:,.2f}")
+            c[4].markdown(f"${stop_p:,.2f}{_stop_icon}")
             c[5].markdown(colored_pct(dts_pct, decimals=2), unsafe_allow_html=True)
             c[6].markdown(f"<span style='color:{DANGER}'>${risk:,.2f}</span>", unsafe_allow_html=True)
             c[7].markdown(f"<span style='color:{TEXT_MUTED}; font-size:12px;'>{row.get('strategy', '') or '-'}</span>", unsafe_allow_html=True)
@@ -193,6 +201,9 @@ else:
             if c[11].button("🗑️", key=f"delete_btn_{tid}", help="Sil"):
                 _set_action('delete', tid)
                 st.rerun()
+
+            if _stop_rec and _stop_rec.severity in ("WARNING", "CRITICAL"):
+                st.caption(f"↳ {row['symbol']} · {_stop_rec.message}")
 
     render_open_section(long_df, chip_long("🟢 LONG"))
     render_open_section(short_df, chip_short("🔴 SHORT"))

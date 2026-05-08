@@ -6,8 +6,9 @@ import os
 
 # Kök dizindeki database.py dosyasına ulaşabilmek için
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from db_connection import get_trades
+from db_connection import get_trades, get_setup_types
 from styles import apply_styles
+from quanfina_math import compute_rba_metrics, should_drop_setup
 
 st.set_page_config(page_title="İstatistikler | Quanfina", layout="wide")
 apply_styles()
@@ -85,3 +86,85 @@ else:
             hole=0.4 # Ortası delik şık bir grafik yapar (Donut chart)
         )
         st.plotly_chart(fig2, use_container_width=True)
+
+# ============================================================
+# RBA — Result Based Analysis (Sprint 4.7b)
+# ============================================================
+st.divider()
+st.subheader("📊 RBA — Result Based Analysis (Adjusted Ratio)")
+st.caption(
+    "Mark Minervini metodolojisi: setup'ın istatistiksel edge'i. "
+    "Min 30 trade gözlem gerekli (anlamlılık eşiği)."
+)
+
+closed_df_full = get_trades(status="Closed")
+
+if test_modu:
+    st.info("📊 RBA bölümü test modunda çalışmaz — gerçek kapalı trade verisi gerekir.")
+elif "pnl_pct" not in closed_df_full.columns or closed_df_full.empty:
+    st.info("📊 Henüz kapanmış trade yok. RBA hesabı için trade kapatın.")
+else:
+    closed_df = closed_df_full.dropna(subset=["pnl_pct"]).copy()
+
+    if closed_df.empty:
+        st.info("📊 Kapalı trade'ler var ama pnl_pct değerleri eksik.")
+    else:
+        closed_trades = closed_df[["pnl_pct"]].to_dict("records")
+        rba = compute_rba_metrics(closed_trades)
+        rec = should_drop_setup(rba)
+
+        col1, col2, col3, col4, col5 = st.columns(5)
+        col1.metric("Trade Sayısı", rba.num_trades)
+        col2.metric("Win Rate", f"%{rba.win_rate*100:.0f}")
+        col3.metric(
+            "Adjusted Ratio",
+            f"{rba.adjusted_ratio:.2f}" if rba.adjusted_ratio != float("inf") else "∞",
+            help="(Win% × AvgGain) / (Loss% × |AvgLoss|). >1.0 = pozitif edge.",
+        )
+        col4.metric("Expectancy", f"%{rba.expectancy_pct:.2f}")
+        col5.metric(
+            "Avg Gain / Loss",
+            f"%{rba.avg_gain_pct:.1f} / %{abs(rba.avg_loss_pct):.1f}",
+        )
+
+        if rec.severity == "OK":
+            st.success(rec.message)
+        elif rec.severity == "INFO":
+            st.info(rec.message)
+        elif rec.severity == "WARNING":
+            st.warning(rec.message)
+        elif rec.severity == "CRITICAL":
+            st.error(rec.message)
+
+        st.caption(
+            f"En büyük kazanç: %{rba.largest_gain_pct:.1f}  •  "
+            f"En büyük kayıp: %{rba.largest_loss_pct:.1f}  •  "
+            f"İstatistiksel anlamlılık: "
+            f"{'✅ Yeterli' if rba.is_statistically_significant else f'⏳ {30 - rba.num_trades} trade daha gerekli'}"
+        )
+
+        if "setup_type_id" in closed_df.columns and closed_df["setup_type_id"].notna().any():
+            st.markdown("##### Setup Bazlı Kırılım")
+            try:
+                setup_pairs = get_setup_types()
+                setup_map = {sid: sname for sid, sname in setup_pairs}
+            except Exception:
+                setup_map = {}
+
+            setup_breakdown = []
+            for setup_id, group in closed_df.groupby("setup_type_id"):
+                if pd.isna(setup_id):
+                    continue
+                rba_sub = compute_rba_metrics(group[["pnl_pct"]].to_dict("records"))
+                setup_breakdown.append({
+                    "Setup": setup_map.get(int(setup_id), f"ID {int(setup_id)}"),
+                    "Trade": rba_sub.num_trades,
+                    "Win %": f"{rba_sub.win_rate*100:.0f}",
+                    "AR": f"{rba_sub.adjusted_ratio:.2f}" if rba_sub.adjusted_ratio != float("inf") else "∞",
+                    "Expectancy %": f"{rba_sub.expectancy_pct:.2f}",
+                })
+
+            if setup_breakdown:
+                st.dataframe(pd.DataFrame(setup_breakdown), use_container_width=True, hide_index=True)
+            else:
+                st.caption("Setup bilgisi olan kapalı trade yok.")
