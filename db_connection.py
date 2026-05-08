@@ -392,6 +392,44 @@ def get_setup_types() -> list:
         conn.close()
 
 
+def get_grade_categories() -> list[dict]:
+    """trade_grade_categories tablosundan 17 TradeGrader kategorisini dondurur.
+
+    Sprint 4.7c.2'de seed edildi (Bundle gradeThresholds birebir).
+    sort_order'a gore sirali.
+
+    Returns:
+        [{'id': 1, 'code': 'BP', 'name': 'Bought perfect',
+          'short_name': 'Perfect', 'leg_type': 'ENTRY',
+          'target_pct': 80.0, 'sort_order': 10}, ...]
+
+    Kaynak: notebook/EK10_TradeGrader_Sentezi.md (Bolum 6)
+    """
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT id, code, name, short_name, leg_type, target_pct, sort_order
+            FROM trade_grade_categories
+            ORDER BY sort_order
+        """)
+        rows = cur.fetchall()
+        return [
+            {
+                "id":         r[0],
+                "code":       r[1],
+                "name":       r[2],
+                "short_name": r[3],
+                "leg_type":   r[4],
+                "target_pct": float(r[5]) if r[5] is not None else None,
+                "sort_order": r[6],
+            }
+            for r in rows
+        ]
+    finally:
+        conn.close()
+
+
 def promote_to_list(user_id: int, symbol: str, from_list: str, to_list: str,
                     strategy: str = "minervini", note: str = None,
                     setup_type_id: int = None, pivot_price: float = None) -> bool:
