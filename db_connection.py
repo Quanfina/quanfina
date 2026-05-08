@@ -892,6 +892,15 @@ def init_trade_journal_tables() -> int:
             cur.execute("CREATE INDEX IF NOT EXISTS idx_trade_legs_grade_category  ON trade_legs(grade_category_id)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_trade_exits_grade_category ON trade_exits(grade_category_id)")
 
+            # ── 22. leg_exits: grade_category_id FK + annotation (Sprint 4.7d.1) ─
+            # close_trade() leg_exits'e yazıyor — grade kayıt akışı için gerekli
+            for stmt in [
+                "ALTER TABLE leg_exits ADD COLUMN IF NOT EXISTS grade_category_id INTEGER REFERENCES trade_grade_categories(id)",
+                "ALTER TABLE leg_exits ADD COLUMN IF NOT EXISTS annotation TEXT",
+            ]:
+                cur.execute(stmt)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_leg_exits_grade_category ON leg_exits(grade_category_id)")
+
             conn.commit()
             log.info("init_trade_journal_tables: tamamlandı")
             return orphan_count
