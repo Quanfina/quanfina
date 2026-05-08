@@ -269,6 +269,25 @@ class StopRecommendation:
     suggested_value: Optional[float] = None
 
 
+@dataclass
+class RBAMetrics:
+    """
+    Mark Minervini RBA — Result Based Analysis metrikleri.
+
+    Kaynak: Notebook B3 Modül 7 + NotebookLM Konu 14 + Bundle adjustedRatio/battingAvg
+    Min trade gözlem: 30 (kitap kuralı — istatistiksel anlamlılık)
+    """
+    num_trades: int
+    win_rate: float           # 0.0-1.0
+    avg_gain_pct: float
+    avg_loss_pct: float       # Negatif (kayıp)
+    largest_gain_pct: float
+    largest_loss_pct: float
+    adjusted_ratio: float     # (Win% × AvgGain) / (Loss% × |AvgLoss|)
+    expectancy_pct: float     # (Win% × AvgGain) - (Loss% × |AvgLoss|)
+    is_statistically_significant: bool  # >=30 trade
+
+
 def check_initial_stop(
     entry_price: float,
     stop_loss: float,
@@ -537,4 +556,115 @@ def count_distribution_days(
         severity=severity,
         message=msg,
         suggested_value=float(count)
+    )
+
+
+# =============================================================================
+# Konu 14 — RBA Result Based Analysis (Mark Minervini Bölüm 4)
+# =============================================================================
+
+
+def compute_rba_metrics(closed_trades: list[dict]) -> RBAMetrics:
+    """
+    Mark Minervini RBA — Result Based Analysis hesaplaması.
+
+    Kaynak: Notebook B3 Modül 7.1 + NotebookLM Konu 14
+
+    Args:
+        closed_trades: Kapanmış trade listesi. Her dict 'pnl_pct' field'i içermeli.
+                       Örnek: [{'pnl_pct': 12.5}, {'pnl_pct': -3.2}, ...]
+
+    Returns:
+        RBAMetrics: Hesaplanmış metrikler. Boş listede sıfır state döner.
+
+    Notlar:
+        - Tüm trade'ler kazanıyorsa adjusted_ratio = float('inf')
+        - Tüm trade'ler kaybediyorsa adjusted_ratio = 0.0
+        - is_statistically_significant: True iff num_trades >= 30
+    """
+    if not closed_trades:
+        return RBAMetrics(
+            num_trades=0,
+            win_rate=0.0,
+            avg_gain_pct=0.0,
+            avg_loss_pct=0.0,
+            largest_gain_pct=0.0,
+            largest_loss_pct=0.0,
+            adjusted_ratio=0.0,
+            expectancy_pct=0.0,
+            is_statistically_significant=False,
+        )
+
+    pnls = [t['pnl_pct'] for t in closed_trades]
+    winners = [p for p in pnls if p > 0]
+    losers = [p for p in pnls if p < 0]
+
+    win_rate = len(winners) / len(pnls)
+    avg_gain = sum(winners) / len(winners) if winners else 0.0
+    avg_loss = sum(losers) / len(losers) if losers else 0.0  # negatif
+
+    # Adjusted Ratio (Bundle adjustedRatio formülü birebir)
+    if losers and avg_loss != 0:
+        adjusted_ratio = (win_rate * avg_gain) / ((1 - win_rate) * abs(avg_loss))
+    elif winners and not losers:
+        adjusted_ratio = float('inf')
+    else:
+        adjusted_ratio = 0.0
+
+    expectancy = (win_rate * avg_gain) - ((1 - win_rate) * abs(avg_loss))
+
+    return RBAMetrics(
+        num_trades=len(pnls),
+        win_rate=win_rate,
+        avg_gain_pct=avg_gain,
+        avg_loss_pct=avg_loss,
+        largest_gain_pct=max(pnls),
+        largest_loss_pct=min(pnls),
+        adjusted_ratio=adjusted_ratio,
+        expectancy_pct=expectancy,
+        is_statistically_significant=len(pnls) >= 30,
+    )
+
+
+def should_drop_setup(rba: RBAMetrics) -> StopRecommendation:
+    """
+    Bir setup'ı bırakma kararı — RBA metrikleri üzerinden.
+
+    Kaynak: Notebook B3 Modül 7.2 + NotebookLM Konu 14
+    Kitap referansı: Think and Trade Like a Champion — Bölüm 4
+
+    Kriter Hiyerarşisi:
+    1. Min 30 trade gözlem yoksa → INFO (yeterli veri yok)
+    2. Adjusted Ratio < 1.0 → CRITICAL (negatif edge, BIRAK)
+    3. abs(avg_loss) > avg_gain → WARNING (setup zayıflıyor)
+    4. win_rate < 0.30 → WARNING (Minervini ortalaması %50+)
+    5. Aksi halde → OK
+    """
+    if not rba.is_statistically_significant:
+        return StopRecommendation(
+            severity="INFO",
+            message=f"📊 Sadece {rba.num_trades} trade. Min 30 trade gözlem gerekli (istatistiksel anlamlılık)."
+        )
+
+    if rba.adjusted_ratio < 1.0:
+        return StopRecommendation(
+            severity="CRITICAL",
+            message=f"🛑 Adjusted Ratio {rba.adjusted_ratio:.2f} < 1.0 — Setup NEGATİF EDGE. BIRAK!"
+        )
+
+    if abs(rba.avg_loss_pct) > rba.avg_gain_pct:
+        return StopRecommendation(
+            severity="WARNING",
+            message=f"⚠️ Avg Loss %{abs(rba.avg_loss_pct):.1f} > Avg Gain %{rba.avg_gain_pct:.1f} — Setup zayıflıyor"
+        )
+
+    if rba.win_rate < 0.30:
+        return StopRecommendation(
+            severity="WARNING",
+            message=f"⚠️ Win rate %{rba.win_rate*100:.0f} çok düşük (Minervini ortalaması %50+)"
+        )
+
+    return StopRecommendation(
+        severity="OK",
+        message=f"✅ Setup sağlıklı — AR {rba.adjusted_ratio:.2f}, Win %{rba.win_rate*100:.0f}"
     )

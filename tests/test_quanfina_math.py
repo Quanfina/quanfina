@@ -24,6 +24,9 @@ from quanfina_math import (
     LONG,
     SHORT,
     StopRecommendation,
+    RBAMetrics,
+    compute_rba_metrics,
+    should_drop_setup,
 )
 
 
@@ -465,3 +468,126 @@ class TestCountDistributionDays:
         history = [(f"2026-01-{i+1:02d}", 100, 1000) for i in range(30)]
         rec = count_distribution_days(history, lookback_days=20)
         assert rec.severity == "OK"
+
+
+# ---------------------------------------------------------------------------
+# Konu 14 — RBA Result Based Analysis
+# ---------------------------------------------------------------------------
+
+class TestRBAMetricsDataclass:
+    """RBAMetrics dataclass — alan tipleri ve sıfır state."""
+
+    def test_zero_state_creates_valid_instance(self):
+        rba = RBAMetrics(0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, False)
+        assert rba.num_trades == 0
+        assert rba.is_statistically_significant is False
+
+    def test_full_state_creates_valid_instance(self):
+        rba = RBAMetrics(50, 0.55, 12.0, -4.0, 30.0, -8.0, 3.67, 4.8, True)
+        assert rba.num_trades == 50
+        assert rba.adjusted_ratio == 3.67
+        assert rba.is_statistically_significant is True
+
+    def test_avg_loss_is_negative(self):
+        rba = RBAMetrics(10, 0.5, 10.0, -5.0, 20.0, -10.0, 2.0, 2.5, False)
+        assert rba.avg_loss_pct < 0
+
+    def test_significance_threshold_30(self):
+        rba = RBAMetrics(30, 0.5, 10.0, -5.0, 20.0, -10.0, 2.0, 2.5, True)
+        assert rba.num_trades == 30
+        assert rba.is_statistically_significant is True
+
+
+class TestComputeRBAMetrics:
+    """compute_rba_metrics — RBA hesaplama davranışları."""
+
+    def test_empty_list_returns_zero_state(self):
+        rba = compute_rba_metrics([])
+        assert rba.num_trades == 0
+        assert rba.win_rate == 0.0
+        assert rba.adjusted_ratio == 0.0
+        assert rba.is_statistically_significant is False
+
+    def test_normal_case_50_50_split(self):
+        trades = [
+            {'pnl_pct': 10.0}, {'pnl_pct': 10.0},
+            {'pnl_pct': -5.0}, {'pnl_pct': -5.0},
+        ]
+        rba = compute_rba_metrics(trades)
+        assert rba.num_trades == 4
+        assert rba.win_rate == 0.5
+        assert rba.avg_gain_pct == 10.0
+        assert rba.avg_loss_pct == -5.0
+        # AR = (0.5 * 10) / (0.5 * 5) = 2.0
+        assert rba.adjusted_ratio == pytest.approx(2.0)
+        # Expectancy = (0.5 * 10) - (0.5 * 5) = 2.5
+        assert rba.expectancy_pct == pytest.approx(2.5)
+
+    def test_all_winners_returns_inf_ratio(self):
+        trades = [{'pnl_pct': 10.0}, {'pnl_pct': 15.0}]
+        rba = compute_rba_metrics(trades)
+        assert rba.win_rate == 1.0
+        assert rba.adjusted_ratio == float('inf')
+
+    def test_all_losers_returns_zero_ratio(self):
+        trades = [{'pnl_pct': -5.0}, {'pnl_pct': -3.0}]
+        rba = compute_rba_metrics(trades)
+        assert rba.win_rate == 0.0
+        assert rba.adjusted_ratio == 0.0
+
+    def test_largest_gain_and_loss_tracking(self):
+        trades = [
+            {'pnl_pct': 5.0}, {'pnl_pct': 25.0}, {'pnl_pct': 10.0},
+            {'pnl_pct': -3.0}, {'pnl_pct': -12.0}, {'pnl_pct': -1.0},
+        ]
+        rba = compute_rba_metrics(trades)
+        assert rba.largest_gain_pct == 25.0
+        assert rba.largest_loss_pct == -12.0
+
+    def test_below_30_trades_not_significant(self):
+        trades = [{'pnl_pct': 10.0}] * 29
+        rba = compute_rba_metrics(trades)
+        assert rba.num_trades == 29
+        assert rba.is_statistically_significant is False
+
+    def test_30_trades_is_significant(self):
+        trades = [{'pnl_pct': 10.0}] * 30
+        rba = compute_rba_metrics(trades)
+        assert rba.num_trades == 30
+        assert rba.is_statistically_significant is True
+
+
+class TestShouldDropSetup:
+    """should_drop_setup — severity hiyerarşi sırası."""
+
+    def test_below_30_trades_returns_info(self):
+        rba = RBAMetrics(10, 0.6, 12.0, -3.0, 20.0, -5.0, 2.4, 4.8, False)
+        rec = should_drop_setup(rba)
+        assert rec.severity == "INFO"
+        assert "30 trade" in rec.message
+
+    def test_adjusted_ratio_below_1_returns_critical(self):
+        rba = RBAMetrics(30, 0.40, 5.0, -10.0, 15.0, -20.0, 0.33, -3.0, True)
+        rec = should_drop_setup(rba)
+        assert rec.severity == "CRITICAL"
+        assert "BIRAK" in rec.message
+
+    def test_avg_loss_exceeds_avg_gain_returns_warning(self):
+        # win_rate=0.6, avg_gain=5, avg_loss=-7 → AR = (0.6*5)/(0.4*7) ≈ 1.07
+        rba = RBAMetrics(30, 0.60, 5.0, -7.0, 12.0, -15.0, 1.07, -0.30, True)
+        rec = should_drop_setup(rba)
+        assert rec.severity == "WARNING"
+        assert "Avg Loss" in rec.message
+
+    def test_low_win_rate_returns_warning(self):
+        # win_rate=0.25, avg_gain=20, avg_loss=-5 → AR = (0.25*20)/(0.75*5) = 1.33
+        rba = RBAMetrics(30, 0.25, 20.0, -5.0, 40.0, -10.0, 1.33, 1.25, True)
+        rec = should_drop_setup(rba)
+        assert rec.severity == "WARNING"
+        assert "Win rate" in rec.message
+
+    def test_healthy_setup_returns_ok(self):
+        rba = RBAMetrics(50, 0.60, 12.0, -4.0, 30.0, -8.0, 4.5, 5.6, True)
+        rec = should_drop_setup(rba)
+        assert rec.severity == "OK"
+        assert "sağlıklı" in rec.message
