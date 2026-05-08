@@ -6,9 +6,14 @@ import os
 
 # Kök dizindeki database.py dosyasına ulaşabilmek için
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from db_connection import get_trades, get_setup_types
+from db_connection import get_trades, get_setup_types, get_grade_categories, get_connection
 from styles import apply_styles
-from quanfina_math import compute_rba_metrics, should_drop_setup
+from quanfina_math import (
+    compute_rba_metrics,
+    should_drop_setup,
+    compute_grade_distribution,
+    GRADE_CATEGORIES,
+)
 
 st.set_page_config(page_title="İstatistikler | Quanfina", layout="wide")
 apply_styles()
@@ -168,3 +173,96 @@ else:
                 st.dataframe(pd.DataFrame(setup_breakdown), use_container_width=True, hide_index=True)
             else:
                 st.caption("Setup bilgisi olan kapalı trade yok.")
+
+# ── Sprint 4.7c.3d — TradeGrader Kategori Dağılımı (EK 10) ──────────
+st.divider()
+st.subheader("🎓 TradeGrader — Kategori Dağılımı")
+st.caption(
+    "Mark Minervini metodolojisi: 17 kategori (ENTRY×7 EXIT×5 LOSS×5). "
+    "Her kategorinin Bundle hedef oranı vardır — "
+    "ideal trader'ın trade'lerinin dağılımı."
+)
+
+try:
+    _conn = get_connection()
+    _cur = _conn.cursor()
+    _cur.execute("""
+        SELECT tgc.code
+        FROM trade_legs tl
+        JOIN trade_grade_categories tgc ON tgc.id = tl.grade_category_id
+        WHERE tl.grade_category_id IS NOT NULL
+        UNION ALL
+        SELECT tgc.code
+        FROM leg_exits le
+        JOIN trade_grade_categories tgc ON tgc.id = le.grade_category_id
+        WHERE le.grade_category_id IS NOT NULL
+    """)
+    _leg_rows = _cur.fetchall()
+    _conn.close()
+except Exception:
+    _leg_rows = []
+
+graded_legs = [{"grade_code": r[0]} for r in _leg_rows]
+
+if not graded_legs:
+    st.info(
+        "📊 Henüz hiçbir trade leg'ine kategori atanmamış. "
+        "TradeGrader manuel atama UI Sprint 4.7d'de gelecek. "
+        "Aşağıda 17 kategorinin referans tablosu var."
+    )
+    cats = get_grade_categories()
+    if cats:
+        ref_rows = []
+        for c in cats:
+            t = c["target_pct"]
+            ref_rows.append({
+                "Kod":      c["code"],
+                "Kategori": c["name"],
+                "Tip":      c["leg_type"],
+                "Hedef":    f"≥{t:.0f}%" if t and t > 0 else (f"≤{abs(t):.0f}%" if t else "—"),
+            })
+        st.dataframe(pd.DataFrame(ref_rows), use_container_width=True, hide_index=True)
+else:
+    distribution = compute_grade_distribution(graded_legs)
+    if not distribution:
+        st.info("📊 Grade verisi var ama tanımlı kategoriye uymuyor.")
+    else:
+        _status_emoji = {
+            "WITHIN_TARGET": "🟢",
+            "BELOW_TARGET":  "🔴",
+            "ABOVE_TARGET":  "🔴",
+            "INFO":          "ℹ️",
+        }
+        for leg_type, leg_label in [
+            ("ENTRY", "🎯 ENTRY — Alım Dağılımı"),
+            ("EXIT",  "💰 EXIT — Kâr Realize Dağılımı"),
+            ("LOSS",  "🛑 LOSS — Zarar Kes Dağılımı"),
+        ]:
+            type_codes = [code for code, info in distribution.items() if info["leg_type"] == leg_type]
+            type_count = sum(distribution[c]["count"] for c in type_codes)
+            if type_count == 0:
+                continue
+            st.markdown(f"##### {leg_label} (n={type_count})")
+            rows = []
+            for code in type_codes:
+                info = distribution[code]
+                rows.append({
+                    "":         _status_emoji.get(info["status"], "—"),
+                    "Kod":      code,
+                    "Kategori": info["name"],
+                    "Sayı":     info["count"],
+                    "Oran":     f"{info['actual_pct']:.1f}%",
+                    "Hedef":    info["target"],
+                    "Durum":    info["status"],
+                })
+            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+        below_n = sum(1 for info in distribution.values() if info["status"] == "BELOW_TARGET")
+        above_n = sum(1 for info in distribution.values() if info["status"] == "ABOVE_TARGET")
+        if below_n > 0 or above_n > 0:
+            st.warning(
+                f"⚠️ **{below_n}** kategori hedef altı • **{above_n}** kategori hedef üstü. "
+                "Trade Journal'da geçmiş analizleri gözden geçir."
+            )
+        else:
+            st.success("✅ Tüm kategoriler hedef dahilinde — disiplinli trader profili!")
