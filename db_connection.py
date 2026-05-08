@@ -337,6 +337,61 @@ def delete_trade(trade_id: int, soft: bool = True) -> bool:
         conn.close()
 
 
+def add_to_list(user_id: int, symbol: str, list_code: str,
+                strategy: str = "minervini", note: str = "") -> bool:
+    """symbol_lists tablosuna hisse ekler.
+
+    Returns:
+        True: Eklendi
+        False: Zaten vardi (ON CONFLICT)
+    """
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            "INSERT INTO symbol_lists (user_id, symbol, list_type, strategy, note) "
+            "VALUES (%s, %s, %s, %s, %s) "
+            "ON CONFLICT (user_id, symbol, list_type, strategy) DO NOTHING",
+            (user_id, symbol.upper().strip(), list_code, strategy, note)
+        )
+        added = cur.rowcount > 0
+        conn.commit()
+        return added
+    except Exception as e:
+        conn.rollback()
+        log.error(f"add_to_list error: {e}")
+        return False
+    finally:
+        conn.close()
+
+
+def remove_from_list(user_id: int, symbol: str, list_code: str,
+                     strategy: str = "minervini") -> bool:
+    """symbol_lists tablosundan hisse siler (hard delete).
+
+    Returns:
+        True: Silindi
+        False: Bulunamadi
+    """
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            "DELETE FROM symbol_lists "
+            "WHERE user_id = %s AND symbol = %s AND list_type = %s AND strategy = %s",
+            (user_id, symbol.upper().strip(), list_code, strategy)
+        )
+        removed = cur.rowcount > 0
+        conn.commit()
+        return removed
+    except Exception as e:
+        conn.rollback()
+        log.error(f"remove_from_list error: {e}")
+        return False
+    finally:
+        conn.close()
+
+
 # ──────────────────────────────────────────────────
 # Schema Migration — Trade Journal Tabloları
 # ──────────────────────────────────────────────────

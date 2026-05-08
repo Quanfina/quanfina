@@ -14,7 +14,7 @@ Eski 7+4 tab yapisi: pages/3_Minervini_old.py (rollback icin).
 """
 import streamlit as st
 import pandas as pd
-from db_connection import get_connection
+from db_connection import get_connection, add_to_list, remove_from_list
 from _list_cols import get_columns_for_list, get_label, get_list_meta, LIST_TYPES
 
 
@@ -161,6 +161,47 @@ def render_list_tab(list_code: str) -> None:
                      "pullback_health", "tt_score"]
         meta_available = [c for c in meta_cols if c in df.columns]
         st.dataframe(df[meta_available], use_container_width=True, hide_index=True)
+
+    # ── CRUD UI ──────────────────────────────────────────────────────────
+    with st.expander("➕ Hisse Ekle"):
+        with st.form(key=f"add_form_{list_code}", clear_on_submit=True):
+            col_sym, col_note = st.columns([1, 2])
+            new_symbol = col_sym.text_input(
+                "Ticker", placeholder="AAPL", key=f"add_sym_{list_code}"
+            )
+            new_note = col_note.text_input(
+                "Not (opsiyonel)", placeholder="VCP setup, breakout watch",
+                key=f"add_note_{list_code}"
+            )
+            submitted = st.form_submit_button("Ekle", type="primary")
+        if submitted:
+            sym_clean = (new_symbol or "").upper().strip()
+            if not sym_clean:
+                st.error("Ticker bos olamaz.")
+            else:
+                ok = add_to_list(user_id, sym_clean, list_code, note=new_note)
+                if ok:
+                    st.success(f"✅ {sym_clean} → {meta['label']} listesine eklendi.")
+                    load_list_data.clear()
+                    st.rerun()
+                else:
+                    st.warning(f"⚠️ {sym_clean} bu listede zaten var.")
+
+    if len(df) > 0:
+        with st.expander("🗑️ Listeden Cikar"):
+            symbols_in_list = df["symbol"].tolist()
+            to_remove = st.selectbox(
+                "Silinecek hisse", symbols_in_list, key=f"remove_sel_{list_code}"
+            )
+            col_btn1, _ = st.columns([1, 4])
+            if col_btn1.button("Sil", key=f"remove_btn_{list_code}", type="secondary"):
+                ok = remove_from_list(user_id, to_remove, list_code)
+                if ok:
+                    st.success(f"✅ {to_remove} listeden silindi.")
+                    load_list_data.clear()
+                    st.rerun()
+                else:
+                    st.error(f"❌ {to_remove} bulunamadi.")
 
 
 # 4 dis tab
