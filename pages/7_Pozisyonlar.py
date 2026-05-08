@@ -7,6 +7,7 @@ import streamlit as st
 import pandas as pd
 from datetime import date, datetime, time
 from db_connection import (
+    get_connection,
     get_trades, get_portfolio,
     update_trade, close_trade, delete_trade,
     update_leg_exit_grade, get_latest_leg_exits_for_trade,  # Sprint 4.7d.2
@@ -14,7 +15,9 @@ from db_connection import (
 )
 from quanfina_math import (
     check_initial_stop, suggest_exit_grade, suggest_loss_grade,
-    GRADE_CATEGORIES,  # Sprint 4.7d.2 — leg_type filtrelemesi
+    GRADE_CATEGORIES,                                        # Sprint 4.7d.2 — leg_type filtrelemesi
+    should_move_to_breakeven, should_sell_half,              # Sprint 4.7e.4 — açık pozisyon sinyalleri
+    compute_rba_metrics, percent_change, LONG, SHORT,        # Sprint 4.7e.4 — RBA + P&L hesabı
 )
 from styles import (
     apply_styles, chip_long, chip_short, colored_pct, tag,
@@ -204,6 +207,37 @@ else:
     long_df = open_df[open_df['trade_type'] == 'Long'].reset_index(drop=True)
     short_df = open_df[open_df['trade_type'] == 'Short'].reset_index(drop=True)
 
+    # Sprint 4.7e.4 — current_price ve RBA avg_gain hazırlığı (render öncesi, closure ile aktarılır)
+    _current_prices = {}
+    try:
+        _tickers = open_df["symbol"].unique().tolist()
+        if _tickers:
+            _cp_conn = get_connection()
+            _cp_cur = _cp_conn.cursor()
+            _cp_cur.execute(
+                "SELECT DISTINCT ON (ticker) ticker, price "
+                "FROM minervini_scans "
+                "WHERE ticker = ANY(%s) "
+                "ORDER BY ticker, scan_date DESC",
+                (_tickers,)
+            )
+            _current_prices = {r[0]: float(r[1]) for r in _cp_cur.fetchall() if r[1] is not None}
+            _cp_conn.close()
+    except Exception:
+        _current_prices = {}
+
+    _rba_avg_gain = 12.0
+    try:
+        _closed_for_rba = get_trades(status="Closed")
+        if not _closed_for_rba.empty and "pnl_pct" in _closed_for_rba.columns:
+            _closed_clean = _closed_for_rba.dropna(subset=["pnl_pct"])
+            if not _closed_clean.empty:
+                _rba = compute_rba_metrics(_closed_clean[["pnl_pct"]].to_dict("records"))
+                if _rba.avg_gain_pct > 0:
+                    _rba_avg_gain = _rba.avg_gain_pct
+    except Exception:
+        _rba_avg_gain = 12.0
+
     def render_open_section(df: pd.DataFrame, chip_html: str):
         """Bir Long veya Short bölümünü render et."""
         if df.empty:
@@ -231,6 +265,27 @@ else:
                 _stop_rec.severity if _stop_rec else "", ""
             )
 
+            # Sprint 4.7e.4 — Breakeven (BE) ve Sell Half (SH) sinyalleri
+            _current_p = _current_prices.get(str(row.get("symbol", "")))
+            _be_rec = None
+            _sh_rec = None
+            if _current_p:
+                if entry_p > 0 and stop_p > 0:
+                    _be_rec = should_move_to_breakeven(entry_p, stop_p, _current_p, _invest_str)
+                if entry_p > 0:
+                    _invest_int = LONG if _invest_str == "LONG" else SHORT
+                    _pnl_pct = percent_change(entry_p, _current_p, _invest_int)
+                    if _pnl_pct > 0:
+                        _sh_rec = should_sell_half(_pnl_pct, user_avg_gain_pct=_rba_avg_gain)
+            _be_icon = (
+                {"INFO": " 🔵BE", "WARNING": " 🟡BE", "CRITICAL": " 🔴BE"}.get(_be_rec.severity, "")
+                if _be_rec and _be_rec.severity != "OK" else ""
+            )
+            _sh_icon = (
+                {"INFO": " 🔵SH", "WARNING": " 🟡SH", "CRITICAL": " 🔴SH"}.get(_sh_rec.severity, "")
+                if _sh_rec and _sh_rec.severity != "OK" else ""
+            )
+
             # DTS%: Long = (entry-stop)/entry, Short = (stop-entry)/entry
             if entry_p > 0 and stop_p > 0:
                 if row['trade_type'] == 'Long':
@@ -248,7 +303,7 @@ else:
                     entry_date_str = str(row['entry_date'])
 
             c = st.columns([1.2, 0.7, 0.9, 1.0, 1.0, 0.9, 1.0, 1.0, 1.0, 0.5, 0.5, 0.5])
-            c[0].markdown(f"**{row['symbol']}**")
+            c[0].markdown(f"**{row['symbol']}**{_be_icon}{_sh_icon}")
             c[1].markdown(chip_long('L') if row['trade_type'] == 'Long' else chip_short('S'), unsafe_allow_html=True)
             c[2].markdown(f"{qty:,.0f}")
             c[3].markdown(f"${entry_p:,.2f}")
@@ -271,6 +326,10 @@ else:
 
             if _stop_rec and _stop_rec.severity in ("WARNING", "CRITICAL"):
                 st.caption(f"↳ {row['symbol']} · {_stop_rec.message}")
+            if _be_rec and _be_rec.severity in ("WARNING", "CRITICAL"):
+                st.caption(f"↳ {row['symbol']} BE · {_be_rec.message}")
+            if _sh_rec and _sh_rec.severity in ("WARNING", "CRITICAL"):
+                st.caption(f"↳ {row['symbol']} SH · {_sh_rec.message}")
 
     render_open_section(long_df, chip_long("🟢 LONG"))
     render_open_section(short_df, chip_short("🔴 SHORT"))
