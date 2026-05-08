@@ -10,7 +10,7 @@ from db_connection import (
     get_trades, get_portfolio,
     update_trade, close_trade, delete_trade,
 )
-from quanfina_math import check_initial_stop
+from quanfina_math import check_initial_stop, suggest_exit_grade, suggest_loss_grade
 from styles import (
     apply_styles, chip_long, chip_short, colored_pct, tag,
     card_title, status_dot,
@@ -63,6 +63,26 @@ st.markdown(card_title("📊 Pozisyonlar", "Açık ve geçmiş tüm işlemlerini
 for key in ('edit_trade_id', 'close_trade_id', 'delete_confirm_id'):
     if key not in st.session_state:
         st.session_state[key] = None
+if 'last_grade_suggestion' not in st.session_state:
+    st.session_state['last_grade_suggestion'] = None
+
+# Sprint 4.7c.3c — Kapatma sonrası grade önerisi (rerun'dan sonra gösterilir)
+if st.session_state['last_grade_suggestion']:
+    _sug = st.session_state['last_grade_suggestion']
+    st.session_state['last_grade_suggestion'] = None
+    _confidence_emoji = {"HIGH": "🎯", "MEDIUM": "📊", "LOW": "💭"}.get(_sug['confidence'], "📊")
+    _sug_msg = (
+        f"{_confidence_emoji} **TradeGrader Exit Önerisi:** "
+        f"`{_sug['code']}` — {_sug['name']} "
+        f"({_sug['confidence']} güven)\n\n"
+        f"💡 {_sug['reason']}"
+    )
+    if _sug['code'] in ("SP", "CLP"):
+        st.success(_sug_msg)
+    elif _sug['code'] in ("SL", "CLL", "BS", "ES"):
+        st.warning(_sug_msg)
+    else:
+        st.info(_sug_msg)
 
 def _clear_action_state():
     """Tüm aksiyon state'lerini sıfırla."""
@@ -380,6 +400,22 @@ if st.session_state['close_trade_id'] is not None:
 
             if submit_close:
                 if close_trade(tid, close_exit_price, close_exit_datetime, close_notes if close_notes else None):
+                    # Sprint 4.7c.3c — grade önerisi session_state'e yaz (rerun sonrası gösterilir)
+                    try:
+                        _stop_p = float(trade.get('stop_loss') or 0)
+                        _invest_str = "LONG" if trade['trade_type'] != 'Short' else "SHORT"
+                        _weeks_held = max(1, (pd.Timestamp(close_exit_datetime) - pd.Timestamp(trade['entry_date'])).days // 7)
+                        if preview_pct >= 0:
+                            _sug = suggest_exit_grade(entry_p, close_exit_price, _weeks_held, _invest_str)
+                        else:
+                            _sug = suggest_loss_grade(entry_p, close_exit_price, _stop_p, _invest_str)
+                        if _sug.code:
+                            st.session_state['last_grade_suggestion'] = {
+                                'code': _sug.code, 'name': _sug.name,
+                                'confidence': _sug.confidence, 'reason': _sug.reason,
+                            }
+                    except Exception:
+                        pass
                     st.success(f"✅ {trade['symbol']} pozisyonu kapatıldı. P&L: ${preview_pnl:,.2f}")
                     st.balloons()
                     _clear_action_state()
