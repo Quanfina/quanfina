@@ -15,6 +15,7 @@ from styles import (
 from db_connection import (
     insert_trade, get_portfolio, update_portfolio, update_portfolio_starting
 )
+from quanfina_math import suggest_entry_grade
 
 st.set_page_config(page_title="Yeni Pozisyon — Quanfina", layout="wide")
 apply_styles()
@@ -129,6 +130,14 @@ with col_form:
         )
         commission = st.number_input(
             "Komisyon", min_value=0.0, step=0.01, format="%.2f", value=0.0
+        )
+        pivot_price = st.number_input(
+            "Pivot Fiyatı ($)",
+            min_value=0.0,
+            value=0.0,
+            step=0.01,
+            format="%.2f",
+            help="TradeGrader önerisi için (opsiyonel) — VCP/Setup pivot fiyatı. 0 bırakırsanız öneri gösterilmez.",
         )
 
     notes = st.text_area("Not", placeholder="Pozisyon notu (isteğe bağlı)", height=80)
@@ -302,5 +311,23 @@ if submit:
     </div>
     """, unsafe_allow_html=True)
             st.balloons()
+            if pivot_price > 0:
+                suggestion = suggest_entry_grade(entry_price, pivot_price)
+                if suggestion.code:
+                    confidence_emoji = {"HIGH": "🎯", "MEDIUM": "📊", "LOW": "💭"}.get(
+                        suggestion.confidence, "📊"
+                    )
+                    message = (
+                        f"{confidence_emoji} **TradeGrader Entry Önerisi:** "
+                        f"`{suggestion.code}` — {suggestion.name} "
+                        f"({suggestion.confidence} güven)\n\n"
+                        f"💡 {suggestion.reason}"
+                    )
+                    if suggestion.code == "BP":
+                        st.success(message)
+                    elif suggestion.code in ("BL", "CE"):
+                        st.warning(message)
+                    else:
+                        st.info(message)
         except Exception as e:
             st.error(f"❌ Kayıt hatası: {e}")
