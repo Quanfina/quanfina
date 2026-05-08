@@ -7,7 +7,7 @@ import yfinance as yf
 from io import StringIO
 from dotenv import load_dotenv
 from datetime import date, datetime, timedelta
-from bs4 import BeautifulSoup
+
 
 from db_connection import get_connection
 
@@ -312,6 +312,72 @@ def get_finviz_52w_high():
     df = pd.read_csv(StringIO(r.text))
     print(f"52W Yüksek filtresi geçti: {len(df)} hisse")
     return df
+
+
+def get_finviz_extras(tickers: list) -> "pd.DataFrame":
+    """
+    Ticker listesi için EPS Q/Q, Sales Q/Q, Perf Year, ROE, Earnings Date toplu çeker.
+    scan_sectors() ile aynı batch pattern — tek API çağrısı, sleep yok.
+    Returns: ticker-indexed DataFrame (eps_qoq, sales_qoq, perf_year, roe, earnings_date)
+    """
+    url = (
+        f"https://elite.finviz.com/export.ashx?"
+        f"v=152&t={','.join(tickers)}&c=1,22,23,46,33,68&auth={FINVIZ_KEY}&ft=4"
+    )
+    r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=30)
+    r.raise_for_status()
+    df = pd.read_csv(StringIO(r.text))
+    df = df.rename(columns={
+        "Ticker": "ticker",
+        "EPS Growth Quarter Over Quarter": "eps_qoq",
+        "Sales Growth Quarter Over Quarter": "sales_qoq",
+        "Performance (Year)": "perf_year",
+        "Return on Equity": "roe",
+        "Earnings Date": "earnings_date",
+    })
+    return df.set_index("ticker")
+
+
+def _parse_pct(val):
+    """
+    Finviz API'den gelen yüzde stringini float'a çevirir.
+    "96.65%" → 96.65
+    "-12.3%" → -12.3
+    "" / "-" / None → None
+    Hata durumunda None döner (NaN/None koruması).
+    """
+    if val is None:
+        return None
+    s = str(val).strip()
+    if s == "" or s == "-" or s.lower() == "nan":
+        return None
+    try:
+        return float(s.rstrip("%"))
+    except (ValueError, TypeError):
+        return None
+
+
+def _compute_grade(eps_qoq, sales_qoq):
+    """
+    EPS Q/Q ve Sales Q/Q yüzdelerine göre Grade hesaplar.
+    Eşikler değişmedi (önceki scraping mantığı ile aynı).
+    None değerler → 'D' (yetersiz veri).
+
+    A: EPS > 40 AND Sales > 25
+    B: EPS > 25 AND Sales > 15
+    C: EPS > 20 AND Sales > 10
+    D: aksi
+    """
+    if eps_qoq is None or sales_qoq is None:
+        return "D"
+    if eps_qoq > 40 and sales_qoq > 25:
+        return "A"
+    if eps_qoq > 25 and sales_qoq > 15:
+        return "B"
+    if eps_qoq > 20 and sales_qoq > 10:
+        return "C"
+    return "D"
+
 
 SECTOR_ETFS = {
     "XLK":  "Technology",
@@ -742,136 +808,27 @@ def save_results(df_finviz, slopes, scan_date):
     conn.close()
     return saved
 
-# --- EPS/SALES Q/Q SCRAPING VE GRADE HESAPLAMA ---
-def scrape_eps_sales_and_grade(scan_date):
-    """
-    minervini_scans tablosundaki her ticker için Finviz'den EPS Q/Q, Sales Q/Q ve
-    Earnings date çeker; akıllı skip mantığıyla gereksiz istekleri atlar.
-    """
-    conn = get_connection()
-    c = conn.cursor()
-
-    c.execute("""
-        SELECT ticker, earnings_date, eps_last_updated
-        FROM minervini_scans WHERE scan_date = %s
-    """, (scan_date,))
-    tickers_data = c.fetchall()
-
-    print(f"EPS/Sales scraping: {len(tickers_data)} hisse kontrol ediliyor...")
-
-    stats = {"skipped": 0, "scraped": 0, "post_earnings": 0}
-    today = date.today()
-
-    for i, (ticker, stored_earnings_date, eps_last_updated) in enumerate(tickers_data, 1):
-        reason = "scrape"
-
-        if eps_last_updated:
-            last_upd = date.fromisoformat(eps_last_updated)
-            days_old = (today - last_upd).days
-            ed = parse_earnings_date(stored_earnings_date)
-
-            if ed is None:
-                if days_old < 30:
-                    stats["skipped"] += 1
-                    continue
-            elif today < ed + timedelta(days=2):
-                if days_old < 30:
-                    stats["skipped"] += 1
-                    continue
-            else:
-                reason = "post_earnings"
-
-        if i % 50 == 0 or i == 1:
-            print(f"  [{i}/{len(tickers_data)}] {ticker} scraping...")
-        try:
-            url = f"https://finviz.com/quote.ashx?t={ticker}"
-            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-
-            response = requests.get(url, headers=headers, timeout=10)
-            soup = BeautifulSoup(response.content, 'html.parser')
-
-            eps_qoq = None
-            sales_qoq = None
-            earnings_date_raw = None
-
-            eps_label = soup.find('td', string='EPS Q/Q')
-            if eps_label:
-                eps_value = eps_label.find_next_sibling('td')
-                if eps_value:
-                    eps_text = eps_value.get_text().strip()
-                    if eps_text.endswith('%'):
-                        try:
-                            eps_qoq = float(eps_text[:-1])
-                        except:
-                            eps_qoq = None
-
-            sales_label = soup.find('td', string='Sales Q/Q')
-            if sales_label:
-                sales_value = sales_label.find_next_sibling('td')
-                if sales_value:
-                    sales_text = sales_value.get_text().strip()
-                    if sales_text.endswith('%'):
-                        try:
-                            sales_qoq = float(sales_text[:-1])
-                        except:
-                            sales_qoq = None
-
-            earnings_label = soup.find('td', string='Earnings')
-            if earnings_label:
-                earnings_value = earnings_label.find_next_sibling('td')
-                if earnings_value:
-                    earnings_date_raw = earnings_value.get_text().strip()
-
-            grade = "D"
-            if eps_qoq is not None and sales_qoq is not None:
-                if eps_qoq > 40 and sales_qoq > 25:
-                    grade = "A"
-                elif eps_qoq > 25 and sales_qoq > 15:
-                    grade = "B"
-                elif eps_qoq > 20 and sales_qoq > 10:
-                    grade = "C"
-
-            today_str = str(today)
-            c.execute("""
-                UPDATE minervini_scans
-                SET eps_qoq = %s, sales_qoq = %s, grade = %s,
-                    earnings_date = %s, eps_last_updated = %s, sales_last_updated = %s
-                WHERE scan_date = %s AND ticker = %s
-            """, (eps_qoq, sales_qoq, grade, earnings_date_raw, today_str, today_str, scan_date, ticker))
-
-            stats["scraped"] += 1
-            if reason == "post_earnings":
-                stats["post_earnings"] += 1
-            time.sleep(0.5)
-
-        except Exception as e:
-            print(f"  Scraping hatası {ticker}: {e}")
-            continue
-
-    conn.commit()
-    conn.close()
-    print(f"\n--- Scraping İstatistikleri ---")
-    print(f"   Atlanan (güncel veri)     : {stats['skipped']}")
-    print(f"   Scraping yapılan          : {stats['scraped']}")
-    print(f"   Bilanço sonrası güncelle  : {stats['post_earnings']}")
-    return stats["scraped"]
-
 # --- ANA AKIŞ ---
-def run_scan():
-    today = date.today()
-    if today.weekday() == 5:
-        scan_date = str(today - timedelta(days=1))
-    elif today.weekday() == 6:
-        scan_date = str(today - timedelta(days=2))
+def run_scan(scan_date_override: str = None):
+    if scan_date_override:
+        scan_date = scan_date_override
+        print("=== QUANFINA SCANNER v2 (Geçmiş Tarih) ===")
     else:
-        scan_date = str(today)
+        today = date.today()
+        if today.weekday() == 5:
+            scan_date = str(today - timedelta(days=1))
+        elif today.weekday() == 6:
+            scan_date = str(today - timedelta(days=2))
+        else:
+            scan_date = str(today)
+        print("=== QUANFINA SCANNER v2 (Hızlı) ===")
 
-    print("=== QUANFINA SCANNER v2 (Hızlı) ===")
     print(f"Tarih: {scan_date}")
 
     # Tek bağlantı kullan - database lock önle
     conn = get_connection()
     c = conn.cursor()
+    resume_partial = False
 
     # Aynı tarih kontrolü
     c.execute(
@@ -881,25 +838,36 @@ def run_scan():
         c.execute("SELECT COUNT(*) FROM minervini_scans WHERE scan_date = %s", (scan_date,))
         count = c.fetchone()[0]
         if count > 0:
-            print(f"\n[!] Bugün ({scan_date}) zaten {count} kayıt mevcut.")
-            noninteractive = os.getenv("QUANFINA_NONINTERACTIVE", "")
-            if noninteractive == "force":
-                answer = "e"
-            elif noninteractive:
-                answer = "h"
+            c.execute("SELECT COUNT(*) FROM minervini_fundamental_scans WHERE scan_date = %s", (scan_date,))
+            fund_c = c.fetchone()[0]
+            c.execute("SELECT COUNT(*) FROM minervini_52w_high WHERE scan_date = %s", (scan_date,))
+            w52_c = c.fetchone()[0]
+            c.execute("SELECT COUNT(*) FROM minervini_fundamental_only WHERE scan_date = %s", (scan_date,))
+            fo_c = c.fetchone()[0]
+            if fund_c == 0 or w52_c == 0 or fo_c == 0:
+                print(f"\n[!] Eksik tarama tespit edildi (fund:{fund_c}, 52w:{w52_c}, fo:{fo_c}).")
+                print("[!] Ana tarama atlanıyor — sadece eksik tablolar tamamlanacak.")
+                resume_partial = True
             else:
-                answer = input("Yeniden tara? (e/h, varsayılan: h): ").strip().lower()
-            if answer != "e":
-                print("Tarama iptal edildi. Mevcut veriler kullanılabilir.")
-                conn.close()
-                sys.exit(0)
-            else:
-                print("Mevcut kayıtlar siliniyor...")
-                for tbl in ["minervini_scans", "minervini_52w_high",
-                            "minervini_fundamental_scans", "minervini_fundamental_only"]:
-                    c.execute(f"DELETE FROM {tbl} WHERE scan_date = %s", (scan_date,))
-                conn.commit()
-                print("Silindi. Tarama başlıyor...\n")
+                print(f"\n[!] Bugün ({scan_date}) zaten {count} kayıt mevcut.")
+                noninteractive = os.getenv("QUANFINA_NONINTERACTIVE", "")
+                if noninteractive == "force":
+                    answer = "e"
+                elif noninteractive:
+                    answer = "h"
+                else:
+                    answer = input("Yeniden tara? (e/h, varsayılan: h): ").strip().lower()
+                if answer != "e":
+                    print("Tarama iptal edildi. Mevcut veriler kullanılabilir.")
+                    conn.close()
+                    sys.exit(0)
+                else:
+                    print("Mevcut kayıtlar siliniyor...")
+                    for tbl in ["minervini_scans", "minervini_52w_high",
+                                "minervini_fundamental_scans", "minervini_fundamental_only"]:
+                        c.execute(f"DELETE FROM {tbl} WHERE scan_date = %s", (scan_date,))
+                    conn.commit()
+                    print("Silindi. Tarama başlıyor...\n")
 
     # Tabloları oluştur
     c.execute("""
@@ -1049,118 +1017,121 @@ def run_scan():
 
     conn.commit()
 
-    # 1. Finviz filtresi
-    print("\n1. Finviz Elite filtresi çalışıyor...")
-    df = get_finviz_screener()
-    
-    if df.empty:
-        print("Hiç hisse bulunamadı.")
-        conn.close()
-        return
-    
-    tickers = df["Ticker"].tolist()
+    if not resume_partial:
+        # 1. Finviz filtresi
+        print("\n1. Finviz Elite filtresi çalışıyor...")
+        df = get_finviz_screener()
 
-    # 2. Sadece geçenler için MA200 slope
-    print("\n2. MA200 slope kontrolü (yfinance toplu indirme)...")
-    slopes, spy_actual_date = check_ma200_slope(tickers)
+        if df.empty:
+            print("Hiç hisse bulunamadı.")
+            conn.close()
+            return
 
-    if spy_actual_date and spy_actual_date != scan_date:
-        print(f"[!] Manuel tarih: {scan_date} → Gerçek piyasa günü: {spy_actual_date} (tatil/hafta sonu)")
-        scan_date = spy_actual_date
-        c.execute("SELECT COUNT(*) FROM minervini_scans WHERE scan_date = %s", (scan_date,))
-        count2 = c.fetchone()[0]
-        if count2 > 0:
-            print(f"\n[!] {scan_date} için zaten {count2} kayıt mevcut.")
-            noninteractive = os.getenv("QUANFINA_NONINTERACTIVE", "")
-            if noninteractive == "force":
-                answer = "e"
-            elif noninteractive:
-                answer = "h"
-            else:
-                answer = input("Yeniden tara? (e/h, varsayılan: h): ").strip().lower()
-            if answer != "e":
-                print("Tarama iptal edildi. Mevcut veriler kullanılabilir.")
-                conn.close()
-                sys.exit(0)
-            else:
-                print("Mevcut kayıtlar siliniyor...")
-                for tbl in ["minervini_scans", "minervini_52w_high",
-                            "minervini_fundamental_scans", "minervini_fundamental_only"]:
-                    c.execute(f"DELETE FROM {tbl} WHERE scan_date = %s", (scan_date,))
-                conn.commit()
-                print("Silindi. Tarama başlıyor...\n")
+        tickers = df["Ticker"].tolist()
 
-    # 3. Kaydet
-    print("\n3. Veritabanına kaydediliyor...")
-    saved = 0
-    
-    for _, row in df.iterrows():
-        ticker     = row["Ticker"]
-        slope_info = slopes.get(ticker) or {}
-        slope      = slope_info.get("slope")
-        high52     = slope_info.get("high52")
-        confs      = slope_info.get("confirmations", "")
-        viols      = slope_info.get("violations", "")
-        rs_ibd     = slope_info.get("rs_ibd")
-        rs_12m     = slope_info.get("rs_12m")
-        rs_20d     = slope_info.get("rs_20d")
-        rs_50d     = slope_info.get("rs_50d")
-        rs_200d    = slope_info.get("rs_200d")
-        rs_mf      = slope_info.get("rs_mansfield")
+        # 2. Sadece geçenler için MA200 slope
+        print("\n2. MA200 slope kontrolü (yfinance toplu indirme)...")
+        slopes, spy_actual_date = check_ma200_slope(tickers)
 
-        # Kural 3: MA200 yükselişte (slope > 0)
-        passed = 1 if slope is not None and slope > 0 else 0
+        if spy_actual_date and spy_actual_date != scan_date:
+            print(f"[!] Manuel tarih: {scan_date} → Gerçek piyasa günü: {spy_actual_date} (tatil/hafta sonu)")
+            scan_date = spy_actual_date
+            c.execute("SELECT COUNT(*) FROM minervini_scans WHERE scan_date = %s", (scan_date,))
+            count2 = c.fetchone()[0]
+            if count2 > 0:
+                print(f"\n[!] {scan_date} için zaten {count2} kayıt mevcut.")
+                noninteractive = os.getenv("QUANFINA_NONINTERACTIVE", "")
+                if noninteractive == "force":
+                    answer = "e"
+                elif noninteractive:
+                    answer = "h"
+                else:
+                    answer = input("Yeniden tara? (e/h, varsayılan: h): ").strip().lower()
+                if answer != "e":
+                    print("Tarama iptal edildi. Mevcut veriler kullanılabilir.")
+                    conn.close()
+                    sys.exit(0)
+                else:
+                    print("Mevcut kayıtlar siliniyor...")
+                    for tbl in ["minervini_scans", "minervini_52w_high",
+                                "minervini_fundamental_scans", "minervini_fundamental_only"]:
+                        c.execute(f"DELETE FROM {tbl} WHERE scan_date = %s", (scan_date,))
+                    conn.commit()
+                    print("Silindi. Tarama başlıyor...\n")
 
-        try:
-            c.execute("""
-                INSERT INTO minervini_scans
-                (scan_date, ticker, company, sector, industry,
-                 price, change_pct, volume, market_cap, pe,
-                 ma200_slope, passed, high52, confirmations, violations,
-                 rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mansfield)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                ON CONFLICT(scan_date, ticker) DO UPDATE SET
-                    company       = EXCLUDED.company,
-                    sector        = EXCLUDED.sector,
-                    industry      = EXCLUDED.industry,
-                    price         = EXCLUDED.price,
-                    change_pct    = EXCLUDED.change_pct,
-                    volume        = EXCLUDED.volume,
-                    market_cap    = EXCLUDED.market_cap,
-                    pe            = EXCLUDED.pe,
-                    ma200_slope   = EXCLUDED.ma200_slope,
-                    passed        = EXCLUDED.passed,
-                    high52        = EXCLUDED.high52,
-                    confirmations = EXCLUDED.confirmations,
-                    violations    = EXCLUDED.violations,
-                    rs_ibd        = EXCLUDED.rs_ibd,
-                    rs_12m        = EXCLUDED.rs_12m,
-                    rs_20d        = EXCLUDED.rs_20d,
-                    rs_50d        = EXCLUDED.rs_50d,
-                    rs_200d       = EXCLUDED.rs_200d,
-                    rs_mansfield  = EXCLUDED.rs_mansfield
-            """, (
-                scan_date, ticker,
-                row.get("Company", ""), row.get("Sector", ""), row.get("Industry", ""),
-                row.get("Price", 0), row.get("Change", ""), row.get("Volume", 0),
-                row.get("Market Cap", 0), row.get("P/E", 0),
-                slope, passed, high52, confs, viols,
-                rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mf,
-            ))
-            saved += 1
-        except Exception as e:
-            print(f"  Kayıt hatası {ticker}: {e}")
-            break  # ilk hatada dur
+        # 3. Kaydet
+        print("\n3. Veritabanına kaydediliyor...")
+        saved = 0
 
-    conn.commit()
+        for _, row in df.iterrows():
+            ticker     = row["Ticker"]
+            slope_info = slopes.get(ticker) or {}
+            slope      = slope_info.get("slope")
+            high52     = slope_info.get("high52")
+            confs      = slope_info.get("confirmations", "")
+            viols      = slope_info.get("violations", "")
+            rs_ibd     = slope_info.get("rs_ibd")
+            rs_12m     = slope_info.get("rs_12m")
+            rs_20d     = slope_info.get("rs_20d")
+            rs_50d     = slope_info.get("rs_50d")
+            rs_200d    = slope_info.get("rs_200d")
+            rs_mf      = slope_info.get("rs_mansfield")
 
-    passed = sum(1 for s in slopes.values() if s and s.get("slope") is not None and s.get("slope") > 0)
-    
-    print(f"\n[OK] TARAMA TAMAMLANDI!")
-    print(f"   Finviz filtresi geçen : {len(tickers)}")
-    print(f"   MA200 slope geçen     : {passed}")
-    print(f"   Toplam kayıt          : {saved}")
-    print(f"   Tarih                 : {scan_date}")
+            # Kural 3: MA200 yükselişte (slope > 0)
+            passed = 1 if slope is not None and slope > 0 else 0
+
+            try:
+                c.execute("""
+                    INSERT INTO minervini_scans
+                    (scan_date, ticker, company, sector, industry,
+                     price, change_pct, volume, market_cap, pe,
+                     ma200_slope, passed, high52, confirmations, violations,
+                     rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mansfield)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    ON CONFLICT(scan_date, ticker) DO UPDATE SET
+                        company       = EXCLUDED.company,
+                        sector        = EXCLUDED.sector,
+                        industry      = EXCLUDED.industry,
+                        price         = EXCLUDED.price,
+                        change_pct    = EXCLUDED.change_pct,
+                        volume        = EXCLUDED.volume,
+                        market_cap    = EXCLUDED.market_cap,
+                        pe            = EXCLUDED.pe,
+                        ma200_slope   = EXCLUDED.ma200_slope,
+                        passed        = EXCLUDED.passed,
+                        high52        = EXCLUDED.high52,
+                        confirmations = EXCLUDED.confirmations,
+                        violations    = EXCLUDED.violations,
+                        rs_ibd        = EXCLUDED.rs_ibd,
+                        rs_12m        = EXCLUDED.rs_12m,
+                        rs_20d        = EXCLUDED.rs_20d,
+                        rs_50d        = EXCLUDED.rs_50d,
+                        rs_200d       = EXCLUDED.rs_200d,
+                        rs_mansfield  = EXCLUDED.rs_mansfield
+                """, (
+                    scan_date, ticker,
+                    row.get("Company", ""), row.get("Sector", ""), row.get("Industry", ""),
+                    row.get("Price", 0), row.get("Change", ""), row.get("Volume", 0),
+                    row.get("Market Cap", 0), row.get("P/E", 0),
+                    slope, passed, high52, confs, viols,
+                    rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mf,
+                ))
+                saved += 1
+            except Exception as e:
+                print(f"  Kayıt hatası {ticker}: {e}")
+                break  # ilk hatada dur
+
+        conn.commit()
+
+        passed = sum(1 for s in slopes.values() if s and s.get("slope") is not None and s.get("slope") > 0)
+
+        print(f"\n[OK] TARAMA TAMAMLANDI!")
+        print(f"   Finviz filtresi geçen : {len(tickers)}")
+        print(f"   MA200 slope geçen     : {passed}")
+        print(f"   Toplam kayıt          : {saved}")
+        print(f"   Tarih                 : {scan_date}")
+    else:
+        print("\n[DEVAM] Ana tarama zaten tamamlanmış — yardımcı tablolar işlenecek.")
 
     # --- EPS/SALES SCRAPING VE GRADE ---
     print("\n4. EPS/Sales Q/Q scraping ve grade hesaplaması...")
@@ -1170,7 +1141,12 @@ def run_scan():
     """, (scan_date,))
     tickers_data = c.fetchall()
 
-    print(f"EPS/Sales scraping: {len(tickers_data)} hisse kontrol ediliyor...")
+    # Batch Finviz Elite API çağrısı (HTML scraping'in yerini aldı)
+    ticker_list_blok1 = [t[0] for t in tickers_data]
+    extras = get_finviz_extras(ticker_list_blok1) if ticker_list_blok1 else None
+    print(f"  → Finviz extras alındı: {len(extras) if extras is not None else 0} ticker")
+
+    print(f"EPS/Sales işleniyor: {len(tickers_data)} hisse...")
 
     stats = {"skipped": 0, "scraped": 0, "post_earnings": 0}
     today = date.today()
@@ -1195,70 +1171,38 @@ def run_scan():
                 reason = "post_earnings"
 
         if i % 50 == 0 or i == 1:
-            print(f"  [{i}/{len(tickers_data)}] {ticker} scraping...")
+            print(f"  [{i}/{len(tickers_data)}] {ticker} işleniyor...")
         try:
-            url = f"https://finviz.com/quote.ashx?t={ticker}"
-            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+            # Finviz Elite batch API'den veri oku (HTML scraping'in yerini aldı)
+            row = extras.loc[ticker] if (extras is not None and ticker in extras.index) else None
+            if row is not None:
+                eps_qoq           = _parse_pct(row["eps_qoq"])
+                sales_qoq         = _parse_pct(row["sales_qoq"])
+                perf_year         = _parse_pct(row["perf_year"])
+                roe               = _parse_pct(row["roe"])
+                earnings_date_raw = str(row["earnings_date"]) if row["earnings_date"] else None
+            else:
+                eps_qoq = sales_qoq = perf_year = roe = None
+                earnings_date_raw = None
 
-            response = requests.get(url, headers=headers, timeout=10)
-            soup = BeautifulSoup(response.content, 'html.parser')
-
-            eps_qoq = None
-            sales_qoq = None
-            earnings_date_raw = None
-
-            eps_label = soup.find('td', string='EPS Q/Q')
-            if eps_label:
-                eps_value = eps_label.find_next_sibling('td')
-                if eps_value:
-                    eps_text = eps_value.get_text().strip()
-                    if eps_text.endswith('%'):
-                        try:
-                            eps_qoq = float(eps_text[:-1])
-                        except:
-                            eps_qoq = None
-
-            sales_label = soup.find('td', string='Sales Q/Q')
-            if sales_label:
-                sales_value = sales_label.find_next_sibling('td')
-                if sales_value:
-                    sales_text = sales_value.get_text().strip()
-                    if sales_text.endswith('%'):
-                        try:
-                            sales_qoq = float(sales_text[:-1])
-                        except:
-                            sales_qoq = None
-
-            earnings_label = soup.find('td', string='Earnings')
-            if earnings_label:
-                earnings_value = earnings_label.find_next_sibling('td')
-                if earnings_value:
-                    earnings_date_raw = earnings_value.get_text().strip()
-
-            grade = "D"
-            if eps_qoq is not None and sales_qoq is not None:
-                if eps_qoq > 40 and sales_qoq > 25:
-                    grade = "A"
-                elif eps_qoq > 25 and sales_qoq > 15:
-                    grade = "B"
-                elif eps_qoq > 20 and sales_qoq > 10:
-                    grade = "C"
+            grade = _compute_grade(eps_qoq, sales_qoq)
 
             today_str = str(today)
             c.execute("""
                 UPDATE minervini_scans
                 SET eps_qoq = %s, sales_qoq = %s, grade = %s,
-                    earnings_date = %s, eps_last_updated = %s, sales_last_updated = %s
+                    earnings_date = %s, eps_last_updated = %s, sales_last_updated = %s,
+                    perf_year = %s, roe = %s
                 WHERE scan_date = %s AND ticker = %s
-            """, (eps_qoq, sales_qoq, grade, earnings_date_raw, today_str, today_str, scan_date, ticker))
+            """, (eps_qoq, sales_qoq, grade, earnings_date_raw, today_str, today_str,
+                  perf_year, roe, scan_date, ticker))
 
             stats["scraped"] += 1
             if reason == "post_earnings":
                 stats["post_earnings"] += 1
-            time.sleep(0.5)
 
         except Exception as e:
-            print(f"  Scraping hatası {ticker}: {e}")
+            print(f"  Extras okuma hatası {ticker}: {e}")
             continue
 
     conn.commit()
@@ -1347,7 +1291,8 @@ def run_scan():
         c.execute(f"""
             SELECT ticker, ma200_slope, high52, eps_qoq, sales_qoq, grade,
                    confirmations, violations,
-                   rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mansfield
+                   rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mansfield,
+                   perf_year, roe
             FROM minervini_scans
             WHERE scan_date = %s AND ticker IN ({placeholders})
         """, [scan_date] + tickers_fo)
@@ -1355,7 +1300,8 @@ def run_scan():
             row[0]: {"slope": row[1], "high52": row[2], "eps_qoq": row[3], "sales_qoq": row[4],
                      "grade": row[5], "confirmations": row[6] or "", "violations": row[7] or "",
                      "rs_ibd": row[8], "rs_12m": row[9], "rs_20d": row[10],
-                     "rs_50d": row[11], "rs_200d": row[12], "rs_mansfield": row[13]}
+                     "rs_50d": row[11], "rs_200d": row[12], "rs_mansfield": row[13],
+                     "perf_year": row[14], "roe": row[15]}
             for row in c.fetchall()
         }
 
@@ -1366,58 +1312,29 @@ def run_scan():
         # Yeni tickerlar icin MA200 slope (yfinance batch)
         fresh_slopes, _ = check_ma200_slope(need_new_data) if need_new_data else ({}, None)
 
-        # Yeni tickerlar icin Finviz EPS/Sales scraping
+        # Yeni tickerlar icin Finviz Elite batch API
         fresh_eps = {}
         if need_new_data:
-            print(f"  Finviz EPS scraping: {len(need_new_data)} ticker...")
-            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-            for i, ticker in enumerate(need_new_data, 1):
-                if i % 25 == 0 or i == 1:
-                    print(f"    [{i}/{len(need_new_data)}] {ticker}...")
-                try:
-                    url = f"https://finviz.com/quote.ashx?t={ticker}"
-                    response = requests.get(url, headers=headers, timeout=10)
-                    soup = BeautifulSoup(response.content, 'html.parser')
-
-                    eps_qoq = None
-                    sales_qoq = None
-
-                    eps_label = soup.find('td', string='EPS Q/Q')
-                    if eps_label:
-                        eps_value = eps_label.find_next_sibling('td')
-                        if eps_value:
-                            eps_text = eps_value.get_text().strip()
-                            if eps_text.endswith('%'):
-                                try:
-                                    eps_qoq = float(eps_text[:-1])
-                                except:
-                                    pass
-
-                    sales_label = soup.find('td', string='Sales Q/Q')
-                    if sales_label:
-                        sales_value = sales_label.find_next_sibling('td')
-                        if sales_value:
-                            sales_text = sales_value.get_text().strip()
-                            if sales_text.endswith('%'):
-                                try:
-                                    sales_qoq = float(sales_text[:-1])
-                                except:
-                                    pass
-
-                    grade = "D"
-                    if eps_qoq is not None and sales_qoq is not None:
-                        if eps_qoq > 40 and sales_qoq > 25:
-                            grade = "A"
-                        elif eps_qoq > 25 and sales_qoq > 15:
-                            grade = "B"
-                        elif eps_qoq > 20 and sales_qoq > 10:
-                            grade = "C"
-
-                    fresh_eps[ticker] = {"eps_qoq": eps_qoq, "sales_qoq": sales_qoq, "grade": grade}
-                    time.sleep(0.5)
-                except Exception as e:
-                    print(f"  Scraping hatasi {ticker}: {e}")
-                    fresh_eps[ticker] = {"eps_qoq": None, "sales_qoq": None, "grade": "D"}
+            print(f"  Finviz extras (batch): {len(need_new_data)} ticker...")
+            try:
+                extras_fo = get_finviz_extras(need_new_data)
+            except Exception as e:
+                print(f"  get_finviz_extras hatasi: {e}")
+                extras_fo = None
+            for ticker in need_new_data:
+                erow = extras_fo.loc[ticker] if (extras_fo is not None and ticker in extras_fo.index) else None
+                if erow is not None:
+                    eps_q    = _parse_pct(erow["eps_qoq"])
+                    sales_q  = _parse_pct(erow["sales_qoq"])
+                    perf_y   = _parse_pct(erow["perf_year"])
+                    roe_v    = _parse_pct(erow["roe"])
+                else:
+                    eps_q = sales_q = perf_y = roe_v = None
+                fresh_eps[ticker] = {
+                    "eps_qoq": eps_q, "sales_qoq": sales_q,
+                    "grade": _compute_grade(eps_q, sales_q),
+                    "perf_year": perf_y, "roe": roe_v,
+                }
 
         # INSERT — tum veriyle
         saved_fund_only = 0
@@ -1437,6 +1354,8 @@ def run_scan():
                 rs_50d    = cached[ticker].get("rs_50d")
                 rs_200d   = cached[ticker].get("rs_200d")
                 rs_mf     = cached[ticker].get("rs_mansfield")
+                perf_year = cached[ticker].get("perf_year")
+                roe       = cached[ticker].get("roe")
             else:
                 fresh_info = fresh_slopes.get(ticker) or {}
                 slope      = fresh_info.get("slope")
@@ -1453,6 +1372,8 @@ def run_scan():
                 eps_qoq    = eps_data.get("eps_qoq")
                 sales_qoq  = eps_data.get("sales_qoq")
                 grade      = eps_data.get("grade", "D")
+                perf_year  = eps_data.get("perf_year")
+                roe        = eps_data.get("roe")
 
             try:
                 c.execute("""
@@ -1461,8 +1382,9 @@ def run_scan():
                      price, change_pct, volume, market_cap, pe,
                      ma200_slope, eps_qoq, sales_qoq, grade, high52,
                      confirmations, violations,
-                     rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mansfield)
-                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                     rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mansfield,
+                     perf_year, roe)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                     ON CONFLICT (scan_date, ticker) DO UPDATE SET
                         company       = EXCLUDED.company,
                         sector        = EXCLUDED.sector,
@@ -1484,7 +1406,9 @@ def run_scan():
                         rs_20d        = EXCLUDED.rs_20d,
                         rs_50d        = EXCLUDED.rs_50d,
                         rs_200d       = EXCLUDED.rs_200d,
-                        rs_mansfield  = EXCLUDED.rs_mansfield
+                        rs_mansfield  = EXCLUDED.rs_mansfield,
+                        perf_year     = EXCLUDED.perf_year,
+                        roe           = EXCLUDED.roe
                 """, (
                     scan_date, ticker,
                     row.get("Company", ""), row.get("Sector", ""), row.get("Industry", ""),
@@ -1492,6 +1416,7 @@ def run_scan():
                     row.get("Market Cap", 0), row.get("P/E", 0),
                     slope, eps_qoq, sales_qoq, grade, high52, confs, viols,
                     rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mf,
+                    perf_year, roe,
                 ))
                 saved_fund_only += 1
             except Exception as e:
@@ -1516,7 +1441,8 @@ def run_scan():
         c.execute(f"""
             SELECT ticker, ma200_slope, high52, eps_qoq, sales_qoq, grade,
                    confirmations, violations,
-                   rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mansfield
+                   rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mansfield,
+                   perf_year, roe
             FROM minervini_scans
             WHERE scan_date = %s AND ticker IN ({placeholders})
         """, [scan_date] + tickers_52w)
@@ -1524,7 +1450,8 @@ def run_scan():
             row[0]: {"slope": row[1], "high52": row[2], "eps_qoq": row[3], "sales_qoq": row[4],
                      "grade": row[5], "confirmations": row[6] or "", "violations": row[7] or "",
                      "rs_ibd": row[8], "rs_12m": row[9], "rs_20d": row[10],
-                     "rs_50d": row[11], "rs_200d": row[12], "rs_mansfield": row[13]}
+                     "rs_50d": row[11], "rs_200d": row[12], "rs_mansfield": row[13],
+                     "perf_year": row[14], "roe": row[15]}
             for row in c.fetchall()
         }
 
@@ -1535,58 +1462,29 @@ def run_scan():
         # Yeni tickerlar icin MA200 slope (yfinance batch)
         fresh_slopes_52w, _ = check_ma200_slope(need_new_52w) if need_new_52w else ({}, None)
 
-        # Yeni tickerlar icin Finviz EPS/Sales scraping
+        # Yeni tickerlar icin Finviz Elite batch API
         fresh_eps_52w = {}
         if need_new_52w:
-            print(f"  Finviz EPS scraping: {len(need_new_52w)} ticker...")
-            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-            for i, ticker in enumerate(need_new_52w, 1):
-                if i % 25 == 0 or i == 1:
-                    print(f"    [{i}/{len(need_new_52w)}] {ticker}...")
-                try:
-                    url = f"https://finviz.com/quote.ashx?t={ticker}"
-                    response = requests.get(url, headers=headers, timeout=10)
-                    soup = BeautifulSoup(response.content, 'html.parser')
-
-                    eps_qoq = None
-                    sales_qoq = None
-
-                    eps_label = soup.find('td', string='EPS Q/Q')
-                    if eps_label:
-                        eps_value = eps_label.find_next_sibling('td')
-                        if eps_value:
-                            eps_text = eps_value.get_text().strip()
-                            if eps_text.endswith('%'):
-                                try:
-                                    eps_qoq = float(eps_text[:-1])
-                                except:
-                                    pass
-
-                    sales_label = soup.find('td', string='Sales Q/Q')
-                    if sales_label:
-                        sales_value = sales_label.find_next_sibling('td')
-                        if sales_value:
-                            sales_text = sales_value.get_text().strip()
-                            if sales_text.endswith('%'):
-                                try:
-                                    sales_qoq = float(sales_text[:-1])
-                                except:
-                                    pass
-
-                    grade = "D"
-                    if eps_qoq is not None and sales_qoq is not None:
-                        if eps_qoq > 40 and sales_qoq > 25:
-                            grade = "A"
-                        elif eps_qoq > 25 and sales_qoq > 15:
-                            grade = "B"
-                        elif eps_qoq > 20 and sales_qoq > 10:
-                            grade = "C"
-
-                    fresh_eps_52w[ticker] = {"eps_qoq": eps_qoq, "sales_qoq": sales_qoq, "grade": grade}
-                    time.sleep(0.5)
-                except Exception as e:
-                    print(f"  Scraping hatasi {ticker}: {e}")
-                    fresh_eps_52w[ticker] = {"eps_qoq": None, "sales_qoq": None, "grade": "D"}
+            print(f"  Finviz extras (batch): {len(need_new_52w)} ticker...")
+            try:
+                extras_52w = get_finviz_extras(need_new_52w)
+            except Exception as e:
+                print(f"  get_finviz_extras hatasi: {e}")
+                extras_52w = None
+            for ticker in need_new_52w:
+                erow = extras_52w.loc[ticker] if (extras_52w is not None and ticker in extras_52w.index) else None
+                if erow is not None:
+                    eps_q    = _parse_pct(erow["eps_qoq"])
+                    sales_q  = _parse_pct(erow["sales_qoq"])
+                    perf_y   = _parse_pct(erow["perf_year"])
+                    roe_v    = _parse_pct(erow["roe"])
+                else:
+                    eps_q = sales_q = perf_y = roe_v = None
+                fresh_eps_52w[ticker] = {
+                    "eps_qoq": eps_q, "sales_qoq": sales_q,
+                    "grade": _compute_grade(eps_q, sales_q),
+                    "perf_year": perf_y, "roe": roe_v,
+                }
 
         # INSERT — tum veriyle
         saved_52w = 0
@@ -1606,6 +1504,8 @@ def run_scan():
                 rs_50d    = cached_52w[ticker].get("rs_50d")
                 rs_200d   = cached_52w[ticker].get("rs_200d")
                 rs_mf     = cached_52w[ticker].get("rs_mansfield")
+                perf_year = cached_52w[ticker].get("perf_year")
+                roe       = cached_52w[ticker].get("roe")
             else:
                 fresh_info_52w = fresh_slopes_52w.get(ticker) or {}
                 slope     = fresh_info_52w.get("slope")
@@ -1622,6 +1522,8 @@ def run_scan():
                 eps_qoq   = eps_data.get("eps_qoq")
                 sales_qoq = eps_data.get("sales_qoq")
                 grade     = eps_data.get("grade", "D")
+                perf_year = eps_data.get("perf_year")
+                roe       = eps_data.get("roe")
 
             try:
                 c.execute("""
@@ -1630,8 +1532,9 @@ def run_scan():
                      price, change_pct, volume, market_cap,
                      ma200_slope, eps_qoq, sales_qoq, grade, high52,
                      confirmations, violations,
-                     rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mansfield)
-                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                     rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mansfield,
+                     perf_year, roe)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                     ON CONFLICT (scan_date, ticker) DO UPDATE SET
                         company       = EXCLUDED.company,
                         sector        = EXCLUDED.sector,
@@ -1652,7 +1555,9 @@ def run_scan():
                         rs_20d        = EXCLUDED.rs_20d,
                         rs_50d        = EXCLUDED.rs_50d,
                         rs_200d       = EXCLUDED.rs_200d,
-                        rs_mansfield  = EXCLUDED.rs_mansfield
+                        rs_mansfield  = EXCLUDED.rs_mansfield,
+                        perf_year     = EXCLUDED.perf_year,
+                        roe           = EXCLUDED.roe
                 """, (
                     scan_date, ticker,
                     row.get("Company", ""), row.get("Sector", ""), row.get("Industry", ""),
@@ -1660,6 +1565,7 @@ def run_scan():
                     row.get("Market Cap", 0),
                     slope, eps_qoq, sales_qoq, grade, high52, confs, viols,
                     rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mf,
+                    perf_year, roe,
                 ))
                 saved_52w += 1
             except Exception as e:

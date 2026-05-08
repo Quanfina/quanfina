@@ -57,7 +57,15 @@ def _existing_count(scan_date):
     c = conn.cursor()
     try:
         c.execute("SELECT COUNT(*) FROM minervini_scans WHERE scan_date = %s", (scan_date,))
-        return c.fetchone()[0]
+        count = c.fetchone()[0]
+        if count == 0:
+            return 0
+        for tbl in ["minervini_fundamental_scans", "minervini_52w_high", "minervini_fundamental_only"]:
+            c.execute(f"SELECT COUNT(*) FROM {tbl} WHERE scan_date = %s", (scan_date,))
+            if c.fetchone()[0] == 0:
+                log.info("Partial scan detected for %s — %s is empty, will re-run", scan_date, tbl)
+                return 0
+        return count
     except Exception:
         return 0
     finally:
@@ -100,10 +108,16 @@ def scan():
     from scanner import run_scan, scan_sectors
 
     force = request.args.get("force", "0") == "1"
+    date_override = request.args.get("date", None)
     if request.is_json:
         force = force or bool(request.json.get("force", False))
+        date_override = date_override or request.json.get("date", None)
 
-    scan_date = _today_scan_date()
+    if date_override:
+        scan_date = date_override
+        log.info("Date override: %s", scan_date)
+    else:
+        scan_date = _today_scan_date()
     today = date.today()
 
     # --- 1. Hisse taraması ---
@@ -126,7 +140,7 @@ def scan():
 
         try:
             log.info("Starting scan for %s (force=%s)", scan_date, force)
-            run_scan()
+            run_scan(scan_date_override=date_override)
             log.info("Scan completed for %s", scan_date)
             stock_response = {"status": "ok", "scan_date": scan_date}
         except SystemExit:
