@@ -224,5 +224,6 @@ __marimo__/
 quanfina.db
 test_pg.py
 test_*.py
+!tests/test_*.py
 _tmp_*.py
 notebook/
