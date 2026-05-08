@@ -16,6 +16,7 @@ import streamlit as st
 import pandas as pd
 from db_connection import get_connection, add_to_list, remove_from_list, get_setup_types, promote_to_list
 from _list_cols import get_columns_for_list, get_label, get_list_meta, LIST_TYPES
+from quanfina_math import check_50ma_trail_stop, check_volatility_position_size  # Sprint 4.7e.2
 
 
 st.set_page_config(page_title="Minervini", page_icon="🎯", layout="wide")
@@ -78,7 +79,8 @@ def load_list_data(list_code: str, user_id: int) -> pd.DataFrame:
         "    s.grade, s.rs_ibd, s.rs_12m, "
         "    s.ma200_slope, s.pct_from_high, s.volume, "
         "    s.eps_qoq, s.sales_qoq, s.market_cap, "
-        "    s.days_to_earnings, s.confirmations, s.violations "
+        "    s.days_to_earnings, s.confirmations, s.violations, "
+        "    s.sma50, s.atr14 "
         "FROM symbol_lists sl "
         "LEFT JOIN setup_types st ON st.id = sl.setup_type_id "
         "LEFT JOIN minervini_scans s "
@@ -97,6 +99,7 @@ def load_list_data(list_code: str, user_id: int) -> pd.DataFrame:
         "ma200_slope", "pct_from_high", "volume",
         "eps_qoq", "sales_qoq", "market_cap",
         "days_to_earnings", "confirmations", "violations",
+        "sma50", "atr14",
     ]
     conn.close()
     return pd.DataFrame(rows, columns=cols)
@@ -168,6 +171,58 @@ def render_list_tab(list_code: str) -> None:
         hide_index=True,
         column_config=column_config,
     )
+
+    # Sprint 4.7e.2 — 50-MA Trail Stop + Volatility sinyalleri (Focus/Buy tabları)
+    if list_code in ("focus", "buy") and not df.empty:
+        has_signal_data = ("sma50" in df.columns and "atr14" in df.columns
+                           and "price" in df.columns
+                           and df["sma50"].notna().any())
+        if has_signal_data:
+            signal_rows = []
+            for _, r in df.iterrows():
+                ticker = r.get("symbol", "?")
+                price  = r.get("price")
+                sma50  = r.get("sma50")
+                atr14  = r.get("atr14")
+                if pd.isna(price) or pd.isna(sma50):
+                    continue
+                ma_rec = check_50ma_trail_stop(
+                    current_price=float(price),
+                    ma50=float(sma50),
+                    invest_type="LONG",
+                    is_climax_run=False,
+                )
+                vol_rec = None
+                if not pd.isna(atr14):
+                    vol_rec = check_volatility_position_size(
+                        atr=float(atr14),
+                        current_price=float(price),
+                        proposed_position_pct=10.0,
+                    )
+                if ma_rec.severity != "OK" or (vol_rec and vol_rec.severity != "OK"):
+                    signal_rows.append({
+                        "Ticker":     ticker,
+                        "50-MA":      ma_rec.severity if ma_rec.severity != "OK" else "—",
+                        "50-MA Not":  ma_rec.message  if ma_rec.severity != "OK" else "",
+                        "ATR":        vol_rec.severity if vol_rec and vol_rec.severity != "OK" else "—",
+                        "ATR Not":    vol_rec.message  if vol_rec and vol_rec.severity != "OK" else "",
+                    })
+            if signal_rows:
+                with st.expander(f"🚨 Sinyaller ({len(signal_rows)} hisse)", expanded=False):
+                    st.caption(
+                        "50-MA Trail Stop ve Volatility (ATR) uyarıları — "
+                        "yalnızca OK olmayan hisseler. Veri: minervini_scans."
+                    )
+                    st.dataframe(pd.DataFrame(signal_rows), use_container_width=True, hide_index=True)
+            else:
+                with st.expander("✅ Sinyaller (tümü OK)", expanded=False):
+                    st.caption("50-MA ve ATR uyarısı olan hisse yok.")
+        else:
+            with st.expander("⏳ Sinyaller (veri bekleniyor)", expanded=False):
+                st.caption(
+                    "sma50 / atr14 henüz taranmamış. "
+                    "Sprint 4.7e.1 sonrası yeni tarama tetiklendiğinde dolar."
+                )
 
     with st.expander("Liste metadata (id, eklenme tarihi, notlar, pivot, vb.)"):
         meta_cols = ["id", "symbol", "day_added", "setup_type_name", "note",
