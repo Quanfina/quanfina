@@ -288,6 +288,54 @@ class RBAMetrics:
     is_statistically_significant: bool  # >=30 trade
 
 
+# =============================================================================
+# TradeGrader — 17 kategori (EK 10 sentezi)
+# Bundle gradeThresholds birebir — NotebookLM + Gemini + Bundle 3 kaynak doğrulamalı
+# =============================================================================
+# target_pct yorumu:
+#   - Pozitif sayı = TABAN (>=X% olmalı, yüksek hedeflenir)
+#   - Negatif sayı = TAVAN (<=|X|% olmalı, düşük hedeflenir)
+#   - None         = INFO (eşik yok, sadece kayıt)
+GRADE_CATEGORIES: dict[str, tuple[str, str, Optional[float]]] = {
+    # ENTRY (alım) — 7 kategori
+    "BP":  ("Bought perfect",          "ENTRY",  80.0),
+    "BE":  ("Bought early",            "ENTRY", -10.0),
+    "BL":  ("Bought late",             "ENTRY", -10.0),
+    "FS":  ("Faulty setup",            "ENTRY", -10.0),
+    "BB":  ("Bad buy",                 "ENTRY", -10.0),
+    "EB":  ("Emotional buy",           "ENTRY",  -2.0),
+    "CE":  ("Chased extended",         "ENTRY",  -2.0),
+    # EXIT (kâr realize) — 5 kategori
+    "SP":  ("Sold perfect",            "EXIT",   30.0),
+    "SE":  ("Sold early",              "EXIT",  -50.0),
+    "SL":  ("Sold late",               "EXIT",  -20.0),
+    "RFR": ("Reduced to finance risk", "EXIT",   None),
+    "BS":  ("Bad sale",                "EXIT",  -10.0),
+    # LOSS (zarar kes) — 5 kategori
+    "CLP": ("Cut loss perfect",        "LOSS",   95.0),
+    "CLE": ("Cut loss early",          "LOSS",  -30.0),
+    "CLL": ("Cut loss late",           "LOSS",   -5.0),
+    "COT": ("Choked off trade",        "LOSS",  -30.0),
+    "ES":  ("Emotional sale",          "LOSS",   -5.0),
+}
+
+
+@dataclass
+class GradeSuggestion:
+    """
+    TradeGrader önerisi — kategori + güven seviyesi + neden.
+
+    Kullanıcı bu öneriyi kabul/red/değiştir edebilir (manuel karar son).
+    Boş code = "öneri yok" (kullanıcı manuel atar).
+
+    Kaynak: notebook/EK10_TradeGrader_Sentezi.md
+    """
+    code: str
+    name: str
+    confidence: Literal["HIGH", "MEDIUM", "LOW"]
+    reason: str
+
+
 def check_initial_stop(
     entry_price: float,
     stop_loss: float,
@@ -668,3 +716,175 @@ def should_drop_setup(rba: RBAMetrics) -> StopRecommendation:
         severity="OK",
         message=f"✅ Setup sağlıklı — AR {rba.adjusted_ratio:.2f}, Win %{rba.win_rate*100:.0f}"
     )
+
+
+# =============================================================================
+# TradeGrader — Öneri Fonksiyonları (EK 10 sentezi)
+# =============================================================================
+
+def suggest_entry_grade(
+    entry_price: float,
+    pivot_price: float,
+) -> GradeSuggestion:
+    """
+    Alım noktası pivot'a göre entry grade önerir.
+
+    BP: pivot ±2% içinde alım
+    BL: pivot +2% ile +5% arasında (geç alım)
+    CE: pivot +5% üzerinde (çok geç, extended chase)
+    BE: pivot -2% altında (erken, setup tamamlanmamış)
+    """
+    if pivot_price <= 0 or entry_price <= 0:
+        return GradeSuggestion("BE", "Bought early", "LOW", "Pivot fiyatı geçersiz")
+
+    deviation_pct = (entry_price - pivot_price) / pivot_price * 100
+
+    if -2.0 <= deviation_pct <= 2.0:
+        return GradeSuggestion(
+            code="BP",
+            name="Bought perfect",
+            confidence="HIGH",
+            reason=f"Pivot'a {deviation_pct:+.1f}% — ideal alım bölgesi",
+        )
+    elif 2.0 < deviation_pct <= 5.0:
+        return GradeSuggestion(
+            code="BL",
+            name="Bought late",
+            confidence="MEDIUM",
+            reason=f"Pivot'a {deviation_pct:+.1f}% — pivot'tan geç alım",
+        )
+    elif deviation_pct > 5.0:
+        return GradeSuggestion(
+            code="CE",
+            name="Chased extended",
+            confidence="HIGH",
+            reason=f"Pivot'a {deviation_pct:+.1f}% — çok uzak, extended chase",
+        )
+    else:
+        return GradeSuggestion(
+            code="BE",
+            name="Bought early",
+            confidence="MEDIUM",
+            reason=f"Pivot'a {deviation_pct:+.1f}% — setup tamamlanmadan erken alım",
+        )
+
+
+def suggest_loss_grade(
+    entry_price: float,
+    exit_price: float,
+    stop_loss: float,
+    invest_type: str = "LONG",
+) -> GradeSuggestion:
+    """
+    Zararla kapanan trade için grade önerir.
+
+    CLP: gerçek zarar ≈ planlı stop (±1%)
+    CLE: stop'tan önce çıkış (acele kes)
+    CLL: stop geçildikten sonra çıkış (geç kes)
+    """
+    _itype = LONG if invest_type.upper() == "LONG" else SHORT
+
+    planned_stop_pct = abs(stop_loss_percentage(entry_price, stop_loss, _itype))
+    actual_pct = percent_change(entry_price, exit_price, _itype)
+    actual_loss_abs = abs(actual_pct)
+
+    diff = actual_loss_abs - planned_stop_pct
+
+    if abs(diff) <= 1.0:
+        return GradeSuggestion(
+            code="CLP",
+            name="Cut loss perfect",
+            confidence="HIGH",
+            reason=f"Gerçek zarar %{actual_loss_abs:.1f} ≈ plan %{planned_stop_pct:.1f} (±1%)",
+        )
+    elif diff < -1.0:
+        return GradeSuggestion(
+            code="CLE",
+            name="Cut loss early",
+            confidence="MEDIUM",
+            reason=f"Stop'tan %{abs(diff):.1f} önce çıkıldı (plan %{planned_stop_pct:.1f}, gerçek %{actual_loss_abs:.1f})",
+        )
+    else:
+        return GradeSuggestion(
+            code="CLL",
+            name="Cut loss late",
+            confidence="HIGH",
+            reason=f"Stop %{diff:.1f} geçildi (plan %{planned_stop_pct:.1f}, gerçek %{actual_loss_abs:.1f})",
+        )
+
+
+def suggest_exit_grade(
+    entry_price: float,
+    exit_price: float,
+    weeks_held: float,
+    invest_type: str = "LONG",
+) -> GradeSuggestion:
+    """
+    Kârlı kapanan trade için grade önerir.
+
+    SP: ≥20% kazanç (yeterli süre tutulduysa HIGH, değilse MEDIUM)
+    SP: 10-20% kazanç, <16 hafta (MEDIUM)
+    SL: 10-20% kazanç, ≥16 hafta (uzun tutma — kâr erimesi riski)
+    SE: <10% kazanç (erken satış)
+    """
+    _itype = LONG if invest_type.upper() == "LONG" else SHORT
+
+    gain_pct = percent_change(entry_price, exit_price, _itype)
+
+    if gain_pct >= 20.0:
+        confidence = "HIGH" if weeks_held >= 6 else "MEDIUM"
+        return GradeSuggestion(
+            code="SP",
+            name="Sold perfect",
+            confidence=confidence,
+            reason=f"%{gain_pct:.1f} kazanç, {weeks_held:.0f} hafta tutuldu",
+        )
+    elif gain_pct >= 10.0:
+        if weeks_held >= 16:
+            return GradeSuggestion(
+                code="SL",
+                name="Sold late",
+                confidence="MEDIUM",
+                reason=f"%{gain_pct:.1f} kazanç, {weeks_held:.0f} hafta tutuldu — kâr erimesi olabilir",
+            )
+        return GradeSuggestion(
+            code="SP",
+            name="Sold perfect",
+            confidence="MEDIUM",
+            reason=f"%{gain_pct:.1f} kazanç, {weeks_held:.0f} hafta tutuldu",
+        )
+    else:
+        return GradeSuggestion(
+            code="SE",
+            name="Sold early",
+            confidence="MEDIUM",
+            reason=f"Sadece %{gain_pct:.1f} kazanç — erken satış",
+        )
+
+
+def compute_grade_distribution(graded_legs: list[dict]) -> dict:
+    """
+    Grade listesinden dağılım istatistiği üretir.
+
+    Input:  [{'grade_code': 'BP'}, {'grade_code': 'BL'}, ...]
+    Output: {
+        'by_code':  {'BP': 3, 'BL': 1, ...},
+        'by_group': {'ENTRY': 5, 'EXIT': 3, 'LOSS': 2, 'UNKNOWN': 0},
+        'total':    10,
+    }
+    """
+    by_code: dict[str, int] = {}
+    by_group: dict[str, int] = {"ENTRY": 0, "EXIT": 0, "LOSS": 0, "UNKNOWN": 0}
+
+    for leg in graded_legs:
+        code = leg.get("grade_code", "")
+        by_code[code] = by_code.get(code, 0) + 1
+
+        group = GRADE_CATEGORIES[code][1] if code in GRADE_CATEGORIES else "UNKNOWN"
+        by_group[group] = by_group.get(group, 0) + 1
+
+    return {
+        "by_code": by_code,
+        "by_group": by_group,
+        "total": len(graded_legs),
+    }

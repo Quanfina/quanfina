@@ -27,6 +27,12 @@ from quanfina_math import (
     RBAMetrics,
     compute_rba_metrics,
     should_drop_setup,
+    GRADE_CATEGORIES,
+    GradeSuggestion,
+    suggest_entry_grade,
+    suggest_loss_grade,
+    suggest_exit_grade,
+    compute_grade_distribution,
 )
 
 
@@ -555,6 +561,197 @@ class TestComputeRBAMetrics:
         rba = compute_rba_metrics(trades)
         assert rba.num_trades == 30
         assert rba.is_statistically_significant is True
+
+
+# ---------------------------------------------------------------------------
+# TradeGrader — GRADE_CATEGORIES sabiti
+# ---------------------------------------------------------------------------
+
+class TestGradeCategories:
+    def test_exactly_17_codes(self):
+        assert len(GRADE_CATEGORIES) == 17
+
+    def test_group_counts(self):
+        groups = [v[1] for v in GRADE_CATEGORIES.values()]
+        assert groups.count("ENTRY") == 7
+        assert groups.count("EXIT") == 5
+        assert groups.count("LOSS") == 5
+
+    def test_target_pct_types(self):
+        for code, (name, group, target) in GRADE_CATEGORIES.items():
+            assert isinstance(name, str)
+            assert group in ("ENTRY", "EXIT", "LOSS")
+            assert target is None or isinstance(target, float)
+
+
+# ---------------------------------------------------------------------------
+# TradeGrader — GradeSuggestion dataclass
+# ---------------------------------------------------------------------------
+
+class TestGradeSuggestionDataclass:
+    def test_fields_set_correctly(self):
+        gs = GradeSuggestion(code="BP", name="Bought perfect", confidence="HIGH", reason="Test")
+        assert gs.code == "BP"
+        assert gs.name == "Bought perfect"
+        assert gs.confidence == "HIGH"
+        assert gs.reason == "Test"
+
+    def test_confidence_medium(self):
+        gs = GradeSuggestion(code="BL", name="Bought late", confidence="MEDIUM", reason="x")
+        assert gs.confidence == "MEDIUM"
+
+    def test_empty_code_valid(self):
+        gs = GradeSuggestion(code="", name="", confidence="LOW", reason="no suggestion")
+        assert gs.code == ""
+
+
+# ---------------------------------------------------------------------------
+# TradeGrader — suggest_entry_grade
+# ---------------------------------------------------------------------------
+
+class TestSuggestEntryGrade:
+    def test_bought_perfect_exact_pivot(self):
+        gs = suggest_entry_grade(entry_price=100.0, pivot_price=100.0)
+        assert gs.code == "BP"
+        assert gs.confidence == "HIGH"
+
+    def test_bought_perfect_within_2pct(self):
+        gs = suggest_entry_grade(entry_price=101.5, pivot_price=100.0)
+        assert gs.code == "BP"
+        assert gs.confidence == "HIGH"
+
+    def test_bought_late_3pct(self):
+        gs = suggest_entry_grade(entry_price=103.0, pivot_price=100.0)
+        assert gs.code == "BL"
+        assert gs.confidence == "MEDIUM"
+
+    def test_chased_extended_6pct(self):
+        gs = suggest_entry_grade(entry_price=106.0, pivot_price=100.0)
+        assert gs.code == "CE"
+        assert gs.confidence == "HIGH"
+
+    def test_bought_early_below_pivot(self):
+        gs = suggest_entry_grade(entry_price=97.0, pivot_price=100.0)
+        assert gs.code == "BE"
+        assert gs.confidence == "MEDIUM"
+
+    def test_invalid_pivot_zero(self):
+        gs = suggest_entry_grade(entry_price=100.0, pivot_price=0.0)
+        assert gs.code == "BE"
+        assert gs.confidence == "LOW"
+
+
+# ---------------------------------------------------------------------------
+# TradeGrader — suggest_loss_grade
+# ---------------------------------------------------------------------------
+
+class TestSuggestLossGrade:
+    def test_cut_loss_perfect_exact(self):
+        # entry=100, stop=95 → plan 5%, exit=95 → actual 5%
+        gs = suggest_loss_grade(100.0, 95.0, 95.0)
+        assert gs.code == "CLP"
+        assert gs.confidence == "HIGH"
+
+    def test_cut_loss_perfect_within_1pct(self):
+        # plan 5%, actual 4.5% → diff 0.5 ≤ 1
+        gs = suggest_loss_grade(100.0, 95.5, 95.0)
+        assert gs.code == "CLP"
+
+    def test_cut_loss_early(self):
+        # entry=100, stop=92 (plan 8%), exit=97 (actual 3%) → diff = 3-8 = -5 < -1
+        gs = suggest_loss_grade(100.0, 97.0, 92.0)
+        assert gs.code == "CLE"
+        assert gs.confidence == "MEDIUM"
+
+    def test_cut_loss_late(self):
+        # entry=100, stop=95 (plan 5%), exit=88 (actual 12%) → diff = 7 > 1
+        gs = suggest_loss_grade(100.0, 88.0, 95.0)
+        assert gs.code == "CLL"
+        assert gs.confidence == "HIGH"
+
+    def test_short_cut_loss_perfect(self):
+        # SHORT: entry=100, stop=105 (plan 5%), exit=105 (actual 5%)
+        gs = suggest_loss_grade(100.0, 105.0, 105.0, invest_type="SHORT")
+        assert gs.code == "CLP"
+
+    def test_cut_loss_late_big_miss(self):
+        # entry=100, stop=97 (plan 3%), exit=85 (actual 15%) → diff = 12 > 1
+        gs = suggest_loss_grade(100.0, 85.0, 97.0)
+        assert gs.code == "CLL"
+
+
+# ---------------------------------------------------------------------------
+# TradeGrader — suggest_exit_grade
+# ---------------------------------------------------------------------------
+
+class TestSuggestExitGrade:
+    def test_sold_perfect_large_gain_long_hold(self):
+        # 25% gain, 8 weeks → SP HIGH
+        gs = suggest_exit_grade(100.0, 125.0, weeks_held=8.0)
+        assert gs.code == "SP"
+        assert gs.confidence == "HIGH"
+
+    def test_sold_perfect_large_gain_short_hold(self):
+        # 25% gain, 3 weeks → SP MEDIUM (< 6 weeks)
+        gs = suggest_exit_grade(100.0, 125.0, weeks_held=3.0)
+        assert gs.code == "SP"
+        assert gs.confidence == "MEDIUM"
+
+    def test_sold_perfect_medium_gain(self):
+        # 12% gain, 4 weeks → SP MEDIUM
+        gs = suggest_exit_grade(100.0, 112.0, weeks_held=4.0)
+        assert gs.code == "SP"
+        assert gs.confidence == "MEDIUM"
+
+    def test_sold_early_small_gain(self):
+        # 5% gain → SE
+        gs = suggest_exit_grade(100.0, 105.0, weeks_held=2.0)
+        assert gs.code == "SE"
+
+    def test_sold_late_long_hold(self):
+        # 11% gain, 20 weeks → SL
+        gs = suggest_exit_grade(100.0, 111.0, weeks_held=20.0)
+        assert gs.code == "SL"
+        assert gs.confidence == "MEDIUM"
+
+
+# ---------------------------------------------------------------------------
+# TradeGrader — compute_grade_distribution
+# ---------------------------------------------------------------------------
+
+class TestComputeGradeDistribution:
+    def test_empty_list(self):
+        result = compute_grade_distribution([])
+        assert result["total"] == 0
+        assert result["by_code"] == {}
+
+    def test_single_grade(self):
+        result = compute_grade_distribution([{"grade_code": "BP"}])
+        assert result["total"] == 1
+        assert result["by_code"]["BP"] == 1
+        assert result["by_group"]["ENTRY"] == 1
+
+    def test_mixed_grades(self):
+        legs = [
+            {"grade_code": "BP"}, {"grade_code": "BP"}, {"grade_code": "BL"},
+            {"grade_code": "SP"}, {"grade_code": "CLP"},
+        ]
+        result = compute_grade_distribution(legs)
+        assert result["total"] == 5
+        assert result["by_code"]["BP"] == 2
+        assert result["by_group"]["ENTRY"] == 3
+        assert result["by_group"]["EXIT"] == 1
+        assert result["by_group"]["LOSS"] == 1
+
+    def test_unknown_grade_code(self):
+        result = compute_grade_distribution([{"grade_code": "XYZ"}])
+        assert result["by_group"]["UNKNOWN"] == 1
+        assert result["total"] == 1
+
+    def test_total_equals_sum_of_by_code(self):
+        legs = [{"grade_code": "BP"}] * 3 + [{"grade_code": "SP"}] * 2
+        result = compute_grade_distribution(legs)
+        assert result["total"] == sum(result["by_code"].values())
 
 
 class TestShouldDropSetup:
