@@ -14,7 +14,7 @@ Eski 7+4 tab yapisi: pages/3_Minervini_old.py (rollback icin).
 """
 import streamlit as st
 import pandas as pd
-from db_connection import get_connection, add_to_list, remove_from_list
+from db_connection import get_connection, add_to_list, remove_from_list, get_setup_types, promote_to_list
 from _list_cols import get_columns_for_list, get_label, get_list_meta, LIST_TYPES
 
 
@@ -24,6 +24,16 @@ st.title("🎯 Mark Minervini — 4 Liste Stratejisi")
 st.caption("SEPA: Specific Entry Point Analysis | 4 kademeli liste yapisi")
 
 USER_EMAIL = "ferit@quanfina.local"
+
+
+@st.cache_data(ttl=3600)
+def cached_setup_types() -> list:
+    """setup_types lookup'unu cache'ler (1 saat TTL).
+
+    Returns:
+        [(1, 'VCP'), (2, 'CWH'), ...]
+    """
+    return get_setup_types()
 
 
 @st.cache_data(ttl=60)
@@ -63,12 +73,14 @@ def load_list_data(list_code: str, user_id: int) -> pd.DataFrame:
         "SELECT "
         "    sl.id, sl.symbol, sl.day_added, sl.note, "
         "    sl.pivot_price, sl.pullback_health, sl.tt_score, "
+        "    sl.setup_type_id, st.name AS setup_type_name, "
         "    s.company, s.sector, s.price, s.change_pct, "
         "    s.grade, s.rs_ibd, s.rs_12m, "
         "    s.ma200_slope, s.pct_from_high, s.volume, "
         "    s.eps_qoq, s.sales_qoq, s.market_cap, "
         "    s.days_to_earnings, s.confirmations, s.violations "
         "FROM symbol_lists sl "
+        "LEFT JOIN setup_types st ON st.id = sl.setup_type_id "
         "LEFT JOIN minervini_scans s "
         "    ON s.ticker = sl.symbol AND s.scan_date = %s "
         "WHERE sl.user_id = %s AND sl.list_type = %s AND sl.strategy = 'minervini' "
@@ -79,6 +91,7 @@ def load_list_data(list_code: str, user_id: int) -> pd.DataFrame:
     cols = [
         "id", "symbol", "day_added", "note",
         "pivot_price", "pullback_health", "tt_score",
+        "setup_type_id", "setup_type_name",
         "company", "sector", "price", "change_pct",
         "grade", "rs_ibd", "rs_12m",
         "ma200_slope", "pct_from_high", "volume",
@@ -157,8 +170,8 @@ def render_list_tab(list_code: str) -> None:
     )
 
     with st.expander("Liste metadata (id, eklenme tarihi, notlar, pivot, vb.)"):
-        meta_cols = ["id", "symbol", "day_added", "note", "pivot_price",
-                     "pullback_health", "tt_score"]
+        meta_cols = ["id", "symbol", "day_added", "setup_type_name", "note",
+                     "pivot_price", "pullback_health", "tt_score"]
         meta_available = [c for c in meta_cols if c in df.columns]
         st.dataframe(df[meta_available], use_container_width=True, hide_index=True)
 
@@ -173,13 +186,35 @@ def render_list_tab(list_code: str) -> None:
                 "Not (opsiyonel)", placeholder="VCP setup, breakout watch",
                 key=f"add_note_{list_code}"
             )
+            col_setup, col_pivot = st.columns([1, 1])
+            setup_pairs = cached_setup_types()
+            setup_options = {"— Seçilmedi —": None}
+            for sid, sname in setup_pairs:
+                setup_options[sname] = sid
+            sel_setup_label = col_setup.selectbox(
+                "Setup Tipi (opsiyonel)",
+                list(setup_options.keys()),
+                key=f"add_setup_{list_code}"
+            )
+            sel_pivot = col_pivot.number_input(
+                "Pivot Fiyat (opsiyonel)",
+                min_value=0.0,
+                step=0.01,
+                format="%.2f",
+                key=f"add_pivot_{list_code}"
+            )
             submitted = st.form_submit_button("Ekle", type="primary")
         if submitted:
             sym_clean = (new_symbol or "").upper().strip()
             if not sym_clean:
                 st.error("Ticker bos olamaz.")
             else:
-                ok = add_to_list(user_id, sym_clean, list_code, note=new_note)
+                ok = add_to_list(
+                    user_id, sym_clean, list_code,
+                    note=new_note,
+                    setup_type_id=setup_options[sel_setup_label],
+                    pivot_price=sel_pivot if sel_pivot > 0 else None
+                )
                 if ok:
                     st.success(f"✅ {sym_clean} → {meta['label']} listesine eklendi.")
                     load_list_data.clear()
@@ -202,6 +237,48 @@ def render_list_tab(list_code: str) -> None:
                     st.rerun()
                 else:
                     st.error(f"❌ {to_remove} bulunamadi.")
+
+    # ── Watch'a ozel: On Deck'e Promote ─────────────────────────────────
+    if list_code == "watch" and len(df) > 0:
+        with st.expander("⬆️ On Deck'e Tasi"):
+            with st.form(key=f"promote_form_{list_code}", clear_on_submit=True):
+                to_promote = st.selectbox(
+                    "Hisse",
+                    df["symbol"].tolist(),
+                    key=f"promote_sel_{list_code}"
+                )
+                col_s, col_p = st.columns([1, 1])
+                promote_pairs = cached_setup_types()
+                promote_options = {"— Seçilmedi —": None}
+                for sid, sname in promote_pairs:
+                    promote_options[sname] = sid
+                promote_setup_label = col_s.selectbox(
+                    "Setup Tipi",
+                    list(promote_options.keys()),
+                    key=f"promote_setup_{list_code}"
+                )
+                promote_pivot = col_p.number_input(
+                    "Pivot Fiyat",
+                    min_value=0.0,
+                    step=0.01,
+                    format="%.2f",
+                    key=f"promote_pivot_{list_code}"
+                )
+                promote_submitted = st.form_submit_button(
+                    "⬆️ On Deck'e Tasi", type="primary"
+                )
+            if promote_submitted:
+                ok = promote_to_list(
+                    user_id, to_promote, "watch", "on_deck",
+                    setup_type_id=promote_options[promote_setup_label],
+                    pivot_price=promote_pivot if promote_pivot > 0 else None
+                )
+                if ok:
+                    st.success(f"✅ {to_promote} → On Deck listesine tasindi.")
+                    load_list_data.clear()
+                    st.rerun()
+                else:
+                    st.error(f"❌ {to_promote} tasinamadi.")
 
 
 # 4 dis tab

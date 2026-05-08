@@ -338,8 +338,18 @@ def delete_trade(trade_id: int, soft: bool = True) -> bool:
 
 
 def add_to_list(user_id: int, symbol: str, list_code: str,
-                strategy: str = "minervini", note: str = "") -> bool:
+                strategy: str = "minervini", note: str = "",
+                setup_type_id: int = None, pivot_price: float = None) -> bool:
     """symbol_lists tablosuna hisse ekler.
+
+    Args:
+        user_id: Kullanici ID
+        symbol: Ticker (otomatik upper+strip)
+        list_code: 'watch', 'on_deck', 'focus', veya 'buy'
+        strategy: Default 'minervini'
+        note: Opsiyonel not
+        setup_type_id: Opsiyonel setup_types FK (1-6)
+        pivot_price: Opsiyonel pivot fiyati
 
     Returns:
         True: Eklendi
@@ -349,10 +359,12 @@ def add_to_list(user_id: int, symbol: str, list_code: str,
     cur = conn.cursor()
     try:
         cur.execute(
-            "INSERT INTO symbol_lists (user_id, symbol, list_type, strategy, note) "
-            "VALUES (%s, %s, %s, %s, %s) "
+            "INSERT INTO symbol_lists "
+            "(user_id, symbol, list_type, strategy, note, setup_type_id, pivot_price) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s) "
             "ON CONFLICT (user_id, symbol, list_type, strategy) DO NOTHING",
-            (user_id, symbol.upper().strip(), list_code, strategy, note)
+            (user_id, symbol.upper().strip(), list_code, strategy, note,
+             setup_type_id, pivot_price)
         )
         added = cur.rowcount > 0
         conn.commit()
@@ -360,6 +372,83 @@ def add_to_list(user_id: int, symbol: str, list_code: str,
     except Exception as e:
         conn.rollback()
         log.error(f"add_to_list error: {e}")
+        return False
+    finally:
+        conn.close()
+
+
+def get_setup_types() -> list:
+    """setup_types tablosunu (id, name) listesi olarak dondurur (sort_order'a gore).
+
+    Returns:
+        Liste: [(1, 'VCP'), (2, 'CWH'), (3, 'Power Play'), ...]
+    """
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT id, name FROM setup_types ORDER BY sort_order")
+        return cur.fetchall()
+    finally:
+        conn.close()
+
+
+def promote_to_list(user_id: int, symbol: str, from_list: str, to_list: str,
+                    strategy: str = "minervini", note: str = None,
+                    setup_type_id: int = None, pivot_price: float = None) -> bool:
+    """Bir hisseyi bir listeden digerine atomic olarak tasir.
+
+    Args:
+        user_id: Kullanici ID
+        symbol: Ticker (otomatik upper+strip)
+        from_list: Kaynak liste ('watch', 'on_deck', 'focus', 'buy')
+        to_list: Hedef liste
+        strategy: Default 'minervini'
+        note: None ise eski not korunur, deger varsa overwrite
+        setup_type_id: Hedefte ayarlanacak setup_types FK
+        pivot_price: Hedefte ayarlanacak pivot fiyati
+
+    Returns:
+        True: Tasima basarili
+        False: Kaynak listede hisse yok veya hata
+    """
+    sym = symbol.upper().strip()
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            "SELECT note FROM symbol_lists "
+            "WHERE user_id = %s AND symbol = %s AND list_type = %s AND strategy = %s",
+            (user_id, sym, from_list, strategy)
+        )
+        row = cur.fetchone()
+        if not row:
+            conn.rollback()
+            return False
+        existing_note = row[0] or ""
+        final_note = note if note is not None else existing_note
+
+        cur.execute(
+            "INSERT INTO symbol_lists "
+            "(user_id, symbol, list_type, strategy, note, setup_type_id, pivot_price) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s) "
+            "ON CONFLICT (user_id, symbol, list_type, strategy) "
+            "DO UPDATE SET note = EXCLUDED.note, "
+            "              setup_type_id = EXCLUDED.setup_type_id, "
+            "              pivot_price = EXCLUDED.pivot_price",
+            (user_id, sym, to_list, strategy, final_note, setup_type_id, pivot_price)
+        )
+
+        cur.execute(
+            "DELETE FROM symbol_lists "
+            "WHERE user_id = %s AND symbol = %s AND list_type = %s AND strategy = %s",
+            (user_id, sym, from_list, strategy)
+        )
+
+        conn.commit()
+        return True
+    except Exception as e:
+        conn.rollback()
+        log.error(f"promote_to_list error: {e}")
         return False
     finally:
         conn.close()
