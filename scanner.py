@@ -69,6 +69,11 @@ def init_db():
         "ALTER TABLE minervini_fundamental_only ADD COLUMN IF NOT EXISTS eps_qoq TEXT",
         "ALTER TABLE minervini_fundamental_only ADD COLUMN IF NOT EXISTS sales_qoq TEXT",
         "ALTER TABLE minervini_fundamental_only ADD COLUMN IF NOT EXISTS grade TEXT",
+        # Sprint 4.7e.1 — sma50 + atr14 teknik göstergeler; perf_year/roe şema tutarsızlık düzeltmesi
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS sma50 DOUBLE PRECISION",
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS atr14 DOUBLE PRECISION",
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS perf_year DOUBLE PRECISION",
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS roe DOUBLE PRECISION",
     ]:
         c.execute(col_sql)
     c.execute("""
@@ -706,6 +711,23 @@ def check_ma200_slope(tickers):
                 ma200_1m    = float(close.rolling(200).mean().iloc[-21])
                 slope       = round(ma200_today - ma200_1m, 4)
                 high52      = round(float(high.max()), 4)
+
+                # Sprint 4.7e.1 — sma50 + atr14 (mevcut OHLCV serisinden, ek API yok)
+                try:
+                    sma50_val = float(close.rolling(50).mean().iloc[-1])
+                except Exception:
+                    sma50_val = None
+                try:
+                    prev_close = close.shift(1)
+                    tr = pd.concat([
+                        (high - low),
+                        (high - prev_close).abs(),
+                        (low  - prev_close).abs(),
+                    ], axis=1).max(axis=1)
+                    atr14_val = float(tr.rolling(14).mean().iloc[-1])
+                except Exception:
+                    atr14_val = None
+
                 ohlcv = pd.DataFrame({
                     "Open": open_, "High": high, "Low": low,
                     "Close": close, "Volume": volume,
@@ -714,11 +736,13 @@ def check_ma200_slope(tickers):
                 results[ticker] = {
                     "slope":         slope,
                     "high52":        high52,
+                    "sma50":         sma50_val,
+                    "atr14":         atr14_val,
                     "confirmations": ",".join(confs),
                     "violations":    ",".join(viols),
                 }
             except:
-                results[ticker] = {"slope": None, "high52": None,
+                results[ticker] = {"slope": None, "high52": None, "sma50": None, "atr14": None,
                                    "confirmations": "", "violations": "", **_null_rs}
 
         try:
@@ -759,6 +783,8 @@ def save_results(df_finviz, slopes, scan_date):
         rs_50d     = slope_info.get("rs_50d")
         rs_200d    = slope_info.get("rs_200d")
         rs_mf      = slope_info.get("rs_mansfield")
+        sma50      = slope_info.get("sma50")
+        atr14      = slope_info.get("atr14")
 
         # Kural 3: MA200 yükselişte (slope > 0)
         passed = 1 if slope is not None and slope > 0 else 0
@@ -768,9 +794,10 @@ def save_results(df_finviz, slopes, scan_date):
                 INSERT INTO minervini_scans
                 (scan_date, ticker, company, sector, industry,
                  price, change_pct, volume, market_cap, pe,
-                 ma200_slope, passed, high52, confirmations, violations,
+                 ma200_slope, passed, high52, sma50, atr14,
+                 confirmations, violations,
                  rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mansfield)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 ON CONFLICT(scan_date, ticker) DO UPDATE SET
                     company       = EXCLUDED.company,
                     sector        = EXCLUDED.sector,
@@ -783,6 +810,8 @@ def save_results(df_finviz, slopes, scan_date):
                     ma200_slope   = EXCLUDED.ma200_slope,
                     passed        = EXCLUDED.passed,
                     high52        = EXCLUDED.high52,
+                    sma50         = EXCLUDED.sma50,
+                    atr14         = EXCLUDED.atr14,
                     confirmations = EXCLUDED.confirmations,
                     violations    = EXCLUDED.violations,
                     rs_ibd        = EXCLUDED.rs_ibd,
@@ -796,7 +825,7 @@ def save_results(df_finviz, slopes, scan_date):
                 row.get("Company", ""), row.get("Sector", ""), row.get("Industry", ""),
                 row.get("Price", 0), row.get("Change", ""), row.get("Volume", 0),
                 row.get("Market Cap", 0), row.get("P/E", 0),
-                slope, passed, high52, confs, viols,
+                slope, passed, high52, sma50, atr14, confs, viols,
                 rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mf,
             ))
             saved += 1
@@ -931,6 +960,11 @@ def run_scan(scan_date_override: str = None):
         "ALTER TABLE minervini_fundamental_scans ADD COLUMN IF NOT EXISTS rs_50d DOUBLE PRECISION",
         "ALTER TABLE minervini_fundamental_scans ADD COLUMN IF NOT EXISTS rs_200d DOUBLE PRECISION",
         "ALTER TABLE minervini_fundamental_scans ADD COLUMN IF NOT EXISTS rs_mansfield DOUBLE PRECISION",
+        # Sprint 4.7e.1 — sma50 + atr14 teknik göstergeler; perf_year/roe şema tutarsızlık düzeltmesi
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS sma50 DOUBLE PRECISION",
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS atr14 DOUBLE PRECISION",
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS perf_year DOUBLE PRECISION",
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS roe DOUBLE PRECISION",
     ]:
         c.execute(col_sql)
 
