@@ -679,6 +679,31 @@ class TestSuggestLossGrade:
         gs = suggest_loss_grade(100.0, 85.0, 97.0)
         assert gs.code == "CLL"
 
+    def test_the_wall_overrides_perfect_stop(self):
+        # Sprint 4.7c.4: plan %15, actual %15 → normalde CLP ama The Wall %10 ihlali → CLL
+        # entry=100, stop=85 (plan %15), exit=85 (actual %15)
+        gs = suggest_loss_grade(100.0, 85.0, 85.0)
+        assert gs.code == "CLL"
+        assert "Wall" in gs.reason or "10" in gs.reason
+
+    def test_the_wall_at_exactly_10_pct(self):
+        # Sprint 4.7c.4: %10 sınır dahil — actual %10 = CLL
+        # entry=100, stop=90 (plan %10), exit=90 (actual %10)
+        gs = suggest_loss_grade(100.0, 90.0, 90.0)
+        assert gs.code == "CLL"
+
+    def test_the_wall_just_below_10_pct(self):
+        # Sprint 4.7c.4: actual %9.5 → The Wall altı, plan-vs-actual mantığı çalışır
+        # entry=100, stop=91 (plan %9), exit=90.5 (actual %9.5) → diff=0.5 ≤ 1 → CLP
+        gs = suggest_loss_grade(100.0, 90.5, 91.0)
+        assert gs.code == "CLP"
+
+    def test_the_wall_short_position(self):
+        # Sprint 4.7c.4: SHORT — entry=100, exit=112 → kayıp %12 ≥ %10 → CLL
+        gs = suggest_loss_grade(100.0, 112.0, 108.0, invest_type="SHORT")
+        assert gs.code == "CLL"
+        assert "Wall" in gs.reason or "10" in gs.reason
+
 
 # ---------------------------------------------------------------------------
 # TradeGrader — suggest_exit_grade

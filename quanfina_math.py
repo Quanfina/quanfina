@@ -778,6 +778,8 @@ def suggest_loss_grade(
     """
     Zararla kapanan trade için grade önerir.
 
+    Sprint 4.7c.4: %10 The Wall absolute ceiling — plan ne olursa olsun ≥%10 kayıp = CLL
+
     CLP: gerçek zarar ≈ planlı stop (±1%)
     CLE: stop'tan önce çıkış (acele kes)
     CLL: stop geçildikten sonra çıkış (geç kes)
@@ -788,6 +790,17 @@ def suggest_loss_grade(
     actual_pct = percent_change(entry_price, exit_price, _itype)
     actual_loss_abs = abs(actual_pct)
 
+    # Sprint 4.7c.4 — The Wall %10 absolute ceiling
+    # Trade Like a Wizard Bölüm 12 — Mark'ın mutlak çıkış sınırı %10
+    # Plan ne olursa olsun, %10+ kayıp = disiplin ihlali → her zaman CLL
+    if actual_loss_abs >= 10.0:
+        return GradeSuggestion(
+            "CLL", "Cut loss late", "HIGH",
+            f"%{actual_loss_abs:.1f} kayıp — The Wall %10 mutlak sınır aşıldı "
+            f"(plan stop %{planned_stop_pct:.1f})",
+        )
+
+    # The Wall altında — disiplin ölçümü (plan-vs-actual sapma)
     diff = actual_loss_abs - planned_stop_pct
 
     if abs(diff) <= 1.0:
