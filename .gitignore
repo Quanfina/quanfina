@@ -225,3 +225,4 @@ quanfina.db
 test_pg.py
 test_*.py
 _tmp_*.py
+notebook/
