@@ -495,6 +495,61 @@ def get_latest_leg_exits_for_trade(trade_id: int) -> list[dict]:
         conn.close()
 
 
+def get_all_leg_exits_for_trade(trade_id: int) -> list[dict]:
+    """Bir trade'in TUM leg_exits satirlarini dondurur (graded ve null).
+
+    Sprint 4.7d.3a — Trade Notlari UI icin: gecmis trade'lerde
+    grade'lenmis ve grade'lenmemis tum exit'ler tek listede gosterilir.
+
+    get_latest_leg_exits_for_trade ile fark:
+      - Bu fonksiyon NULL grade dahil HER SEY doner
+      - grade_category_id, code, name, annotation JOIN ile dolu gelir
+
+    Returns:
+        list[dict]: [{'id', 'leg_id', 'exit_idx', 'shares', 'price',
+                      'exit_date', 'grade_category_id', 'grade_code',
+                      'grade_name', 'annotation'}, ...]
+                    Bos trade veya leg_exits yoksa [] doner.
+    """
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            SELECT le.id, le.leg_id, le.exit_idx, le.shares, le.price,
+                   le.exit_date, le.grade_category_id,
+                   gc.code, gc.name, le.annotation
+            FROM leg_exits le
+            JOIN trade_legs tl ON tl.id = le.leg_id
+            LEFT JOIN trade_grade_categories gc ON gc.id = le.grade_category_id
+            WHERE tl.trade_id = %s
+            ORDER BY le.id
+            """,
+            (trade_id,),
+        )
+        rows = cur.fetchall()
+        return [
+            {
+                "id": r[0],
+                "leg_id": r[1],
+                "exit_idx": r[2],
+                "shares": float(r[3]) if r[3] is not None else None,
+                "price": float(r[4]) if r[4] is not None else None,
+                "exit_date": r[5],
+                "grade_category_id": r[6],
+                "grade_code": r[7],
+                "grade_name": r[8],
+                "annotation": r[9],
+            }
+            for r in rows
+        ]
+    except Exception as e:
+        log.error(f"get_all_leg_exits_for_trade error: {e}")
+        return []
+    finally:
+        conn.close()
+
+
 def promote_to_list(user_id: int, symbol: str, from_list: str, to_list: str,
                     strategy: str = "minervini", note: str = None,
                     setup_type_id: int = None, pivot_price: float = None) -> bool:
