@@ -430,6 +430,71 @@ def get_grade_categories() -> list[dict]:
         conn.close()
 
 
+def update_leg_exit_grade(
+    leg_exit_id: int,
+    grade_category_id: int,
+    annotation: str = None,
+) -> bool:
+    """leg_exits satırına grade_category_id + opsiyonel annotation atar.
+
+    Sprint 4.7d.2 — close_trade sonrası kullanıcı grade önerisini kabul/değiştirirse çağrılır.
+
+    Returns:
+        bool: UPDATE başarılı mı
+    """
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            "UPDATE leg_exits SET grade_category_id = %s, annotation = %s WHERE id = %s",
+            (grade_category_id, annotation, leg_exit_id),
+        )
+        updated = cur.rowcount > 0
+        conn.commit()
+        return updated
+    except Exception as e:
+        conn.rollback()
+        log.error(f"update_leg_exit_grade error: {e}")
+        return False
+    finally:
+        conn.close()
+
+
+def get_latest_leg_exits_for_trade(trade_id: int) -> list[dict]:
+    """Bir trade'in grade_category_id NULL olan leg_exits satirlarini dondurur.
+
+    Sprint 4.7d.2 — close_trade sonrasi grade atama icin kullanilir.
+    Birden fazla leg varsa hepsini dondurur (close_trade her acik leg icin ayri INSERT).
+
+    Returns:
+        list[dict]: [{'id': ..., 'leg_id': ..., 'exit_idx': ...,
+                      'shares': ..., 'price': ...}, ...]
+                    Bos trade veya hepsi grade'li ise [] doner.
+    """
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """SELECT le.id, le.leg_id, le.exit_idx, le.shares, le.price
+               FROM leg_exits le
+               JOIN trade_legs tl ON tl.id = le.leg_id
+               WHERE tl.trade_id = %s AND le.grade_category_id IS NULL
+               ORDER BY le.id DESC""",
+            (trade_id,),
+        )
+        rows = cur.fetchall()
+        return [
+            {"id": r[0], "leg_id": r[1], "exit_idx": r[2],
+             "shares": float(r[3]), "price": float(r[4])}
+            for r in rows
+        ]
+    except Exception as e:
+        log.error(f"get_latest_leg_exits_for_trade error: {e}")
+        return []
+    finally:
+        conn.close()
+
+
 def promote_to_list(user_id: int, symbol: str, from_list: str, to_list: str,
                     strategy: str = "minervini", note: str = None,
                     setup_type_id: int = None, pivot_price: float = None) -> bool:

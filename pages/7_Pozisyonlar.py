@@ -9,8 +9,13 @@ from datetime import date, datetime, time
 from db_connection import (
     get_trades, get_portfolio,
     update_trade, close_trade, delete_trade,
+    update_leg_exit_grade, get_latest_leg_exits_for_trade,  # Sprint 4.7d.2
+    get_grade_categories,                                    # Sprint 4.7d.2
 )
-from quanfina_math import check_initial_stop, suggest_exit_grade, suggest_loss_grade
+from quanfina_math import (
+    check_initial_stop, suggest_exit_grade, suggest_loss_grade,
+    GRADE_CATEGORIES,  # Sprint 4.7d.2 — leg_type filtrelemesi
+)
 from styles import (
     apply_styles, chip_long, chip_short, colored_pct, tag,
     card_title, status_dot,
@@ -66,10 +71,9 @@ for key in ('edit_trade_id', 'close_trade_id', 'delete_confirm_id'):
 if 'last_grade_suggestion' not in st.session_state:
     st.session_state['last_grade_suggestion'] = None
 
-# Sprint 4.7c.3c — Kapatma sonrası grade önerisi (rerun'dan sonra gösterilir)
-if st.session_state['last_grade_suggestion']:
+# Sprint 4.7d.2 — Kapatma sonrası grade önerisi + Kabul/Farklı/Atla aksiyonları
+if st.session_state.get('last_grade_suggestion'):
     _sug = st.session_state['last_grade_suggestion']
-    st.session_state['last_grade_suggestion'] = None
     _confidence_emoji = {"HIGH": "🎯", "MEDIUM": "📊", "LOW": "💭"}.get(_sug['confidence'], "📊")
     _sug_msg = (
         f"{_confidence_emoji} **TradeGrader Exit Önerisi:** "
@@ -83,6 +87,49 @@ if st.session_state['last_grade_suggestion']:
         st.warning(_sug_msg)
     else:
         st.info(_sug_msg)
+
+    # Grade atama UI — Kabul / Farklı Kaydet / Atla
+    _all_cats = get_grade_categories()
+    _code_to_id = {c['code']: c['id'] for c in _all_cats}
+    _sug_leg_type = GRADE_CATEGORIES.get(_sug['code'], ('', 'EXIT', None))[1]
+    _type_cats = [c for c in _all_cats if c['leg_type'] == _sug_leg_type]
+    _type_codes = [c['code'] for c in _type_cats]
+
+    _col_kabul, _col_override, _col_atla = st.columns([1, 2, 1])
+
+    with _col_kabul:
+        if st.button("✅ Kabul", key="grade_kabul", use_container_width=True):
+            _cat_id = _code_to_id.get(_sug['code'])
+            if _cat_id:
+                for _le in get_latest_leg_exits_for_trade(_sug['trade_id']):
+                    update_leg_exit_grade(_le['id'], _cat_id)
+                st.toast(f"✅ Grade kaydedildi: {_sug['code']}", icon="✅")
+            st.session_state['last_grade_suggestion'] = None
+            st.rerun()
+
+    with _col_override:
+        _default_idx = _type_codes.index(_sug['code']) if _sug['code'] in _type_codes else 0
+        _sel = st.selectbox(
+            "Farklı kategori",
+            _type_codes,
+            index=_default_idx,
+            format_func=lambda x: f"{x} — {next((c['name'] for c in _type_cats if c['code'] == x), x)}",
+            key="grade_override_sel",
+            label_visibility="collapsed",
+        )
+        if st.button("💾 Farklı Kaydet", key="grade_override_save", use_container_width=True):
+            _cat_id = _code_to_id.get(_sel)
+            if _cat_id:
+                for _le in get_latest_leg_exits_for_trade(_sug['trade_id']):
+                    update_leg_exit_grade(_le['id'], _cat_id)
+                st.toast(f"💾 Grade kaydedildi: {_sel}", icon="💾")
+            st.session_state['last_grade_suggestion'] = None
+            st.rerun()
+
+    with _col_atla:
+        if st.button("⏭ Atla", key="grade_atla", use_container_width=True):
+            st.session_state['last_grade_suggestion'] = None
+            st.rerun()
 
 def _clear_action_state():
     """Tüm aksiyon state'lerini sıfırla."""
@@ -413,6 +460,7 @@ if st.session_state['close_trade_id'] is not None:
                             st.session_state['last_grade_suggestion'] = {
                                 'code': _sug.code, 'name': _sug.name,
                                 'confidence': _sug.confidence, 'reason': _sug.reason,
+                                'trade_id': tid,  # Sprint 4.7d.2 — leg_exits grade atama için
                             }
                     except Exception:
                         pass
