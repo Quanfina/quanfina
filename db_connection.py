@@ -806,6 +806,54 @@ def init_trade_journal_tables() -> int:
             cur.execute("CREATE INDEX IF NOT EXISTS idx_trades_code_id       ON trades(code_id)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_trades_setup_type_id ON trades(setup_type_id)")
 
+            # ── 20. trade_grade_categories (Sprint 4.7c.2 — EK 10 TradeGrader) ──
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS trade_grade_categories (
+                    id          SERIAL PRIMARY KEY,
+                    code        VARCHAR(8)  UNIQUE NOT NULL,
+                    name        TEXT        NOT NULL,
+                    short_name  VARCHAR(16) NOT NULL,
+                    leg_type    VARCHAR(8)  NOT NULL,
+                    target_pct  NUMERIC,
+                    sort_order  INTEGER     NOT NULL,
+                    created_at  TIMESTAMP   DEFAULT NOW(),
+                    CONSTRAINT chk_tgc_leg_type CHECK (leg_type IN ('ENTRY', 'EXIT', 'LOSS'))
+                )
+            """)
+            cur.execute("""
+                INSERT INTO trade_grade_categories
+                    (code, name, short_name, leg_type, target_pct, sort_order) VALUES
+                ('BP',  'Bought perfect',          'Perfect',   'ENTRY',  80.0,  10),
+                ('BE',  'Bought early',            'Early',     'ENTRY', -10.0,  20),
+                ('BL',  'Bought late',             'Late',      'ENTRY', -10.0,  30),
+                ('FS',  'Faulty setup',            'Faulty',    'ENTRY', -10.0,  40),
+                ('BB',  'Bad buy',                 'Bad',       'ENTRY', -10.0,  50),
+                ('EB',  'Emotional buy',           'Emotional', 'ENTRY',  -2.0,  60),
+                ('CE',  'Chased extended',         'Chased',    'ENTRY',  -2.0,  70),
+                ('SP',  'Sold perfect',            'Perfect',   'EXIT',   30.0, 110),
+                ('SE',  'Sold early',              'Early',     'EXIT',  -50.0, 120),
+                ('SL',  'Sold late',               'Late',      'EXIT',  -20.0, 130),
+                ('RFR', 'Reduced to finance risk', 'RFR',       'EXIT',   NULL, 140),
+                ('BS',  'Bad sale',                'Bad',       'EXIT',  -10.0, 150),
+                ('CLP', 'Cut loss perfect',        'Perfect',   'LOSS',   95.0, 210),
+                ('CLE', 'Cut loss early',          'Early',     'LOSS',  -30.0, 220),
+                ('CLL', 'Cut loss late',           'Late',      'LOSS',   -5.0, 230),
+                ('COT', 'Choked off trade',        'Choked',    'LOSS',  -30.0, 240),
+                ('ES',  'Emotional sale',          'Emotional', 'LOSS',   -5.0, 250)
+                ON CONFLICT (code) DO NOTHING
+            """)
+
+            # ── 21. trade_legs / trade_exits: grade_category_id FK + annotation ─
+            for stmt in [
+                "ALTER TABLE trade_legs  ADD COLUMN IF NOT EXISTS grade_category_id INTEGER REFERENCES trade_grade_categories(id)",
+                "ALTER TABLE trade_legs  ADD COLUMN IF NOT EXISTS annotation TEXT",
+                "ALTER TABLE trade_exits ADD COLUMN IF NOT EXISTS grade_category_id INTEGER REFERENCES trade_grade_categories(id)",
+                "ALTER TABLE trade_exits ADD COLUMN IF NOT EXISTS annotation TEXT",
+            ]:
+                cur.execute(stmt)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_trade_legs_grade_category  ON trade_legs(grade_category_id)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_trade_exits_grade_category ON trade_exits(grade_category_id)")
+
             conn.commit()
             log.info("init_trade_journal_tables: tamamlandı")
             return orphan_count
