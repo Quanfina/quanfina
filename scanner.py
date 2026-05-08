@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import json
 import requests
 import pandas as pd
 import yfinance as yf
@@ -74,6 +75,8 @@ def init_db():
         "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS atr14 DOUBLE PRECISION",
         "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS perf_year DOUBLE PRECISION",
         "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS roe DOUBLE PRECISION",
+        # Sprint 4.7e.3 — son 25 günlük fiyat/hacim geçmişi (count_distribution_days için)
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS price_volume_history JSONB",
     ]:
         c.execute(col_sql)
     c.execute("""
@@ -728,21 +731,34 @@ def check_ma200_slope(tickers):
                 except Exception:
                     atr14_val = None
 
+                # Sprint 4.7e.3 — son 25 gün fiyat+hacim (count_distribution_days için)
+                try:
+                    tail_c = close.tail(25)
+                    tail_v = volume.tail(25)
+                    pvh_val = [
+                        {"date": str(d.date()), "close": float(c_), "volume": float(v_)}
+                        for d, c_, v_ in zip(tail_c.index, tail_c, tail_v)
+                    ]
+                except Exception:
+                    pvh_val = None
+
                 ohlcv = pd.DataFrame({
                     "Open": open_, "High": high, "Low": low,
                     "Close": close, "Volume": volume,
                 }).dropna()
                 confs, viols = detect_signals(ohlcv)
                 results[ticker] = {
-                    "slope":         slope,
-                    "high52":        high52,
-                    "sma50":         sma50_val,
-                    "atr14":         atr14_val,
-                    "confirmations": ",".join(confs),
-                    "violations":    ",".join(viols),
+                    "slope":                slope,
+                    "high52":               high52,
+                    "sma50":                sma50_val,
+                    "atr14":                atr14_val,
+                    "price_volume_history": pvh_val,
+                    "confirmations":        ",".join(confs),
+                    "violations":           ",".join(viols),
                 }
             except:
                 results[ticker] = {"slope": None, "high52": None, "sma50": None, "atr14": None,
+                                   "price_volume_history": None,
                                    "confirmations": "", "violations": "", **_null_rs}
 
         try:
@@ -785,6 +801,8 @@ def save_results(df_finviz, slopes, scan_date):
         rs_mf      = slope_info.get("rs_mansfield")
         sma50      = slope_info.get("sma50")
         atr14      = slope_info.get("atr14")
+        pvh        = slope_info.get("price_volume_history")
+        pvh_json   = json.dumps(pvh) if pvh else None
 
         # Kural 3: MA200 yükselişte (slope > 0)
         passed = 1 if slope is not None and slope > 0 else 0
@@ -795,37 +813,39 @@ def save_results(df_finviz, slopes, scan_date):
                 (scan_date, ticker, company, sector, industry,
                  price, change_pct, volume, market_cap, pe,
                  ma200_slope, passed, high52, sma50, atr14,
+                 price_volume_history,
                  confirmations, violations,
                  rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mansfield)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 ON CONFLICT(scan_date, ticker) DO UPDATE SET
-                    company       = EXCLUDED.company,
-                    sector        = EXCLUDED.sector,
-                    industry      = EXCLUDED.industry,
-                    price         = EXCLUDED.price,
-                    change_pct    = EXCLUDED.change_pct,
-                    volume        = EXCLUDED.volume,
-                    market_cap    = EXCLUDED.market_cap,
-                    pe            = EXCLUDED.pe,
-                    ma200_slope   = EXCLUDED.ma200_slope,
-                    passed        = EXCLUDED.passed,
-                    high52        = EXCLUDED.high52,
-                    sma50         = EXCLUDED.sma50,
-                    atr14         = EXCLUDED.atr14,
-                    confirmations = EXCLUDED.confirmations,
-                    violations    = EXCLUDED.violations,
-                    rs_ibd        = EXCLUDED.rs_ibd,
-                    rs_12m        = EXCLUDED.rs_12m,
-                    rs_20d        = EXCLUDED.rs_20d,
-                    rs_50d        = EXCLUDED.rs_50d,
-                    rs_200d       = EXCLUDED.rs_200d,
-                    rs_mansfield  = EXCLUDED.rs_mansfield
+                    company               = EXCLUDED.company,
+                    sector                = EXCLUDED.sector,
+                    industry              = EXCLUDED.industry,
+                    price                 = EXCLUDED.price,
+                    change_pct            = EXCLUDED.change_pct,
+                    volume                = EXCLUDED.volume,
+                    market_cap            = EXCLUDED.market_cap,
+                    pe                    = EXCLUDED.pe,
+                    ma200_slope           = EXCLUDED.ma200_slope,
+                    passed                = EXCLUDED.passed,
+                    high52                = EXCLUDED.high52,
+                    sma50                 = EXCLUDED.sma50,
+                    atr14                 = EXCLUDED.atr14,
+                    price_volume_history  = EXCLUDED.price_volume_history,
+                    confirmations         = EXCLUDED.confirmations,
+                    violations            = EXCLUDED.violations,
+                    rs_ibd                = EXCLUDED.rs_ibd,
+                    rs_12m                = EXCLUDED.rs_12m,
+                    rs_20d                = EXCLUDED.rs_20d,
+                    rs_50d                = EXCLUDED.rs_50d,
+                    rs_200d               = EXCLUDED.rs_200d,
+                    rs_mansfield          = EXCLUDED.rs_mansfield
             """, (
                 scan_date, ticker,
                 row.get("Company", ""), row.get("Sector", ""), row.get("Industry", ""),
                 row.get("Price", 0), row.get("Change", ""), row.get("Volume", 0),
                 row.get("Market Cap", 0), row.get("P/E", 0),
-                slope, passed, high52, sma50, atr14, confs, viols,
+                slope, passed, high52, sma50, atr14, pvh_json, confs, viols,
                 rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mf,
             ))
             saved += 1
@@ -965,6 +985,8 @@ def run_scan(scan_date_override: str = None):
         "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS atr14 DOUBLE PRECISION",
         "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS perf_year DOUBLE PRECISION",
         "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS roe DOUBLE PRECISION",
+        # Sprint 4.7e.3 — son 25 günlük fiyat/hacim geçmişi (count_distribution_days için)
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS price_volume_history JSONB",
     ]:
         c.execute(col_sql)
 
