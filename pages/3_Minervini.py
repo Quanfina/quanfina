@@ -95,7 +95,7 @@ def load_list_data(list_code: str, user_id: int) -> pd.DataFrame:
     conn = get_connection()
     cur = conn.cursor()
 
-    cur.execute("SELECT MAX(scan_date) FROM minervini_scans")
+    cur.execute("SELECT MAX(scan_date) FROM minervini_scans WHERE price > 0")
     last_scan_date = cur.fetchone()[0]
 
     cur.execute(

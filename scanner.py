@@ -15,6 +15,12 @@ from db_connection import get_connection
 load_dotenv()
 FINVIZ_KEY = os.getenv("FINVIZ_API_KEY")
 
+
+class ScannerHealthError(Exception):
+    """Scanner çalışma öncesi/sırasında veri sağlığı kontrolü başarısız oldu."""
+    pass
+
+
 def parse_earnings_date(raw: str):
     """'Apr 30 AMC' gibi Finviz earnings stringini date nesnesine çevirir."""
     if not raw or raw in ('-', 'N/A', ''):
@@ -195,6 +201,137 @@ def init_db():
     conn.commit()
     conn.close()
 
+# --- FİNVİZ API SAĞLIK KONTROLLERI ---
+
+_SCREENER_REQUIRED_COLS = [
+    'Ticker', 'Company', 'Sector', 'Industry',
+    'Market Cap', 'P/E', 'Price', 'Change', 'Volume',
+]
+
+
+def health_check_finviz() -> None:
+    """Scanner çalışmadan önce Finviz API'sının beklenen kolonları döndürdüğünü
+    doğrula. Tek ticker (AAPL) ile minimum maliyetli test çağrısı yapar.
+
+    Raises:
+        ScannerHealthError: API formatı değişmiş veya auth sorunu var.
+    """
+    print("Finviz health check basliyor...")
+
+    test_url = (
+        f"https://elite.finviz.com/export.ashx?"
+        f"v=152&t=AAPL&c=1,2,3,4,6,7,65,66,67"
+        f"&auth={FINVIZ_KEY}&ft=4"
+    )
+
+    try:
+        r = requests.get(test_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
+        r.raise_for_status()
+    except requests.RequestException as e:
+        raise ScannerHealthError(
+            f"Finviz health check HTTP hatasi: {e}\n"
+            f"  Olasi sebep: Network sorunu, API key bozuk, veya endpoint kapali."
+        )
+
+    try:
+        df = pd.read_csv(StringIO(r.text))
+    except Exception as e:
+        raise ScannerHealthError(
+            f"Finviz cevabi CSV olarak parse edilemedi: {e}\n"
+            f"  Ilk 200 char: {r.text[:200]}"
+        )
+
+    missing = [c for c in _SCREENER_REQUIRED_COLS if c not in df.columns]
+    if missing:
+        raise ScannerHealthError(
+            f"Finviz API formati degismis!\n"
+            f"  Eksik kolonlar: {missing}\n"
+            f"  Gelen kolonlar: {list(df.columns)}\n"
+            f"  Cozum: scanner.py URL'lerinde c= parametresini guncelle."
+        )
+
+    if df.empty:
+        raise ScannerHealthError("Finviz health check: AAPL test bos dondü.")
+
+    aapl_price = df.iloc[0].get('Price', 0)
+    aapl_company = str(df.iloc[0].get('Company', '')).strip()
+
+    if aapl_price <= 0:
+        raise ScannerHealthError(
+            f"Finviz health check: AAPL price={aapl_price} (sifir veya negatif).\n"
+            f"  API key gecersiz olabilir, abonelik kontrol et."
+        )
+
+    if not aapl_company:
+        raise ScannerHealthError(
+            f"Finviz health check: AAPL Company bos.\n"
+            f"  v=152 view formati bozuk olabilir."
+        )
+
+    print(f"[OK] Finviz health check OK")
+    print(f"   AAPL: price=${aapl_price}, company={aapl_company!r}")
+    print(f"   Kolonlar tam ({len(df.columns)} kolon)")
+
+
+def validate_finviz_response(df: pd.DataFrame, source: str,
+                              required_cols: list = None,
+                              min_filled_ratio: float = 0.50) -> None:
+    """Her screener API cevabini runtime'da dogrular.
+
+    Args:
+        df: Finviz CSV parse sonucu DataFrame
+        source: Hangi fonksiyondan geldigini belirtir (log icin)
+        required_cols: Beklenen kolon isimleri. None ise standart 9 kolon.
+        min_filled_ratio: Price/Company minimum doluluk orani (varsayilan %50)
+
+    Raises:
+        ScannerHealthError: Kolon eksik veya kritik veri yetersiz dolu.
+    """
+    if required_cols is None:
+        required_cols = _SCREENER_REQUIRED_COLS
+
+    missing = [c for c in required_cols if c not in df.columns]
+    if missing:
+        raise ScannerHealthError(
+            f"[{source}] Kolonlar eksik: {missing}\n"
+            f"  Gelen: {list(df.columns)}\n"
+            f"  c= parametresi URL'de eksik veya yanlis olabilir."
+        )
+
+    if df.empty:
+        print(f"  [{source}] DataFrame bos dondü (filtreden hic ticker gecmedi).")
+        return
+
+    if 'Price' in df.columns:
+        try:
+            price_filled = pd.to_numeric(df['Price'], errors='coerce').gt(0).sum()
+            ratio = price_filled / len(df)
+            if ratio < min_filled_ratio:
+                raise ScannerHealthError(
+                    f"[{source}] Price kolonu yetersiz dolu: "
+                    f"{price_filled}/{len(df)} ({ratio*100:.0f}%) > 0.\n"
+                    f"  Beklenen: en az %{min_filled_ratio*100:.0f}. Scan abort."
+                )
+        except ScannerHealthError:
+            raise
+        except Exception as e:
+            print(f"  [{source}] Price doluluk kontrolü hata: {e}")
+
+    if 'Company' in df.columns:
+        try:
+            company_filled = (df['Company'].astype(str).str.strip() != '').sum()
+            ratio = company_filled / len(df)
+            if ratio < min_filled_ratio:
+                raise ScannerHealthError(
+                    f"[{source}] Company kolonu yetersiz dolu: "
+                    f"{company_filled}/{len(df)} ({ratio*100:.0f}%). Scan abort."
+                )
+        except ScannerHealthError:
+            raise
+        except Exception as e:
+            print(f"  [{source}] Company doluluk kontrolü hata: {e}")
+
+
 # --- FİNVİZ TARAMASI (8 KURAL FİLTRELİ) ---
 def get_finviz_screener():
     """
@@ -227,11 +364,12 @@ def get_finviz_screener():
     
     url = (
         f"https://elite.finviz.com/export.ashx?"
-        f"v=152&f={filters}&auth={FINVIZ_KEY}&ft=4"
+        f"v=152&f={filters}&c=1,2,3,4,6,7,65,66,67&auth={FINVIZ_KEY}&ft=4"
     )
     
     r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
     df = pd.read_csv(StringIO(r.text))
+    validate_finviz_response(df, source="get_finviz_screener")
     print(f"Finviz filtresi geçti: {len(df)} hisse")
     return df
 
@@ -262,11 +400,12 @@ def get_finviz_fundamental():
 
     url = (
         f"https://elite.finviz.com/export.ashx?"
-        f"v=152&f={filters}&auth={FINVIZ_KEY}&ft=4"
+        f"v=152&f={filters}&c=1,2,3,4,6,7,65,66,67&auth={FINVIZ_KEY}&ft=4"
     )
 
     r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
     df = pd.read_csv(StringIO(r.text))
+    validate_finviz_response(df, source="get_finviz_fundamental")
     print(f"Fundamental filtresi geçti: {len(df)} hisse")
     return df
 
@@ -290,11 +429,12 @@ def get_finviz_fundamental_only():
 
     url = (
         f"https://elite.finviz.com/export.ashx?"
-        f"v=152&f={filters}&auth={FINVIZ_KEY}&ft=4"
+        f"v=152&f={filters}&c=1,2,3,4,6,7,65,66,67&auth={FINVIZ_KEY}&ft=4"
     )
 
     r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
     df = pd.read_csv(StringIO(r.text))
+    validate_finviz_response(df, source="get_finviz_fundamental_only")
     print(f"Temel filtresi geçti: {len(df)} hisse")
     return df
 
@@ -314,10 +454,11 @@ def get_finviz_52w_high():
     ])
     url = (
         f"https://elite.finviz.com/export.ashx?"
-        f"v=152&f={filters}&auth={FINVIZ_KEY}&ft=4"
+        f"v=152&f={filters}&c=1,2,3,4,6,7,65,66,67&auth={FINVIZ_KEY}&ft=4"
     )
     r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
     df = pd.read_csv(StringIO(r.text))
+    validate_finviz_response(df, source="get_finviz_52w_high")
     print(f"52W Yüksek filtresi geçti: {len(df)} hisse")
     return df
 
@@ -859,6 +1000,13 @@ def save_results(df_finviz, slopes, scan_date):
 
 # --- ANA AKIŞ ---
 def run_scan(scan_date_override: str = None):
+    try:
+        health_check_finviz()
+    except ScannerHealthError as e:
+        print(f"[FAIL] FINVIZ HEALTH CHECK BASARISIZ:\n{e}")
+        print(f"\nScan iptal edildi. Sorunu coz, tekrar dene.")
+        return
+
     if scan_date_override:
         scan_date = scan_date_override
         print("=== QUANFINA SCANNER v2 (Geçmiş Tarih) ===")
