@@ -550,6 +550,83 @@ def get_all_leg_exits_for_trade(trade_id: int) -> list[dict]:
         conn.close()
 
 
+def get_legs_for_trade(trade_id: int) -> list[dict]:
+    """Trade'in tüm giriş leg'lerini grade kategorisi bilgisiyle döndürür.
+
+    leg_idx'e göre artan sırada. grade_category_id NULL olsa da döner.
+
+    Returns:
+        list[dict]: id, trade_id, leg_idx, shares, price, leg_date, note,
+                    grade_category_id, grade_code, grade_name, annotation
+    """
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            SELECT tl.id, tl.trade_id, tl.leg_idx, tl.shares, tl.price,
+                   tl.leg_date, tl.note, tl.grade_category_id,
+                   gc.code AS grade_code, gc.name AS grade_name,
+                   tl.annotation
+            FROM trade_legs tl
+            LEFT JOIN trade_grade_categories gc ON gc.id = tl.grade_category_id
+            WHERE tl.trade_id = %s
+            ORDER BY tl.leg_idx
+            """,
+            (trade_id,),
+        )
+        rows = cur.fetchall()
+        return [
+            {
+                "id": r[0],
+                "trade_id": r[1],
+                "leg_idx": r[2],
+                "shares": float(r[3]) if r[3] is not None else None,
+                "price": float(r[4]) if r[4] is not None else None,
+                "leg_date": r[5],
+                "note": r[6],
+                "grade_category_id": r[7],
+                "grade_code": r[8],
+                "grade_name": r[9],
+                "annotation": r[10],
+            }
+            for r in rows
+        ]
+    except Exception as e:
+        log.error(f"get_legs_for_trade error: {e}")
+        return []
+    finally:
+        conn.close()
+
+
+def update_leg_grade(
+    leg_id: int,
+    grade_category_id: int,
+    annotation: str = None,
+) -> bool:
+    """trade_legs satırına grade_category_id + opsiyonel annotation atar.
+
+    Returns:
+        bool: UPDATE başarılı mı
+    """
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            "UPDATE trade_legs SET grade_category_id = %s, annotation = %s WHERE id = %s",
+            (grade_category_id, annotation, leg_id),
+        )
+        updated = cur.rowcount > 0
+        conn.commit()
+        return updated
+    except Exception as e:
+        conn.rollback()
+        log.error(f"update_leg_grade error: {e}")
+        return False
+    finally:
+        conn.close()
+
+
 def promote_to_list(user_id: int, symbol: str, from_list: str, to_list: str,
                     strategy: str = "minervini", note: str = None,
                     setup_type_id: int = None, pivot_price: float = None) -> bool:
