@@ -12,8 +12,10 @@ from db_connection import (
     get_grade_categories,
     get_all_leg_exits_for_trade,
     update_leg_exit_grade,
+    get_legs_for_trade,
+    update_leg_grade,
 )
-from quanfina_math import GRADE_CATEGORIES
+from quanfina_math import GRADE_CATEGORIES, suggest_entry_grade
 from styles import apply_styles
 
 st.set_page_config(page_title="Trade Journal | Quanfina", layout="wide")
@@ -270,6 +272,101 @@ with tab_trade:
                                         update_count += 1
                             if update_count > 0:
                                 st.success(f"✅ {update_count} grade kaydedildi.")
+                                st.rerun()
+                            else:
+                                st.warning("Hiç grade seçilmedi veya kayıt başarısız.")
+
+                    st.divider()
+                    st.markdown("**Giriş Legi Gradeleri**")
+
+                    _entry_legs = get_legs_for_trade(selected_tid)
+
+                    if not _entry_legs:
+                        st.caption("Bu trade'in kayıtlı giriş legi yok.")
+                    else:
+                        _all_cats_full = get_grade_categories()
+                        entry_cats = [c for c in _all_cats_full if c["leg_type"] == "ENTRY"]
+                        entry_codes = [c["code"] for c in entry_cats]
+                        entry_code_to_id = {c["code"]: c["id"] for c in entry_cats}
+                        entry_code_to_name = {c["code"]: c["name"] for c in entry_cats}
+
+                        with st.form(key=f"entry_leg_grade_form_{selected_tid}"):
+                            new_leg_grades = {}
+                            new_leg_annotations = {}
+
+                            for leg in _entry_legs:
+                                lid = leg["id"]
+                                current_code = leg.get("grade_code")
+
+                                col_info, col_pivot = st.columns([2, 1])
+                                with col_info:
+                                    st.markdown(
+                                        f"**Leg #{leg['leg_idx']}** — "
+                                        f"{float(leg['shares']):.0f} adet @ ${float(leg['price']):.2f}"
+                                        + (f" — Mevcut: `{current_code}`" if current_code else " — *Grade atanmamış*")
+                                    )
+                                with col_pivot:
+                                    pivot_in = st.number_input(
+                                        "Pivot $",
+                                        min_value=0.0,
+                                        value=0.0,
+                                        step=0.01,
+                                        key=f"tj_entry_pivot_{lid}",
+                                        help="Pivot fiyatı gir → otomatik öneri çıkar. 0 = öneri yok.",
+                                    )
+
+                                sug = None
+                                if pivot_in > 0:
+                                    try:
+                                        _s = suggest_entry_grade(float(leg["price"]), pivot_in)
+                                        if _s.confidence != "LOW":
+                                            sug = _s
+                                    except Exception:
+                                        sug = None
+
+                                options = ["(Atla)"] + entry_codes
+                                default_idx = 0
+                                if sug and sug.code in entry_codes:
+                                    default_idx = entry_codes.index(sug.code) + 1
+                                elif current_code and current_code in entry_codes:
+                                    default_idx = entry_codes.index(current_code) + 1
+
+                                selected = st.selectbox(
+                                    "Grade",
+                                    options=options,
+                                    index=default_idx,
+                                    format_func=lambda x: x if x == "(Atla)" else f"{x} — {entry_code_to_name.get(x, x)}",
+                                    key=f"tj_entry_grade_{lid}",
+                                    label_visibility="collapsed",
+                                )
+                                if sug:
+                                    st.caption(f"💡 Öneri: `{sug.code}` ({sug.confidence}) — {sug.reason}")
+
+                                annotation = st.text_input(
+                                    "Açıklama (opsiyonel)",
+                                    value=leg.get("annotation") or "",
+                                    key=f"tj_entry_annot_{lid}",
+                                    placeholder="örn: pivot kırılımında temiz giriş",
+                                )
+
+                                new_leg_grades[lid] = None if selected == "(Atla)" else entry_code_to_id.get(selected)
+                                new_leg_annotations[lid] = annotation.strip() or None
+                                st.divider()
+
+                            entry_saved = st.form_submit_button(
+                                "💾 Giriş Grade'lerini Kaydet",
+                                use_container_width=True,
+                            )
+
+                        if entry_saved:
+                            update_count = 0
+                            for lid, cat_id in new_leg_grades.items():
+                                if cat_id is not None:
+                                    ok = update_leg_grade(lid, cat_id, new_leg_annotations.get(lid))
+                                    if ok:
+                                        update_count += 1
+                            if update_count > 0:
+                                st.success(f"✅ {update_count} giriş legi grade kaydedildi.")
                                 st.rerun()
                             else:
                                 st.warning("Hiç grade seçilmedi veya kayıt başarısız.")
