@@ -13,6 +13,7 @@ Henuz veri yok - sonraki sprintlerde populate edilecek.
 Eski 7+4 tab yapisi: pages/3_Minervini_old.py (rollback icin).
 """
 import json
+from datetime import date, datetime, timedelta
 import streamlit as st
 import pandas as pd
 from db_connection import get_connection, add_to_list, remove_from_list, get_setup_types, promote_to_list
@@ -22,6 +23,28 @@ from quanfina_math import (  # Sprint 4.7e.2 + 4.7e.3
     check_volatility_position_size,
     count_distribution_days,
 )
+
+
+def parse_earnings_date(raw):
+    if raw is None:
+        return None
+    if isinstance(raw, float) and pd.isna(raw):
+        return None
+    if isinstance(raw, str):
+        if not raw or raw in ('-', 'N/A', ''):
+            return None
+        parts = raw.split()
+        if len(parts) < 2:
+            return None
+        today = date.today()
+        for year in [today.year, today.year + 1]:
+            try:
+                d = datetime.strptime(f"{parts[0]} {parts[1]} {year}", "%b %d %Y").date()
+                if d >= today - timedelta(days=180):
+                    return d
+            except ValueError:
+                continue
+    return None
 
 
 st.set_page_config(page_title="Minervini", page_icon="🎯", layout="wide")
@@ -82,10 +105,10 @@ def load_list_data(list_code: str, user_id: int) -> pd.DataFrame:
         "    sl.setup_type_id, st.name AS setup_type_name, "
         "    s.company, s.sector, s.price, s.change_pct, "
         "    s.grade, s.rs_ibd, s.rs_12m, "
-        "    s.ma200_slope, s.pct_from_high, s.volume, "
+        "    s.ma200_slope, s.high52, s.volume, "
         "    s.eps_qoq, s.sales_qoq, s.market_cap, "
-        "    s.days_to_earnings, s.confirmations, s.violations, "
-        "    s.sma50, s.atr14, s.price_volume_history "
+        "    s.earnings_date, s.confirmations, s.violations, "
+        "    s.sma50, s.atr14, NULL AS price_volume_history "
         "FROM symbol_lists sl "
         "LEFT JOIN setup_types st ON st.id = sl.setup_type_id "
         "LEFT JOIN minervini_scans s "
@@ -101,13 +124,21 @@ def load_list_data(list_code: str, user_id: int) -> pd.DataFrame:
         "setup_type_id", "setup_type_name",
         "company", "sector", "price", "change_pct",
         "grade", "rs_ibd", "rs_12m",
-        "ma200_slope", "pct_from_high", "volume",
+        "ma200_slope", "high52", "volume",
         "eps_qoq", "sales_qoq", "market_cap",
-        "days_to_earnings", "confirmations", "violations",
+        "earnings_date", "confirmations", "violations",
         "sma50", "atr14", "price_volume_history",
     ]
     conn.close()
-    return pd.DataFrame(rows, columns=cols)
+    df = pd.DataFrame(rows, columns=cols)
+    df["pct_from_high"] = (
+        (df["price"] - df["high52"]) / df["high52"] * 100
+    ).where(df["high52"].fillna(0) > 0)
+    df["days_to_earnings"] = df["earnings_date"].apply(
+        lambda x: (parse_earnings_date(x) - date.today()).days
+        if parse_earnings_date(x) else None
+    )
+    return df
 
 
 def render_list_tab(list_code: str) -> None:
