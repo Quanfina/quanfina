@@ -227,3 +227,17 @@ test_*.py
 !tests/test_*.py
 _tmp_*.py
 notebook/
+
+# UX tarama dökümleri (notebook çıktısı, repo dışı)
+ux_tarama/
+
+# Next.js / web/ (POC ADIM 1.2)
+web/node_modules/
+web/.next/
+web/out/
+web/.env.local
+web/.env*.local
+
+# Scanner log dosyaları
+scanner_err.txt
+scanner_log.txt
