@@ -1,6 +1,7 @@
 "use client";
 
 import Decimal from "decimal.js";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
@@ -29,6 +30,20 @@ export default function Home() {
           Quanfina — POC ADIM 1.3 Smoke Test
         </h1>
         <ThemeToggle />
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+          Sayfalar
+        </h2>
+        <div className="flex gap-2 flex-wrap">
+          <Link href="/minervini">
+            <Button variant="outline" size="sm">Minervini Tarama</Button>
+          </Link>
+          <Link href="/api-test">
+            <Button variant="outline" size="sm">API Test</Button>
+          </Link>
+        </div>
       </section>
 
       <section className="flex flex-col gap-2">
