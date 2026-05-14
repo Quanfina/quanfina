@@ -1,0 +1,38 @@
+/* Quanfina Renk Paleti — KARAR #308 (14 May 2026) */
+
+:root {
+  /* MTP Status 7-seviye */
+  --mtp-passive:   #cbcbcb;
+  --mtp-fatal:     #d70040;
+  --mtp-danger:    #ff5733;
+  --mtp-waiting:   #fdda0d;
+  --mtp-neutral:   #4b9cd3;
+  --mtp-good:      #90ee90;
+  --mtp-excellent: #28a745;
+
+  /* Pozisyon chip renkleri */
+  --chip-long-bg:    #def2e5;
+  --chip-long-text:  #3e9d61;
+  --chip-short-bg:   #ffc7c7;
+  --chip-short-text: #bd0000;
+
+  /* Trade marker renkleri (grafik) */
+  --marker-bought: #089981;
+  --marker-sold:   #CC2F3C;
+  --marker-missed: #4471C3;
+
+  /* Genel indikatörler */
+  --indicator-red:    #ef4444;
+  --indicator-green:  #22c55e;
+  --indicator-yellow: #eab308;
+  --indicator-orange: #f97316;
+
+  /* Setup type renkleri */
+  --setup-standard-vcp: #28a745;
+  --setup-cup-handle:   #16a34a;
+  --setup-3c-cheat:     #4b9cd3;
+
+  /* Tipografi — KARAR #299 */
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), "Courier New", monospace;
+}
