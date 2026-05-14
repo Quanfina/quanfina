@@ -1,0 +1,9 @@
+# Quanfina API — POC ADIM 2
+# db_connection.py import zinciri: psycopg2 + SQLAlchemy + pandas + pytz
+fastapi==0.115.12
+uvicorn[standard]==0.34.3
+python-dotenv==1.2.2
+psycopg2-binary==2.9.12
+SQLAlchemy==2.0.49
+pandas==3.0.2
+pytz==2025.2
