@@ -1,17 +1,11 @@
 import type { ColDef, ValueFormatterParams, CellClassParams, CellStyle } from "ag-grid-community";
 import type { MinerviniStock } from "@/types/minervini";
+import { GradeBadge } from "./GradeBadge";
 
 const NUM: CellStyle = {
   fontFamily: "var(--font-jetbrains-mono, monospace)",
   fontVariantNumeric: "tabular-nums",
   textAlign: "right",
-};
-
-const GRADE_COLORS: Record<string, { bg: string; color: string }> = {
-  A: { bg: "var(--mtp-excellent)", color: "#fff" },
-  B: { bg: "var(--mtp-neutral)", color: "#fff" },
-  C: { bg: "var(--mtp-waiting)", color: "#222" },
-  D: { bg: "var(--mtp-danger)", color: "#fff" },
 };
 
 function fmtPrice(p: ValueFormatterParams<MinerviniStock>) {
@@ -41,6 +35,7 @@ export const COL_DEFS: ColDef<MinerviniStock>[] = [
     headerName: "HISSE",
     pinned: "left",
     width: 90,
+    minWidth: 80,
     cellStyle: {
       fontWeight: 700,
       fontFamily: "var(--font-jetbrains-mono, monospace)",
@@ -49,14 +44,16 @@ export const COL_DEFS: ColDef<MinerviniStock>[] = [
   {
     field: "price",
     headerName: "FIYAT",
-    width: 95,
+    width: 100,
+    minWidth: 100,
     valueFormatter: fmtPrice,
     cellStyle: NUM,
   },
   {
     field: "change_pct",
     headerName: "DEĞİŞİM",
-    width: 98,
+    width: 100,
+    minWidth: 100,
     valueFormatter: fmtPct,
     cellStyle: (p: CellClassParams<MinerviniStock, number>) => ({
       ...NUM,
@@ -66,16 +63,15 @@ export const COL_DEFS: ColDef<MinerviniStock>[] = [
   {
     field: "grade",
     headerName: "NOT",
-    width: 68,
-    cellRenderer: (p: { value: string }) => {
-      const c = GRADE_COLORS[p.value] ?? { bg: "transparent", color: "inherit" };
-      return `<span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:20px;border-radius:4px;background:${c.bg};color:${c.color};font-size:11px;font-weight:700;font-family:var(--font-jetbrains-mono,monospace)">${p.value}</span>`;
-    },
+    width: 80,
+    minWidth: 80,
+    cellRenderer: GradeBadge,
   },
   {
     field: "rs_ibd",
     headerName: "RS IBD",
-    width: 85,
+    width: 90,
+    minWidth: 90,
     valueFormatter: fmtInt,
     cellStyle: (p: CellClassParams<MinerviniStock, number>) => {
       const hue = Math.round((Math.min(Math.max(p.value ?? 0, 0), 99) / 99) * 120);
@@ -85,7 +81,8 @@ export const COL_DEFS: ColDef<MinerviniStock>[] = [
   {
     field: "ma200_slope",
     headerName: "MA200 EĞİM",
-    width: 112,
+    width: 130,
+    minWidth: 130,
     valueFormatter: (p) => (p.value != null ? (p.value as number).toFixed(2) : "-"),
     cellStyle: (p: CellClassParams<MinerviniStock, number>) => ({
       ...NUM,
@@ -95,21 +92,24 @@ export const COL_DEFS: ColDef<MinerviniStock>[] = [
   {
     field: "pct_from_high",
     headerName: "52H MESAFE",
-    width: 108,
+    width: 130,
+    minWidth: 130,
     valueFormatter: fmtPct1,
     cellStyle: NUM,
   },
   {
     field: "eps_qoq",
     headerName: "EPS Q/Q",
-    width: 92,
+    width: 100,
+    minWidth: 100,
     valueFormatter: fmtPct1,
     cellStyle: NUM,
   },
   {
     field: "confirmations",
     headerName: "ONAY",
-    width: 72,
+    width: 80,
+    minWidth: 80,
     valueFormatter: fmtInt,
     cellStyle: {
       ...NUM,
@@ -119,7 +119,8 @@ export const COL_DEFS: ColDef<MinerviniStock>[] = [
   {
     field: "violations",
     headerName: "İHLAL",
-    width: 72,
+    width: 80,
+    minWidth: 80,
     valueFormatter: fmtInt,
     cellStyle: (p: CellClassParams<MinerviniStock, number>) => ({
       ...NUM,
@@ -133,7 +134,8 @@ export const COL_DEFS: ColDef<MinerviniStock>[] = [
   {
     field: "market_cap",
     headerName: "PİYASA DEĞ",
-    width: 108,
+    width: 130,
+    minWidth: 130,
     valueFormatter: fmtCap,
     cellStyle: NUM,
   },
