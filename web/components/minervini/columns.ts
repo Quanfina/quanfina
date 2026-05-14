@@ -1,6 +1,8 @@
 import type { ColDef, ValueFormatterParams, CellClassParams, CellStyle } from "ag-grid-community";
-import type { MinerviniStock } from "@/types/minervini";
+import type { MinerviniStock, ListType } from "@/types/minervini";
+import { LIST_LABELS } from "@/types/minervini";
 import { GradeBadge } from "./GradeBadge";
+import { ListTypeEditor } from "./ListTypeEditor";
 
 const NUM: CellStyle = {
   fontFamily: "var(--font-jetbrains-mono, monospace)",
@@ -139,8 +141,27 @@ export const COL_DEFS: ColDef<MinerviniStock>[] = [
     valueFormatter: fmtCap,
     cellStyle: NUM,
   },
+  // list_type editor (visible, editable)
+  {
+    field: "list_type",
+    headerName: "LİSTE",
+    width: 110,
+    minWidth: 110,
+    editable: true,
+    singleClickEdit: true,
+    cellEditor: ListTypeEditor,
+    valueFormatter: (p) => LIST_LABELS[p.value as ListType] ?? (p.value as string),
+    cellStyle: (p: CellClassParams<MinerviniStock, string>) => {
+      const bg: Record<string, string> = {
+        buy:    "color-mix(in srgb, var(--mtp-excellent) 18%, transparent)",
+        focus:  "color-mix(in srgb, var(--mtp-good)      14%, transparent)",
+        on_deck:"color-mix(in srgb, var(--mtp-neutral)   14%, transparent)",
+        watch:  "transparent",
+      };
+      return { background: bg[p.value ?? ""] ?? "transparent" };
+    },
+  },
   // hidden metadata
-  { field: "list_type", hide: true },
   { field: "company", hide: true },
   { field: "sector", hide: true },
   { field: "high52", hide: true },

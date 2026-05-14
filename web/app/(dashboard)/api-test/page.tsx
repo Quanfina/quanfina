@@ -25,7 +25,7 @@ export default function ApiTestPage() {
   });
 
   return (
-    <div className="min-h-screen p-8 flex flex-col gap-6 font-sans">
+    <div className="p-8 flex flex-col gap-6 font-sans">
       <h1 className="text-2xl font-semibold tracking-tight">
         POC ADIM 2 — FastAPI Health Check
       </h1>
