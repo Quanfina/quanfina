@@ -1,5 +1,5 @@
 """
-Quanfina FastAPI — POC ADIM 7
+Quanfina FastAPI — POC ADIM 8
 """
 from __future__ import annotations
 
@@ -18,9 +18,9 @@ sys.path.insert(0, str(_ROOT))
 
 from db_connection import get_connection  # noqa: E402
 
-from typing import Optional
+from typing import Literal, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -576,6 +576,21 @@ MOCK_TERMS: list[Term] = [
         quanfina_context="Hisse detay sayfasında ana fiyat grafiği candlestick formatta gösterilir. TradingView Lightweight Charts v5 kullanılır.",
         category="technical",
     ),
+    Term(
+        key="promote_status",
+        short_name="Statü Yükseltme",
+        tooltip="Watch → On Deck → Focus → Buy — hisse olgunlaştıkça statü yükselir.",
+        definition=(
+            "Quanfina watchlist statü hiyerarşisi: Watch (izlemede) → On Deck (hazır beklemede) → "
+            "Focus (odak listesi, setup aktif) → Buy (alım bölgesi, pivot kırıldı). "
+            "Hisse analiz açısından olgunlaştıkça statüsü yükseltilir; zayıflayınca düşürülür."
+        ),
+        source_book=None,
+        source_author=None,
+        source_year=None,
+        quanfina_context="Watchlist satır eylemleri menüsünde Yükselt/Düşür butonları. Watch→Buy tek yönlü hiyerarşi.",
+        category="strategy",
+    ),
 ]
 
 _TERMS_BY_KEY: dict[str, Term] = {t.key: t for t in MOCK_TERMS}
@@ -714,6 +729,141 @@ MOCK_WATCHLIST: list[WatchlistRow] = [
 @app.get("/api/watchlist", response_model=list[WatchlistRow])
 def get_watchlist() -> list[WatchlistRow]:
     return MOCK_WATCHLIST
+
+
+# ── Watchlist CRUD helpers ────────────────────────────────────────────────────
+
+_STATUS_HIERARCHY = ["watch", "on_deck", "focus", "buy"]
+
+
+def _recompute_consensus() -> None:
+    sym_strategies: dict[str, list[str]] = {}
+    for row in MOCK_WATCHLIST:
+        sym_strategies.setdefault(row.symbol, []).append(row.strategy)
+    for row in MOCK_WATCHLIST:
+        strats = sym_strategies.get(row.symbol, [])
+        row.consensus_count = len(strats)
+        row.consensus_strategies = list(strats)
+
+
+def _mock_rs(symbol: str) -> int:
+    stock = _STOCK_BY_SYM.get(symbol)
+    if stock:
+        return int(stock.rs_ibd)
+    seed = sum(ord(c) for c in symbol)
+    return 60 + (seed % 31)
+
+
+def _mock_price(symbol: str) -> float:
+    stock = _STOCK_BY_SYM.get(symbol)
+    if stock:
+        return stock.price
+    existing = [r for r in MOCK_WATCHLIST if r.symbol == symbol]
+    if existing:
+        return existing[0].price
+    seed = sum(ord(c) * (i + 1) for i, c in enumerate(symbol))
+    return round(20.0 + (seed % 500) * 1.5, 2)
+
+
+def _promote_status(current: str) -> str:
+    idx = _STATUS_HIERARCHY.index(current) if current in _STATUS_HIERARCHY else -1
+    if idx == -1 or idx == len(_STATUS_HIERARCHY) - 1:
+        return current
+    return _STATUS_HIERARCHY[idx + 1]
+
+
+# ── Watchlist mutation models ─────────────────────────────────────────────────
+
+class WatchlistRowCreate(BaseModel):
+    symbol: str
+    strategy: Literal["minervini", "carr"]
+    status: Literal["watch", "on_deck", "focus", "buy"]
+    setup_type: Optional[str] = None
+    pivot_price: Optional[float] = None
+    note: Optional[str] = None
+
+
+class WatchlistRowUpdate(BaseModel):
+    status: Optional[Literal["watch", "on_deck", "focus", "buy"]] = None
+    note: Optional[str] = None
+    setup_type: Optional[str] = None
+
+
+# ── Watchlist CRUD endpoints ──────────────────────────────────────────────────
+
+@app.post("/api/watchlist", response_model=WatchlistRow, status_code=201)
+def add_watchlist_row(body: WatchlistRowCreate) -> WatchlistRow:
+    sym = body.symbol.strip().upper()
+    existing = next(
+        (r for r in MOCK_WATCHLIST if r.symbol == sym and r.strategy == body.strategy),
+        None,
+    )
+    if existing:
+        raise HTTPException(
+            status_code=409, detail=f"{sym}-{body.strategy} zaten watchlist'te"
+        )
+    new_row = WatchlistRow(
+        symbol=sym,
+        strategy=body.strategy,
+        status=body.status,
+        price=_mock_price(sym),
+        added_date=date.today().isoformat(),
+        setup_type=body.setup_type,
+        pivot_price=body.pivot_price,
+        note=body.note,
+        rs_rating=_mock_rs(sym),
+        consensus_count=1,
+        consensus_strategies=[body.strategy],
+    )
+    MOCK_WATCHLIST.append(new_row)
+    _recompute_consensus()
+    return new_row
+
+
+@app.patch("/api/watchlist/{symbol}/{strategy}", response_model=WatchlistRow)
+def update_watchlist_row(symbol: str, strategy: str, body: WatchlistRowUpdate) -> WatchlistRow:
+    sym = symbol.upper()
+    row = next(
+        (r for r in MOCK_WATCHLIST if r.symbol == sym and r.strategy == strategy),
+        None,
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail=f"{sym}-{strategy} bulunamadı")
+    fields = body.model_fields_set
+    if "status" in fields and body.status is not None:
+        row.status = body.status
+    if "note" in fields:
+        row.note = body.note
+    if "setup_type" in fields:
+        row.setup_type = body.setup_type
+    return row
+
+
+@app.delete("/api/watchlist/{symbol}/{strategy}", status_code=204)
+def delete_watchlist_row(symbol: str, strategy: str) -> Response:
+    sym = symbol.upper()
+    idx = next(
+        (i for i, r in enumerate(MOCK_WATCHLIST) if r.symbol == sym and r.strategy == strategy),
+        None,
+    )
+    if idx is None:
+        raise HTTPException(status_code=404, detail=f"{sym}-{strategy} bulunamadı")
+    MOCK_WATCHLIST.pop(idx)
+    _recompute_consensus()
+    return Response(status_code=204)
+
+
+@app.post("/api/watchlist/{symbol}/{strategy}/promote", response_model=WatchlistRow)
+def promote_watchlist_row(symbol: str, strategy: str) -> WatchlistRow:
+    sym = symbol.upper()
+    row = next(
+        (r for r in MOCK_WATCHLIST if r.symbol == sym and r.strategy == strategy),
+        None,
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail=f"{sym}-{strategy} bulunamadı")
+    row.status = _promote_status(row.status)
+    return row
 
 
 # ── Hisse Detay ─────────────────────────────────────────────────────────────

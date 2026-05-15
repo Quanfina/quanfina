@@ -15,6 +15,21 @@ export interface WatchlistRow {
   consensus_strategies: string[];
 }
 
+export interface WatchlistRowCreate {
+  symbol: string;
+  strategy: WatchlistStrategy;
+  status: WatchlistStatus;
+  setup_type?: string | null;
+  pivot_price?: number | null;
+  note?: string | null;
+}
+
+export interface WatchlistRowUpdate {
+  status?: WatchlistStatus;
+  note?: string | null;
+  setup_type?: string | null;
+}
+
 export const STATUS_LABELS: Record<WatchlistStatus | 'all', string> = {
   all:    'Tümü',
   watch:  'Watch',
