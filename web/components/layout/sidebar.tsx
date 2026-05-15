@@ -1,18 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { Menu, Home, BarChart2, TrendingUp, Activity, FlaskConical } from "lucide-react";
+import { Menu, Home, BarChart2, TrendingUp, Activity, FlaskConical, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { NavLink } from "@/components/layout/nav-link";
 
+// KARAR #347: Sinyaller > Piyasa Durumu > diğerleri
 const NAV_ITEMS = [
-  { href: "/",           label: "Ana Sayfa",  icon: Home         },
-  { href: "/minervini",  label: "Minervini",  icon: BarChart2    },
-  { href: "/carr",       label: "Carr",       icon: TrendingUp   },
-  { href: "/signals",    label: "Signals",    icon: Activity     },
-  { href: "/api-test",   label: "API Test",   icon: FlaskConical },
+  { href: "/",               label: "Ana Sayfa",      icon: Home         },
+  { href: "/signals",        label: "Sinyaller",      icon: Activity     },
+  { href: "/piyasa-durumu",  label: "Piyasa Durumu",  icon: Globe        },
+  { href: "/minervini",      label: "Minervini",      icon: BarChart2    },
+  { href: "/carr",           label: "Carr",           icon: TrendingUp   },
+  { href: "/api-test",       label: "API Test",       icon: FlaskConical },
 ];
 
 function SidebarContent() {

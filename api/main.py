@@ -1,5 +1,5 @@
 """
-Quanfina FastAPI — POC ADIM 3
+Quanfina FastAPI — POC ADIM 5
 """
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from db_connection import get_connection  # noqa: E402
 
 from typing import Optional
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -33,7 +33,7 @@ app = FastAPI(title="Quanfina API", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000", "http://localhost:3001"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -220,3 +220,313 @@ def health() -> HealthResponse:
         timestamp=datetime.now(timezone.utc).isoformat(),
         db_connected=db_connected,
     )
+
+
+# ── Terim Sözlüğü ──────────────────────────────────────────────────────────────
+
+class Term(BaseModel):
+    key: str
+    short_name: str
+    tooltip: str
+    definition: str
+    source_book: Optional[str] = None
+    source_author: Optional[str] = None
+    source_year: Optional[int] = None
+    quanfina_context: str
+    category: str  # technical | fundamental | strategy | risk
+
+
+MOCK_TERMS: list[Term] = [
+    Term(
+        key="spy_stage_2",
+        short_name="SPY Stage 2",
+        tooltip="S&P 500 Stage 2 yükseliş trendi — piyasa bull fazında.",
+        definition=(
+            "Stan Weinstein'ın 4 aşama modelinde Stage 2, 200 haftalık hareketli "
+            "ortalama üzerinde yatay bazdan çıkışı ifade eden yükseliş trendinin "
+            "başlangıcı ve ana aşamasıdır. SPY Stage 2 = genel piyasa sağlıklı."
+        ),
+        source_book="Secrets for Profiting in Bull and Bear Markets",
+        source_author="Stan Weinstein",
+        source_year=1988,
+        quanfina_context="Piyasa Durumu sayfasında SPY/QQQ/IWM için Stage tespiti. Stage 2 = LONG mod önerilir.",
+        category="technical",
+    ),
+    Term(
+        key="rs_ibd",
+        short_name="RS IBD",
+        tooltip="IBD Göreceli Güç Puanı. 99 = en iyi %1, 1 = en kötü %1.",
+        definition=(
+            "Investor's Business Daily'nin geliştirdiği 1–99 arası göreceli güç "
+            "puanı. Son 12 ayda bir hissenin tüm hisselere göre fiyat performansını "
+            "ölçer. Minervini Trend Template koşullarından biri: RS > 70."
+        ),
+        source_book="How to Make Money in Stocks",
+        source_author="William J. O'Neil",
+        source_year=1988,
+        quanfina_context="Minervini tarama grid'inde sütun. Renk: 0-99 arası yeşil gradient.",
+        category="technical",
+    ),
+    Term(
+        key="ma200_slope",
+        short_name="MA200 Eğim",
+        tooltip="200 günlük hareketli ortalama eğimi. Pozitif = uzun vadeli yükseliş.",
+        definition=(
+            "200 günlük basit hareketli ortalamanın eğimi (günlük değişim). "
+            "Pozitif eğim uzun vadeli yükseliş trendini gösterir. "
+            "Minervini Trend Template: MA200 eğimi pozitif olmalı."
+        ),
+        source_book=None,
+        source_author=None,
+        source_year=None,
+        quanfina_context="Minervini grid MA200 EĞİM sütunu. Pozitif = yeşil, negatif = kırmızı.",
+        category="technical",
+    ),
+    Term(
+        key="vcp",
+        short_name="VCP",
+        tooltip="Volatility Contraction Pattern — daralan volatilite bazı, Minervini.",
+        definition=(
+            "Mark Minervini'nin tanımladığı Volatility Contraction Pattern (VCP). "
+            "Fiyat konsolidasyonu sırasında hacim azalırken volatilitenin kademeli "
+            "olarak daraldığı formasyon. Kırılım öncesi kurumsal birikimi yansıtır. "
+            "Tipik dizi: %25 → %12 → %6 → %2 daralma."
+        ),
+        source_book="Trade Like a Stock Market Wizard",
+        source_author="Mark Minervini",
+        source_year=2013,
+        quanfina_context="Minervini stratejisinin ana setup paterni. Tarama motorunda VCP kriterleri uygulanır.",
+        category="strategy",
+    ),
+    Term(
+        key="pullback",
+        short_name="Pullback",
+        tooltip="Yükseliş trendinde geçici geri çekilme — Carr'ın 5 long setup'ından biri.",
+        definition=(
+            "Thomas Carr'ın tanımladığı Pullback setup: Ana yükseliş trendi devam "
+            "ederken oluşan geçici geri çekilme. Ana trende geri döneceği öngörüsüyle "
+            "momentum girişi yapılır. Destek bölgesi (MA20/MA50) yakınında tetikler."
+        ),
+        source_book="Trend Trading for a Living",
+        source_author="Thomas Carr",
+        source_year=2008,
+        quanfina_context="Carr sayfasında Long Setup kartı. Tooltip henüz NotebookLM'den detaylandırılacak.",
+        category="strategy",
+    ),
+    Term(
+        key="coiled_spring",
+        short_name="Coiled Spring",
+        tooltip="Sıkışma sonrası kırılım potansiyeli — Carr'ın 5 long setup'ından biri.",
+        definition=(
+            "Thomas Carr'ın tanımladığı Coiled Spring setup: Dar bant içinde volatilite "
+            "sıkışması ve ardından yüksek hacimli kırılım potansiyeli. VCP'ye benzer "
+            "ancak Carr metodolojisine göre tanımlanır."
+        ),
+        source_book="Trend Trading for a Living",
+        source_author="Thomas Carr",
+        source_year=2008,
+        quanfina_context="Carr sayfasında Long Setup kartı.",
+        category="strategy",
+    ),
+    Term(
+        key="distribution_days",
+        short_name="Distribution Days",
+        tooltip="Artan hacimle endeks düşüşü — kurumsal satış sinyali (IBD kavramı).",
+        definition=(
+            "IBD (Investor's Business Daily) kavramı. S&P 500 veya Nasdaq'ın bir "
+            "önceki güne göre %0.2+ düşerken hacmin artması. 4–6 adet distribution "
+            "day birikimi piyasa topu ve satış baskısı sinyali verir."
+        ),
+        source_book="How to Make Money in Stocks",
+        source_author="William J. O'Neil",
+        source_year=1988,
+        quanfina_context="Piyasa Durumu sayfasında sayaç olarak gösterilir. >4 ise sarı uyarı.",
+        category="technical",
+    ),
+    Term(
+        key="trend_template",
+        short_name="Trend Template",
+        tooltip="Minervini'nin 8 koşullu hisse filtresi — tüm koşullar sağlanmalı.",
+        definition=(
+            "Mark Minervini'nin Trend Template'i 8 koşuldan oluşur: "
+            "(1) Fiyat MA150 ve MA200 üstünde, (2) MA150 > MA200, "
+            "(3) MA200 en az 1 aydır yükseliş eğiminde, (4) MA50 > MA150 ve MA200, "
+            "(5) Fiyat MA50 üstünde, (6) Fiyat 52 hafta düşüğünden %30+ yüksek, "
+            "(7) Fiyat 52 hafta yükseklerinin %25 içinde, (8) RS > 70."
+        ),
+        source_book="Trade Like a Stock Market Wizard",
+        source_author="Mark Minervini",
+        source_year=2013,
+        quanfina_context="Minervini tarama motorunun temel filtresi. Tüm hisseler Trend Template'den geçmeli.",
+        category="strategy",
+    ),
+    Term(
+        key="sepa",
+        short_name="SEPA",
+        tooltip="Tooltip henüz tanımlanmadı. NotebookLM'den detay alınacak.",
+        definition="Tooltip henüz tanımlanmadı, NotebookLM'den detay alınacak.",
+        source_book=None,
+        source_author="Mark Minervini",
+        source_year=None,
+        quanfina_context="Minervini metodolojisi kapsamında. Detay NotebookLM NB-1'den alınacak.",
+        category="strategy",
+    ),
+    Term(
+        key="canslim",
+        short_name="CANSLIM",
+        tooltip="O'Neil'in 7 koşullu hisse seçim metodolojisi — C-A-N-S-L-I-M kısaltması.",
+        definition=(
+            "William J. O'Neil'in CANSLIM metodolojisi: "
+            "C = Current Earnings (mevcut çeyrek kazanç büyümesi %25+), "
+            "A = Annual Earnings (yıllık kazanç büyümesi %25+), "
+            "N = New (yeni ürün/hizmet/yönetim veya yeni fiyat zirvesi), "
+            "S = Supply/Demand (az free float, kurumsal alım hacmi), "
+            "L = Leader (RS > 80, sektör lideri), "
+            "I = Institutional Sponsorship (kurumsal sahiplik artışı), "
+            "M = Market Direction (genel piyasa yükseliş trendinde)."
+        ),
+        source_book="How to Make Money in Stocks",
+        source_author="William J. O'Neil",
+        source_year=1988,
+        quanfina_context="Minervini ve IBD metodolojisinin temeli. EPS/Sales kriterleri buradan.",
+        category="strategy",
+    ),
+    Term(
+        key="pivot_price",
+        short_name="Pivot Fiyatı",
+        tooltip="Konsolidasyon bazından kırılım seviyesi — bu fiyat üstünde alım yapılır.",
+        definition=(
+            "Minervini ve IBD terminolojisinde pivot fiyat: Hissenin konsolidasyon "
+            "bazının (örn. VCP, cup-with-handle) en yüksek noktası. Pivot fiyat "
+            "üzerinde yüksek hacimle kapanış = kırılım onayı ve alım noktası."
+        ),
+        source_book="Trade Like a Stock Market Wizard",
+        source_author="Mark Minervini",
+        source_year=2013,
+        quanfina_context="Minervini grid'inde opsiyonel sütun. Null ise henüz baz oluşmamış.",
+        category="technical",
+    ),
+    Term(
+        key="high_52w",
+        short_name="52 Hafta Yüksek",
+        tooltip="Son 52 haftanın en yüksek kapanış fiyatı.",
+        definition=(
+            "Bir hissenin son 52 haftalık (yaklaşık 1 yıl) en yüksek kapanış fiyatı. "
+            "Minervini Trend Template koşulu: fiyat 52 hafta yükseklerinin %25 içinde "
+            "olmalı (pct_from_high > -25%)."
+        ),
+        source_book=None,
+        source_author=None,
+        source_year=None,
+        quanfina_context="Minervini grid 52H MESAFE sütunu: mevcut fiyatın 52 hafta yüksekten uzaklığı.",
+        category="technical",
+    ),
+    Term(
+        key="atr",
+        short_name="ATR",
+        tooltip="Average True Range — volatilite ölçüsü. Stop ve pozisyon büyüklüğünde kullanılır.",
+        definition=(
+            "Average True Range (ATR). J. Welles Wilder tarafından geliştirildi. "
+            "Belirli bir periyottaki (genellikle 14 gün) ortalama fiyat aralığını ölçer. "
+            "Yüksek ATR = yüksek volatilite. Stop loss ve pozisyon büyüklüğü "
+            "hesaplamalarında temel gösterge."
+        ),
+        source_book="New Concepts in Technical Trading Systems",
+        source_author="J. Welles Wilder",
+        source_year=1978,
+        quanfina_context="Risk hesaplama modülünde stop mesafesi ve pozisyon büyüklüğü için kullanılır.",
+        category="risk",
+    ),
+    Term(
+        key="vix",
+        short_name="VIX",
+        tooltip="CBOE Volatilite Endeksi. <15 = sakin, >30 = korku bölgesi.",
+        definition=(
+            "CBOE Volatility Index (VIX). S&P 500 opsiyonlarından hesaplanan, "
+            "piyasanın önümüzdeki 30 gün için beklediği volatilite seviyesi. "
+            "VIX < 15: düşük volatilite/güven ortamı. "
+            "VIX 15–25: normal. VIX > 30: korku bölgesi, satış baskısı yüksek."
+        ),
+        source_book=None,
+        source_author="CBOE",
+        source_year=1993,
+        quanfina_context="Piyasa Durumu sayfasında gösterge. Yüksek VIX = LONG pozisyon boyutunu küçült.",
+        category="technical",
+    ),
+    Term(
+        key="market_breadth",
+        short_name="Piyasa Genişliği",
+        tooltip="Piyasada yükselen/düşen hisse oranı — piyasa sağlığını ölçer.",
+        definition=(
+            "Market Breadth (Piyasa Genişliği): Piyasada yükselen hisse sayısının "
+            "düşene oranı, 52 hafta yeni yüksekler/düşükler, NYSE A/D Line gibi "
+            "göstergeler. Endeks yükselirken breadth zayıfsa = divergence uyarısı."
+        ),
+        source_book=None,
+        source_author=None,
+        source_year=None,
+        quanfina_context="Piyasa Durumu sayfasında Market Health Score'un bileşenlerinden biri. Tooltip henüz NotebookLM'den detaylandırılacak.",
+        category="technical",
+    ),
+]
+
+_TERMS_BY_KEY: dict[str, Term] = {t.key: t for t in MOCK_TERMS}
+
+
+@app.get("/api/terms", response_model=list[Term])
+def get_terms() -> list[Term]:
+    return MOCK_TERMS
+
+
+@app.get("/api/terms/{key}", response_model=Term)
+def get_term(key: str) -> Term:
+    term = _TERMS_BY_KEY.get(key)
+    if not term:
+        raise HTTPException(status_code=404, detail=f"Term '{key}' not found")
+    return term
+
+
+# ── Piyasa Durumu ──────────────────────────────────────────────────────────────
+
+class SectorChange(BaseModel):
+    name: str
+    change_pct: float
+
+
+class MarketStatus(BaseModel):
+    spy_stage: int
+    qqq_stage: int
+    iwm_stage: int
+    vix: float
+    distribution_days: int
+    market_health_score: int
+    market_health_label: str
+    suggested_mode: str
+    top_sectors: list[SectorChange]
+    bottom_sectors: list[SectorChange]
+
+
+MOCK_MARKET_STATUS = MarketStatus(
+    spy_stage=2,
+    qqq_stage=2,
+    iwm_stage=1,
+    vix=14.2,
+    distribution_days=3,
+    market_health_score=75,
+    market_health_label="YEŞİL",
+    suggested_mode="LONG",
+    top_sectors=[
+        SectorChange(name="Technology", change_pct=2.3),
+        SectorChange(name="Energy", change_pct=1.8),
+        SectorChange(name="Industrials", change_pct=1.2),
+    ],
+    bottom_sectors=[
+        SectorChange(name="Utilities", change_pct=-1.2),
+        SectorChange(name="Health Care", change_pct=-0.4),
+    ],
+)
+
+
+@app.get("/api/market/status", response_model=MarketStatus)
+def get_market_status() -> MarketStatus:
+    return MOCK_MARKET_STATUS

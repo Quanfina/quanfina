@@ -3,6 +3,7 @@ import type { MinerviniStock, ListType } from "@/types/minervini";
 import { LIST_LABELS } from "@/types/minervini";
 import { GradeBadge } from "./GradeBadge";
 import { ListTypeEditor } from "./ListTypeEditor";
+import { TermHeaderComponent } from "@/components/terminology/TermHeaderComponent";
 
 const NUM: CellStyle = {
   fontFamily: "var(--font-jetbrains-mono, monospace)",
@@ -72,6 +73,8 @@ export const COL_DEFS: ColDef<MinerviniStock>[] = [
   {
     field: "rs_ibd",
     headerName: "RS IBD",
+    headerComponent: TermHeaderComponent,
+    headerComponentParams: { termKey: "rs_ibd" },
     width: 90,
     minWidth: 90,
     valueFormatter: fmtInt,
@@ -83,6 +86,8 @@ export const COL_DEFS: ColDef<MinerviniStock>[] = [
   {
     field: "ma200_slope",
     headerName: "MA200 EĞİM",
+    headerComponent: TermHeaderComponent,
+    headerComponentParams: { termKey: "ma200_slope" },
     width: 130,
     minWidth: 130,
     valueFormatter: (p) => (p.value != null ? (p.value as number).toFixed(2) : "-"),
@@ -94,6 +99,8 @@ export const COL_DEFS: ColDef<MinerviniStock>[] = [
   {
     field: "pct_from_high",
     headerName: "52H MESAFE",
+    headerComponent: TermHeaderComponent,
+    headerComponentParams: { termKey: "high_52w" },
     width: 130,
     minWidth: 130,
     valueFormatter: fmtPct1,
@@ -102,6 +109,8 @@ export const COL_DEFS: ColDef<MinerviniStock>[] = [
   {
     field: "eps_qoq",
     headerName: "EPS Q/Q",
+    headerComponent: TermHeaderComponent,
+    headerComponentParams: { termKey: "canslim" },
     width: 100,
     minWidth: 100,
     valueFormatter: fmtPct1,

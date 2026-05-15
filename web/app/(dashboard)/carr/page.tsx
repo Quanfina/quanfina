@@ -1,3 +1,5 @@
+"use client";
+
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -6,26 +8,32 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { TermTooltip } from "@/components/terminology/TermTooltip";
 
 const LONG_SETUPS = [
   {
     name: "Pullback",
+    termKey: "pullback",
     desc: "Trend içinde geri çekilme sonrası momentum girişi",
   },
   {
     name: "Coiled Spring",
+    termKey: "coiled_spring",
     desc: "Sıkışma / konsolidasyon sonrası kırılım potansiyeli",
   },
   {
     name: "Bullish Divergence",
+    termKey: null,
     desc: "Fiyat düşerken momentum yükselir — reversal sinyali",
   },
   {
     name: "Blue Sky Breakout",
+    termKey: null,
     desc: "Tüm zamanların yüksek seviyesinin üzerinde kırılım",
   },
   {
     name: "Bullish Base Breakout",
+    termKey: null,
     desc: "Uzun konsolidasyon tabanından yukarı kırılım",
   },
 ];
@@ -33,32 +41,49 @@ const LONG_SETUPS = [
 const SHORT_SETUPS = [
   {
     name: "Rally",
+    termKey: null,
     desc: "Düşüş trendinde yükseliş sonrası momentum short girişi",
   },
   {
     name: "Coiled Spring (Short)",
+    termKey: "coiled_spring",
     desc: "Sıkışma sonrası aşağı kırılım potansiyeli",
   },
   {
     name: "Bearish Divergence",
+    termKey: null,
     desc: "Fiyat yükselirken momentum düşer — reversal sinyali",
   },
   {
     name: "Gap Down",
+    termKey: null,
     desc: "Gap sonrası devam hareketi ve kapanış bölgesinden short",
   },
   {
     name: "Bearish Base Breakdown",
+    termKey: null,
     desc: "Uzun konsolidasyon tabanından aşağı kırılım",
   },
 ];
 
-function SetupCard({ name, desc }: { name: string; desc: string }) {
+function SetupCard({
+  name,
+  termKey,
+  desc,
+}: {
+  name: string;
+  termKey: string | null;
+  desc: string;
+}) {
   return (
     <Card className="flex flex-col gap-1">
       <CardHeader className="pb-1">
         <CardTitle className="text-sm font-semibold flex items-center justify-between">
-          {name}
+          {termKey ? (
+            <TermTooltip termKey={termKey}>{name}</TermTooltip>
+          ) : (
+            name
+          )}
           <Badge variant="outline" className="text-xs font-normal">
             Yakında
           </Badge>
