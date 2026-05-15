@@ -1,11 +1,12 @@
 """
-Quanfina FastAPI — POC ADIM 5
+Quanfina FastAPI — POC ADIM 7
 """
 from __future__ import annotations
 
 import logging
+import random
 import sys
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -525,6 +526,56 @@ MOCK_TERMS: list[Term] = [
         quanfina_context="Watchlist sayfasında KONSENSUS kolonu. Default sort: konsensus DESC. Filtre: 1+ / 2+ / 3+.",
         category="strategy",
     ),
+    Term(
+        key="ma50",
+        short_name="MA50",
+        tooltip="50 günlük hareketli ortalama — kısa vadeli trend desteği.",
+        definition=(
+            "50 günlük basit hareketli ortalama (SMA50). Son 50 kapanış fiyatının "
+            "aritmetik ortalaması. Minervini Trend Template koşullarından biri: "
+            "fiyat MA50 üzerinde olmalı. Destek veya direnç olarak da işlev görür. "
+            "MA50 > MA150 > MA200 sırası sağlıklı bir yükseliş trendi gösterir."
+        ),
+        source_book="Trade Like a Stock Market Wizard",
+        source_author="Mark Minervini",
+        source_year=2013,
+        quanfina_context="Hisse detay sayfasında candlestick grafik üzerine sarı çizgi olarak çizilir.",
+        category="technical",
+    ),
+    Term(
+        key="ma200",
+        short_name="MA200",
+        tooltip="200 günlük hareketli ortalama — uzun vadeli trend çizgisi.",
+        definition=(
+            "200 günlük basit hareketli ortalama (SMA200). Son 200 kapanış fiyatının "
+            "aritmetik ortalaması. Kurumsal yatırımcıların en çok izlediği uzun vadeli "
+            "trend göstergesi. Minervini Trend Template: fiyat MA200 üzerinde olmalı ve "
+            "MA200 en az 1 aydır pozitif eğimde olmalı. "
+            "MA200 altına düşüş genellikle güçlü satış sinyali olarak değerlendirilir."
+        ),
+        source_book="Trade Like a Stock Market Wizard",
+        source_author="Mark Minervini",
+        source_year=2013,
+        quanfina_context="Hisse detay sayfasında candlestick grafik üzerine mor çizgi olarak çizilir. Eğim hesabı MA200 Eğim sütununda ayrıca gösterilir.",
+        category="technical",
+    ),
+    Term(
+        key="candlestick",
+        short_name="Candlestick",
+        tooltip="Mum grafik — her bar açılış, yüksek, düşük ve kapanış fiyatını gösterir.",
+        definition=(
+            "Candlestick (mum) grafik: Her zaman dilimi (gün, hafta vb.) için dört fiyat "
+            "noktasını gösterir. Gövde: açılış ve kapanış arası. Fitil (wick): yüksek ve "
+            "düşük fiyat. Yeşil/boş gövde = kapanış > açılış (yükseldi). "
+            "Kırmızı/dolu gövde = kapanış < açılış (düştü). "
+            "Japon pirinç tüccarlarından 17. yüzyılda gelen teknik analiz aracı."
+        ),
+        source_book=None,
+        source_author=None,
+        source_year=None,
+        quanfina_context="Hisse detay sayfasında ana fiyat grafiği candlestick formatta gösterilir. TradingView Lightweight Charts v5 kullanılır.",
+        category="technical",
+    ),
 ]
 
 _TERMS_BY_KEY: dict[str, Term] = {t.key: t for t in MOCK_TERMS}
@@ -663,3 +714,153 @@ MOCK_WATCHLIST: list[WatchlistRow] = [
 @app.get("/api/watchlist", response_model=list[WatchlistRow])
 def get_watchlist() -> list[WatchlistRow]:
     return MOCK_WATCHLIST
+
+
+# ── Hisse Detay ─────────────────────────────────────────────────────────────
+
+_STOCK_META: dict[str, dict] = {
+    "NVDA": {"name": "NVIDIA Corp",            "industry": "Semiconductors",          "market_cap": "$2.2T"},
+    "AVGO": {"name": "Broadcom Inc",           "industry": "Semiconductors",          "market_cap": "$780B"},
+    "META": {"name": "Meta Platforms Inc",     "industry": "Social Media",            "market_cap": "$1.3T"},
+    "MSFT": {"name": "Microsoft Corp",         "industry": "Software",                "market_cap": "$3.1T"},
+    "COST": {"name": "Costco Wholesale Corp",  "industry": "Retail",                  "market_cap": "$395B"},
+    "GOOGL":{"name": "Alphabet Inc Class A",   "industry": "Internet Services",       "market_cap": "$2.2T"},
+    "ASML": {"name": "ASML Holding NV",        "industry": "Semiconductor Equipment", "market_cap": "$292B"},
+    "AMZN": {"name": "Amazon.com Inc",         "industry": "E-Commerce / Cloud",      "market_cap": "$2.1T"},
+    "ORCL": {"name": "Oracle Corp",            "industry": "Enterprise Software",     "market_cap": "$412B"},
+    "CRM":  {"name": "Salesforce Inc",         "industry": "CRM Software",            "market_cap": "$286B"},
+    "NFLX": {"name": "Netflix Inc",            "industry": "Streaming",               "market_cap": "$288B"},
+    "AMD":  {"name": "Advanced Micro Devices", "industry": "Semiconductors",          "market_cap": "$257B"},
+    "ADBE": {"name": "Adobe Inc",              "industry": "Creative Software",       "market_cap": "$174B"},
+    "V":    {"name": "Visa Inc",               "industry": "Payment Processing",      "market_cap": "$544B"},
+    "MA":   {"name": "Mastercard Inc",         "industry": "Payment Processing",      "market_cap": "$440B"},
+    "JPM":  {"name": "JPMorgan Chase & Co",    "industry": "Banking",                 "market_cap": "$618B"},
+    "HD":   {"name": "Home Depot Inc",         "industry": "Home Improvement",        "market_cap": "$346B"},
+    "WMT":  {"name": "Walmart Inc",            "industry": "Retail",                  "market_cap": "$720B"},
+    "AMAT": {"name": "Applied Materials Inc",  "industry": "Semiconductor Equipment", "market_cap": "$149B"},
+    "MRVL": {"name": "Marvell Technology Inc", "industry": "Semiconductors",          "market_cap": "$53B"},
+    "AAPL": {"name": "Apple Inc",              "industry": "Consumer Electronics",    "market_cap": "$2.8T", "sector": "Technology"},
+    "TSM":  {"name": "Taiwan Semiconductor",   "industry": "Semiconductors",          "market_cap": "$740B", "sector": "Technology"},
+    "LLY":  {"name": "Eli Lilly and Company",  "industry": "Pharmaceuticals",         "market_cap": "$680B", "sector": "Health Care"},
+    "UBER": {"name": "Uber Technologies Inc",  "industry": "Ride-Hailing",            "market_cap": "$140B", "sector": "Technology"},
+    "PLTR": {"name": "Palantir Technologies",  "industry": "Software",                "market_cap": "$49B",  "sector": "Technology"},
+    "COIN": {"name": "Coinbase Global Inc",    "industry": "Crypto Exchange",         "market_cap": "$38B",  "sector": "Financials"},
+    "DASH": {"name": "DoorDash Inc",           "industry": "Food Delivery",           "market_cap": "$47B",  "sector": "Consumer Discretionary"},
+    "SHOP": {"name": "Shopify Inc",            "industry": "E-Commerce",              "market_cap": "$96B",  "sector": "Technology"},
+}
+
+_STOCK_BY_SYM: dict[str, MinerviniStock] = {s.symbol: s for s in MOCK_STOCKS}
+
+
+class StockInfo(BaseModel):
+    symbol: str
+    name: str
+    sector: str
+    industry: str
+    market_cap: str
+    price: float
+    change_pct: float
+    rs_rating: int
+    active_strategies: list[WatchlistRow]
+
+
+class OhlcvBar(BaseModel):
+    time: str         # ISO date "YYYY-MM-DD"
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: int
+
+
+def _generate_ohlcv(symbol: str, end_price: float, n_bars: int = 252) -> list[OhlcvBar]:
+    """Deterministic OHLCV generation — seed per symbol, Minervini-appropriate uptrend."""
+    rng = random.Random(sum(ord(c) for c in symbol) * 7919)
+
+    # Collect n_bars trading days (Mon–Fri) backwards from yesterday
+    trading_days: list[date] = []
+    d = date.today() - timedelta(days=1)
+    while len(trading_days) < n_bars:
+        if d.weekday() < 5:
+            trading_days.append(d)
+        d -= timedelta(days=1)
+    trading_days.reverse()   # chronological order
+
+    # Price series: start ~22% lower, slight uptrend drift
+    start_price = end_price * rng.uniform(0.73, 0.82)
+    prices = [start_price]
+    for _ in range(n_bars - 1):
+        prices.append(prices[-1] * (1.0 + rng.gauss(0.0009, 0.014)))
+
+    # Scale to match end_price exactly
+    scale = end_price / prices[-1]
+    prices = [p * scale for p in prices]
+
+    bars: list[OhlcvBar] = []
+    for bar_date, close in zip(trading_days, prices):
+        daily_range = rng.uniform(0.006, 0.022)
+        high = close * (1.0 + rng.uniform(daily_range * 0.4, daily_range))
+        low  = close * (1.0 - rng.uniform(daily_range * 0.4, daily_range))
+        open_ = low + rng.random() * (high - low)
+        high = max(high, open_, close)
+        low  = min(low,  open_, close)
+        bars.append(OhlcvBar(
+            time=bar_date.isoformat(),
+            open=round(open_, 2),
+            high=round(high, 2),
+            low=round(low, 2),
+            close=round(close, 2),
+            volume=int(rng.uniform(8_000_000, 55_000_000)),
+        ))
+    return bars
+
+
+@app.get("/api/stock/{symbol}/info", response_model=StockInfo)
+def get_stock_info(symbol: str) -> StockInfo:
+    sym = symbol.upper()
+    stock = _STOCK_BY_SYM.get(sym)
+    meta  = _STOCK_META.get(sym, {})
+    active = [row for row in MOCK_WATCHLIST if row.symbol == sym]
+
+    if not stock and not active:
+        raise HTTPException(status_code=404, detail=f"Symbol '{sym}' not found")
+
+    if stock:
+        return StockInfo(
+            symbol=sym,
+            name=meta.get("name", stock.company),
+            sector=meta.get("sector", stock.sector),
+            industry=meta.get("industry", stock.sector),
+            market_cap=meta.get("market_cap", f"${stock.market_cap:.0f}B"),
+            price=stock.price,
+            change_pct=stock.change_pct,
+            rs_rating=int(stock.rs_ibd),
+            active_strategies=active,
+        )
+    else:
+        row = active[0]
+        return StockInfo(
+            symbol=sym,
+            name=meta.get("name", sym),
+            sector=meta.get("sector", "—"),
+            industry=meta.get("industry", "—"),
+            market_cap=meta.get("market_cap", "—"),
+            price=row.price,
+            change_pct=0.0,
+            rs_rating=row.rs_rating,
+            active_strategies=active,
+        )
+
+
+@app.get("/api/stock/{symbol}/ohlcv", response_model=list[OhlcvBar])
+def get_stock_ohlcv(symbol: str) -> list[OhlcvBar]:
+    sym = symbol.upper()
+    stock = _STOCK_BY_SYM.get(sym)
+    if stock:
+        price = stock.price
+    else:
+        wl = [r for r in MOCK_WATCHLIST if r.symbol == sym]
+        if not wl:
+            raise HTTPException(status_code=404, detail=f"Symbol '{sym}' not found")
+        price = wl[0].price
+    return _generate_ohlcv(sym, price)

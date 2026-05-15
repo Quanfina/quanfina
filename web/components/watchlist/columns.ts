@@ -4,6 +4,7 @@ import { StatusBadge } from "./StatusBadge";
 import { ConsensusBadge } from "./ConsensusBadge";
 import { StrategyCellRenderer } from "./StrategyCellRenderer";
 import { SetupCellRenderer } from "./SetupCellRenderer";
+import { SymbolCellRenderer } from "./SymbolCellRenderer";
 import { TermHeaderComponent } from "@/components/terminology/TermHeaderComponent";
 
 const MONO: CellStyle = {
@@ -38,7 +39,7 @@ export const COL_DEFS: ColDef<WatchlistRow>[] = [
     pinned: "left",
     width: 90,
     minWidth: 80,
-    cellStyle: { fontWeight: 700, fontFamily: "var(--font-jetbrains-mono, monospace)" },
+    cellRenderer: SymbolCellRenderer,
   },
   {
     field: "strategy",
