@@ -672,6 +672,37 @@ MOCK_TERMS: list[Term] = [
         quanfina_context="Trade Journal'da grade kolonunda renkli badge olarak gösterilir. A+=koyu yeşil, F=kırmızı.",
         category="strategy",
     ),
+    Term(
+        key="signal",
+        short_name="Sinyal",
+        tooltip="Konsensus sinyal — birden fazla stratejide aynı hissenin watchlist'e girmesi.",
+        definition=(
+            "Quanfina sinyal: Bir hissenin en az bir stratejide (Minervini veya Carr) "
+            "watchlist'e alınmasıyla oluşan eylem önerisi. Konsensus sinyal ise hissenin "
+            "birden fazla stratejide (örn. hem Minervini hem Carr) watchlist'te yer alması. "
+            "Konsensus ne kadar yüksekse sinyal gücü o kadar yüksek kabul edilir."
+        ),
+        source_book=None,
+        source_author=None,
+        source_year=None,
+        quanfina_context="Sinyaller sayfasında SignalCard olarak gösterilir. Konsensus rozeti 2/2 veya 1/2 gibi.",
+        category="strategy",
+    ),
+    Term(
+        key="new_today",
+        short_name="Yeni Bugün",
+        tooltip="Son 24 saat içinde watchlist'e eklenen sinyal.",
+        definition=(
+            "Sinyaller sayfasında 'Yeni Bugün' filtresi: added_date değeri bugünün tarihi "
+            "olan watchlist girişlerine dayalı sinyalleri gösterir. "
+            "Sabah rutininde 'dün gece veya bugün sabah ne eklendi?' sorusunu yanıtlar."
+        ),
+        source_book=None,
+        source_author=None,
+        source_year=None,
+        quanfina_context="Sinyaller sayfasında yeşil 'YENİ BUGÜN' badge olarak görünür. Checkbox ile filtrelenebilir.",
+        category="strategy",
+    ),
 ]
 
 _TERMS_BY_KEY: dict[str, Term] = {t.key: t for t in MOCK_TERMS}
@@ -758,7 +789,7 @@ from collections import defaultdict as _dd
 _RAW: list[tuple] = [
     # symbol, strategy, status, price, added_date, setup_type, pivot_price, note, rs_rating
     # ── Minervini (20 satır) ──────────────────────────────────────
-    ("NVDA", "minervini", "buy",     875.40, "2026-05-13", "VCP",   820.00, None,          97),
+    ("NVDA", "minervini", "buy",     875.40, "2026-05-16", "VCP",   820.00, None,          97),
     ("AVGO", "minervini", "buy",    1680.20, "2026-05-12", None,   1620.00, None,          94),
     ("META", "minervini", "focus",   525.80, "2026-05-10", None,    505.00, None,          92),
     ("MSFT", "minervini", "focus",   415.60, "2026-05-10", None,      None, None,          88),
@@ -1321,3 +1352,57 @@ def delete_trade(trade_id: int) -> Response:
         raise HTTPException(status_code=404, detail=f"Trade {trade_id} bulunamadı")
     MOCK_TRADES.pop(idx)
     return Response(status_code=204)
+
+
+# ── Signals ───────────────────────────────────────────────────────────────────
+
+_STATUS_RANK: dict[str, int] = {s: i for i, s in enumerate(_STATUS_HIERARCHY)}
+
+
+class StrategyEntry(BaseModel):
+    strategy: str
+    status: str
+    setup_type: Optional[str] = None
+
+
+class Signal(BaseModel):
+    symbol: str
+    strategies: list[StrategyEntry]
+    consensus_count: int
+    max_status: str
+    avg_rs_rating: float
+    price: float
+    latest_added: str
+    is_new_today: bool
+
+
+@app.get("/api/signals", response_model=list[Signal])
+def get_signals() -> list[Signal]:
+    today = date.today().isoformat()
+
+    grouped: dict[str, list[WatchlistRow]] = {}
+    for row in MOCK_WATCHLIST:
+        grouped.setdefault(row.symbol, []).append(row)
+
+    signals: list[Signal] = []
+    for symbol, rows in grouped.items():
+        strategies = [
+            StrategyEntry(strategy=r.strategy, status=r.status, setup_type=r.setup_type)
+            for r in rows
+        ]
+        max_status = max(rows, key=lambda r: _STATUS_RANK.get(r.status, -1)).status
+        avg_rs = sum(r.rs_rating for r in rows) / len(rows)
+        latest = max(r.added_date for r in rows)
+        signals.append(Signal(
+            symbol=symbol,
+            strategies=strategies,
+            consensus_count=len(rows),
+            max_status=max_status,
+            avg_rs_rating=round(avg_rs, 1),
+            price=rows[0].price,
+            latest_added=latest,
+            is_new_today=(latest >= today),
+        ))
+
+    signals.sort(key=lambda s: (-s.consensus_count, -s.avg_rs_rating))
+    return signals

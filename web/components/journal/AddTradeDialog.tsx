@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,12 +19,21 @@ import { GRADE_OPTIONS, EXIT_REASON_LABELS } from "@/types/trade";
 const SELECT = "h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring";
 const TEXTAREA = "w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm resize-none focus:outline-none focus:ring-1 focus:ring-ring";
 
+interface InitialData {
+  symbol?: string;
+  strategy?: string;
+  setup_type?: string;
+  entry_date?: string;
+  entry_price?: number;
+}
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialData?: InitialData;
 }
 
-export function AddTradeDialog({ open, onOpenChange }: Props) {
+export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
   const addMutation = useAddTrade();
   const { data: setupTypes = [] } = useSetupTypes();
 
@@ -42,6 +51,15 @@ export function AddTradeDialog({ open, onOpenChange }: Props) {
   const [exitReason, setExitReason] = useState<ExitReason>("stop_loss");
   const [lessons, setLessons]       = useState("");
   const [error, setError]           = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open || !initialData) return;
+    if (initialData.symbol !== undefined) setSymbol(initialData.symbol);
+    if (initialData.strategy !== undefined) setStrategy(initialData.strategy);
+    if (initialData.setup_type !== undefined) setSetupType(initialData.setup_type);
+    if (initialData.entry_date !== undefined) setEntryDate(initialData.entry_date);
+    if (initialData.entry_price !== undefined) setEntryPrice(String(initialData.entry_price));
+  }, [open, initialData]);
 
   const isClosed = status === "closed";
 
