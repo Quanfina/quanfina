@@ -468,6 +468,63 @@ MOCK_TERMS: list[Term] = [
         quanfina_context="Piyasa Durumu sayfasında Market Health Score'un bileşenlerinden biri. Tooltip henüz NotebookLM'den detaylandırılacak.",
         category="technical",
     ),
+    Term(
+        key="minervini_method",
+        short_name="Minervini Stratejisi",
+        tooltip="Tooltip henüz tanımlanmadı. NotebookLM'den detay alınacak.",
+        definition="Tooltip henüz tanımlanmadı, NotebookLM'den detay alınacak.",
+        source_book=None,
+        source_author="Mark Minervini",
+        source_year=None,
+        quanfina_context="Watchlist sayfasında Minervini stratejisi satırlarına bağlı terim. Detay NB-1'den alınacak.",
+        category="strategy",
+    ),
+    Term(
+        key="carr_method",
+        short_name="Carr Stratejisi",
+        tooltip="Tooltip henüz tanımlanmadı. NotebookLM'den detay alınacak.",
+        definition="Tooltip henüz tanımlanmadı, NotebookLM'den detay alınacak.",
+        source_book="Trend Trading for a Living",
+        source_author="Thomas Carr",
+        source_year=2008,
+        quanfina_context="Watchlist sayfasında Carr stratejisi satırlarına bağlı terim. Detay NB-2'den alınacak.",
+        category="strategy",
+    ),
+    Term(
+        key="watchlist_status",
+        short_name="Watchlist Statüsü",
+        tooltip="Watch → On Deck → Focus → Buy — 4 aşamalı hisse öncelik sıralaması.",
+        definition=(
+            "Quanfina Watchlist sistemi 4 statü: "
+            "Watch (izlemede, henüz koşul sağlanmadı), "
+            "On Deck (hazır beklemede, yakında setup oluşabilir), "
+            "Focus (odak listesi, setup aktif), "
+            "Buy (alım bölgesi, pivot kırıldı veya kırılmak üzere). "
+            "Hisse olgunlaştıkça statü yükselir."
+        ),
+        source_book=None,
+        source_author=None,
+        source_year=None,
+        quanfina_context="Watchlist sayfasında her satırın öncelik durumu. Renk: Buy=yeşil, Focus=mavi, On Deck=turuncu, Watch=gri.",
+        category="strategy",
+    ),
+    Term(
+        key="consensus",
+        short_name="Konsensus",
+        tooltip="Kaç farklı stratejide aynı hisse var — yüksek = daha güçlü sinyal.",
+        definition=(
+            "Quanfina konsensus skoru: Bir hissenin kaç ayrı stratejide "
+            "(Minervini, Carr vb.) watchlist'te yer aldığını gösterir. "
+            "Konsensus=1: tek stratejide var. "
+            "Konsensus=2: hem Minervini hem Carr'da var — çakışan onay. "
+            "Yüksek konsensus, hisse hakkında birden fazla bağımsız sinyal oluştuğunu gösterir."
+        ),
+        source_book=None,
+        source_author=None,
+        source_year=None,
+        quanfina_context="Watchlist sayfasında KONSENSUS kolonu. Default sort: konsensus DESC. Filtre: 1+ / 2+ / 3+.",
+        category="strategy",
+    ),
 ]
 
 _TERMS_BY_KEY: dict[str, Term] = {t.key: t for t in MOCK_TERMS}
@@ -530,3 +587,79 @@ MOCK_MARKET_STATUS = MarketStatus(
 @app.get("/api/market/status", response_model=MarketStatus)
 def get_market_status() -> MarketStatus:
     return MOCK_MARKET_STATUS
+
+
+# ── Watchlist ────────────────────────────────────────────────────────────────
+
+class WatchlistRow(BaseModel):
+    symbol: str
+    strategy: str                      # "minervini" | "carr"
+    status: str                        # "watch" | "on_deck" | "focus" | "buy"
+    price: float
+    added_date: str                    # ISO date string
+    setup_type: Optional[str] = None
+    pivot_price: Optional[float] = None
+    note: Optional[str] = None
+    rs_rating: int                     # 0–99
+    consensus_count: int
+    consensus_strategies: list[str]
+
+
+# Build mock data — consensus computed automatically
+from collections import defaultdict as _dd
+
+_RAW: list[tuple] = [
+    # symbol, strategy, status, price, added_date, setup_type, pivot_price, note, rs_rating
+    # ── Minervini (20 satır) ──────────────────────────────────────
+    ("NVDA", "minervini", "buy",     875.40, "2026-05-13", "VCP",   820.00, None,          97),
+    ("AVGO", "minervini", "buy",    1680.20, "2026-05-12", None,   1620.00, None,          94),
+    ("META", "minervini", "focus",   525.80, "2026-05-10", None,    505.00, None,          92),
+    ("MSFT", "minervini", "focus",   415.60, "2026-05-10", None,      None, None,          88),
+    ("COST", "minervini", "focus",   890.30, "2026-05-09", None,      None, None,          85),
+    ("GOOGL","minervini", "on_deck", 178.40, "2026-05-08", None,      None, None,          83),
+    ("ASML", "minervini", "on_deck", 742.10, "2026-05-08", None,      None, None,          81),
+    ("AMZN", "minervini", "on_deck", 196.70, "2026-05-07", None,      None, None,          80),
+    ("ORCL", "minervini", "on_deck", 148.90, "2026-05-05", None,      None, None,          76),
+    ("CRM",  "minervini", "on_deck", 296.40, "2026-05-05", None,      None, None,          74),
+    ("NFLX", "minervini", "watch",   672.30, "2026-05-03", None,      None, None,          79),
+    ("AMD",  "minervini", "watch",   158.70, "2026-05-03", None,      None, None,          73),
+    ("ADBE", "minervini", "watch",   394.50, "2026-05-02", None,      None, None,          71),
+    ("V",    "minervini", "watch",   275.80, "2026-05-01", None,      None, None,          75),
+    ("MA",   "minervini", "watch",   477.20, "2026-05-01", None,      None, None,          73),
+    ("JPM",  "minervini", "watch",   215.40, "2026-04-28", None,      None, None,          70),
+    ("PLTR", "minervini", "watch",    22.80, "2026-04-25", None,      None, None,          65),
+    ("COIN", "minervini", "watch",   152.40, "2026-04-24", None,      None, None,          68),
+    ("DASH", "minervini", "watch",   118.60, "2026-04-22", None,      None, None,          63),
+    ("SHOP", "minervini", "watch",    74.20, "2026-04-18", None,      None, None,          61),
+    # ── Carr (10 satır) ──────────────────────────────────────────
+    ("NVDA", "carr",      "focus",   875.40, "2026-05-13", "Pullback",           820.00, "MA50 destek", 97),
+    ("META", "carr",      "focus",   525.80, "2026-05-10", "Pullback",           505.00, None,          92),
+    ("GOOGL","carr",      "on_deck", 178.40, "2026-05-08", "Coiled Spring",        None, None,          83),
+    ("AMZN", "carr",      "on_deck", 196.70, "2026-05-07", "Coiled Spring",        None, None,          80),
+    ("MSFT", "carr",      "on_deck", 415.60, "2026-05-10", "Bullish Divergence",   None, None,          88),
+    ("AAPL", "carr",      "watch",   182.30, "2026-05-03", "Bullish Divergence",   None, None,          72),
+    ("TSM",  "carr",      "watch",   142.80, "2026-05-02", "Blue Sky Breakout",    None, None,          78),
+    ("AMD",  "carr",      "watch",   158.70, "2026-05-03", "Blue Sky Breakout",    None, None,          73),
+    ("LLY",  "carr",      "watch",   724.50, "2026-04-28", "Bullish Base Breakout",None, None,          82),
+    ("UBER", "carr",      "watch",    68.40, "2026-04-25", "Bullish Base Breakout",None, None,          70),
+]
+
+_sym_strategies: dict[str, list[str]] = _dd(list)
+for _r in _RAW:
+    _sym_strategies[_r[0]].append(_r[1])
+
+MOCK_WATCHLIST: list[WatchlistRow] = [
+    WatchlistRow(
+        symbol=r[0], strategy=r[1], status=r[2], price=r[3],
+        added_date=r[4], setup_type=r[5], pivot_price=r[6], note=r[7],
+        rs_rating=r[8],
+        consensus_count=len(_sym_strategies[r[0]]),
+        consensus_strategies=_sym_strategies[r[0]],
+    )
+    for r in _RAW
+]
+
+
+@app.get("/api/watchlist", response_model=list[WatchlistRow])
+def get_watchlist() -> list[WatchlistRow]:
+    return MOCK_WATCHLIST
