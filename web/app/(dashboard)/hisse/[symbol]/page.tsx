@@ -4,9 +4,24 @@ import { use } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { useStockInfo, useOhlcv } from "@/hooks/use-stock";
+import dynamic from "next/dynamic";
 import { StockHeader } from "@/components/stock/StockHeader";
-import { PriceChart } from "@/components/stock/PriceChart";
 import { ActiveStrategies } from "@/components/stock/ActiveStrategies";
+
+const PriceChart = dynamic(
+  () => import("@/components/stock/PriceChart").then((m) => ({ default: m.PriceChart })),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className="flex items-center justify-center border rounded-lg text-sm text-muted-foreground"
+        style={{ height: 470 }}
+      >
+        Grafik yükleniyor...
+      </div>
+    ),
+  }
+);
 import { SetupNotes } from "@/components/stock/SetupNotes";
 
 export default function HissePage({
