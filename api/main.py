@@ -591,6 +591,87 @@ MOCK_TERMS: list[Term] = [
         quanfina_context="Watchlist satır eylemleri menüsünde Yükselt/Düşür butonları. Watch→Buy tek yönlü hiyerarşi.",
         category="strategy",
     ),
+    Term(
+        key="rba",
+        short_name="RBA",
+        tooltip="Rule-Based Analysis — Minervini'nin kural tabanlı trade değerlendirme sistemi.",
+        definition=(
+            "Tooltip henüz tanımlanmadı, NotebookLM'den detay alınacak. "
+            "Mark Minervini'nin Rule-Based Analysis (RBA) sistemi, her trade'in kurallarını "
+            "ve bu kurallara uyumu analiz eder. Giriş, çıkış ve pozisyon yönetiminin "
+            "her adımı not edilir."
+        ),
+        source_book="Trade Like a Stock Market Wizard",
+        source_author="Mark Minervini",
+        source_year=2013,
+        quanfina_context="Trade Journal sayfasında grade ve ders notları RBA metodolojisine dayanır. POC ADIM 10'da detaylandırılacak.",
+        category="strategy",
+    ),
+    Term(
+        key="setup_type",
+        short_name="Setup Tipi",
+        tooltip="Fiyat formasyonunun türü — VCP, Pivot, Pocket Pivot vb.",
+        definition=(
+            "Trade journal'daki setup tipi, giriş yapılan fiyat formasyonunu tanımlar. "
+            "Minervini 6 setup: VCP, Pivot, Pocket Pivot, Power Play (High Tight Flag), "
+            "Cup & Handle, Flat Base. Carr 2 setup: Pullback, Coiled Spring. "
+            "Aynı setup'ın tekrarlayan başarısı veya başarısızlığı öğrenme sağlar."
+        ),
+        source_book=None,
+        source_author=None,
+        source_year=None,
+        quanfina_context="Trade Journal'da setup kolonunda görünür. 8 standart tip dropdown'dan seçilir.",
+        category="strategy",
+    ),
+    Term(
+        key="exit_reason",
+        short_name="Çıkış Sebebi",
+        tooltip="Trade neden kapatıldı — stop loss, hedef, trailing stop veya takdiri.",
+        definition=(
+            "Trade kapatma sebepleri: Stop Loss (önceden belirlenen risk noktası tetiklendi), "
+            "Hedef Ulaşıldı (fiyat hedefine ulaşıldı), Trailing Stop (sürüklenen stop tetiklendi), "
+            "Takdiri (koşullar değişti, kuralsız çıkış), Süre Çıkışı (beklenen hareket gelmedi). "
+            "Çıkış sebebini takip etmek disiplini ölçer."
+        ),
+        source_book=None,
+        source_author=None,
+        source_year=None,
+        quanfina_context="Trade Journal'da çıkış sebebi kolonunda görünür. Stop loss oranı yüksekse setup kalitesi düşük demektir.",
+        category="risk",
+    ),
+    Term(
+        key="pl_pct",
+        short_name="P/L %",
+        tooltip="Trade kar/zarar yüzdesi — (çıkış - giriş) / giriş × 100.",
+        definition=(
+            "Trade kar veya zarar yüzdesi: (çıkış fiyatı - giriş fiyatı) / giriş fiyatı × 100. "
+            "Pozitif = kârlı trade, negatif = zararlı trade. "
+            "Decimal.js ile hesaplanır (kayan nokta hatası yok). "
+            "Başarılı Minervini trade'leri genellikle %20-50 P/L hedefler."
+        ),
+        source_book=None,
+        source_author=None,
+        source_year=None,
+        quanfina_context="Trade Journal P/L % kolonunda gösterilir. Yeşil = kâr, kırmızı = zarar.",
+        category="risk",
+    ),
+    Term(
+        key="trade_grade",
+        short_name="Trade Grade",
+        tooltip="Trade kalite notu: A+ (mükemmel) → F (başarısız) — süreç, sonuç değil.",
+        definition=(
+            "Mark Minervini'nin trade grading sistemi: A+ (her kurala uyuldu, mükemmel süreç), "
+            "A (küçük sapmalar), B (iyi ama hatalar var), C (birçok kural ihlali), "
+            "D (kötü süreç), F (tamamen kuralsız). "
+            "Not: Grade sonucu değil süreci ölçer. Zararlı A+ trade mümkün (kurallara uyuldu, "
+            "piyasa döndü). Kârlı F trade mümkün (şans, kural ihlaliyle)."
+        ),
+        source_book="Trade Like a Stock Market Wizard",
+        source_author="Mark Minervini",
+        source_year=2013,
+        quanfina_context="Trade Journal'da grade kolonunda renkli badge olarak gösterilir. A+=koyu yeşil, F=kırmızı.",
+        category="strategy",
+    ),
 ]
 
 _TERMS_BY_KEY: dict[str, Term] = {t.key: t for t in MOCK_TERMS}
@@ -1014,3 +1095,229 @@ def get_stock_ohlcv(symbol: str) -> list[OhlcvBar]:
             raise HTTPException(status_code=404, detail=f"Symbol '{sym}' not found")
         price = wl[0].price
     return _generate_ohlcv(sym, price)
+
+
+# ── Setup Types ───────────────────────────────────────────────────────────────
+
+class SetupTypeModel(BaseModel):
+    key: str
+    label: str
+    description: str
+
+
+SETUP_TYPES: list[SetupTypeModel] = [
+    SetupTypeModel(key="vcp",           label="VCP",          description="Volatility Contraction Pattern — Minervini"),
+    SetupTypeModel(key="pivot",         label="Pivot",        description="Konsolidasyondan kırılım noktası"),
+    SetupTypeModel(key="pocket_pivot",  label="Pocket Pivot", description="Kısmen gizli kırılım — Gill/Morales"),
+    SetupTypeModel(key="power_play",    label="Power Play",   description="High Tight Flag — güçlü momentum"),
+    SetupTypeModel(key="cup_and_handle",label="Cup & Handle", description="O'Neil klasik cup-and-handle formasyonu"),
+    SetupTypeModel(key="flat_base",     label="Flat Base",    description="Dar bantlı konsolidasyon tabanı"),
+    SetupTypeModel(key="pullback",      label="Pullback",     description="Yükseliş trendinde geri çekilme — Carr"),
+    SetupTypeModel(key="coiled_spring", label="Coiled Spring",description="Sıkışma sonrası kırılım — Carr"),
+]
+
+
+@app.get("/api/setup-types", response_model=list[SetupTypeModel])
+def get_setup_types() -> list[SetupTypeModel]:
+    return SETUP_TYPES
+
+
+# ── Trade Journal ─────────────────────────────────────────────────────────────
+
+from decimal import Decimal as _D, ROUND_HALF_UP as _RHU
+
+
+def _calc_pl(entry_price: float, exit_price: float, shares: int) -> tuple[float, float]:
+    entry = _D(str(entry_price))
+    exit_ = _D(str(exit_price))
+    qty   = _D(str(shares))
+    pl_dollar = float(((exit_ - entry) * qty).quantize(_D("0.01"), rounding=_RHU))
+    pl_pct    = float(((exit_ - entry) / entry * 100).quantize(_D("0.01"), rounding=_RHU))
+    return pl_dollar, pl_pct
+
+
+class Trade(BaseModel):
+    id: int
+    symbol: str
+    strategy: str
+    setup_type: str
+    entry_date: str
+    entry_price: float
+    exit_date: Optional[str] = None
+    exit_price: Optional[float] = None
+    shares: int
+    status: Literal["open", "closed"]
+    pl_dollar: Optional[float] = None
+    pl_pct: Optional[float] = None
+    grade: Optional[str] = None
+    exit_reason: Optional[str] = None
+    lessons: Optional[str] = None
+
+
+class TradeCreate(BaseModel):
+    symbol: str
+    strategy: str
+    setup_type: str
+    entry_date: str
+    entry_price: float
+    shares: int
+    status: Literal["open", "closed"] = "open"
+    exit_date: Optional[str] = None
+    exit_price: Optional[float] = None
+    grade: Optional[str] = None
+    exit_reason: Optional[str] = None
+    lessons: Optional[str] = None
+
+
+class TradeUpdate(BaseModel):
+    exit_date: Optional[str] = None
+    exit_price: Optional[float] = None
+    status: Optional[Literal["open", "closed"]] = None
+    grade: Optional[str] = None
+    exit_reason: Optional[str] = None
+    lessons: Optional[str] = None
+    setup_type: Optional[str] = None
+
+
+def _make_closed(
+    id_: int, symbol: str, strategy: str, setup_type: str,
+    entry_date: str, entry_price: float, shares: int,
+    exit_date: str, exit_price: float,
+    grade: str, exit_reason: str, lessons: Optional[str] = None,
+) -> Trade:
+    pld, plp = _calc_pl(entry_price, exit_price, shares)
+    return Trade(
+        id=id_, symbol=symbol, strategy=strategy, setup_type=setup_type,
+        entry_date=entry_date, entry_price=entry_price,
+        exit_date=exit_date, exit_price=exit_price,
+        shares=shares, status="closed",
+        pl_dollar=pld, pl_pct=plp,
+        grade=grade, exit_reason=exit_reason, lessons=lessons,
+    )
+
+
+MOCK_TRADES: list[Trade] = [
+    # ── Closed winners ───────────────────────────────────────────────────────
+    _make_closed(1, "NVDA", "minervini", "vcp",
+        "2025-12-01", 700.00, 50,
+        "2026-02-15", 826.00,
+        "A+", "target_hit",
+        "Mükemmel kırılım, plan tam uygulandı. Hacim onayı çok güçlüydü."),
+    _make_closed(2, "AVGO", "minervini", "pivot",
+        "2026-01-10", 1480.00, 20,
+        "2026-03-05", 1657.60,
+        "A", "target_hit",
+        "Giriş temiz, trailing stop ile çıkış erken olabilirdi."),
+    _make_closed(3, "META", "carr", "pullback",
+        "2026-01-20", 496.00, 30,
+        "2026-03-15", 525.76,
+        "B", "trailing_stop",
+        None),
+    _make_closed(5, "MSFT", "minervini", "pocket_pivot",
+        "2026-01-15", 392.00, 15,
+        "2026-04-01", 423.36,
+        "B", "trailing_stop",
+        None),
+    # ── Closed losers/break-even ──────────────────────────────────────────────
+    _make_closed(4, "AAPL", "carr", "coiled_spring",
+        "2026-02-01", 188.00, 40,
+        "2026-03-10", 184.24,
+        "A", "stop_loss",
+        "Stop zamanında uygulandı. Giriş doğruydu, piyasa döndü. Grade A çünkü kurala uyuldu."),
+    _make_closed(6, "TSM", "carr", "pullback",
+        "2026-02-10", 160.00, 25,
+        "2026-03-20", 152.00,
+        "C", "stop_loss",
+        "Stop geç uygulandı. Daha çabuk kesilmeli. Kurala uymama nedeniyle C."),
+    _make_closed(7, "AMD", "minervini", "vcp",
+        "2026-03-01", 158.00, 30,
+        "2026-04-15", 158.00,
+        "B", "discretionary",
+        "Yeterli momentum gelmedi, tasfiye edildi. Break-even kabul."),
+    # ── Open trades ──────────────────────────────────────────────────────────
+    Trade(id=8,  symbol="GOOGL", strategy="minervini", setup_type="vcp",
+        entry_date="2026-04-10", entry_price=165.00, shares=35, status="open"),
+    Trade(id=9,  symbol="AMZN",  strategy="carr",      setup_type="coiled_spring",
+        entry_date="2026-05-01", entry_price=185.00, shares=25, status="open"),
+    Trade(id=10, symbol="LLY",   strategy="minervini", setup_type="pivot",
+        entry_date="2026-05-10", entry_price=710.00, shares=10, status="open"),
+]
+
+_TRADE_ID_COUNTER: list[int] = [10]
+
+
+def _next_trade_id() -> int:
+    _TRADE_ID_COUNTER[0] += 1
+    return _TRADE_ID_COUNTER[0]
+
+
+@app.get("/api/trades", response_model=list[Trade])
+def get_trades() -> list[Trade]:
+    return MOCK_TRADES
+
+
+@app.post("/api/trades", response_model=Trade, status_code=201)
+def add_trade(body: TradeCreate) -> Trade:
+    pl_dollar, pl_pct = None, None
+    status = body.status
+    if status == "closed" and body.exit_price is not None:
+        pl_dollar, pl_pct = _calc_pl(body.entry_price, body.exit_price, body.shares)
+    new_trade = Trade(
+        id=_next_trade_id(),
+        symbol=body.symbol.strip().upper(),
+        strategy=body.strategy,
+        setup_type=body.setup_type,
+        entry_date=body.entry_date,
+        entry_price=body.entry_price,
+        exit_date=body.exit_date,
+        exit_price=body.exit_price,
+        shares=body.shares,
+        status=status,
+        pl_dollar=pl_dollar,
+        pl_pct=pl_pct,
+        grade=body.grade,
+        exit_reason=body.exit_reason,
+        lessons=body.lessons,
+    )
+    MOCK_TRADES.append(new_trade)
+    return new_trade
+
+
+@app.patch("/api/trades/{trade_id}", response_model=Trade)
+def update_trade(trade_id: int, body: TradeUpdate) -> Trade:
+    trade = next((t for t in MOCK_TRADES if t.id == trade_id), None)
+    if not trade:
+        raise HTTPException(status_code=404, detail=f"Trade {trade_id} bulunamadı")
+    fields = body.model_fields_set
+    if "setup_type" in fields and body.setup_type:
+        trade.setup_type = body.setup_type
+    if "exit_date" in fields:
+        trade.exit_date = body.exit_date
+    if "exit_price" in fields:
+        trade.exit_price = body.exit_price
+    if "status" in fields and body.status:
+        trade.status = body.status
+    if "grade" in fields:
+        trade.grade = body.grade
+    if "exit_reason" in fields:
+        trade.exit_reason = body.exit_reason
+    if "lessons" in fields:
+        trade.lessons = body.lessons
+    # Recompute P/L if closed with exit price
+    if trade.status == "closed" and trade.exit_price is not None:
+        trade.pl_dollar, trade.pl_pct = _calc_pl(
+            trade.entry_price, trade.exit_price, trade.shares
+        )
+    else:
+        trade.pl_dollar = None
+        trade.pl_pct = None
+    return trade
+
+
+@app.delete("/api/trades/{trade_id}", status_code=204)
+def delete_trade(trade_id: int) -> Response:
+    idx = next((i for i, t in enumerate(MOCK_TRADES) if t.id == trade_id), None)
+    if idx is None:
+        raise HTTPException(status_code=404, detail=f"Trade {trade_id} bulunamadı")
+    MOCK_TRADES.pop(idx)
+    return Response(status_code=204)
