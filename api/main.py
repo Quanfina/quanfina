@@ -13,10 +13,20 @@ from dotenv import load_dotenv
 
 # Project root'u sys.path'e ekle — db_connection + quanfina_math importlanabilsin
 _ROOT = Path(__file__).parent.parent
+_API_DIR = Path(__file__).parent
 load_dotenv(_ROOT / ".env")          # .env'i db_connection importu ÖNCE yükle
 sys.path.insert(0, str(_ROOT))
+sys.path.insert(0, str(_API_DIR))    # db_helpers importu için
 
 from db_connection import get_connection  # noqa: E402
+from db_helpers import (  # noqa: E402
+    db_health_check,
+    watchlist_get_all, watchlist_get_one, watchlist_exists,
+    watchlist_insert, watchlist_update, watchlist_delete,
+    watchlist_recompute_consensus,
+    trades_get_all, trades_get_by_id,
+    trades_insert, trades_update, trades_delete,
+)
 
 from typing import Literal, Optional
 
@@ -206,20 +216,11 @@ def get_minervini_stocks() -> list[MinerviniStock]:
 
 @app.get("/api/health", response_model=HealthResponse)
 def health() -> HealthResponse:
-    db_connected = False
-    try:
-        conn = get_connection()
-        conn.close()
-        db_connected = True
-        log.info("DB health check OK")
-    except Exception as exc:
-        log.warning("DB health check failed: %s", exc)
-
     return HealthResponse(
         status="ok",
         service="quanfina-api",
         timestamp=datetime.now(timezone.utc).isoformat(),
-        db_connected=db_connected,
+        db_connected=db_health_check(),
     )
 
 
@@ -783,79 +784,14 @@ class WatchlistRow(BaseModel):
     consensus_strategies: list[str]
 
 
-# Build mock data — consensus computed automatically
-from collections import defaultdict as _dd
-
-_RAW: list[tuple] = [
-    # symbol, strategy, status, price, added_date, setup_type, pivot_price, note, rs_rating
-    # ── Minervini (20 satır) ──────────────────────────────────────
-    ("NVDA", "minervini", "buy",     875.40, "2026-05-16", "VCP",   820.00, None,          97),
-    ("AVGO", "minervini", "buy",    1680.20, "2026-05-12", None,   1620.00, None,          94),
-    ("META", "minervini", "focus",   525.80, "2026-05-10", None,    505.00, None,          92),
-    ("MSFT", "minervini", "focus",   415.60, "2026-05-10", None,      None, None,          88),
-    ("COST", "minervini", "focus",   890.30, "2026-05-09", None,      None, None,          85),
-    ("GOOGL","minervini", "on_deck", 178.40, "2026-05-08", None,      None, None,          83),
-    ("ASML", "minervini", "on_deck", 742.10, "2026-05-08", None,      None, None,          81),
-    ("AMZN", "minervini", "on_deck", 196.70, "2026-05-07", None,      None, None,          80),
-    ("ORCL", "minervini", "on_deck", 148.90, "2026-05-05", None,      None, None,          76),
-    ("CRM",  "minervini", "on_deck", 296.40, "2026-05-05", None,      None, None,          74),
-    ("NFLX", "minervini", "watch",   672.30, "2026-05-03", None,      None, None,          79),
-    ("AMD",  "minervini", "watch",   158.70, "2026-05-03", None,      None, None,          73),
-    ("ADBE", "minervini", "watch",   394.50, "2026-05-02", None,      None, None,          71),
-    ("V",    "minervini", "watch",   275.80, "2026-05-01", None,      None, None,          75),
-    ("MA",   "minervini", "watch",   477.20, "2026-05-01", None,      None, None,          73),
-    ("JPM",  "minervini", "watch",   215.40, "2026-04-28", None,      None, None,          70),
-    ("PLTR", "minervini", "watch",    22.80, "2026-04-25", None,      None, None,          65),
-    ("COIN", "minervini", "watch",   152.40, "2026-04-24", None,      None, None,          68),
-    ("DASH", "minervini", "watch",   118.60, "2026-04-22", None,      None, None,          63),
-    ("SHOP", "minervini", "watch",    74.20, "2026-04-18", None,      None, None,          61),
-    # ── Carr (10 satır) ──────────────────────────────────────────
-    ("NVDA", "carr",      "focus",   875.40, "2026-05-13", "Pullback",           820.00, "MA50 destek", 97),
-    ("META", "carr",      "focus",   525.80, "2026-05-10", "Pullback",           505.00, None,          92),
-    ("GOOGL","carr",      "on_deck", 178.40, "2026-05-08", "Coiled Spring",        None, None,          83),
-    ("AMZN", "carr",      "on_deck", 196.70, "2026-05-07", "Coiled Spring",        None, None,          80),
-    ("MSFT", "carr",      "on_deck", 415.60, "2026-05-10", "Bullish Divergence",   None, None,          88),
-    ("AAPL", "carr",      "watch",   182.30, "2026-05-03", "Bullish Divergence",   None, None,          72),
-    ("TSM",  "carr",      "watch",   142.80, "2026-05-02", "Blue Sky Breakout",    None, None,          78),
-    ("AMD",  "carr",      "watch",   158.70, "2026-05-03", "Blue Sky Breakout",    None, None,          73),
-    ("LLY",  "carr",      "watch",   724.50, "2026-04-28", "Bullish Base Breakout",None, None,          82),
-    ("UBER", "carr",      "watch",    68.40, "2026-04-25", "Bullish Base Breakout",None, None,          70),
-]
-
-_sym_strategies: dict[str, list[str]] = _dd(list)
-for _r in _RAW:
-    _sym_strategies[_r[0]].append(_r[1])
-
-MOCK_WATCHLIST: list[WatchlistRow] = [
-    WatchlistRow(
-        symbol=r[0], strategy=r[1], status=r[2], price=r[3],
-        added_date=r[4], setup_type=r[5], pivot_price=r[6], note=r[7],
-        rs_rating=r[8],
-        consensus_count=len(_sym_strategies[r[0]]),
-        consensus_strategies=_sym_strategies[r[0]],
-    )
-    for r in _RAW
-]
-
-
 @app.get("/api/watchlist", response_model=list[WatchlistRow])
 def get_watchlist() -> list[WatchlistRow]:
-    return MOCK_WATCHLIST
+    return [WatchlistRow(**r) for r in watchlist_get_all()]
 
 
 # ── Watchlist CRUD helpers ────────────────────────────────────────────────────
 
 _STATUS_HIERARCHY = ["watch", "on_deck", "focus", "buy"]
-
-
-def _recompute_consensus() -> None:
-    sym_strategies: dict[str, list[str]] = {}
-    for row in MOCK_WATCHLIST:
-        sym_strategies.setdefault(row.symbol, []).append(row.strategy)
-    for row in MOCK_WATCHLIST:
-        strats = sym_strategies.get(row.symbol, [])
-        row.consensus_count = len(strats)
-        row.consensus_strategies = list(strats)
 
 
 def _mock_rs(symbol: str) -> int:
@@ -870,9 +806,9 @@ def _mock_price(symbol: str) -> float:
     stock = _STOCK_BY_SYM.get(symbol)
     if stock:
         return stock.price
-    existing = [r for r in MOCK_WATCHLIST if r.symbol == symbol]
+    existing = [r for r in watchlist_get_all() if r["symbol"] == symbol]
     if existing:
-        return existing[0].price
+        return float(existing[0]["price"])
     seed = sum(ord(c) * (i + 1) for i, c in enumerate(symbol))
     return round(20.0 + (seed % 500) * 1.5, 2)
 
@@ -906,76 +842,56 @@ class WatchlistRowUpdate(BaseModel):
 @app.post("/api/watchlist", response_model=WatchlistRow, status_code=201)
 def add_watchlist_row(body: WatchlistRowCreate) -> WatchlistRow:
     sym = body.symbol.strip().upper()
-    existing = next(
-        (r for r in MOCK_WATCHLIST if r.symbol == sym and r.strategy == body.strategy),
-        None,
-    )
-    if existing:
+    if watchlist_exists(sym, body.strategy):
         raise HTTPException(
             status_code=409, detail=f"{sym}-{body.strategy} zaten watchlist'te"
         )
-    new_row = WatchlistRow(
-        symbol=sym,
-        strategy=body.strategy,
-        status=body.status,
-        price=_mock_price(sym),
-        added_date=date.today().isoformat(),
-        setup_type=body.setup_type,
-        pivot_price=body.pivot_price,
-        note=body.note,
-        rs_rating=_mock_rs(sym),
-        consensus_count=1,
-        consensus_strategies=[body.strategy],
-    )
-    MOCK_WATCHLIST.append(new_row)
-    _recompute_consensus()
-    return new_row
+    row_data = {
+        "symbol": sym,
+        "strategy": body.strategy,
+        "status": body.status,
+        "price": _mock_price(sym),
+        "added_date": date.today().isoformat(),
+        "setup_type": body.setup_type,
+        "pivot_price": body.pivot_price,
+        "note": body.note,
+        "rs_rating": _mock_rs(sym),
+        "consensus_count": 1,
+        "consensus_strategies": [body.strategy],
+    }
+    watchlist_insert(row_data)
+    watchlist_recompute_consensus()
+    return WatchlistRow(**watchlist_get_one(sym, body.strategy))
 
 
 @app.patch("/api/watchlist/{symbol}/{strategy}", response_model=WatchlistRow)
 def update_watchlist_row(symbol: str, strategy: str, body: WatchlistRowUpdate) -> WatchlistRow:
     sym = symbol.upper()
-    row = next(
-        (r for r in MOCK_WATCHLIST if r.symbol == sym and r.strategy == strategy),
-        None,
-    )
-    if not row:
+    if not watchlist_exists(sym, strategy):
         raise HTTPException(status_code=404, detail=f"{sym}-{strategy} bulunamadı")
-    fields = body.model_fields_set
-    if "status" in fields and body.status is not None:
-        row.status = body.status
-    if "note" in fields:
-        row.note = body.note
-    if "setup_type" in fields:
-        row.setup_type = body.setup_type
-    return row
+    updates = {k: v for k, v in body.model_dump(include=body.model_fields_set).items()}
+    watchlist_update(sym, strategy, updates)
+    return WatchlistRow(**watchlist_get_one(sym, strategy))
 
 
 @app.delete("/api/watchlist/{symbol}/{strategy}", status_code=204)
 def delete_watchlist_row(symbol: str, strategy: str) -> Response:
     sym = symbol.upper()
-    idx = next(
-        (i for i, r in enumerate(MOCK_WATCHLIST) if r.symbol == sym and r.strategy == strategy),
-        None,
-    )
-    if idx is None:
+    if not watchlist_delete(sym, strategy):
         raise HTTPException(status_code=404, detail=f"{sym}-{strategy} bulunamadı")
-    MOCK_WATCHLIST.pop(idx)
-    _recompute_consensus()
+    watchlist_recompute_consensus()
     return Response(status_code=204)
 
 
 @app.post("/api/watchlist/{symbol}/{strategy}/promote", response_model=WatchlistRow)
 def promote_watchlist_row(symbol: str, strategy: str) -> WatchlistRow:
     sym = symbol.upper()
-    row = next(
-        (r for r in MOCK_WATCHLIST if r.symbol == sym and r.strategy == strategy),
-        None,
-    )
+    row = watchlist_get_one(sym, strategy)
     if not row:
         raise HTTPException(status_code=404, detail=f"{sym}-{strategy} bulunamadı")
-    row.status = _promote_status(row.status)
-    return row
+    new_status = _promote_status(row["status"])
+    watchlist_update(sym, strategy, {"status": new_status})
+    return WatchlistRow(**watchlist_get_one(sym, strategy))
 
 
 # ── Hisse Detay ─────────────────────────────────────────────────────────────
@@ -1082,7 +998,7 @@ def get_stock_info(symbol: str) -> StockInfo:
     sym = symbol.upper()
     stock = _STOCK_BY_SYM.get(sym)
     meta  = _STOCK_META.get(sym, {})
-    active = [row for row in MOCK_WATCHLIST if row.symbol == sym]
+    active = [WatchlistRow(**r) for r in watchlist_get_all() if r["symbol"] == sym]
 
     if not stock and not active:
         raise HTTPException(status_code=404, detail=f"Symbol '{sym}' not found")
@@ -1121,10 +1037,10 @@ def get_stock_ohlcv(symbol: str) -> list[OhlcvBar]:
     if stock:
         price = stock.price
     else:
-        wl = [r for r in MOCK_WATCHLIST if r.symbol == sym]
+        wl = [r for r in watchlist_get_all() if r["symbol"] == sym]
         if not wl:
             raise HTTPException(status_code=404, detail=f"Symbol '{sym}' not found")
-        price = wl[0].price
+        price = float(wl[0]["price"])
     return _generate_ohlcv(sym, price)
 
 
@@ -1227,64 +1143,9 @@ def _make_closed(
     )
 
 
-MOCK_TRADES: list[Trade] = [
-    # ── Closed winners ───────────────────────────────────────────────────────
-    _make_closed(1, "NVDA", "minervini", "vcp",
-        "2025-12-01", 700.00, 50,
-        "2026-02-15", 826.00,
-        "A+", "target_hit",
-        "Mükemmel kırılım, plan tam uygulandı. Hacim onayı çok güçlüydü."),
-    _make_closed(2, "AVGO", "minervini", "pivot",
-        "2026-01-10", 1480.00, 20,
-        "2026-03-05", 1657.60,
-        "A", "target_hit",
-        "Giriş temiz, trailing stop ile çıkış erken olabilirdi."),
-    _make_closed(3, "META", "carr", "pullback",
-        "2026-01-20", 496.00, 30,
-        "2026-03-15", 525.76,
-        "B", "trailing_stop",
-        None),
-    _make_closed(5, "MSFT", "minervini", "pocket_pivot",
-        "2026-01-15", 392.00, 15,
-        "2026-04-01", 423.36,
-        "B", "trailing_stop",
-        None),
-    # ── Closed losers/break-even ──────────────────────────────────────────────
-    _make_closed(4, "AAPL", "carr", "coiled_spring",
-        "2026-02-01", 188.00, 40,
-        "2026-03-10", 184.24,
-        "A", "stop_loss",
-        "Stop zamanında uygulandı. Giriş doğruydu, piyasa döndü. Grade A çünkü kurala uyuldu."),
-    _make_closed(6, "TSM", "carr", "pullback",
-        "2026-02-10", 160.00, 25,
-        "2026-03-20", 152.00,
-        "C", "stop_loss",
-        "Stop geç uygulandı. Daha çabuk kesilmeli. Kurala uymama nedeniyle C."),
-    _make_closed(7, "AMD", "minervini", "vcp",
-        "2026-03-01", 158.00, 30,
-        "2026-04-15", 158.00,
-        "B", "discretionary",
-        "Yeterli momentum gelmedi, tasfiye edildi. Break-even kabul."),
-    # ── Open trades ──────────────────────────────────────────────────────────
-    Trade(id=8,  symbol="GOOGL", strategy="minervini", setup_type="vcp",
-        entry_date="2026-04-10", entry_price=165.00, shares=35, status="open"),
-    Trade(id=9,  symbol="AMZN",  strategy="carr",      setup_type="coiled_spring",
-        entry_date="2026-05-01", entry_price=185.00, shares=25, status="open"),
-    Trade(id=10, symbol="LLY",   strategy="minervini", setup_type="pivot",
-        entry_date="2026-05-10", entry_price=710.00, shares=10, status="open"),
-]
-
-_TRADE_ID_COUNTER: list[int] = [10]
-
-
-def _next_trade_id() -> int:
-    _TRADE_ID_COUNTER[0] += 1
-    return _TRADE_ID_COUNTER[0]
-
-
 @app.get("/api/trades", response_model=list[Trade])
 def get_trades() -> list[Trade]:
-    return MOCK_TRADES
+    return [Trade(**t) for t in trades_get_all()]
 
 
 @app.post("/api/trades", response_model=Trade, status_code=201)
@@ -1293,64 +1154,49 @@ def add_trade(body: TradeCreate) -> Trade:
     status = body.status
     if status == "closed" and body.exit_price is not None:
         pl_dollar, pl_pct = _calc_pl(body.entry_price, body.exit_price, body.shares)
-    new_trade = Trade(
-        id=_next_trade_id(),
-        symbol=body.symbol.strip().upper(),
-        strategy=body.strategy,
-        setup_type=body.setup_type,
-        entry_date=body.entry_date,
-        entry_price=body.entry_price,
-        exit_date=body.exit_date,
-        exit_price=body.exit_price,
-        shares=body.shares,
-        status=status,
-        pl_dollar=pl_dollar,
-        pl_pct=pl_pct,
-        grade=body.grade,
-        exit_reason=body.exit_reason,
-        lessons=body.lessons,
-    )
-    MOCK_TRADES.append(new_trade)
-    return new_trade
+    trade_data = {
+        "symbol": body.symbol.strip().upper(),
+        "strategy": body.strategy,
+        "setup_type": body.setup_type,
+        "entry_date": body.entry_date,
+        "entry_price": body.entry_price,
+        "exit_date": body.exit_date,
+        "exit_price": body.exit_price,
+        "shares": body.shares,
+        "status": status,
+        "pl_dollar": pl_dollar,
+        "pl_pct": pl_pct,
+        "grade": body.grade,
+        "exit_reason": body.exit_reason,
+        "lessons": body.lessons,
+    }
+    new_id = trades_insert(trade_data)
+    return Trade(**trades_get_by_id(new_id))
 
 
 @app.patch("/api/trades/{trade_id}", response_model=Trade)
 def update_trade(trade_id: int, body: TradeUpdate) -> Trade:
-    trade = next((t for t in MOCK_TRADES if t.id == trade_id), None)
-    if not trade:
+    current = trades_get_by_id(trade_id)
+    if not current:
         raise HTTPException(status_code=404, detail=f"Trade {trade_id} bulunamadı")
-    fields = body.model_fields_set
-    if "setup_type" in fields and body.setup_type:
-        trade.setup_type = body.setup_type
-    if "exit_date" in fields:
-        trade.exit_date = body.exit_date
-    if "exit_price" in fields:
-        trade.exit_price = body.exit_price
-    if "status" in fields and body.status:
-        trade.status = body.status
-    if "grade" in fields:
-        trade.grade = body.grade
-    if "exit_reason" in fields:
-        trade.exit_reason = body.exit_reason
-    if "lessons" in fields:
-        trade.lessons = body.lessons
-    # Recompute P/L if closed with exit price
-    if trade.status == "closed" and trade.exit_price is not None:
-        trade.pl_dollar, trade.pl_pct = _calc_pl(
-            trade.entry_price, trade.exit_price, trade.shares
+    updates = body.model_dump(include=body.model_fields_set)
+    # Merge with current values for P/L recompute
+    merged = {**current, **updates}
+    if merged.get("status") == "closed" and merged.get("exit_price") is not None:
+        updates["pl_dollar"], updates["pl_pct"] = _calc_pl(
+            merged["entry_price"], merged["exit_price"], merged["shares"]
         )
     else:
-        trade.pl_dollar = None
-        trade.pl_pct = None
-    return trade
+        updates["pl_dollar"] = None
+        updates["pl_pct"] = None
+    trades_update(trade_id, updates)
+    return Trade(**trades_get_by_id(trade_id))
 
 
 @app.delete("/api/trades/{trade_id}", status_code=204)
 def delete_trade(trade_id: int) -> Response:
-    idx = next((i for i, t in enumerate(MOCK_TRADES) if t.id == trade_id), None)
-    if idx is None:
+    if not trades_delete(trade_id):
         raise HTTPException(status_code=404, detail=f"Trade {trade_id} bulunamadı")
-    MOCK_TRADES.pop(idx)
     return Response(status_code=204)
 
 
@@ -1380,8 +1226,9 @@ class Signal(BaseModel):
 def get_signals() -> list[Signal]:
     today = date.today().isoformat()
 
+    all_rows = [WatchlistRow(**r) for r in watchlist_get_all()]
     grouped: dict[str, list[WatchlistRow]] = {}
-    for row in MOCK_WATCHLIST:
+    for row in all_rows:
         grouped.setdefault(row.symbol, []).append(row)
 
     signals: list[Signal] = []
