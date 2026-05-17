@@ -84,6 +84,7 @@ export default function WatchlistPage() {
         headerName: "",
         width: 48,
         minWidth: 48,
+        pinned: "right" as const,
         sortable: false,
         resizable: false,
         suppressMovable: true,
