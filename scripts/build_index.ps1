@@ -164,6 +164,7 @@ if (Test-Path $scriptsDir) {
 }
 
 # 8c. notebook/*.md (sistem katmani markdown'lari)
+# NOT: *_backup.md pattern'i _INDEX.md "Backup" bolumunde belgelenir, yetim sayilmaz
 $beklenenNotebook = @(
     "_BASLAT.md", "_ROADMAP.md", "_LINKLER.md", "_INDEX.md",
     "_KOD_ENVANTERI.md", "_DEVIR.md", "_kisisel_okuma.md",
@@ -175,7 +176,9 @@ $beklenenNotebook = @(
 $notebookDir = Join-Path $repoRoot "notebook"
 if (Test-Path $notebookDir) {
     $gercekNotebook = Get-ChildItem -Path $notebookDir -File -Filter "*.md" | Select-Object -ExpandProperty Name
-    $yetimNotebook = $gercekNotebook | Where-Object { $_ -notin $beklenenNotebook }
+    $yetimNotebook = $gercekNotebook | Where-Object {
+        $_ -notin $beklenenNotebook -and $_ -notlike "*_backup.md"
+    }
     if ($yetimNotebook) {
         Write-Host "  [YETIM] notebook/*.md:" -ForegroundColor Red
         $yetimNotebook | ForEach-Object {
