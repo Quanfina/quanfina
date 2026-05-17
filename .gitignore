@@ -241,3 +241,15 @@ web/.env*.local
 # Scanner log dosyaları
 scanner_err.txt
 scanner_log.txt
+
+# Hijyen (Adım 1.2.5.b — GitHub İlke #3 uygulaması)
+# Backup dosyaları repo'ya girmez (CLAUDE.md.backup_*, notebook backup'ları, vb.)
+*.backup_*
+*.tmp
+
+# Kök node_modules (Playwright devDep — sadece dev gerekiyor)
+/node_modules/
+
+# Visual test çıktıları (script'ler commit'lenir, çıktı/screenshot'lar ignore)
+test-screenshots/
+visual_test_report.json

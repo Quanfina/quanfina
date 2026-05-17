@@ -11,7 +11,7 @@ Sprint progress:
 - 4-bis.1a [BU]: UI iskeleti + dummy data
 - 4-bis.1b: 7 ready screen — gerçek SQL
 - 4-bis.1c: "Add to Watch" entegrasyonu
-- 4-bis.2: parse-bazlı (Loose, Buy Risk, Fab 5, Qualifier, Tight) — 9 screen
+- 4-bis.2: parse-bazlı (Loose, Buy Risk, 5-Kriter Momentum, Qualifier, Tight) — 9 screen
 - 4-bis.3: scan_diff (Moving Up, Jump 2+, D to B+, New RPR×3) — 6 screen
 - 4-bis.4: near_ready (IPO×3 + TPR D Below 200d) — 4 screen
 - 4-bis.5+: complex (Stage 2 ETFs) — 1 screen
@@ -62,7 +62,7 @@ SCREENS = [
     # Kategori E — Pattern (3)
     ("tight_low_volume",   "Tight Price Low Volume",        "Pattern",   "parse",       "price_volume_history JSONB üzerinden hesap",    85),
     ("buy_risk_green",     "Buy Risk Green",                "Pattern",   "parse",       "(conf - viol) sayısı + eşik (belirsiz)",        585),
-    ("fab_5_rpr_70",       "Fab 5 (RPR 70+)",               "Pattern",   "parse",       "rs_ibd>=70 + Fab 5 5 kriteri (kısmen açık)",    339),
+    ("momentum_5x_rpr_70", "5-Kriter Momentum (RPR 70+)",   "Pattern",   "parse",       "rs_ibd>=70 + 5-kriter momentum pattern (kısmen açık)", 339),
 
     # Kategori F — Momentum (3)
     ("mom_10p",            "Minervini Momentum ($10+)",     "Momentum",  "ready",       "passed=1 AND price >= 10 (≈ Stage 2 strict)",   286),
@@ -151,7 +151,7 @@ if selected_screen:
     info_col1, info_col2, info_col3 = st.columns(3)
     info_col1.markdown(f"**Kategori:** {category}")
     info_col2.markdown(f"**Durum:** {badge_text}")
-    info_col3.markdown(f"**Markets 360 ref:** {ref_count} hisse")
+    info_col3.markdown(f"**Tarama ref:** {ref_count} hisse")
 
     st.markdown(f"**Filtre:** `{filter_desc}`")
     st.caption(f"📌 {badge_note}")

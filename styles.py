@@ -1,5 +1,5 @@
 """
-Quanfina Tasarim Sistemi - Minervini Markets 360 esinli koyu tema.
+Quanfina Tasarim Sistemi - Minervini esinli modern koyu tema.
 PrimeVue Indigo brand + Tailwind Zinc surface paleti.
 Tum sayfalarda apply_styles() cagrisiyla aktive edilir.
 """
@@ -318,7 +318,7 @@ def apply_styles():
 
 def tag(text: str, severity: str = "info") -> str:
     """
-    Minervini Markets 360 tarzi pill etiket. Pastel BG + koyu text.
+    Minervini tarzi pill etiket. Pastel BG + koyu text.
 
     severity: "success" | "info" | "warn" | "danger" | "neutral"
 

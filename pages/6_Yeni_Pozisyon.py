@@ -1,8 +1,8 @@
 """
 Yeni Pozisyon — Trade entry formu + Live Risk Calculator.
 
-Minervini PA1 referansından + Markets 360 risk calculator formüllerinden
-hibrit. Portfolio değeri portfolios tablosundan okunur, üstte gösterilir,
+Minervini PA1 referansından + sektör risk modeline göre hibrit.
+Portfolio değeri portfolios tablosundan okunur, üstte gösterilir,
 edit modal'ı ile güncellenebilir.
 """
 
