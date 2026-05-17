@@ -403,15 +403,27 @@ onayıyla). Sn. Ferit'in deyimiyle: **"bir nevi skill oluşturuyoruz"**.
 - Sn. Ferit aynı düzeltmeyi 2+ kez söylüyorsa → bilinçli kayda al
 - Belirli bir iş akışı 2+ defa aynı sırayla yapılırsa → kural
 
-**Eylem zinciri:**
-1. Pattern tespit edildiğinde AI rapor sonunda öneri sunar:
-   "Şu pattern'i tespit ettim, Kural #X olarak ekleyelim mi?"
-2. Sn. Ferit onaylarsa:
-   - Kural CLAUDE.md'ye eklenir (kalıcı tescil)
+**Eylem zinciri (17 May 2026 revize — Sn. Ferit talimatı):**
+Sn. Ferit'in deyimi: "Önceki kurallarla iş akışını düzelterek, bunu
+söyleme ihtiyacı duymuyorum artık." Yani AI pattern tespit ettiğinde:
+
+1. **Doğrudan tescil et** (öneri sormadan):
+   - Kural CLAUDE.md'ye eklenir (kalıcı tescil) → numara otomatik
+     (mevcut son kural + 1)
    - VEYA İlke / Feedback memory olarak tescil edilir (kullanıcı düzeyi)
    - VEYA scripts/ altına otomasyon scripti yazılır (yaşayan sistem)
-3. `notebook/_BASLAT.md` güncellenir (yeni chat hemen görür)
-4. Skill setine eklenir → "yaşayan sistem skill kart" pattern'i
+2. **Raporda bildir** — "Pattern X tespit edildi, Kural #Y olarak
+   tescil ettim. Detay: ...". Sn. Ferit yanlış bulursa geri alır
+   (reversible — git revert + Edit ile, yıkıcı değil).
+3. **`notebook/_BASLAT.md` güncellenir** — yeni chat hemen görür
+4. **Skill setine eklenir** → "yaşayan sistem skill kart" pattern'i
+
+Bu revize Kural #14'ün **kendi felsefesini kendine uygulamasının**
+canlı örneği — pattern (Sn. Ferit aynı talimatı 2. kez söyledi:
+"kurala ekle, ben söyleme ihtiyacı duymayayım") → otomatik tescil.
+
+**İstisna:** Yıkıcı kural değişiklikleri (mevcut bir kuralı silme,
+büyük yön değişimi) hâlâ Sn. Ferit onayı ister (Kural #4).
 
 **Skill felsefesi:**
 `notebook/_BASLAT.md` tek bir **skill kart** gibi davranır. Yeni
