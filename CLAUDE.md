@@ -425,6 +425,33 @@ sistem kullanıldıkça kendi pattern kütüphanesini büyütür.
 Proaktif Tarama), Kural #12 (Önce Keşfet), Kural #13 (Commit Disiplini),
 Bilgi Mimarisi İlke #3 (Yaşayan Sistem) + #5 (Klasör Bağlamı).
 
+### Kural 15 — PowerShell Script Encoding (17 May 2026 yeni)
+`scripts/*.ps1` dosyaları **ASCII-only içerik** kullanır. Write tool ile
+yazılan .ps1 dosyaları BOM-less UTF-8'dir; PowerShell default encoding
+(cp1254 Windows Turkish) bekler ve Türkçe karakterlerde "missing
+terminator" parse hatası verir.
+
+**Doğru pattern:**
+- ASCII içerik (ş → s, ğ → g, ı → i, ç → c, ü → u, ö → o, "—" → "-")
+- Yorum satırlarında bile ASCII tercih edilir
+- Tek istisna: kullanıcıya gösterilen UI string'leri (Write-Host)
+  ASCII ile yazılır — Türkçe render gerekirse `Out-File -Encoding utf8`
+  veya `[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($true)`
+
+**Markdown / notebook dosyaları:** Türkçe içerik **OK** — PowerShell
+parse'i değil, Markdown render'ı kullanılır.
+
+**Commit mesajları:** Kural #13 — temp dosya + `git commit -F` (Türkçe
+için ASCII title + Türkçe detay OK).
+
+**Pattern keşfi:** Aşama 1 sonrası `scripts/hesap_tarama.ps1` yazımı
+sırasında tespit edildi. Kural #14'ün **ilk canlı somut uygulaması**
+— pattern → kural önerisi → tescil tek turda.
+
+**Etki:** Tüm mevcut scripts/*.ps1 ASCII-only zaten:
+- `sizma_kontrol.ps1`, `notebook_yedekle.ps1`,
+  `build_index.ps1`, `hesap_tarama.ps1`
+
 ---
 
 ## 🤝 Çalışma Mantığı + AI Rol Dağılımı
