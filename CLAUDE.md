@@ -493,7 +493,8 @@ Her büyük adım sonu zorunlu (Kural #2). Rapor formatı: trafik lambası + kı
 >
 > - Detaylı bilgi haritası: bu dosyada "Bilgi Haritası" bölümü
 > - Tam karar günlüğü: `notebook/Notebook_A_Vizyon.md`
-> - Notebook indeksi (yapılacak): `notebook/_INDEX.md`
+> - Master indeks: `notebook/_INDEX.md` (Aşama 1.E.a — 17 May 2026 canlı)
+> - İndeks doğrulayıcı: `scripts/build_index.ps1` (Manifesto Özellik #3 bakımı)
 
 ## Proje Vizyonu
 
@@ -868,8 +869,18 @@ Yeni oturum başında **son 100 satırı** okumak yeterlidir. Eski kararlar değ
 
 ## Bilgi Haritası — Hangi Konu Nerede?
 
+> 🎯 **Master indeks:** Tüm dosya envanteri için → `notebook/_INDEX.md`
+> (Aşama 1.E.a, 17 May 2026 canlı). Bu tablo en sık başvurulan
+> konuların kısa eşleştirmesi — tam liste için _INDEX.md'ye bak.
+> Doğrulama: `.\scripts\build_index.ps1`
+
 | Konu | Dosya/Klasör | Tür |
 |------|--------------|-----|
+| Master indeks (tam dosya envanteri) | `notebook/_INDEX.md` | Sistem |
+| Yeni chat bootstrap | `notebook/_BASLAT.md` | Sistem |
+| Yol haritası (Aşama 1.C → 5) | `notebook/_ROADMAP.md` | Sistem |
+| Hesap/araç matrisi | `notebook/_LINKLER.md` | Sistem |
+| Kod envanteri (sınıflandırma + dependency) | `notebook/_KOD_ENVANTERI.md` | Sistem |
 | Proje vizyonu, kararlar, açık konular | `notebook/Notebook_A_Vizyon.md` | Karar günlüğü |
 | Minervini metodoloji | `notebook/kitaplar/Minervini.md` | Strateji bilgisi |
 | Minervini video analizleri | `notebook/kitaplar/Minervini_Video.md` | Strateji bilgisi |
