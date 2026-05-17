@@ -1,0 +1,67 @@
+# Quanfina .gitattributes
+# Referans: Vizyon AÇIK KONU #39 — LF/CRLF normalize
+#           Aşama 1 sonrası hijyen (17 May 2026)
+#
+# Amaç: Windows ↔ Linux/Cloud Run uyumu için tüm metin dosyaları
+# git'te LF olarak tutulur. Windows'ta checkout sırasında otomatik
+# CRLF'e çevrilir (core.autocrlf=true ile uyumlu).
+#
+# Bu dosya eklenmeden önce her commit'te "warning: LF will be replaced
+# by CRLF" uyarısı geliyordu.
+
+# Genel: metin dosyaları auto-detect, LF normalize
+* text=auto eol=lf
+
+# Python kaynak: kesin LF (Cloud Run Linux'ta çalışıyor)
+*.py text eol=lf
+
+# Shell scripts: LF zorunlu (POSIX)
+*.sh text eol=lf
+
+# PowerShell scripts: LF (cross-platform, PowerShell Core)
+*.ps1 text eol=lf
+
+# Web kodları: LF (Next.js Vercel/Linux deploy)
+*.ts text eol=lf
+*.tsx text eol=lf
+*.js text eol=lf
+*.jsx text eol=lf
+*.json text eol=lf
+*.css text eol=lf
+*.mjs text eol=lf
+
+# Markdown ve config: LF
+*.md text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.toml text eol=lf
+*.env text eol=lf
+.env* text eol=lf
+
+# Windows-specific: CRLF zorunlu
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1xml text eol=crlf
+
+# Binary dosyalar (LF/CRLF çevirimi yok)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg binary
+*.pdf binary
+*.zip binary
+*.gz binary
+*.tar binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.db binary
+*.sqlite binary
+
+# Lock files (auto LF, ama görsel diff'i azalt)
+*.lock text eol=lf
+pnpm-lock.yaml -text -diff
+package-lock.json -text -diff
