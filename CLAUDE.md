@@ -281,10 +281,50 @@ seçeyim" kararı yok.
 ### Kural 10 — Push Öncesi Sızma Kontrolü (17 May 2026 yeni)
 Her `git push` öncesi sızma taraması ZORUNLU.
 - Otomatik araç: `scripts/sizma_kontrol.ps1` (GitHub İlke #8 listesi)
+- Pre-push hook bağlı: `.git/hooks/pre-push` — push komutu otomatik tetikler
 - Bulgu varsa push BLOK. Tertemiz olana kadar push yapılmaz
 - Bypass yok. Auto-approve bu kuralı geçersiz kılmaz (Kural #4)
 - Geri dönüş zor: public repo'ya sızan içerik fork/cache/AI eğitim verisi
   riskini geri alamaz. Önlemek tek seçenek.
+
+---
+
+## 🤝 Çalışma Mantığı + AI Rol Dağılımı
+
+### Çalışma Mantığı
+- Sn. Ferit **vibe coding** yapar — kod yazmaz, kopyala-yapıştır
+- Karar yorgunluğunu azaltma felsefesi: operasyonel detaylar AI'ya devredilir,
+  Sn. Ferit stratejik karar + final onay verir
+- "Sağlam gidelim, bir daha bir daha uğraşmayalım" — kalıcı çözüm tercih edilir
+- "Yavaş düşün, hızlı uygula" — analiz uzun, eylem net
+- Şüpheli durum → Sn. Ferit'e sor (Kural #3); dürüstlük tercih edilir, yağcılık değil
+
+### AI Rol Dağılımı (17 May 2026 itibarıyla, Kural #9 sonrası)
+
+| Araç | Rol | Notlar |
+|---|---|---|
+| **Claude Desktop** | Ana araç — strateji, prompt yazımı, dosya işlemleri, operasyonel yönetim, rapor özeti | Filesystem MCP ile direkt erişim |
+| **Claude Code (VS Code)** | Büyük kod işleri için manuel devreye alınır | Sadece gerektiğinde |
+| **Web Claude** | **Kullanılmaz** — Kural #9 Tek Araç Felsefesi gereği | Üç araç karmaşası elendi |
+| **Google AI Pro** | Gemini araştırma, NotebookLM Plus kitap analizi, Gems özel uzmanlar | Mevcut: 01_Minervini_Uzmanı |
+| **Sn. Ferit** | Stratejik kararlar, final onay, ŞÜPHELİ durum hakemi | Operasyonel detaylar AI'ya devredilmiş |
+
+### Yetki Devri Prensipleri
+- **Auto-approve AÇIK** — yes tıklama yükü yok (Kural #4 ihlal etmeyenler için)
+- **Yıkıcı işlemde manuel onay** (Kural #4) — dosya silme, büyük rename, mimari değişiklik
+- **Rapor formatı:** Trafik lambası 🟢 / 🟡 / 🔴 + kısa, net özet
+- **Şüphede dur, sor** (Kural #3) — otonom değilsin
+- **"Karar sende" yetkisi:** Sn. Ferit açıkça verirse karar verici AI'dir,
+  ama yıkıcı tarafı varsa raporla sun (Kural #4 hâlâ geçerli)
+
+### Bilgi Akışı (Manifesto özelliklerinin günlük yansıması)
+- **Giriş yönlü** — sistem bilgiyi okur: Özellik #1 (Sn. Ferit'i tanır),
+  #2 (kaldığı yeri bilir → ⚡ GÜNCEL DURUM), #3 (hangi dosyada ne var → Bilgi Haritası),
+  #4 (proaktif "şuna bakalım" önerisi)
+- **Çıkış yönlü** — sistem yeni bilgiyi yerleştirir: Özellik #5 (kayıt yeri önerisi),
+  #6 (yeni araştırma → doğru kategoriye — Bilgi Mimarisi İlke #1)
+- **Bakım yönlü** — sistem kendini günceller: Özellik #7 (adım sonu güncelleme — Kural #8),
+  #8 (pattern öğrenme — feedback memory), #9 (felaket dayanıklılığı — Drive + git + NotebookLM)
 
 ---
 
@@ -343,7 +383,50 @@ Her push öncesi şu 6 kontrol — hepsi PASS olmadan push yok:
 
 Otomatik script: `scripts/sizma_kontrol.ps1` — bu 6 kontrolü çalıştırır,
 exit 0 = temiz, exit 1 = kirli (rapor üretir). Pre-push hook olarak da
-bağlanabilir.
+bağlanabilir (`.git/hooks/pre-push` — 17 May 2026 itibarıyla bağlı).
+
+---
+
+## 📚 Terminoloji Disiplini
+
+### Onaylı Türkçe Proje Terminolojisi
+| Yasak | Doğru | Gerekçe |
+|---|---|---|
+| Faz 1, Faz 2 | **Aşama 1, Aşama 2** | Tescilli proje terminolojisi |
+| Step 1.2 | **Adım 1.2.5.b** | Noktalı hiyerarşi alt-adım netliği |
+| Sprint X | **Adım X.Y** veya **Aşama X.Y** | Yeni sistemde sprint kullanılmaz |
+| Phase | Aşama | Türkçe |
+
+Eski commit mesajlarında "Faz" veya "Sprint" geçebilir — bunlar geçmiş, kanon
+değil. Yeni metinde tekrar etme.
+
+### Yasaklı İsimler ve Markalar (Sızma Kontrolü #4 ile birebir)
+| Yasak | Açıklama |
+|---|---|
+| Markets 360 | Yabancı platform; clean-room ihlali |
+| Fab 5 | Mark Minervini tescilli marka |
+| SEPA®, MonAlert®, MAI | Mark Minervini tescilli markalar |
+| Vd, Wp, valueGetter, aB() | Yabancı platform minified internal isimler |
+
+Otomatik kontrol: `scripts/sizma_kontrol.ps1` kontrol #4 + pre-push hook.
+
+### Piyasa Bağlamı
+- **Quanfina ABD piyasasında işlem yapar** (NYSE / NASDAQ / ARCA)
+- YASAK: BIST, Türk piyasası, TRY (₺), "Türk yatırımcıya özel" gibi ifadeler
+- Sn. Ferit Türkiye'de yaşıyor ama platform ABD piyasası odaklı
+- USD ($) ana para birimi, "$" sembolü kullanılır
+
+### Trafik Lambası Standartları (Kural #2 ile birlikte)
+- 🟢 **Yeşil** — Operasyon başarılı, devam güvenli
+- 🟡 **Sarı** — Dikkat gerekiyor ama operasyon devam edebilir
+- 🔴 **Kırmızı** — BLOK, müdahale gerekli
+
+Her büyük adım sonu zorunlu (Kural #2). Rapor formatı: trafik lambası + kısa özet.
+
+### Dil ve Üslup
+- Türkçe ana dil; teknik terimler orijinal bırakılabilir (FastAPI, watchlist, vb.)
+- Sertlik + dürüstlük tercih edilir, yağcılık yapılmaz
+- Komut iletilirken kısa, net; rapor verilirken trafik lambası + tablo
 
 ---
 
