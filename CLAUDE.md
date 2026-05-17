@@ -464,6 +464,41 @@ sırasında tespit edildi. Kural #14'ün **ilk canlı somut uygulaması**
 - `sizma_kontrol.ps1`, `notebook_yedekle.ps1`,
   `build_index.ps1`, `hesap_tarama.ps1`
 
+### Kural 16 — PowerShell Native Exe `2>&1` Yasağı (18 May 2026 yeni)
+Windows PowerShell 5.1'de bir **native executable**'in (git, gh,
+node, python, .exe) stderr'ini `2>&1` ile stdout'a yönlendirmek
+hatalıdır. PowerShell stderr satırlarını `NativeCommandError`
+ErrorRecord nesnelerine sarar; exit kodu 0 olsa bile `$?` `$false`
+döner ve script `$ErrorActionPreference = "Stop"` altında patlar.
+
+**Yasak pattern:**
+```powershell
+$out = git status 2>&1          # YANLIS — stderr wrap edilir
+$out = & gh pr list 2>&1        # YANLIS — ayni sorun
+```
+
+**Doğru pattern:**
+- stderr'i bırak, PowerShell zaten ayrı stream'de yakalar
+- Native exit kodunu `$LASTEXITCODE` ile kontrol et (`$?` değil)
+- Mutlak gerekiyorsa: `try/catch` ile `NativeCommandError`'ı yut,
+  veya `$out = & git status; if ($LASTEXITCODE -ne 0) { ... }`
+
+```powershell
+$out = git status                # OK
+if ($LASTEXITCODE -ne 0) { ... } # exit kodu kontrolu
+```
+
+**Pattern keşfi:** Önceki AI bir kez yaşadı (`_DEVIR.md` 17 May 2026
+notu), sistem prompt'umda da uyarı vardı → 2. ortaya çıkış = Kural
+#14 doğrudan tescil eşiği. Kural #15 ile birlikte PowerShell
+disiplinini tamamlar.
+
+**İstisna:** PowerShell cmdlet'leri (`Get-*`, `Invoke-*`) için `2>&1`
+**güvenli** — sadece native .exe'lerde sorun var.
+
+**İlişkili:** [`feedback_kesfet_sor`](memory) (Kural #12), Kural #13
+(commit disiplini), Kural #15 (PS encoding).
+
 ---
 
 ## 🤝 Çalışma Mantığı + AI Rol Dağılımı

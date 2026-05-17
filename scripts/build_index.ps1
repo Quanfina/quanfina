@@ -15,8 +15,11 @@
 #   0 = senkron (envanter güncel)
 #   1 = senkronsuzluk var (rapor üretildi)
 #
-# NOT: Bu script şu an "üretmez" sadece "doğrular". Aşama 5'te tam
-# otomatik üretici sürümü eklenebilir.
+# Surum: 2 (18 May 2026) - yetim tespit + _INDEX.md patch onerisi
+# - scripts/, notebook/*.md ve kok Python icin yetim taramasi
+# - Yetim bulunursa OZET bolumunde _INDEX.md icin satir onerisi uretilir
+# - Asama 5'te tam otomatik uretici (mevcut _INDEX.md overwrite) eklenebilir
+# Kural #15 (ASCII-only) + Kural #16 (native exe 2>&1 yasagi) uyumlu
 
 param(
     [switch]$VerboseOutput
@@ -116,20 +119,73 @@ Write-Host ""
 Write-Host "7. Git hooks" -ForegroundColor Yellow
 Test-File ".git/hooks/pre-push" "Git hooks" | Out-Null
 
-# --- Yetim Python tarama (indekste olmayan kok Python) ---
+# --- Yetim dosya tarama (indekste olmayan) ---
 Write-Host ""
 Write-Host "8. Yetim dosya taramasi" -ForegroundColor Yellow
-$beklenenKok = $rootPython
+
+$yetimList = @()
+
+# 8a. Kok Python
 $gercekKok = Get-ChildItem -Path $repoRoot -File -Filter "*.py" | Select-Object -ExpandProperty Name
-$yetim = $gercekKok | Where-Object { $_ -notin $beklenenKok }
-if ($yetim) {
-    Write-Host "  [YETIM] Kok Python (indekste yok):" -ForegroundColor Red
-    $yetim | ForEach-Object {
+$yetimKok = $gercekKok | Where-Object { $_ -notin $rootPython }
+if ($yetimKok) {
+    Write-Host "  [YETIM] Kok Python:" -ForegroundColor Red
+    $yetimKok | ForEach-Object {
         Write-Host "    $_" -ForegroundColor Red
-        $script:findings += "yetim: $_"
+        $script:findings += "yetim-kok-py: $_"
+        $yetimList += @{ Path = $_; Kategori = "Yasayan Python (kok)" }
     }
 } else {
     Write-Host "  [OK] Yetim kok Python yok" -ForegroundColor Green
+}
+
+# 8b. Scripts klasoru (PS1 + PY)
+$beklenenScript = @(
+    "sizma_kontrol.ps1", "notebook_yedekle.ps1", "build_index.ps1",
+    "hesap_tarama.ps1", "run_migration.py", "seed_initial_data.py",
+    "seed_symbol_lists.py"
+)
+$scriptsDir = Join-Path $repoRoot "scripts"
+if (Test-Path $scriptsDir) {
+    $gercekScript = Get-ChildItem -Path $scriptsDir -File | Where-Object {
+        $_.Extension -in ".ps1", ".py"
+    } | Select-Object -ExpandProperty Name
+    $yetimScript = $gercekScript | Where-Object { $_ -notin $beklenenScript }
+    if ($yetimScript) {
+        Write-Host "  [YETIM] scripts/:" -ForegroundColor Red
+        $yetimScript | ForEach-Object {
+            Write-Host "    scripts/$_" -ForegroundColor Red
+            $script:findings += "yetim-scripts: scripts/$_"
+            $yetimList += @{ Path = "scripts/$_"; Kategori = "Scripts" }
+        }
+    } else {
+        Write-Host "  [OK] Yetim scripts dosyasi yok" -ForegroundColor Green
+    }
+}
+
+# 8c. notebook/*.md (sistem katmani markdown'lari)
+$beklenenNotebook = @(
+    "_BASLAT.md", "_ROADMAP.md", "_LINKLER.md", "_INDEX.md",
+    "_KOD_ENVANTERI.md", "_DEVIR.md", "_kisisel_okuma.md",
+    "YAPILANLAR.md", "Notebook_A_Vizyon.md",
+    "Notebook_B6_AdimlarKarar.md", "Notebook_C1_Sprint_QuickStart.md",
+    "Notebook_C2_EK1-8.md", "Notebook_C3_EK9_DBSchema.md",
+    "EK10_TradeGrader_Sentezi.md"
+)
+$notebookDir = Join-Path $repoRoot "notebook"
+if (Test-Path $notebookDir) {
+    $gercekNotebook = Get-ChildItem -Path $notebookDir -File -Filter "*.md" | Select-Object -ExpandProperty Name
+    $yetimNotebook = $gercekNotebook | Where-Object { $_ -notin $beklenenNotebook }
+    if ($yetimNotebook) {
+        Write-Host "  [YETIM] notebook/*.md:" -ForegroundColor Red
+        $yetimNotebook | ForEach-Object {
+            Write-Host "    notebook/$_" -ForegroundColor Red
+            $script:findings += "yetim-notebook: notebook/$_"
+            $yetimList += @{ Path = "notebook/$_"; Kategori = "Sistem katmani" }
+        }
+    } else {
+        Write-Host "  [OK] Yetim notebook/*.md yok" -ForegroundColor Green
+    }
 }
 
 # --- Arsiv durum ---
@@ -155,7 +211,24 @@ if ($findings.Count -eq 0) {
 } else {
     Write-Host "SENKRONSUZ - $($findings.Count) bulgu:" -ForegroundColor Red
     $findings | ForEach-Object { Write-Host "  - $_" -ForegroundColor Yellow }
+
+    # _INDEX.md patch onerisi (uretici davranis)
+    if ($yetimList.Count -gt 0) {
+        Write-Host ""
+        Write-Host "=== _INDEX.md PATCH ONERISI ===" -ForegroundColor Cyan
+        Write-Host "Yetim dosyalar icin uygun bolumlere ekle:" -ForegroundColor Yellow
+        Write-Host ""
+        $grouped = $yetimList | Group-Object -Property { $_.Kategori }
+        foreach ($g in $grouped) {
+            Write-Host "  [$($g.Name)]" -ForegroundColor Cyan
+            foreach ($item in $g.Group) {
+                $name = Split-Path $item.Path -Leaf
+                $href = $item.Path -replace "^notebook/", ""
+                Write-Host "    | [``$($item.Path)``]($href) | <ACIKLAMA EKLE> |"
+            }
+        }
+    }
     Write-Host ""
-    Write-Host "Cozum: _INDEX.md'i guncelle veya kayip dosyayi tamamla" -ForegroundColor Yellow
+    Write-Host "Cozum: _INDEX.md'i yukaridaki onerilerle guncelle" -ForegroundColor Yellow
     exit 1
 }
