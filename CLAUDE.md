@@ -241,6 +241,22 @@ Her bilgi parçasının tek doğru kaynağı var.
 - Referans: "Detay: [dosya/bölüm]"
 - Tekrar tespit → tek noktada topla
 
+### İlke 5 — Klasör Bağlamı (17 May 2026 yeni)
+Yeni bir klasör oluşturulduğunda **README.md amaç belgesi** eklenir.
+Yeni araştırıcı veya yeni AI session bu klasörün ne için olduğunu
+30 saniyede anlamalı.
+
+**README.md içeriği şablonu:**
+- "Bu klasör ne için?" (1 paragraf)
+- İçerik haritası (dosya tipleri + sayılar)
+- Geri alma / kullanım talimatları (varsa)
+- İlgili referanslar (notebook/, CLAUDE.md, vs.)
+
+**Örnek:** `_archive/README.md` (Aşama 1.D sonrası eklendi).
+
+**İstisna:** Geçici/tek-amaçlı klasörler (örn. `node_modules/`,
+`__pycache__/`) — bunlar zaten gitignore'da, bağlam belgesi gerekmez.
+
 ---
 
 ## ⚙️ Operasyonel Disiplin Kuralları
@@ -336,7 +352,41 @@ felsefesi — karar yorgunluğunu azalt).
 PowerShell olarak yaz (yaşayan sistem birikimi). Örnek:
 - `scripts/sizma_kontrol.ps1` (push güvenliği)
 - `scripts/notebook_yedekle.ps1` (felaket dayanıklılığı)
+- `scripts/build_index.ps1` (envanter doğrulayıcı)
 - `scripts/hesap_tarama.ps1` (gelecek — hesap matris keşfi)
+
+### Kural 13 — Commit Mesajı Disiplini (17 May 2026 yeni)
+Çoklu satır veya Türkçe karakter içeren commit mesajları **temp dosya
++ `git commit -F`** ile geçirilir. PowerShell here-string (`@'...'@`)
+Türkçe karakterlerde (ş, ğ, ı, "—" em dash, "?") parse hatası verir
+ve `git commit -m`'in argümanını yanlış token'lara böler.
+
+**Doğru pattern:**
+```powershell
+$msg = "Asama X.Y.Z: ASCII baslik (Turkce icerikli detay multiline)"
+$path = "$env:TEMP\_commit_msg.txt"
+[System.IO.File]::WriteAllText($path, $msg, [Text.UTF8Encoding]::new($false))
+git commit -F $path
+Remove-Item $path
+```
+
+Veya Write tool ile temp dosya yazıp `git commit -F` çağrısı (bu chat'in
+kullandığı pattern).
+
+**Tek satır + ASCII commit:**
+```powershell
+git commit -m "Asama 1.E: index update"   # OK
+```
+
+**Yasak (parse hatası garantili):**
+```powershell
+git commit -m @'
+Aşama X.Y: çoklu satır Türkçe
+'@   # ş, ğ, ı, ?, — parse'i boşluk olarak böler
+```
+
+Bu kural [`feedback_kesfet_sor`](memory) ile birlikte yaşayan sistemin
+operasyonel disiplinine girer.
 
 ---
 
