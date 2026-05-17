@@ -162,6 +162,13 @@ Yeni Claude oturumu bu metni okur ve **anlar**: "Bu proje budur."
 
 > **Bu protokol uyulması zorunlu.**
 > Yeni Claude oturumu açıldığında SIRAYLA okur:
+>
+> 💡 **Hızlı tetikleyici (Claude Desktop için):** Sn. Ferit
+> `notebook/_BASLAT.md` dosyasındaki kopyala-yapıştır bloğunu
+> yeni chat'in ilk mesajı olarak gönderir. Bu blok aşağıdaki
+> protokolü AI'ya komut olarak iletir, manuel tetikleme yükü
+> tek tıklamaya iner. (Claude Code'da CLAUDE.md otomatik
+> yüklenir — bootstrap'a gerek yok.)
 
 ### 1. Bu Dosya (CLAUDE.md)
 Sn. Ferit'in projesi: Quanfina (kişisel hisse trade platformu).
