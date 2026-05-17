@@ -287,6 +287,18 @@ Her `git push` öncesi sızma taraması ZORUNLU.
 - Geri dönüş zor: public repo'ya sızan içerik fork/cache/AI eğitim verisi
   riskini geri alamaz. Önlemek tek seçenek.
 
+### Kural 11 — Notebook Proaktif Tarama (17 May 2026 yeni)
+`notebook/` Sn. Ferit'in ortak hafızası ve karar günlüğü. AI proaktif tarar:
+- **Adıma başlamadan ÖNCE:** `notebook/Notebook_A_Vizyon.md` ⚡ GÜNCEL DURUM
+  + `notebook/YAPILANLAR.md` okunur (zaten Görev Başlangıç Protokolü #2-3)
+- **Belirsiz konuda:** KARAR ADAY, AÇIK KONU, İLKE notebook'ta var mı tarar
+- **Geçmiş referans için:** `notebook/kitaplar/`, `notebook/analizler/`,
+  `notebook/Notebook_B6_AdimlarKarar.md`, `notebook/EK10_*.md` kontrol edilir
+- **Yaklaşım:** "Burada bir şey var mı?" değil "Burada şu olabilir mi?"
+  mantığıyla bakılır (Manifesto Özellik #4 proaktif öneri)
+- **Sızma riski yok:** notebook git'te değil — özgürce tara, kayıt ekle,
+  sadece HEAD commit'ine girmez (`.gitignore`'da `notebook/` korunuyor)
+
 ---
 
 ## 🤝 Çalışma Mantığı + AI Rol Dağılımı
