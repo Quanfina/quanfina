@@ -306,6 +306,38 @@ Her `git push` öncesi sızma taraması ZORUNLU.
 - **Sızma riski yok:** notebook git'te değil — özgürce tara, kayıt ekle,
   sadece HEAD commit'ine girmez (`.gitignore`'da `notebook/` korunuyor)
 
+### Kural 12 — Önce Keşfet, Sonra Sor (17 May 2026 yeni)
+Sn. Ferit'e bilgi sormadan ÖNCE sistem otomatik keşif yap (yaşayan sistem
+felsefesi — karar yorgunluğunu azalt).
+
+**Keşif sırası:**
+1. **Dosya sistemi**: registry (`HKCU:\Software\...`), AppData
+   (`%APPDATA%`, `%LOCALAPPDATA%`), config dosyaları (`.env`, `.json`, ini)
+2. **Git/dev araçlar**: `git config`, `git credential fill`, `git log
+   --format='%ae'`, `git remote -v`
+3. **API çağrıları**: GitHub API (token credential'da), Google API
+   (oauth varsa), vb.
+4. **Yüklü program tespiti**: `winget list`, `Get-AppxPackage`,
+   `HKLM:\...\Uninstall`, sistem dizinleri
+5. **Süreç/ağ durumu**: `Get-Process`, `Get-NetTCPConnection`
+
+**Sn. Ferit'e sorulması gereken durumlar:**
+- Browser GUI sayfasındaki bilgi (Drive Settings, GitHub Settings)
+- Office GUI (File→Account paneli — encrypted lokalde)
+- Stratejik/öznel karar (A/B/C seçimi, öncelik)
+- Lisans/abonelik web tarafı (kişiselleştirilmiş)
+
+**Rapor formatı:** Keşif yaptıktan sonra rapor verirken:
+- "PowerShell ile şuna baktım, şu çıktı" (somut)
+- Belirsiz kalan kısım için tek soru sor (toplu soru listesi değil)
+- Asla "şunları yapar mısın: 1, 2, 3, 4..." şeklinde Sn. Ferit'i yorma
+
+**Tarama scripti standardı:** Tekrar eden keşifleri `scripts/` altına
+PowerShell olarak yaz (yaşayan sistem birikimi). Örnek:
+- `scripts/sizma_kontrol.ps1` (push güvenliği)
+- `scripts/notebook_yedekle.ps1` (felaket dayanıklılığı)
+- `scripts/hesap_tarama.ps1` (gelecek — hesap matris keşfi)
+
 ---
 
 ## 🤝 Çalışma Mantığı + AI Rol Dağılımı
