@@ -388,6 +388,43 @@ Aşama X.Y: çoklu satır Türkçe
 Bu kural [`feedback_kesfet_sor`](memory) ile birlikte yaşayan sistemin
 operasyonel disiplinine girer.
 
+### Kural 14 — Pattern Tespit + Otomatik Kural Önerisi (17 May 2026 yeni)
+Yaşayan sistem sürdürülebilirliği için: AI her çalışma sırasında tekrar
+eden pattern veya sürpriz/unutulmuş yaşayan sistem parçaları tespit
+ederse, bunları kalıcı kurala dönüştürme önerisi sunar (Sn. Ferit
+onayıyla). Sn. Ferit'in deyimiyle: **"bir nevi skill oluşturuyoruz"**.
+
+**Pattern tespiti tetikleyicileri:**
+- Aynı problem 2. kez ortaya çıkarsa (örn. PowerShell heredoc Türkçe
+  karakter sorunu → Kural #13 olarak tescil)
+- Yeni klasör/dosya/araç eklenirse → bağlam belgesi (İlke #5)
+- AI yeni bir keşif yöntemi geliştirirse (Kural #12 örneği —
+  registry/API ile otomatik tespit)
+- Sn. Ferit aynı düzeltmeyi 2+ kez söylüyorsa → bilinçli kayda al
+- Belirli bir iş akışı 2+ defa aynı sırayla yapılırsa → kural
+
+**Eylem zinciri:**
+1. Pattern tespit edildiğinde AI rapor sonunda öneri sunar:
+   "Şu pattern'i tespit ettim, Kural #X olarak ekleyelim mi?"
+2. Sn. Ferit onaylarsa:
+   - Kural CLAUDE.md'ye eklenir (kalıcı tescil)
+   - VEYA İlke / Feedback memory olarak tescil edilir (kullanıcı düzeyi)
+   - VEYA scripts/ altına otomasyon scripti yazılır (yaşayan sistem)
+3. `notebook/_BASLAT.md` güncellenir (yeni chat hemen görür)
+4. Skill setine eklenir → "yaşayan sistem skill kart" pattern'i
+
+**Skill felsefesi:**
+`notebook/_BASLAT.md` tek bir **skill kart** gibi davranır. Yeni
+Claude Desktop chat'i bu kart ile tam iş akışını edinir. CLAUDE.md
+anayasa katmanı detaylı belgeler, _BASLAT.md ise hızlı tetikleyicidir.
+
+**Manifesto Özellik #8 (Öğrenen)** bu kuralla canlı tescile geçer —
+sistem kullanıldıkça kendi pattern kütüphanesini büyütür.
+
+**İlişkili:** Kural #8 (Adım Sonu Güncelleme), Kural #11 (Notebook
+Proaktif Tarama), Kural #12 (Önce Keşfet), Kural #13 (Commit Disiplini),
+Bilgi Mimarisi İlke #3 (Yaşayan Sistem) + #5 (Klasör Bağlamı).
+
 ---
 
 ## 🤝 Çalışma Mantığı + AI Rol Dağılımı
