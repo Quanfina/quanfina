@@ -317,11 +317,84 @@ Her büyük adım sonu:
 3. Bu, adımın resmî kapanışıdır.
 Kapanış yapılmadan sonraki adıma geçilmez.
 
-### Kural 9 — Tek Araç Felsefesi (17 May 2026 yeni)
-Sn. Ferit'in karar yorgunluğunu azaltmak için: Claude Desktop
-ana araç. VS Code Claude Code sadece büyük kod işleri için
-manuel. Web Claude kullanılmaz. Üç araç arasında "hangisini
-seçeyim" kararı yok.
+### Kural 9 — Akıllı Araç Dağılımı + Handoff (17 May 2026 v1 → 18 May 2026 v2)
+
+**v1 (17 May 2026):** "Tek Araç Felsefesi — Claude Desktop ana,
+Web Claude kullanılmaz." → ❌ DEPRECATED 18 May 2026.
+
+**v2 (18 May 2026):** **Akıllı Dağılım + Handoff Protokolü.**
+
+Sn. Ferit'in karar yorgunluğunu azaltmak için: her araç güçlü
+olduğu işte, "hangisini seçeyim" kararı yine sıfır — ama bu
+sefer **paralel araç değil, akıllı dağılım** ile.
+
+**Tetikleyici revize (Kural #14 doğrudan tescil):**
+- 18 May 2026 ~21:00 Sn. Ferit Claude Code (Opus 4.7 1M) cevap
+  hızını "Web Claude'a göre yavaş" buldu. Gerçek: Opus 4.7 +
+  tool round-trip + 1225 satır CLAUDE.md context + 9 memory
+  dosyası → Web Claude'un Sonnet default + hafif system prompt'una
+  göre yavaş yanıt
+- Web Claude'a **Google Drive Connector** bağlandı → Quanfina
+  bağlamına Drive üzerinden erişebiliyor (Quanfina_notebook/_BASLAT.txt
+  dahil tüm yaşayan sistem)
+- Kural #9 v1'in temel varsayımı ("Web Claude bağlamsız, kullanışsız")
+  artık geçersiz
+
+**Birincil dağılım:**
+
+| İş Türü | Birincil Araç | Gerekçe |
+|---|---|---|
+| Strateji, düşünme, hızlı sorgu | **Web Claude** ⭐ | Sonnet hızı + Drive Connector ile bağlam |
+| Karar üretme (KARAR/AÇIK KONU/İLKE düşünme) | **Web Claude** | Drive'dan Vizyon okur, prompt üretir |
+| Dosya operasyonu (Edit/Write/multi-file) | **Claude Code (VS Code)** ⭐ | Direkt dosya erişimi, paralel tool |
+| Commit + push (Kural #10) | **Claude Code** | Bash, pre-push hook, git geçmişi |
+| Yaşayan sistem hijyeni (Vizyon sürüm, _DEVIR vb.) | **Claude Code** | TaskCreate, multi-step |
+| Kavram/kitap yorumu | **NotebookLM Plus** doğrudan | Kural #17 |
+| Trade grade önerisi | **TradeGrader Gem** | Kural #17 istisna (stateless skor) |
+| Filesystem MCP özel iş | **Claude Desktop** (gerektiğinde) | Düşük öncelik |
+
+**Handoff Protokolü (vibe coding evrimi):**
+
+```
+Sn. Ferit Web Claude'da konuşur (hızlı düşünme)
+       ↓
+Web Claude prompt üretir (Drive Connector ile bağlam okuyarak)
+       ↓
+Sn. Ferit prompt'u kopyalar (vibe coding — kod yazmaz)
+       ↓
+Claude Code (VS Code worktree veya ana repo) yapıştırılan prompt'u uygular
+       ↓
+Commit + push + Drive senkron (drive_sync.ps1)
+       ↓
+Bir sonraki Web Claude oturumu Drive üzerinden yeni hali görür
+```
+
+**Tetikleyici durumlar (Web Claude → Code handoff):**
+- Web chat içeriği dolduğunda (token limiti yaklaşıyor) → tescil
+  + güncelleme Code'a devredilir
+- Doğrudan dosya operasyonu gerektiğinde (Edit/Write/Bash)
+- Multi-step yaşayan sistem hijyeni (3+ dosya güncelleme +
+  commit/push zinciri)
+- Karar tescili (KARAR ekleme, AÇIK KONU kapanış, sürüm bloğu)
+
+**Web Claude'un kapasitesi (18 May 2026):**
+- ✅ Drive Connector (`mcp__09e271fe-...`): list_recent_files,
+  search_files, read_file_content, get_file_metadata, copy_file,
+  create_file, download_file_content, get_file_permissions
+- ✅ Quanfina_notebook klasörüne Drive üzerinden erişim
+- ❌ Lokal dosya yazma (Edit/Write) — bu Code'un işi
+- ❌ Bash/git/commit — bu Code'un işi
+
+**Karar yorgunluğu yine sıfır:** her iş için tek doğru araç var,
+seçim yok.
+
+**Manifesto Özellik #8 (Öğrenen) zirvesi:** sistem kendi
+anayasasını revize ediyor — v1 → v2. Statik kural değil, yaşayan
+felsefe.
+
+**İlişkili:** Kural #17 (Uzman/Yorumcu Varsayılanı = NotebookLM),
+[[feedback_hibrit_arac_dagilimi]] (memory karşılığı), Aşama 5
+felsefe seviyesi.
 
 ### Kural 10 — Push Öncesi Sızma Kontrolü (17 May 2026 yeni)
 Her `git push` öncesi sızma taraması ZORUNLU.
@@ -582,15 +655,27 @@ Aşama 2.3 (a+b) + Aşama 4.2 RESMÎ KAPANIŞ (KARAR #445).
 - "Yavaş düşün, hızlı uygula" — analiz uzun, eylem net
 - Şüpheli durum → Sn. Ferit'e sor (Kural #3); dürüstlük tercih edilir, yağcılık değil
 
-### AI Rol Dağılımı (17 May 2026 itibarıyla, Kural #9 sonrası)
+### AI Rol Dağılımı (18 May 2026 v2 — Kural #9 v2 sonrası: Akıllı Dağılım + Handoff)
 
 | Araç | Rol | Notlar |
 |---|---|---|
-| **Claude Desktop** | Ana araç — strateji, prompt yazımı, dosya işlemleri, operasyonel yönetim, rapor özeti | Filesystem MCP ile direkt erişim |
-| **Claude Code (VS Code)** | Büyük kod işleri için manuel devreye alınır | Sadece gerektiğinde |
-| **Web Claude** | **Kullanılmaz** — Kural #9 Tek Araç Felsefesi gereği | Üç araç karmaşası elendi |
-| **Google AI Pro** | Gemini araştırma, NotebookLM Plus kitap analizi, Gems özel uzmanlar | Mevcut: 01_Minervini_Uzmanı |
-| **Sn. Ferit** | Stratejik kararlar, final onay, ŞÜPHELİ durum hakemi | Operasyonel detaylar AI'ya devredilmiş |
+| **Web Claude** ⭐ | **Birincil strateji + düşünme + hızlı sorgu + karar üretme** — Drive Connector ile Quanfina bağlamlı | Sonnet hızı + Quanfina_notebook Drive üzerinden okur. Chat dolunca / dosya işi → Code'a handoff |
+| **Claude Code (VS Code)** ⭐ | **Birincil dosya operasyonu + commit/push + multi-step yaşayan sistem hijyeni + kodlama** | Edit/Write/Bash/Git direkt erişim, paralel tool. Web Claude'un ürettiği prompt'u uygulayıcı |
+| **Claude Desktop** | Filesystem MCP gerektiren özel iş (azaldı) | Düşük kullanım, gerektiğinde |
+| **NotebookLM Plus** | Kavram/kitap/strateji yorumu (Kural #17 — Vizyon Bekçisi + Minervini + Carr Stage Analizi) | Drive linkli canlı kaynak, otomatik senkron |
+| **Gemini Gems** | TradeGrader (Kural #17 istisna — stateless skor) | Diğer Gem'ler NotebookLM'e taşındı |
+| **Sn. Ferit** | Stratejik kararlar, final onay, ŞÜPHELİ durum hakemi, **handoff orkestratörü** (Web → Code prompt aktarımı) | Vibe coding evrimi: Web Claude prompt üretir, Sn. Ferit yapıştırır, Code uygular |
+
+**Handoff Protokolü:** Detay için Kural #9 v2. Kısa özet: chat
+dolunca / dosya işi gelince Web Claude → Code yönlendirir, prompt
+üretir. Sn. Ferit kopyala-yapıştır. Code uygular + commit + Drive
+senkron. Bir sonraki Web Claude oturumu Drive üzerinden yeni
+hali görür.
+
+**Yaşayan sistem köprüsü:** `drive_sync.ps1` saatlik mirror →
+NotebookLM otomatik yeniden indeks + Web Claude Drive Connector
+canlı kaynak. **Aynı bilgi 3 araçta paralel** (lokal canon +
+Drive ayna + NotebookLM canlı).
 
 ### Yetki Devri Prensipleri
 - **Auto-approve AÇIK** — yes tıklama yükü yok (Kural #4 ihlal etmeyenler için)
