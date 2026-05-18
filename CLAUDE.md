@@ -396,6 +396,42 @@ felsefe.
 [[feedback_hibrit_arac_dagilimi]] (memory karşılığı), Aşama 5
 felsefe seviyesi.
 
+### Kural 9 v2 alt-bölüm — Web Claude → Code Handoff (Yöntem B) (18 May 2026 ~22:00)
+
+Web Claude (Drive Connector ile) büyük adım sonrası `_DEVIR.md`
+formatlı blok üretir. Sn. Ferit kopyalar → Code'a "_DEVIR.md üstüne
+ekle" der → Code günceller, commit, drive_sync.ps1 mirror.
+
+Web Claude Drive yazma yetkisi VAR (create_file, copy_file) ama
+KULLANILMAZ — drive_sync.ps1 /MIR Drive yazımını sonraki turda
+silebilir, lokal kanon bozulur, .md vs .txt çift gerçeklik tuzağı.
+Manuel tek-kopya akış mevcut altyapıyla bütünleşik, yeni script
+gerekmez.
+
+**Blok formatı:**
+```
+### 🔄 Güncelleme (TARIH ~SAAT) — [Konu]
+
+> Web Claude session: [özet]
+
+#### 🟢 Tespit/Karar
+- ...
+
+#### Code'a iş
+- ...
+```
+
+**DRY İlke #4 uyumu:** `_HANDOFF.md` iptal — `_DEVIR.md` zaten bu
+görev için var (kurulu, çalışıyor). Tek köprü dosyası.
+
+**H#10 bağlantısı:** Web Claude Drive yazma yeteneğini başta "yok"
+dedi (araç listesine kör güven). Sn. Ferit sorgusuyla tool_search
+yeniden çalıştırıldı → create_file + copy_file mevcut çıktı.
+Kural #12 (Önce Keşfet) doğrudan uygulama — bkz. `_HATALAR.md` H#10.
+
+**İlişkili:** Kural #8 (Adım Sonu Güncelleme), `_DEVIR.md`,
+`_HATALAR.md` H#10, [[feedback_hibrit_arac_dagilimi]].
+
 ### Kural 10 — Push Öncesi Sızma Kontrolü (17 May 2026 yeni)
 Her `git push` öncesi sızma taraması ZORUNLU.
 - Otomatik araç: `scripts/sizma_kontrol.ps1` (GitHub İlke #8 listesi)
