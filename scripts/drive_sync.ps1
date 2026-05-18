@@ -15,8 +15,16 @@
 #   .\scripts\drive_sync.ps1 -ScheduledTask   # Windows task kayit (saatlik)
 #   .\scripts\drive_sync.ps1 -UnregisterTask  # Task sil
 #
-# Versiyon: v0.5 (18 May 2026, Asama 2.2 v2 ilk uretim)
+# Versiyon: v2.1 (18 May 2026, NotebookLM Plus .txt otomasyonu)
 # Kural uyumu: #15 (ASCII-only), #16 (native exe 2>&1 yok)
+#
+# v2.1 degisiklikleri (H#8 pattern - NotebookLM Plus .md gormez):
+#   - Robocopy /XF *.txt ile hedefteki .txt'ler extra sayilmaz (silinme korumasi)
+#   - Robocopy sonrasi: hedefteki tum .md icin paralel .txt kopya uretilir
+#   - Subfolder dahil (kitaplar/ vs.)
+#   - Idempotent: ayni icerikte overwrite, fark yoksa is yok
+# Kural #14 dogrudan tescil (5. kanal: script otomasyonu)
+# Iliskili: notebook/_CLEAN_ROOM.md, notebook/_HATALAR.md H#8
 
 param(
     [string]$Hedef = $null,
@@ -168,7 +176,8 @@ $robocopyArgs = @(
     "/R:3",
     "/W:5",
     "/NDL",
-    "/NFL"
+    "/NFL",
+    "/XF", "*.txt"  # v2.1: hedef .txt'leri extra sayilmaz - NotebookLM kaynaklari korunur
 )
 if ($KuruCalisma) {
     $robocopyArgs += "/L"
@@ -206,18 +215,84 @@ if ($rc -le 3) {
     Write-Host "[uyari] Robocopy uyumsuzluk (exit: $rc)" -ForegroundColor Yellow
 }
 
+# ============================================================
+# v2.1 NotebookLM .txt paralel kopya uretimi
+# ============================================================
+# Sebep: NotebookLM Plus Drive picker'da .md uzantisini listelemez (H#8)
+# Cozum: hedefteki her .md icin .txt paralel kopya. Lokal kanon .md,
+#        Drive ayna hem .md hem .txt (.md insan icin, .txt NotebookLM icin)
+
+Write-Host ""
+Write-Host "=== v2.1 .txt paralel kopya uretimi ===" -ForegroundColor Cyan
+
+$mdDosyalari = Get-ChildItem -Path $Hedef -Recurse -File -Filter "*.md" -ErrorAction SilentlyContinue
+$txtUretildi = 0
+$txtAtlandi = 0
+$txtHata = 0
+
+foreach ($md in $mdDosyalari) {
+    $txtYolu = $md.FullName -replace '\.md$', '.txt'
+    try {
+        if ($KuruCalisma) {
+            # Dry-run: sadece ne uretilecegini raporla
+            if (-not (Test-Path $txtYolu) -or `
+                (Get-Item $txtYolu).LastWriteTime -lt $md.LastWriteTime) {
+                $txtUretildi++
+            } else {
+                $txtAtlandi++
+            }
+        } else {
+            # Gercek: kaynak .md daha yeniyse veya .txt yoksa kopyala
+            $kopyalaGerek = $true
+            if (Test-Path $txtYolu) {
+                $txtMevcut = Get-Item $txtYolu
+                if ($txtMevcut.LastWriteTime -ge $md.LastWriteTime -and `
+                    $txtMevcut.Length -eq $md.Length) {
+                    $kopyalaGerek = $false
+                }
+            }
+
+            if ($kopyalaGerek) {
+                Copy-Item -Path $md.FullName -Destination $txtYolu -Force
+                $txtUretildi++
+            } else {
+                $txtAtlandi++
+            }
+        }
+    } catch {
+        $txtHata++
+        Write-Host "  [hata] $($md.Name): $_" -ForegroundColor Red
+    }
+}
+
+if ($KuruCalisma) {
+    Write-Host "[kuru] Uretilecek : $txtUretildi" -ForegroundColor Yellow
+    Write-Host "[kuru] Atlanacak  : $txtAtlandi (zaten guncel)" -ForegroundColor DarkGray
+} else {
+    Write-Host "[ok] Uretildi : $txtUretildi" -ForegroundColor Green
+    Write-Host "[ok] Atlandi  : $txtAtlandi (zaten guncel)" -ForegroundColor DarkGray
+}
+if ($txtHata -gt 0) {
+    Write-Host "[uyari] Hata sayisi : $txtHata" -ForegroundColor Red
+}
+
+# ============================================================
 # Son ozet
+# ============================================================
 $hedefDosyaSayisi = (Get-ChildItem -Path $Hedef -Recurse -File -ErrorAction SilentlyContinue).Count
+$hedefMdSayisi = (Get-ChildItem -Path $Hedef -Recurse -File -Filter "*.md" -ErrorAction SilentlyContinue).Count
+$hedefTxtSayisi = (Get-ChildItem -Path $Hedef -Recurse -File -Filter "*.txt" -ErrorAction SilentlyContinue).Count
 $hedefBoyutMB = [math]::Round(((Get-ChildItem -Path $Hedef -Recurse -File -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum / 1MB), 2)
 
 Write-Host ""
 Write-Host "=== OZET ===" -ForegroundColor Cyan
 Write-Host "Drive hedef   : $Hedef"
-Write-Host "Mirror dosya  : $hedefDosyaSayisi"
-Write-Host "Mirror boyut  : $hedefBoyutMB MB"
+Write-Host "Toplam dosya  : $hedefDosyaSayisi  (.md: $hedefMdSayisi, .txt: $hedefTxtSayisi)"
+Write-Host "Toplam boyut  : $hedefBoyutMB MB"
 Write-Host ""
 Write-Host "NotebookLM Plus: drive.google.com/drive uzerinden klasor goruncu" -ForegroundColor Yellow
-Write-Host "  - Quanfina_notebook icindeki *.md dosyalari notebook'a ekle" -ForegroundColor Yellow
+Write-Host "  - Quanfina_notebook icindeki *.txt dosyalari notebook'a ekle" -ForegroundColor Yellow
+Write-Host "  - (.md uzantisi NotebookLM Plus Drive picker'da listelenmez - H#8)" -ForegroundColor DarkGray
 Write-Host "  - Drive degisirse NotebookLM otomatik yeniden indeksler" -ForegroundColor Yellow
 Write-Host ""
 
