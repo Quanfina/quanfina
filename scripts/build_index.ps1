@@ -174,7 +174,8 @@ $beklenenNotebook = @(
     "YAPILANLAR.md", "Notebook_A_Vizyon.md",
     "Notebook_B6_AdimlarKarar.md", "Notebook_C1_Sprint_QuickStart.md",
     "Notebook_C2_EK1-8.md", "Notebook_C3_EK9_DBSchema.md",
-    "EK10_TradeGrader_Sentezi.md"
+    "EK10_TradeGrader_Sentezi.md",
+    "Asama_4_1_TradeGrader_Gem.md"
 )
 $notebookDir = Join-Path $repoRoot "notebook"
 if (Test-Path $notebookDir) {
