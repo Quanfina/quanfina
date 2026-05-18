@@ -754,6 +754,54 @@ işaretlenir.
 **İstisna:** KARAR'lar **asla** silinmez (mimari karar geçmişi
 kanıtı). Sadece "PASİF" notu eklenir, içeriği kalır.
 
+**İlk somut canlı uygulama (KARAR #448, 19 May 2026 ~01:00):**
+Aşama 3.3 GitHub MCP iptal kararı doğrulandı — 5 dk önce `gh
+auth login` ile Bash üzerinden tam GitHub yetkisi (gist + read:org
++ repo + workflow scopes). MCP çiftlemesi gereksizdi, `gh` CLI
+yeterli. Negatif tescil canlı — kanon iptal, gerçeklik destekledi.
+Aşama 3 RESMÎ KAPANIŞ ile aynı turda. Bu, Web Claude turunda
+yakalanan "Kural #18 metnine ilk uygulama referansı" disiplinine
+karşılık geliyor.
+
+### Kural 9 v2 alt-bölümü — Otomatik Çift Yönlü Senkron (19 May 2026 ~01:30, KARAR #449)
+
+**Tetikleyici (Manifesto Özellik #8 9. self-correction — tasarım
+seviyesi):** Sn. Ferit talimatı: *"web claude ile sistemi
+birleştir nasıl olacaksa bana sorma sen orda yaptıklarımızı görsün
+o burda falan"*. Yöntem B handoff (KARAR #447) Web → Code yönünde
+`_DEVIR.md` üzerinden manuel handoff'a güveniyordu — eksik yarı:
+Web Claude'un Drive'a yazdıkları lokal `notebook/`'a otomatik
+yansımıyordu.
+
+**Çözüm (çift yönlü otomatik senkron):**
+
+```
+Code → Drive (PUSH):  drive_sync.ps1 saatlik (09:00 başlangıç, PT1H)
+Drive → Code (PULL):  drive_pull.ps1 saatlik (09:30 başlangıç, PT1H, alternat)
+```
+
+**`scripts/drive_pull.ps1` v0.5 davranışı:**
+- Sadece `.md` dosyaları (`.txt`'ler drive_sync üretimi, lokal'de yok)
+- Drive newer + lokal yok → kopyala (yeni Web Claude dosyası)
+- Drive newer + lokal eski (1+ saat) → overwrite
+- Drive newer + lokal de yeni (son 1 saat) → **CONFLICT** —
+  `_PULL_CONFLICT.md` log dosyası, Sn. Ferit manuel çözer
+- Silme YOK (sadece kopyala/güncelle, Kural #4 yıkıcı eylem yok)
+
+**ScheduledTask:** `Quanfina_Notebook_Drive_Pull` saatlik, 09:30
+başlangıç (drive_sync 09:00'ın tam yarısı), idempotent.
+
+**Conflict önleme disiplini:**
+- Web Claude sadece `_DEVIR.md` "## ⏳ KUYRUK" altına yeni blok
+  ekler — append-only pattern
+- Code büyük edit'leri commit + push sonrası yapar (Drive'a yansır)
+- 30 dk aralık → conflict penceresi az
+
+**İlişkili:** Kural #9 v2 ana metni (Akıllı Dağılım + Handoff
+Protokolü), KARAR #447 (Yöntem B), `scripts/drive_sync.ps1`,
+`scripts/drive_pull.ps1`, `notebook/_OZET.md` "Bilgi Akışı"
+bölümü.
+
 ---
 
 ## 🤝 Çalışma Mantığı + AI Rol Dağılımı
