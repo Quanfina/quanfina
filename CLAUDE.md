@@ -521,6 +521,55 @@ disiplinini tamamlar.
 **İlişkili:** [`feedback_kesfet_sor`](memory) (Kural #12), Kural #13
 (commit disiplini), Kural #15 (PS encoding).
 
+### Kural 17 — Uzman/Yorumcu Rolü Varsayılanı = NotebookLM Plus (18 May 2026 yeni)
+
+AI uzman/yorumcu rolü kurarken **varsayılan araç NotebookLM Plus**,
+Gemini Gems değil. Yeni uzman/danışman ihtiyacı doğduğunda Gems
+düşünmeden NotebookLM Plus seçilir.
+
+**Why:** Gems'in **Drive senkronu yok** — yüklenen dosya snapshot,
+kaynak güncellenince manuel re-upload gerekir. NotebookLM Plus
+**Drive linkli canlı kaynak** destekler — `drive_sync.ps1` notebook/
+→ `G:\Drive'ım\Quanfina_notebook\` her saat ayna alır, NotebookLM
+otomatik yeniden indeksler. Yaşayan sistem kaynak akışı sadece
+NotebookLM tarafında bütünleşik.
+
+**2 ortaya çıkış (Kural #14 eşiği aşıldı):**
+1. **Aşama 2.4** Vizyon Bekçisi Gem → ❌ İPTAL, NotebookLM'e taşındı
+   (18 May 2026 öğleden sonra, Aşama 2.3 (b) RESMÎ KAPANIŞ)
+2. **Aşama 4.2** Carr Yorumcu Gem → ❌ İPTAL, NotebookLM "Quanfina
+   Carr Stage Analizi" doğrudan Yorumcu rolünde (18 May 2026 akşam,
+   KARAR #445)
+
+**Canlı tescil:** 3 NotebookLM uzmanı tam rolde — Vizyon Bekçisi
+(karar tarihi denetçisi) + Minervini (kavram sözlüğü) + Carr Stage
+Analizi (Carr 1.+2. baskı + Weinstein yorumu).
+
+**İstisna — Gems'te kalabilecek rol türleri:**
+- **Stateless skor üretici** — TradeGrader Gem (Aşama 4.1): 17
+  kategori prompt yeterli, canlı kaynak gerekmez, snapshot problem değil
+- **Generic kodlama desteği** — Gemini Kodlama Gem: kaynak yerine
+  Quanfina-spesifik prompt yeterli
+- **Sayfa-bağımsız asistan** — kaynak Drive'da değilse
+
+**Bilgi-yoğun roller için NotebookLM Plus ZORUNLU:**
+- Karar/AÇIK KONU/İLKE denetçisi (Vizyon Bekçisi paterni)
+- Kavram sözlüğü (Minervini, Carr Stage Analizi)
+- Manifesto bilgi katmanlı yorumcu
+- Strateji kitabı yorumcu (her yeni strateji kaynak → ayrı NotebookLM)
+
+**Eylem:**
+- Yeni uzman/yorumcu ihtiyacında **ilk seçenek NotebookLM**, gerekçe
+  sorulmadan
+- Mevcut Gem'i NotebookLM'e taşıma kararı için **1. madde tetikleyici**
+  (canlı kaynak gerekli mi sorusu yeter)
+- Kurulum belgesi şablonu: `notebook/Asama_X_Y_*.md` — Drive linkli
+  .txt kaynak listesi + clean-room sınırı + system prompt + test PASS
+
+**İlişkili:** Kural #9 (Tek Araç Felsefesi — uzman katmanında tek
+standart), Kural #14 (Pattern Tescil — 2 ortaya çıkış kuralı),
+Aşama 2.3 (a+b) + Aşama 4.2 RESMÎ KAPANIŞ (KARAR #445).
+
 ---
 
 ## 🤝 Çalışma Mantığı + AI Rol Dağılımı
