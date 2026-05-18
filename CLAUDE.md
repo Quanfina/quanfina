@@ -14,10 +14,15 @@ Bu cümle, Quanfina sisteminin kalbidir.
 
 ---
 
-## 🧬 Manifestonun 8 Özelliği
+## 🧬 Manifestonun 9 Özelliği
 
 Sistem üç yönlü çalışır: **Giriş** (oturum açılışı), **Çıkış** (oturum 
 kapanışı), **Bakım** (sürekli yaşam).
+
+> 📜 **Versiyon notu:** 17 May 2026 — 8 özellik tescil. **18 May 2026 — 9.
+> özellik RESMÎ TESCİL** (Aşama 5.7 kapanış). Eski 7. Felaket Dayanıklılığı
+> 9. konuma alındı (ultimate dayanıklılık), 6. konum yeni "Doğru Kategoriye
+> Otomatik" özelliği için açıldı.
 
 ### Giriş Yönlü (Oturum Açılışında)
 
@@ -45,22 +50,31 @@ Sistem "şunu yazalım, kaybolmasın" der.
 Yeni KARAR, AÇIK KONU, İLKE adayı tespit ettiğinde otomatik kaydı önerir.
 Sn. Ferit'in unutması beklenmez.
 
+**6. Doğru Kategoriye Otomatik** *(18 May 2026 RESMÎ TESCİL — Aşama 5.7)*
+Yeni araştırma, KARAR, AÇIK KONU, İLKE doğru klasör/dosya kategorisine
+otomatik yerleşir. Bilgi Mimarisi 5 İlke (Doğru Yer + Klasör Bağlamı) ve
+Aşama 1.A'da yapılan %29 strateji kategorilendirmesi bu özelliğin somut
+altyapısıdır.
+
 ### Bakım Yönlü (Sürekli)
 
-**6. Anılı Güncelleme**
+**7. Anılı Güncelleme**
 Sistem "burası çok güncellendi, dosyayı temizleyelim" der.
-Adım sonu güncellemesi bu görevin pratik karşılığıdır.
-
-**7. Felaket Dayanıklılığı**
-Bilgi tek noktada değildir. Yedekler, çoklu dosyalar, kayıt sistemi 
-"elektrik kesilse, bilgisayar bozulsa, hatta proje yıllarca dursa" 
-sistemin yeniden başlayabilmesini sağlar.
+Adım sonu güncellemesi (Kural #8) bu görevin pratik karşılığıdır.
 
 **8. Öğrenen / Öneren**
-Sistem deneyimden öğrenir, pattern'leri tespit eder.
-"Şunu fark ettim, böyle yapalım mı?" der.
-Auto-approve aktivasyonu (sistem kendi yapılandırmasını yaptı) bu 
-özelliğin canlı kanıtıdır.
+Sistem deneyimden öğrenir, pattern'leri tespit eder, kural önerir veya
+**doğrudan tescil eder** (Kural #14 revize, 18 May 2026). 3 kanalda canlı:
+anayasa (Kural #16) + feedback memory + USER settings genişletme.
+
+**9. Felaket Dayanıklılığı** *(18 May 2026 — Aşama 2.1 TAM CANLI)*
+Bilgi tek noktada değildir. Yedekler, çoklu dosyalar, kayıt sistemi 
+"elektrik kesilse, bilgisayar bozulsa, hatta proje yıllarca dursa" 
+sistemin yeniden başlayabilmesini sağlar. Pratik altyapı:
+- Lokal yedek (rotation 10) — `notebook_yedekle.ps1`
+- Off-machine yedek (Google Drive Stream — `G:\Drive'ım\Quanfina_Backup\`)
+- Otomasyon (Windows ScheduledTask günlük 09:00)
+- Pre-push hook + sızma kontrol (Kural #10)
 
 ---
 
@@ -136,11 +150,19 @@ Türetilen kural: Operasyonel Disiplin Kuralı #8 — Adım Sonu Güncelleme.
 Sonuç: Sistem doğru yerlere baktı, doğru bilgiyi okudu, doğru cevap 
 verdi, hatta bonus olarak tüm Aşama 1.B alt-adımlarını sıraladı.
 Doğrulanan özellikler: #1 Tanıma, #2 Yer Belirleme, #3 Bilgi Haritası,
-#4 Proaktif Yönlendirme, #6 Anılı Güncelleme, #7 Felaket Dayanıklılığı, 
-#8 Öğrenen.
+#4 Proaktif Yönlendirme, #7 Anılı Güncelleme, #8 Öğrenen,
+#9 Felaket Dayanıklılığı.
 
-**Sonuç:** Manifesto 6/8 özellikte canlı ve çalışan halde. #5 ve #8'in 
-tamamı Aşama 5'te tam aktifleşecek.
+### Test #4 — Manifesto Testi #3 cross-tool ✅ (17-18 May 2026)
+Yeni Claude Desktop chat'i (17 May) + Yeni Claude Code worktree (18 May)
+`_BASLAT.md` skill kart bootstrap'ı ile aynı kalitede başladı.
+Doğrulanan: tool-agnostic davranış + `_DEVIR.md` zamansal hafıza.
+
+**Sonuç (18 May 2026 RESMÎ KAPANIŞ):** Manifesto **9/9 özellik canlı** —
+9 özellik tam tescil edildi (Aşama 5.7). #6 (Doğru Kategoriye Otomatik —
+yeni) Aşama 1.A %29 strateji kategorilendirmesi + Bilgi Mimarisi 5 İlke
+ile canlı. #9 (Felaket Dayanıklılığı) Aşama 2.1 Drive Stream +
+ScheduledTask ile **TAM CANLI**.
 
 ---
 
