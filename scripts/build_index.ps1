@@ -143,6 +143,7 @@ if ($yetimKok) {
 $beklenenScript = @(
     "sizma_kontrol.ps1", "notebook_yedekle.ps1", "build_index.ps1",
     "hesap_tarama.ps1", "saglik_kontrol.ps1", "pattern_ogren.ps1",
+    "proaktif_oneri.ps1",
     "run_migration.py", "seed_initial_data.py", "seed_symbol_lists.py"
 )
 $scriptsDir = Join-Path $repoRoot "scripts"
