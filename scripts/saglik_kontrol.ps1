@@ -15,6 +15,7 @@
 
 param(
     [switch]$ToFile,
+    [switch]$Uygula,
     [string]$DriveYedekPath = $null
 )
 
@@ -256,7 +257,45 @@ Add-Line "_v1.0'da _SAGLIK_KONTROL.md auto-rewrite eklenecek (Asama 5.2 tamami).
 
 $ciktiMetni = $report.ToString()
 
-if ($ToFile) {
+if ($Uygula) {
+    # v1.0 - _SAGLIK_KONTROL.md sonuna "Otomatik Olcum" bolumu ekle veya guncelle
+    # Marker-based: manuel statik bolumler korunur, sadece otomatik kisim degisir
+    $saglikMd = Join-Path $repoRoot "notebook\_SAGLIK_KONTROL.md"
+    if (-not (Test-Path $saglikMd)) {
+        Write-Host "[hata] _SAGLIK_KONTROL.md bulunamadi" -ForegroundColor Red
+        exit 1
+    }
+
+    $mevcut = Get-Content -Path $saglikMd -Raw -Encoding UTF8
+    $marker = "<!-- AUTO-SAGLIK:START -->"
+    $markerEnd = "<!-- AUTO-SAGLIK:END -->"
+
+    $yeniBolum = @"
+$marker
+
+> Bu bolum ``scripts/saglik_kontrol.ps1 -Uygula`` ile otomatik uretildi.
+> Manuel duzenleme yapma - bir sonraki calismada uzerine yazilir.
+
+$ciktiMetni
+
+$markerEnd
+"@
+
+    if ($mevcut -match [regex]::Escape($marker)) {
+        # Mevcut bolumu replace et
+        $pattern = "(?s)$([regex]::Escape($marker)).*?$([regex]::Escape($markerEnd))"
+        $yeni = $mevcut -replace $pattern, $yeniBolum
+        Write-Host "[ok] _SAGLIK_KONTROL.md otomatik bolum guncellendi" -ForegroundColor Green
+    } else {
+        # Sona ekle
+        $yeni = $mevcut.TrimEnd() + "`n`n---`n`n" + $yeniBolum + "`n"
+        Write-Host "[ok] _SAGLIK_KONTROL.md sonuna otomatik bolum eklendi" -ForegroundColor Green
+    }
+
+    [System.IO.File]::WriteAllText($saglikMd, $yeni, [System.Text.UTF8Encoding]::new($false))
+    Write-Host "  Dosya: $saglikMd" -ForegroundColor DarkGray
+    Write-Host "  Sonraki calistirmada otomatik guncel kalir (Manifesto #7 + #8)" -ForegroundColor DarkGray
+} elseif ($ToFile) {
     $outPath = Join-Path $env:TEMP "quanfina_saglik_son_rapor.md"
     [System.IO.File]::WriteAllText($outPath, $ciktiMetni, [System.Text.UTF8Encoding]::new($false))
     Write-Host "Rapor TEMP'e yazildi: $outPath" -ForegroundColor Green
