@@ -679,6 +679,81 @@ Analizi (Carr 1.+2. baskı + Weinstein yorumu).
 standart), Kural #14 (Pattern Tescil — 2 ortaya çıkış kuralı),
 Aşama 2.3 (a+b) + Aşama 4.2 RESMÎ KAPANIŞ (KARAR #445).
 
+### Kural 18 — Pasif Öğe Çıkarma Protokolü (Negatif Tescil) (18 May 2026 ~23:00 yeni)
+
+**Felsefe:** Yaşayan sistem sadece büyümez — pasif kalmış öğeler
+toplanır, sınırlı dikkati tüketir, AI'a gereksiz bağlam yükler.
+Kural #14 ile **eklenir**, Kural #18 ile **çıkarılır**. Sistem
+nefes alır.
+
+**Why (Sn. Ferit talimatı 18 May 2026 ~23:00):** *"kural ekleme
+varsa kural çıkarma protokolü kuralı da eklicem masaüstüne
+yazdırcam"*. 3 günde sistem 17 Kural + 41 İLKE adayı + 447 KARAR
++ 13 script + 11 notebook + 9 memory'e büyüdü, çıkarma mekanizması
+yoktu. Web Claude turu bu eksiği dürüstçe tespit etti.
+
+**Kapsam (tüm sistem öğeleri):**
+- Kural (CLAUDE.md)
+- İLKE (Bilgi Mimarisi, GitHub, vs.)
+- KARAR (Vizyon karar günlüğü — geçmiş, asla silinmez)
+- AÇIK KONU (Vizyon)
+- Memory dosyası (`~/.claude/projects/.../memory/`)
+- Script (`scripts/`)
+- Notebook belgesi (`notebook/`)
+- Manifesto özelliği (CLAUDE.md)
+- Self-correction sayımı
+
+**Pasiflik eşiği:** Son **30 gün** içinde 0 referans (commit log +
+chat geçmişi + AI uygulama kanıtı). Eşik aşıldıysa "PASİF ADAY"
+işaretlenir.
+
+**Tetikleme — 2 yol:**
+
+1. **Hijyen Turu (3 ayda bir):**
+   - AI `pasif_tara.ps1` (gelecek script, aday) ile tüm öğeleri
+     tarar (30 gün eşiği)
+   - Pasif aday listesi üretilir
+   - Sn. Ferit kararı (Kural #4 yıkıcı eylem onayı) bekler
+   - Onay alınanlar çıkarılır
+
+2. **Doğrudan tescil (Sn. Ferit veya AI):**
+   - Sn. Ferit *"şu kural artık gerek değil"* derse → Kural #18 ile
+     doğrudan çıkarma
+   - AI "bu pattern artık geçerli değil" tespit ederse → Kural #14
+     gibi öneri sunar, Sn. Ferit onay verir
+
+**Çıkarma stratejisi — öğe tipine göre:**
+
+| Öğe | Eylem |
+|---|---|
+| Kural | "PASİF (tarih, sebep)" notu CLAUDE.md'de **kalır** — anayasa kararlı, silinmez |
+| İLKE | "PASİF" notu Vizyon'da kalır |
+| KARAR | Vizyon'da **kalır** (mimari karar geçmişi, asla silinmez) |
+| AÇIK KONU | Kapanmışsa silinir — kapatma disiplini ayrı (Kural #11 alt-madde) |
+| Memory dosyası | `memory/_archive/` altına taşı |
+| Script | `scripts/_archive/` altına taşı |
+| Notebook belgesi | `notebook/_archive/` altına taşı |
+| Manifesto özelliği | "PASİF" notu, **donuk olmalı**, çıkarma çok nadir |
+| Self-correction sayımı | Sayımı bırak (KARAR #447 sonrası: "yeni pattern askıda") |
+
+**Negatif tescil disiplini:**
+- Çıkarma her zaman **gerekçeli**: "Çıkarıldı [tarih] — sebep: [...]"
+- **Geri ekleme:** Eğer çıkarılan öğe sonra tekrar geçerli olursa,
+  yeni Kural #14 turuyla eklenir (eski kayıt referans olarak kalır)
+- **Toplu çıkarma:** Hijyen turunda max **5 öğe** (radikal değişim
+  önlemek için)
+
+**Bağlantı diğer kurallarla:**
+- Kural #14 (Pattern Tespit + Kural Önerisi): **ekleme** mekanizması
+- Kural #18 (Pasif Öğe Çıkarma): **çıkarma** mekanizması
+- Kural #4 (Yıkıcı Eylem Onayı): çıkarma yıkıcı, onay zorunlu
+- İlke #4 (DRY): çıkarma DRY uyumu
+- KARAR ADAY #442 (Yetenek Minimalizmi): "Çok yetenek yanlışa sebep
+  olabiliyor" — Kural #18'in felsefi temeli
+
+**İstisna:** KARAR'lar **asla** silinmez (mimari karar geçmişi
+kanıtı). Sadece "PASİF" notu eklenir, içeriği kalır.
+
 ---
 
 ## 🤝 Çalışma Mantığı + AI Rol Dağılımı
