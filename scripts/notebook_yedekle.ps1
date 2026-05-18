@@ -10,16 +10,100 @@
 #   .\scripts\notebook_yedekle.ps1
 #   .\scripts\notebook_yedekle.ps1 -Hedef "G:\Drive\Quanfina_Backup"
 #   .\scripts\notebook_yedekle.ps1 -SonNAdet 5
+#   .\scripts\notebook_yedekle.ps1 -ScheduledTask -Hedef "G:\Drive\Quanfina_Backup"  # Task Scheduler kayit
+#   .\scripts\notebook_yedekle.ps1 -UnregisterTask  # Task Scheduler kayit sil
 #
 # Default hedef: $env:USERPROFILE\Quanfina_Backup
 # Default SonN: 10 (en son 10 yedek tutulur, eskileri silinir)
+# Default Saat: 09:00 (ScheduledTask icin)
 
 param(
     [string]$Hedef = (Join-Path $env:USERPROFILE "Quanfina_Backup"),
-    [int]$SonNAdet = 10
+    [int]$SonNAdet = 10,
+    [switch]$ScheduledTask,
+    [switch]$UnregisterTask,
+    [string]$Saat = "09:00"
 )
 
 $ErrorActionPreference = "Stop"
+
+$TaskName = "Quanfina_Notebook_Yedek_Gunluk"
+
+# ============================================================
+# ScheduledTask kurulum/kaldirma modu
+# ============================================================
+if ($ScheduledTask -or $UnregisterTask) {
+    # Repo kokunu bul (script path tabanli, git'e bagimli degil)
+    $scriptPath = $MyInvocation.MyCommand.Path
+    $scriptsDir = Split-Path -Parent $scriptPath
+    $repoBase = Split-Path -Parent $scriptsDir
+
+    Write-Host ""
+    Write-Host "=== Quanfina Notebook Yedek ScheduledTask ===" -ForegroundColor Cyan
+    Write-Host ""
+
+    # Once mevcut task var mi temizle (idempotent)
+    $mevcut = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+    if ($mevcut) {
+        Write-Host "[bakim] Mevcut task siliniyor: $TaskName" -ForegroundColor Yellow
+        Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
+    }
+
+    if ($UnregisterTask) {
+        if ($mevcut) {
+            Write-Host "[ok] Task silindi: $TaskName" -ForegroundColor Green
+        } else {
+            Write-Host "[bilgi] Task zaten yoktu: $TaskName" -ForegroundColor DarkGray
+        }
+        exit 0
+    }
+
+    # ScheduledTask kurma
+    Write-Host "Task adi : $TaskName"
+    Write-Host "Tetik    : Gunluk $Saat"
+    Write-Host "Hedef    : $Hedef"
+    Write-Host "Script   : $scriptPath"
+    Write-Host ""
+
+    $argList = @(
+        "-NoProfile",
+        "-NonInteractive",
+        "-ExecutionPolicy", "Bypass",
+        "-File", "`"$scriptPath`"",
+        "-Hedef", "`"$Hedef`""
+    )
+    $action = New-ScheduledTaskAction `
+        -Execute "powershell.exe" `
+        -Argument ($argList -join " ")
+
+    $trigger = New-ScheduledTaskTrigger -Daily -At $Saat
+
+    $settings = New-ScheduledTaskSettingsSet `
+        -StartWhenAvailable `
+        -DontStopOnIdleEnd `
+        -ExecutionTimeLimit (New-TimeSpan -Minutes 10)
+
+    $principal = New-ScheduledTaskPrincipal `
+        -UserId $env:USERNAME `
+        -LogonType Interactive `
+        -RunLevel Limited
+
+    Register-ScheduledTask `
+        -TaskName $TaskName `
+        -Action $action `
+        -Trigger $trigger `
+        -Settings $settings `
+        -Principal $principal `
+        -Description "Quanfina notebook/ klasoru gunluk ZIP yedek (Manifesto Ozellik #9)" | Out-Null
+
+    Write-Host "[ok] ScheduledTask kuruldu: $TaskName" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "Dogrulama: Get-ScheduledTask -TaskName '$TaskName'" -ForegroundColor DarkGray
+    Write-Host "Manuel calistirma: Start-ScheduledTask -TaskName '$TaskName'" -ForegroundColor DarkGray
+    Write-Host "Silme: .\scripts\notebook_yedekle.ps1 -UnregisterTask" -ForegroundColor DarkGray
+    Write-Host ""
+    exit 0
+}
 
 # Repo kökünü bul
 try {

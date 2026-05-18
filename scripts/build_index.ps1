@@ -191,9 +191,39 @@ if (Test-Path $notebookDir) {
     }
 }
 
+# --- Belge satir sayim raporu (v3.0 — manuel hijyen yardimcisi) ---
+Write-Host ""
+Write-Host "9. Belge satir sayim raporu" -ForegroundColor Yellow
+Write-Host "   (Bu sayilar _INDEX.md ve _BASLAT.md'deki referanslarla manuel karsilastir)" -ForegroundColor DarkGray
+$belgeDosyalari = @(
+    @{ Path = "CLAUDE.md"; Etiket = "CLAUDE.md (anayasa)" },
+    @{ Path = "notebook/_BASLAT.md"; Etiket = "_BASLAT.md" },
+    @{ Path = "notebook/_INDEX.md"; Etiket = "_INDEX.md" },
+    @{ Path = "notebook/_DEVIR.md"; Etiket = "_DEVIR.md" },
+    @{ Path = "notebook/_ROADMAP.md"; Etiket = "_ROADMAP.md" },
+    @{ Path = "notebook/_LINKLER.md"; Etiket = "_LINKLER.md" },
+    @{ Path = "notebook/_KOD_ENVANTERI.md"; Etiket = "_KOD_ENVANTERI.md" },
+    @{ Path = "notebook/YAPILANLAR.md"; Etiket = "YAPILANLAR.md" },
+    @{ Path = "notebook/Notebook_A_Vizyon.md"; Etiket = "Notebook_A_Vizyon.md" }
+)
+foreach ($belge in $belgeDosyalari) {
+    $fullPath = Join-Path $repoRoot $belge.Path
+    if (Test-Path $fullPath) {
+        # NOT: (Get-Content).Count tum satirlari sayar (bos dahil).
+        # Measure-Object -Line bos satirlari atlar (yanlis sonuc verir, KULLANMA).
+        $satir = (Get-Content -Path $fullPath -Encoding UTF8).Count
+        $boyutKB = [math]::Round((Get-Item $fullPath).Length / 1KB, 1)
+        $etiketPadded = $belge.Etiket.PadRight(28)
+        Write-Host "  $etiketPadded : $satir satir, $boyutKB KB" -ForegroundColor Cyan
+    } else {
+        Write-Host "  $($belge.Etiket) : [BULUNAMADI] $($belge.Path)" -ForegroundColor Red
+        $script:findings += "kayip-belge: $($belge.Path)"
+    }
+}
+
 # --- Arsiv durum ---
 Write-Host ""
-Write-Host "9. Arsiv durumu" -ForegroundColor Yellow
+Write-Host "10. Arsiv durumu" -ForegroundColor Yellow
 $arsiv = Join-Path $repoRoot "_archive"
 if (Test-Path $arsiv) {
     $arsivCount = (Get-ChildItem -Path $arsiv -Recurse -File).Count
