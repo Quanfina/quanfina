@@ -142,8 +142,8 @@ if ($yetimKok) {
 # 8b. Scripts klasoru (PS1 + PY)
 $beklenenScript = @(
     "sizma_kontrol.ps1", "notebook_yedekle.ps1", "build_index.ps1",
-    "hesap_tarama.ps1", "run_migration.py", "seed_initial_data.py",
-    "seed_symbol_lists.py"
+    "hesap_tarama.ps1", "saglik_kontrol.ps1",
+    "run_migration.py", "seed_initial_data.py", "seed_symbol_lists.py"
 )
 $scriptsDir = Join-Path $repoRoot "scripts"
 if (Test-Path $scriptsDir) {
@@ -168,7 +168,7 @@ if (Test-Path $scriptsDir) {
 $beklenenNotebook = @(
     "_BASLAT.md", "_ROADMAP.md", "_LINKLER.md", "_INDEX.md",
     "_KOD_ENVANTERI.md", "_DEVIR.md", "_kisisel_okuma.md",
-    "_SAGLIK_KONTROL.md",
+    "_SAGLIK_KONTROL.md", "_HATALAR.md", "_FELSEFE.md",
     "YAPILANLAR.md", "Notebook_A_Vizyon.md",
     "Notebook_B6_AdimlarKarar.md", "Notebook_C1_Sprint_QuickStart.md",
     "Notebook_C2_EK1-8.md", "Notebook_C3_EK9_DBSchema.md",
@@ -205,6 +205,8 @@ $belgeDosyalari = @(
     @{ Path = "notebook/_LINKLER.md"; Etiket = "_LINKLER.md" },
     @{ Path = "notebook/_KOD_ENVANTERI.md"; Etiket = "_KOD_ENVANTERI.md" },
     @{ Path = "notebook/_SAGLIK_KONTROL.md"; Etiket = "_SAGLIK_KONTROL.md" },
+    @{ Path = "notebook/_HATALAR.md"; Etiket = "_HATALAR.md" },
+    @{ Path = "notebook/_FELSEFE.md"; Etiket = "_FELSEFE.md" },
     @{ Path = "notebook/YAPILANLAR.md"; Etiket = "YAPILANLAR.md" },
     @{ Path = "notebook/Notebook_A_Vizyon.md"; Etiket = "Notebook_A_Vizyon.md" }
 )
