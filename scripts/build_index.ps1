@@ -168,6 +168,7 @@ if (Test-Path $scriptsDir) {
 $beklenenNotebook = @(
     "_BASLAT.md", "_ROADMAP.md", "_LINKLER.md", "_INDEX.md",
     "_KOD_ENVANTERI.md", "_DEVIR.md", "_kisisel_okuma.md",
+    "_SAGLIK_KONTROL.md",
     "YAPILANLAR.md", "Notebook_A_Vizyon.md",
     "Notebook_B6_AdimlarKarar.md", "Notebook_C1_Sprint_QuickStart.md",
     "Notebook_C2_EK1-8.md", "Notebook_C3_EK9_DBSchema.md",
@@ -203,6 +204,7 @@ $belgeDosyalari = @(
     @{ Path = "notebook/_ROADMAP.md"; Etiket = "_ROADMAP.md" },
     @{ Path = "notebook/_LINKLER.md"; Etiket = "_LINKLER.md" },
     @{ Path = "notebook/_KOD_ENVANTERI.md"; Etiket = "_KOD_ENVANTERI.md" },
+    @{ Path = "notebook/_SAGLIK_KONTROL.md"; Etiket = "_SAGLIK_KONTROL.md" },
     @{ Path = "notebook/YAPILANLAR.md"; Etiket = "YAPILANLAR.md" },
     @{ Path = "notebook/Notebook_A_Vizyon.md"; Etiket = "Notebook_A_Vizyon.md" }
 )
