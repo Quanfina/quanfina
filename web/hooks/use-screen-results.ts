@@ -7,8 +7,15 @@ async function fetchScreenResults(
   slug: ScreenSlug,
   limit: number = 500
 ): Promise<ScreenResultRow[]> {
-  const res = await fetch(`/api/screens/${slug}?limit=${limit}`);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  // 12sn timeout: scan_diff CTE 6+ sn surebilir, watchlist'ten daha cömert
+  const res = await fetch(`/api/screens/${slug}?limit=${limit}`, {
+    signal: AbortSignal.timeout(12000),
+  });
+  if (!res.ok) {
+    let body = "";
+    try { body = await res.text(); } catch { /* ignore */ }
+    throw new Error(`HTTP ${res.status}${body ? ` — ${body.slice(0, 160)}` : ""}`);
+  }
   return res.json();
 }
 

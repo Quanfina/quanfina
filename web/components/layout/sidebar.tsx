@@ -1,16 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { Menu, Home, BarChart2, TrendingUp, Activity, FlaskConical, Globe, ListChecks, NotebookText } from "lucide-react";
+import { Menu, Home, BarChart2, TrendingUp, Activity, FlaskConical, Globe, ListChecks, NotebookText, ScanLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { NavLink } from "@/components/layout/nav-link";
 
-// KARAR #347 + KARAR #359: Sinyaller > Watchlist > Piyasa Durumu > diğerleri
+// KARAR #347 + KARAR #359: Sinyaller > Screens > Watchlist > Piyasa Durumu > diğerleri
+// Sprint 4-bis.1b+: /screens — hisse tarama (22 ekran), Sinyaller ile Watchlist arası akış adımı
 const NAV_ITEMS = [
   { href: "/",               label: "Ana Sayfa",      icon: Home         },
   { href: "/signals",        label: "Sinyaller",      icon: Activity     },
+  { href: "/screens",        label: "Hisse Tarama",   icon: ScanLine     },
   { href: "/watchlist",      label: "Watchlist",      icon: ListChecks    },
   { href: "/journal",        label: "Trade Journal",  icon: NotebookText  },
   { href: "/piyasa-durumu",  label: "Piyasa Durumu",  icon: Globe         },

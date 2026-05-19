@@ -24,7 +24,17 @@ if _HOST.startswith("/"):
 else:
     _URL = f"postgresql+psycopg2://{_USER}:{_PASS}@{_HOST}:{_PORT}/{_DB}?sslmode=require"
 
-engine = create_engine(_URL, pool_pre_ping=True, pool_size=5, max_overflow=10)
+# connect_timeout=5: Cloud SQL erisilemez (paused / IP whitelist) durumlarinda
+# OS default TCP timeout (~75-130s) yerine 5sn'de hizli fail.
+# pool_recycle=300: 5 dakikalik baglantilar Cloud SQL idle drop'tan kacinir.
+engine = create_engine(
+    _URL,
+    pool_pre_ping=True,
+    pool_size=5,
+    max_overflow=10,
+    pool_recycle=300,
+    connect_args={"connect_timeout": 5},
+)
 
 # =============================================================
 # web_watchlist CRUD

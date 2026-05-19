@@ -4,7 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import type { ScreenMeta } from "@/types/screens";
 
 async function fetchScreenMeta(): Promise<ScreenMeta[]> {
-  const res = await fetch("/api/screens");
+  // Meta endpoint statik dict (bellek), DB yok — 5sn fazlasiyla yeter
+  const res = await fetch("/api/screens", { signal: AbortSignal.timeout(5000) });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }

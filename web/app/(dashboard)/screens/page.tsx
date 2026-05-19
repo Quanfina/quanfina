@@ -173,6 +173,8 @@ export default function ScreensPage() {
 
   const metaQ = useScreenMeta();
   const resultsQ = useScreenResults(selectedSlug, 500);
+  const refetchResults = resultsQ.refetch;
+  const isRefetchingResults = resultsQ.isFetching && !resultsQ.isLoading;
   const addWatchlistRow = useAddWatchlistRow();
 
   // Sprint 4-bis.1c — Multi-select Watch'a ekleme (KARAR ADAY #454 sonner toast)
@@ -334,10 +336,28 @@ export default function ScreensPage() {
         </button>
       </div>
 
-      {/* Hata mesajı */}
+      {/* Hata mesajı — DB unreachable senaryosu için actionable banner */}
       {resultsQ.isError && (
-        <div className="p-4 border border-destructive bg-destructive/10 rounded-md text-sm">
-          API hata: {(resultsQ.error as Error).message}
+        <div className="p-4 border border-destructive bg-destructive/10 rounded-md" role="alert">
+          <div className="font-semibold text-destructive mb-1">
+            ⚠️ Tarama sonucu alınamadı
+          </div>
+          <div className="text-xs mb-2 opacity-80">
+            {(resultsQ.error as Error).message}
+          </div>
+          <div className="text-xs mb-3 opacity-70">
+            Olası sebep: Cloud SQL erişilemez (instance durmuş veya IP whitelist eski).
+            GCP Console → SQL → instance durum kontrol et. Meta liste yine çalışır
+            (dropdown&apos;da kategorileri görebilirsin).
+          </div>
+          <button
+            type="button"
+            onClick={() => refetchResults()}
+            disabled={isRefetchingResults}
+            className="px-3 py-1.5 rounded-md border bg-background text-sm hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isRefetchingResults ? "Tekrar deneniyor..." : "Tekrar Dene"}
+          </button>
         </div>
       )}
 

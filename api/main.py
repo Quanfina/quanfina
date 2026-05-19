@@ -33,6 +33,7 @@ from typing import Literal, Optional
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from sqlalchemy.exc import OperationalError
 
 logging.basicConfig(
     level=logging.INFO,
@@ -879,7 +880,16 @@ class WatchlistRow(BaseModel):
 
 @app.get("/api/watchlist", response_model=list[WatchlistRow])
 def get_watchlist() -> list[WatchlistRow]:
-    return [WatchlistRow(**r) for r in watchlist_get_all()]
+    # DB unreachable durumunda generic 500 yerine 503 + informative body don.
+    # Frontend banner net hata mesaji gosterebilsin (Kural #20 UX disiplini).
+    try:
+        return [WatchlistRow(**r) for r in watchlist_get_all()]
+    except OperationalError as e:
+        # Cloud SQL paused / IP whitelist eski / network problemi
+        raise HTTPException(
+            status_code=503,
+            detail="Veritabanına ulaşılamıyor (Cloud SQL). GCP Console → SQL → instance durum/Authorized Networks kontrol et."
+        ) from e
 
 
 # ── Watchlist CRUD helpers ────────────────────────────────────────────────────

@@ -36,7 +36,7 @@ export default function WatchlistPage() {
   const [status, setStatus] = useState("all");
   const [minConsensus, setMinConsensus] = useState(0);
   const [search, setSearch] = useState("");
-  const { data, isLoading, isError, error } = useWatchlist();
+  const { data, isLoading, isError, error, refetch, isFetching } = useWatchlist();
   const gridRef = useRef<AgGridReact<WatchlistRow>>(null);
 
   // Dialog state
@@ -152,16 +152,32 @@ export default function WatchlistPage() {
 
       <div className="flex-1 px-6 py-4">
         {isLoading && (
-          <div className="flex items-center justify-center h-64 text-sm text-muted-foreground">
-            Yükleniyor...
+          <div className="flex flex-col items-center justify-center h-64 gap-2 text-sm text-muted-foreground">
+            <span>Yükleniyor...</span>
+            <span className="text-xs opacity-60">DB bağlantısı (en fazla 8sn)</span>
           </div>
         )}
         {isError && (
-          <div
-            className="flex items-center justify-center h-64 text-sm"
-            style={{ color: "var(--mtp-danger)" }}
-          >
-            Hata: {(error as Error)?.message ?? "Watchlist verisi alınamadı"}
+          <div className="flex items-center justify-center h-64 px-6">
+            <div
+              className="max-w-xl w-full p-4 border rounded-md"
+              style={{ borderColor: "var(--mtp-danger)", background: "rgba(255, 80, 80, 0.06)" }}
+              role="alert"
+            >
+              <div className="font-semibold mb-1" style={{ color: "var(--mtp-danger)" }}>
+                ⚠️ Watchlist verisi alınamadı
+              </div>
+              <div className="text-xs mb-3 opacity-80">
+                {(error as Error)?.message ?? "Bilinmeyen hata"}
+              </div>
+              <div className="text-xs mb-3 opacity-70">
+                Olası sebep: Cloud SQL erişilemez (instance durmuş veya IP whitelist eski).
+                GCP Console → SQL → instance durum kontrol et.
+              </div>
+              <Button size="sm" variant="outline" onClick={() => refetch()} disabled={isFetching}>
+                {isFetching ? "Tekrar deneniyor..." : "Tekrar Dene"}
+              </Button>
+            </div>
           </div>
         )}
         {!isLoading && !isError && (
@@ -197,7 +213,7 @@ export default function WatchlistPage() {
             <AlertDialogDescription>
               <strong>{deletingRow?.symbol}</strong> —{" "}
               {deletingRow?.strategy === "minervini" ? "Minervini" : "Carr"}{" "}
-              watchlist'ten kaldırılacak. Bu işlem geri alınamaz.
+              watchlist&apos;ten kaldırılacak. Bu işlem geri alınamaz.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
