@@ -145,6 +145,8 @@ $beklenenScript = @(
     "hesap_tarama.ps1", "saglik_kontrol.ps1", "pattern_ogren.ps1",
     "proaktif_oneri.ps1", "drive_sync.ps1", "yapilanlar_otomatik_guncelle.ps1",
     "aciklama_konsolide.ps1",
+    # 19 May 2026 Otonom Hijyen Modu yeni scripts:
+    "drive_pull.ps1", "hijyen_paketi.ps1", "pasif_tara.ps1", "satir_sayim_otomatik.ps1",
     "run_migration.py", "seed_initial_data.py", "seed_symbol_lists.py"
 )
 $scriptsDir = Join-Path $repoRoot "scripts"
@@ -175,7 +177,11 @@ $beklenenNotebook = @(
     "Notebook_B6_AdimlarKarar.md", "Notebook_C1_Sprint_QuickStart.md",
     "Notebook_C2_EK1-8.md", "Notebook_C3_EK9_DBSchema.md",
     "EK10_TradeGrader_Sentezi.md",
-    "Asama_4_1_TradeGrader_Gem.md"
+    "Asama_4_1_TradeGrader_Gem.md",
+    # 18 May 2026 Aşama 2.3 NotebookLM kurulumlari:
+    "Asama_2_3_a_Minervini_NotebookLM.md", "Asama_2_3_Vizyon_Bekcisi_NotebookLM.md",
+    # 18 May 2026 clean-room + 19 May Otonom Hijyen yeni dosyalar:
+    "_CLEAN_ROOM.md", "_OZET.md", "_SISTEM_SEMA.md", "_DEVIR_ARSIV.md"
 )
 $notebookDir = Join-Path $repoRoot "notebook"
 if (Test-Path $notebookDir) {

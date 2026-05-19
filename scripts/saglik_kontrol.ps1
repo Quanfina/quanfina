@@ -65,7 +65,10 @@ if (Test-Path $claudeMd) {
     # v0.5.2 fix (19 May 2026): unique kural numarasi (alt-bolum sayilmasin)
     # Eski: Where-Object Count → "### Kural 9 v2 alt-bolumu" gibi alt-bolumler dahil sayim sisirilir
     $kuralSayim = ($claudeLines | ForEach-Object { if ($_ -match '^### Kural (\d+)') { $matches[1] } } | Sort-Object -Unique).Count
-    $ilkeSayim = ($claudeLines | ForEach-Object { if ($_ -match '^### .lke (\d+)') { $matches[1] } } | Sort-Object -Unique).Count
+    # v0.5.3 fix (19 May 2026 ~05:00): Ilke total = Bilgi Mim 5 + GitHub 8 = 13
+    # Sort-Object -Unique YANLIS — iki ayri bolumde numara cakisiyor (BM #1-5 + GH #1-8)
+    # Where-Object Count dogru — her "### Ilke N" satiri ayri ilkedir
+    $ilkeSayim = ($claudeLines | Where-Object { $_ -match '^### .lke \d+' }).Count
     $githubIlke = $ilkeSayim  # Toplam (Bilgi Mimarisi 5 + GitHub 8 = 13 beklenir)
     Add-Line "| Olcum | Deger |"
     Add-Line "|---|---:|"
