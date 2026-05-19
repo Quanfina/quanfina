@@ -264,14 +264,31 @@ export default function ScreensPage() {
           id="screen-select"
           value={selectedSlug ?? ""}
           onChange={(e) => setSelectedSlug(e.target.value as ScreenSlug)}
-          className="px-3 py-2 border rounded-md bg-background min-w-[280px]"
+          className="px-3 py-2 border rounded-md bg-background min-w-[300px]"
           disabled={metaQ.isLoading}
         >
-          {metaQ.data?.map((meta) => (
-            <option key={meta.slug} value={meta.slug}>
-              {SCREEN_CATEGORIES[meta.slug]} — {meta.label}
-            </option>
-          ))}
+          {/* Sprint 4-bis.2 — 3 kategori (ready/parse/deferred) optgroup ile gruplu */}
+          <optgroup label="✅ Ready (8) — Saf SQL filtre">
+            {metaQ.data?.filter((m) => m.category === "ready").map((meta) => (
+              <option key={meta.slug} value={meta.slug}>
+                {SCREEN_CATEGORIES[meta.slug]} — {meta.label}
+              </option>
+            ))}
+          </optgroup>
+          <optgroup label="⚙️ Parse (7) — Confirmations/Violations text-parse">
+            {metaQ.data?.filter((m) => m.category === "parse").map((meta) => (
+              <option key={meta.slug} value={meta.slug}>
+                {SCREEN_CATEGORIES[meta.slug]} — {meta.label}
+              </option>
+            ))}
+          </optgroup>
+          <optgroup label="⏳ Deferred (1) — Sprint 4-bis.4">
+            {metaQ.data?.filter((m) => m.category === "deferred").map((meta) => (
+              <option key={meta.slug} value={meta.slug} disabled>
+                {SCREEN_CATEGORIES[meta.slug]} — {meta.label} (henüz hazır değil)
+              </option>
+            ))}
+          </optgroup>
         </select>
 
         {selectedMeta && (
