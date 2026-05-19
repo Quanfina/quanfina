@@ -263,10 +263,15 @@ SCREENS_READY_9 = {
     "mom_below_10":     {"label": "Momentum (Below $10)",      "filter": "passed = 1 AND price < 10"},
     # KARAR #461 — Master Pre-Compute (VCP scanner.py'de hesap, DB sade BOOLEAN okur)
     "tight_low_volume": {"label": "Tight Price Low Vol (VCP)", "filter": "tight_low_vol_pass = TRUE"},
+    # KARAR #466 (20 May 2026) — VCP A+ Kalite (Mark canon "%50 alti en siki" + Bonus FMP altin)
+    "tight_low_vol_excellent": {
+        "label": "Tight Price Low Vol — EXCELLENT (A+)",
+        "filter": "vcp_quality_score = 'EXCELLENT'",
+    },
 }
 
 # Geriye dönük alias — Sprint 4-bis.1b'de SCREENS_READY_8 ismiyle bilinen
-# dict artık 9 entry. Eski referansları kırmamak için yeniden bağlanır.
+# dict artık 10 entry. Eski referansları kırmamak için yeniden bağlanır.
 SCREENS_READY_8 = SCREENS_READY_9
 
 
@@ -299,8 +304,11 @@ def screen_get_results(slug: str, limit: int = 500) -> list[dict]:
     # NOT: minervini_scans tablosunda kolon adi 'ticker', frontend uyumu icin 'symbol' alias
     # rs_ibd double precision (TEXT degil) - Python tarafinda float kabul edilir
     # scan_date TEXT (TIMESTAMP degil) - .isoformat() cagrilmaz
+    # KARAR #466 (20 May 2026) — vcp_quality_score TUM ready screens'te donulur.
+    # tight_low_volume slug'inda anlamli, digerlerinde NULL (rozet UI'de gizlenir).
     query = f"""
-        SELECT ticker AS symbol, grade, rs_ibd, price, passed, scan_date
+        SELECT ticker AS symbol, grade, rs_ibd, price, passed, scan_date,
+               vcp_quality_score
         FROM minervini_scans
         WHERE scan_date = (SELECT MAX(scan_date) FROM minervini_scans)
           AND {sql_filter}
@@ -323,8 +331,8 @@ def screen_get_results(slug: str, limit: int = 500) -> list[dict]:
 
 
 def screen_list_available() -> list[dict]:
-    """22 screen meta listesini doner (frontend dropdown icin).
-    Sprint 4-bis.4 KARAR #461 sonrasi kategori sayim: 9 ready + 7 parse + 6 diff + 0 deferred.
+    """Screen meta listesini doner (frontend dropdown icin).
+    Sprint 4-bis.5 KARAR #466 sonrasi kategori sayim: 10 ready + 7 parse + 6 diff + 0 deferred = 23 ekran.
     """
     out = [
         {"slug": slug, "label": meta["label"], "filter_summary": meta["filter"],

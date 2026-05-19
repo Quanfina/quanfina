@@ -101,7 +101,56 @@ function PassedCell(p: ICellRendererParams<ScreenResultRow>) {
   return <span style={{ color: "#888" }}>—</span>;
 }
 
+// KARAR #466 — VCP Kalite Skoru rozeti (EXCELLENT/PASS/None)
+function VcpQualityCell(p: ICellRendererParams<ScreenResultRow>) {
+  const score = p.value as "EXCELLENT" | "PASS" | null | undefined;
+  if (!score) return <span style={{ color: "#888" }}>—</span>;
+  const style = score === "EXCELLENT"
+    ? { bg: "#0f5132", color: "#fff", label: "A+ Kalite" }    // koyu yeşil — Mark canon "%50 alti"
+    : { bg: "#d1e7dd", color: "#155724", label: "Olgun" };    // açık yeşil — Brandon PASS filtre
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        padding: "2px 10px",
+        borderRadius: "9999px",
+        background: style.bg,
+        color: style.color,
+        fontWeight: 600,
+        fontSize: "11px",
+        textAlign: "center",
+      }}
+      title={score === "EXCELLENT"
+        ? "VCP A+ Kalite — Mark canon: hacim 50d MA × %50 altı (en sıkı pivot anı)"
+        : "VCP Olgun — Brandon muhafazakar filtre: hacim 50d MA × %70 altı"}
+    >
+      {style.label}
+    </span>
+  );
+}
+
 // === AG Grid ColDef (KARAR ADAY #455 standart pattern) ===
+
+// KARAR #466 — VCP slug'larinda Kalite kolonu acilir, digerlerinde gizli
+const VCP_SLUGS = new Set<string>(["tight_low_volume", "tight_low_vol_excellent"]);
+
+function buildColDefs(slug: string | null): ColDef<ScreenResultRow>[] {
+  const isVcpSlug = slug ? VCP_SLUGS.has(slug) : false;
+  return [
+    ...(isVcpSlug
+      ? [{
+          field: "vcp_quality_score" as keyof ScreenResultRow,
+          headerName: "Kalite",
+          headerTooltip:
+            "VCP Kalite Skoru (KARAR #466) — EXCELLENT: Mark canon %50 alti " +
+            "(A+); PASS: Brandon muhafazakar filtre %70 alti",
+          width: 110,
+          cellRenderer: VcpQualityCell,
+          cellStyle: { display: "flex", alignItems: "center", justifyContent: "center" },
+        }]
+      : []),
+  ];
+}
 
 const COL_DEFS: ColDef<ScreenResultRow>[] = [
   {
@@ -177,6 +226,12 @@ export default function ScreensPage() {
   const refetchResults = resultsQ.refetch;
   const isRefetchingResults = resultsQ.isFetching && !resultsQ.isLoading;
   const addWatchlistRow = useAddWatchlistRow();
+
+  // KARAR #466 — VCP slug'larinda Kalite kolonu acilir, base COL_DEFS sonuna eklenir
+  const dynamicColDefs = useMemo(
+    () => [...COL_DEFS, ...buildColDefs(selectedSlug)],
+    [selectedSlug]
+  );
 
   // Sprint 4-bis.1c — Multi-select Watch'a ekleme (KARAR ADAY #454 sonner toast)
   const handleAddSelectedToWatch = async () => {
@@ -254,7 +309,7 @@ export default function ScreensPage() {
       <div className="space-y-2">
         <h1 className="text-2xl font-bold">Hisse Tarama (Screens)</h1>
         <p className="text-sm text-muted-foreground">
-          22 tarama: 9 Ready (saf SQL) + 7 Parse (text-parse) + 6 Scan-Diff (Self-JOIN).
+          23 tarama: 10 Ready (saf SQL) + 7 Parse (text-parse) + 6 Scan-Diff (Self-JOIN).
           Strateji-bağımsız fırsat keşfi.
         </p>
       </div>
@@ -271,8 +326,8 @@ export default function ScreensPage() {
           className="px-3 py-2 border rounded-md bg-background min-w-[300px]"
           disabled={metaQ.isLoading}
         >
-          {/* Sprint 4-bis.4 KARAR #461 — 3 kategori (ready/parse/diff) optgroup, Deferred boşaldı */}
-          <optgroup label="✅ Ready (9) — Saf SQL filtre">
+          {/* Sprint 4-bis.5 KARAR #466 — Ready 9 → 10 (tight_low_vol_excellent eklendi) */}
+          <optgroup label="✅ Ready (10) — Saf SQL filtre">
             {metaQ.data?.filter((m) => m.category === "ready").map((meta) => (
               <option key={meta.slug} value={meta.slug}>
                 {SCREEN_CATEGORIES[meta.slug]} — {meta.label}
@@ -391,13 +446,14 @@ export default function ScreensPage() {
             <AgGridReact<ScreenResultRow>
               ref={gridRef}
               rowData={resultsQ.data ?? []}
-              columnDefs={COL_DEFS}
+              columnDefs={dynamicColDefs}
               defaultColDef={DEFAULT_COL_DEF}
               animateRows
               rowHeight={40}
               rowSelection="multiple"
               suppressRowClickSelection={false}
               // KARAR ADAY #454: Add to Watch multi-select (1c canlı)
+              // KARAR #466: VCP slug'larinda Kalite kolonu (dynamicColDefs)
             />
           )}
         </div>
