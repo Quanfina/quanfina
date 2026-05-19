@@ -35,7 +35,7 @@ export function ActiveStrategies({
 
       {strategies.length === 0 ? (
         <div className="rounded-lg border px-4 py-3 text-sm text-muted-foreground">
-          {symbol} watchlist'te yok
+          {symbol} watchlist&apos;te yok
         </div>
       ) : (
         <div className="flex flex-col gap-2">
