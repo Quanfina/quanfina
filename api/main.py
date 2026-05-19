@@ -254,27 +254,25 @@ def list_screens() -> list[ScreenMeta]:
 @app.get("/api/screens/{slug}", response_model=list[ScreenResultRow])
 def get_screen_results(slug: str, limit: int = 500) -> list[ScreenResultRow]:
     """
-    Sprint 4-bis.1b (ready) + Sprint 4-bis.2 (parse) — slug dispatch ile sonuc dondur.
+    Sprint 4-bis.1b (ready) + Sprint 4-bis.2 (parse) + Sprint 4-bis.3 (diff)
+    + Sprint 4-bis.4 (tight_low_volume — pre-compute) — slug dispatch ile sonuc dondur.
 
-    - SCREENS_READY_8 (8 ekran, saf SQL)
+    - SCREENS_READY_9 (9 ekran, saf SQL — tight_low_volume artik buraya dahil)
     - SCREENS_PARSE_7 (7 ekran, confirmations/violations text-parse SQL)
-    - tight_low_volume (1 ekran, JSONB deferred — Sprint 4-bis.4)
+    - SCREENS_DIFF_6 (6 ekran, Self-JOIN onceki scan karsilastirma)
 
     db_connected=false durumunda MOCK donus (dev ortam).
-    db_connected=true → minervini_scans tablosundan gerçek sorgu.
+    db_connected=true -> minervini_scans tablosundan gercek sorgu.
+
+    KARAR #461 (19 May 2026): tight_low_volume artik Master pre-compute
+    stratejisiyle SCREENS_READY_9'a tasindi (scanner.py tight_low_vol_pass
+    BOOLEAN kolonunu yazar, SQL sade WHERE okur). 501 deferred kaldirildi.
     """
     valid_slugs = (
-        set(SCREENS_READY_8.keys()) |
+        set(SCREENS_READY_8.keys()) |  # alias of SCREENS_READY_9 (geriye uyum)
         set(SCREENS_PARSE_7.keys()) |
         set(SCREENS_DIFF_6.keys())
     )
-    if slug == "tight_low_volume":
-        from fastapi import HTTPException
-        raise HTTPException(
-            status_code=501,
-            detail="tight_low_volume: price_volume_history JSONB parse — "
-                   "Sprint 4-bis.4 scanner refactor adayi (AÇIK KONU #69 ailesi)."
-        )
     if slug not in valid_slugs:
         from fastapi import HTTPException
         raise HTTPException(

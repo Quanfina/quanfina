@@ -253,7 +253,7 @@ export default function ScreensPage() {
       <div className="space-y-2">
         <h1 className="text-2xl font-bold">Hisse Tarama (Screens)</h1>
         <p className="text-sm text-muted-foreground">
-          22 tarama: 8 Ready (saf SQL) + 7 Parse (text-parse) + 6 Scan-Diff (Self-JOIN) + 1 Deferred.
+          22 tarama: 9 Ready (saf SQL) + 7 Parse (text-parse) + 6 Scan-Diff (Self-JOIN).
           Strateji-bağımsız fırsat keşfi.
         </p>
       </div>
@@ -270,8 +270,8 @@ export default function ScreensPage() {
           className="px-3 py-2 border rounded-md bg-background min-w-[300px]"
           disabled={metaQ.isLoading}
         >
-          {/* Sprint 4-bis.2 — 3 kategori (ready/parse/deferred) optgroup ile gruplu */}
-          <optgroup label="✅ Ready (8) — Saf SQL filtre">
+          {/* Sprint 4-bis.4 KARAR #461 — 3 kategori (ready/parse/diff) optgroup, Deferred boşaldı */}
+          <optgroup label="✅ Ready (9) — Saf SQL filtre">
             {metaQ.data?.filter((m) => m.category === "ready").map((meta) => (
               <option key={meta.slug} value={meta.slug}>
                 {SCREEN_CATEGORIES[meta.slug]} — {meta.label}
@@ -292,13 +292,8 @@ export default function ScreensPage() {
               </option>
             ))}
           </optgroup>
-          <optgroup label="⏳ Deferred (1) — Sprint 4-bis.4">
-            {metaQ.data?.filter((m) => m.category === "deferred").map((meta) => (
-              <option key={meta.slug} value={meta.slug} disabled>
-                {SCREEN_CATEGORIES[meta.slug]} — {meta.label} (henüz hazır değil)
-              </option>
-            ))}
-          </optgroup>
+          {/* KARAR #461 (Sprint 4-bis.4): Deferred kategorisi boşaldı (tight_low_volume Ready'ye taşındı).
+              30 gün sonra Kural #18 pasif öğe çıkarma adayı — optgroup tamamen kaldırılabilir. */}
         </select>
 
         {selectedMeta && (

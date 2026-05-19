@@ -248,16 +248,26 @@ def trades_get_by_id(trade_id: int) -> Optional[dict]:
 # Kural: "Notebook = Hedef Vizyon" (Kalıcı İlke #4) — Notebook neyse SQL onu uygular
 # =============================================================
 
-SCREENS_READY_8 = {
-    "tpr_a":           {"label": "TPR A",                     "filter": "grade = 'A'"},
-    "tpr_a_b":         {"label": "TPR A & B",                 "filter": "grade IN ('A','B')"},
-    "rpr_89_tpr_c":    {"label": "RPR 89+ TPR C+",            "filter": "rs_ibd >= 89 AND grade IN ('A','B','C')"},
-    "stage2_10p":      {"label": "Stage 2 ($10+)",            "filter": "passed = 1 AND price >= 10"},
-    "stage2_below_10": {"label": "Stage 2 (Below $10)",       "filter": "passed = 1 AND price < 10"},
-    "top5_rpr":        {"label": "Top 5% RPR",                "filter": "rs_ibd >= 95"},
-    "mom_10p":         {"label": "Minervini Momentum ($10+)", "filter": "passed = 1 AND price >= 10"},
-    "mom_below_10":    {"label": "Momentum (Below $10)",      "filter": "passed = 1 AND price < 10"},
+# SCREENS_READY_9: 8 orijinal + tight_low_volume (Sprint 4-bis.4, KARAR #461
+# Master pre-compute kararı — scanner.py'nin yazdığı BOOLEAN okunur).
+# Eski "SCREENS_READY_8" referansı bilinçli korundu (geriye uyumluluk),
+# yeni isim aşağıda alias olarak set edilir.
+SCREENS_READY_9 = {
+    "tpr_a":            {"label": "TPR A",                     "filter": "grade = 'A'"},
+    "tpr_a_b":          {"label": "TPR A & B",                 "filter": "grade IN ('A','B')"},
+    "rpr_89_tpr_c":     {"label": "RPR 89+ TPR C+",            "filter": "rs_ibd >= 89 AND grade IN ('A','B','C')"},
+    "stage2_10p":       {"label": "Stage 2 ($10+)",            "filter": "passed = 1 AND price >= 10"},
+    "stage2_below_10":  {"label": "Stage 2 (Below $10)",       "filter": "passed = 1 AND price < 10"},
+    "top5_rpr":         {"label": "Top 5% RPR",                "filter": "rs_ibd >= 95"},
+    "mom_10p":          {"label": "Minervini Momentum ($10+)", "filter": "passed = 1 AND price >= 10"},
+    "mom_below_10":     {"label": "Momentum (Below $10)",      "filter": "passed = 1 AND price < 10"},
+    # KARAR #461 — Master Pre-Compute (VCP scanner.py'de hesap, DB sade BOOLEAN okur)
+    "tight_low_volume": {"label": "Tight Price Low Vol (VCP)", "filter": "tight_low_vol_pass = TRUE"},
 }
+
+# Geriye dönük alias — Sprint 4-bis.1b'de SCREENS_READY_8 ismiyle bilinen
+# dict artık 9 entry. Eski referansları kırmamak için yeniden bağlanır.
+SCREENS_READY_8 = SCREENS_READY_9
 
 
 def screen_get_results(slug: str, limit: int = 500) -> list[dict]:
@@ -313,11 +323,13 @@ def screen_get_results(slug: str, limit: int = 500) -> list[dict]:
 
 
 def screen_list_available() -> list[dict]:
-    """8 ready + 7 parse + 1 deferred screen meta listesini döner (frontend dropdown icin)."""
+    """22 screen meta listesini doner (frontend dropdown icin).
+    Sprint 4-bis.4 KARAR #461 sonrasi kategori sayim: 9 ready + 7 parse + 6 diff + 0 deferred.
+    """
     out = [
         {"slug": slug, "label": meta["label"], "filter_summary": meta["filter"],
          "category": "ready"}
-        for slug, meta in SCREENS_READY_8.items()
+        for slug, meta in SCREENS_READY_9.items()
     ]
     out.extend([
         {"slug": slug, "label": meta["label"], "filter_summary": meta["filter"],
@@ -330,12 +342,8 @@ def screen_list_available() -> list[dict]:
          "category": "diff"}
         for slug, meta in SCREENS_DIFF_6.items()
     ])
-    out.append({
-        "slug": "tight_low_volume",
-        "label": "Tight Price Low Volume",
-        "filter_summary": "price_volume_history JSONB (deferred: Sprint 4-bis.4)",
-        "category": "deferred",
-    })
+    # KARAR #461 — Deferred kategorisi bosaldi (tight_low_volume Ready'ye tasindi).
+    # 30 gun sonra Kural #18 pasif oge cikarma adayi (ScreenCategory union'dan da silinebilir).
     return out
 
 
