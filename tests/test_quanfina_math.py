@@ -876,23 +876,44 @@ class TestComputeVcpPass:
     3 koşul AND: small_drops (<1.5%) + volume_drying (<50d MA × 0.7) + tight_closes (<2%)
     """
 
-    def _build_pvh(self, days: int, base_close: float, close_step: float,
-                   vol_avg: int, vol_last: int) -> list[dict]:
-        """Test PVH üreticisi.
-        - İlk N-1 günü stabil close (drift close_step % ile)
-        - Son gün vol_last, diğer günler vol_avg
+    def _build_pvh(self, days: int, base_close: float = 100.0,
+                   vol_avg: int = 1_000_000, vol_last: int = 600_000,
+                   tight: bool = True, range_pct: float = 0.5) -> list[dict]:
+        """Test PVH üreticisi — KARAR #464 sonrası OHLC formatında.
+
+        Args:
+            days: gün sayısı
+            base_close: baseline close
+            vol_avg: ilk N-1 gün hacim
+            vol_last: son gün hacim
+            tight: True → son 5 gün tight intraday range, False → geniş
+            range_pct: gün-içi (high-low)/close % (tight=True iken)
         """
         pvh = []
         for i in range(days):
-            pct_drift = close_step * (i / max(days - 1, 1))
-            close = base_close * (1 + pct_drift / 100)
+            close = base_close
+            if i >= days - 5:
+                close = base_close + (i - (days - 5)) * 0.3  # ardışık +%0.3
+            # Intraday OHLC — tight veya geniş
+            if i >= days - 5 and tight:
+                # Son 5 gün dar range (örn %0.5)
+                rng = close * range_pct / 100
+            else:
+                # İlk günler veya tight=False — geniş range
+                rng = close * 2.5 / 100  # %2.5 geniş
+            high = close + rng / 2
+            low = close - rng / 2
+            open_val = close - rng / 4  # arbitrary
             volume = vol_avg if i < days - 1 else vol_last
-            pvh.append({"date": f"2026-04-{i+1:02d}", "close": close, "volume": volume})
+            pvh.append({
+                "date": f"2026-04-{i+1:02d}",
+                "open": open_val, "high": high, "low": low,
+                "close": close, "volume": volume,
+            })
         return pvh
 
     def test_short_history_returns_false(self):
-        # 50 günden az → False (yetersiz veri)
-        pvh = self._build_pvh(20, 100.0, 0.0, 1_000_000, 500_000)
+        pvh = self._build_pvh(20)  # 50 günden az
         assert compute_vcp_pass(pvh) is False
 
     def test_none_returns_false(self):
@@ -900,77 +921,71 @@ class TestComputeVcpPass:
         assert compute_vcp_pass([]) is False
 
     def test_vcp_pass_when_all_three_conditions_met(self):
-        # 50 gün düz close, son 5 gün tight + low vol → VCP pass
-        # prev_day (day -6) ile recent[0] arası geçiş yumuşak (<%2)
-        days = 60
-        pvh = []
-        for i in range(days):
-            if i < days - 5:
-                close = 100.0  # tam düz baseline
-                volume = 1_000_000
-            else:
-                # Son 5 gün: 100.5 → 100.8 → 101.1 → 101.4 → 101.7 (ardışık ~%0.3)
-                # prev_day 100.0 → recent[0] 100.5 = +%0.5 (tight OK)
-                close = 100.5 + (i - (days - 5)) * 0.3
-                volume = 600_000  # 50d MA ≈ 960K, %70 = 672K → 600K ALTINDA
-            pvh.append({"date": f"2026-04-{i+1:02d}", "close": close, "volume": volume})
+        # 60 gün OHLC, son 5 gün tight (intraday %0.5) + low vol → VCP pass
+        pvh = self._build_pvh(60, vol_last=600_000, tight=True, range_pct=0.5)
         result = compute_vcp_pass(pvh)
         assert result is True, f"Beklenen True, gelen {result}"
 
     def test_vcp_fail_when_volume_not_dry(self):
-        # Tight close OK ama son gün hacim yüksek
-        days = 60
-        pvh = []
-        for i in range(days):
-            close = 100.0 + (i % 3) * 0.3
-            volume = 1_000_000 if i < days - 1 else 2_000_000  # son gün YÜKSEK
-            pvh.append({"date": f"2026-04-{i+1:02d}", "close": close, "volume": volume})
+        # Tight close OK ama son gün hacim yüksek (2M)
+        pvh = self._build_pvh(60, vol_last=2_000_000, tight=True, range_pct=0.5)
         assert compute_vcp_pass(pvh) is False
 
     def test_vcp_fail_when_drops_large(self):
-        # Hacim ve range ok ama son 5 gün büyük düşüşler (>%1.5)
+        # Hacim + range ok ama close-to-close büyük düşüşler
         days = 60
         pvh = []
         for i in range(days):
             if i < days - 5:
                 close = 100.0
-                volume = 1_000_000
             else:
-                # Her gün -%3 düşüş — small_drops fail
+                # Her gün -%3 düşüş → close-to-close > %1.5
                 close = 100.0 - (i - (days - 5) + 1) * 3.0
-                volume = 600_000
-            pvh.append({"date": f"2026-04-{i+1:02d}", "close": close, "volume": volume})
+            rng = close * 0.5 / 100  # dar intraday range
+            pvh.append({
+                "date": f"2026-04-{i+1:02d}",
+                "open": close - rng/4, "high": close + rng/2, "low": close - rng/2,
+                "close": close, "volume": 1_000_000 if i < days - 1 else 600_000,
+            })
         assert compute_vcp_pass(pvh) is False
 
-    def test_vcp_fail_when_close_range_too_wide(self):
-        # Drops küçük + hacim dry ama close değişimleri >%2 (alterneli +/- 2.5%)
-        days = 60
-        pvh = []
-        for i in range(days):
-            if i < days - 5:
-                close = 100.0
-                volume = 1_000_000
-            else:
-                # Ardışık değişim büyük (~ +%2.5 / -%2.5)
-                shift = 2.5 if (i - (days - 5)) % 2 == 0 else -2.5
-                close = 100.0 * (1 + shift / 100)
-                volume = 600_000
-            pvh.append({"date": f"2026-04-{i+1:02d}", "close": close, "volume": volume})
+    def test_vcp_fail_when_intraday_range_too_wide(self):
+        # KARAR #464: gerçek range_pct = (high-low)/close*100
+        # Close-to-close tight ama intraday HIGH-LOW >%2 → fail
+        pvh = self._build_pvh(60, vol_last=600_000, tight=False)  # geniş intraday
         assert compute_vcp_pass(pvh) is False
 
     def test_vcp_handles_zero_volume_gracefully(self):
-        # 50-gün MA hesabında ZeroDivision koruması
         days = 60
-        pvh = [
-            {"date": f"2026-04-{i+1:02d}", "close": 100.0, "volume": 0}
-            for i in range(days)
-        ]
+        pvh = []
+        for i in range(days):
+            pvh.append({
+                "date": f"2026-04-{i+1:02d}",
+                "open": 100.0, "high": 100.5, "low": 99.5,
+                "close": 100.0, "volume": 0,
+            })
         assert compute_vcp_pass(pvh) is False
 
     def test_vcp_handles_malformed_entry(self):
-        # Eksik anahtar → False (graceful)
-        pvh = [{"date": "x", "close": 100.0} for _ in range(60)]  # volume yok
+        # Eksik anahtar (volume) → False (graceful)
+        pvh = [{"date": "x", "close": 100.0} for _ in range(60)]
         assert compute_vcp_pass(pvh) is False
+
+    def test_vcp_backward_compat_close_only_returns_false(self):
+        # KARAR #464 backward compat:
+        # Eski format {date, close, volume} (high/low yok) → False
+        # Migration 003 öncesi yazılmış PVH için
+        days = 60
+        pvh = [
+            {"date": f"2026-04-{i+1:02d}", "close": 100.0, "volume": 1_000_000}
+            for i in range(days)
+        ]
+        # Son gün hacim düşük + tight close ama OHLC yok → backward compat False
+        pvh[-1]["volume"] = 600_000
+        result = compute_vcp_pass(pvh)
+        assert result is False, (
+            "KARAR #464 backward compat: eski PVH high/low yok -> False olmali"
+        )
 
     def test_threshold_constants_exposed(self):
         # Kalibrasyon noktaları dışarıdan erişilebilir olmalı

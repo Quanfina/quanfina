@@ -881,13 +881,25 @@ def check_ma200_slope(tickers):
                 except Exception:
                     atr14_val = None
 
-                # Sprint 4.7e.3 — son 25 gün fiyat+hacim (count_distribution_days için)
+                # Sprint 4-bis.4 KARAR #464 (19 May 2026) — PVH OHLC genişlemesi
+                # ESKI: {date, close, volume}
+                # YENI: {date, open, high, low, close, volume}
+                # Sebep: Brandon range_pct gun-ici, Mark canon Inside/Outside Day +
+                # Pivot intraday high/low gerektirir (3 kanal onay).
+                # Kapsam genisledi: 25 -> 60 gun (compute_vcp_pass 50d MA + 5g pencere)
                 try:
-                    tail_c = close.tail(25)
-                    tail_v = volume.tail(25)
+                    tail_o = open_.tail(60)
+                    tail_h = high.tail(60)
+                    tail_l = low.tail(60)
+                    tail_c = close.tail(60)
+                    tail_v = volume.tail(60)
                     pvh_val = [
-                        {"date": str(d.date()), "close": float(c_), "volume": float(v_)}
-                        for d, c_, v_ in zip(tail_c.index, tail_c, tail_v)
+                        {"date": str(d.date()),
+                         "open": float(o_), "high": float(h_), "low": float(l_),
+                         "close": float(c_), "volume": float(v_)}
+                        for d, o_, h_, l_, c_, v_ in zip(
+                            tail_c.index, tail_o, tail_h, tail_l, tail_c, tail_v
+                        )
                     ]
                 except Exception:
                     pvh_val = None

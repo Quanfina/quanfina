@@ -663,36 +663,51 @@ def compute_vcp_pass(price_volume_history: Optional[list[dict]]) -> bool:
     """Brandon "Begrudgingly Pull Back" + V-Dry VCP olgunluk tespiti.
     Minervini_Video.md sat. 2823-2834 (video 10:20) kanon.
 
-    3 koşul aynı anda:
-      1. is_small_drops: Son 5 gün ortalama düşüş < %1.5
-      2. volume_drying: Son gün hacim < 50-gün ortalama × 0.70
-      3. tight_closes: Ardışık close değişim < %2 (PVH range_pct proxy)
+    KARAR #464 (19 May 2026, 3 kanal onayli):
+      PVH OHLC formatinda zorunlu — `range_pct = (high-low)/close*100`
+      gercek hesap. Eski close-only PVH (Migration 003 oncesi) yetersiz
+      veri sayilir, False doner (backward compat).
 
-    NOT: Brandon orijinal formülünde "range_pct" gün-içi high-low farkı.
-    Quanfina PVH formatı {date, close, volume} - high/low YOK.
-    Proxy: ardışık close değişim < %2 (yaklaşık eşdeğer, Sprint 4-bis.5 adayı
-    PVH genişletme high/low ekleyerek tam doğru ölçüm).
+    3 koşul aynı anda (AND):
+      1. is_small_drops: Son 5 gün ortalama düşüş (close-to-close) < %1.5
+      2. volume_drying: Son gün hacim < 50-gün ortalama × 0.70 (muhafazakar
+         filtre, KARAR ADAY #466 EXCELLENT seviye 0.50 ileride)
+      3. tight_closes: Son 5 gun GUN-ICI range_pct < %2
+         range_pct = (high - low) / close * 100
+
+    Master + Minervini Uzmani + Bonus FMP/ASX 3 kanal cross-check
+    sonucu close proxy KESINLIKLE REDDEDILDI ("Sagilam gidelim" + Mark
+    canon Trade Like a Stock Market Wizard Bolum 10 + Bonus FMP
+    matematik formul (Peak-Trough)/Peak*100).
 
     Args:
-        price_volume_history: list[dict] - [{"date":..., "close":..., "volume":...}, ...]
-                              veya None/kısa liste
+        price_volume_history: list[dict]
+          [{"date":..., "open":..., "high":..., "low":..., "close":..., "volume":...}, ...]
+          veya None / kisa liste / eski close-only format -> False
 
     Returns:
-        bool: True = VCP setup'i olgun (Brandon kriteri 3 koşul AND)
+        bool: True = VCP setup'i olgun (Brandon kriteri 3 kosul AND)
+
+    Backward compat: Eski {date, close, volume} format -> False (yetersiz veri)
     """
     if not price_volume_history or len(price_volume_history) < VCP_MIN_HISTORY:
         return False
 
     try:
         recent = price_volume_history[-VCP_LOOKBACK_DAYS:]
-        # Ardışık close değişim için bir önceki gün de gerekli
         prev_day = price_volume_history[-(VCP_LOOKBACK_DAYS + 1)]
         last_50 = price_volume_history[-VCP_MIN_HISTORY:]
 
         if len(recent) < VCP_LOOKBACK_DAYS:
             return False
 
-        # 1. is_small_drops: ardışık close değişim ortalama düşüş < %1.5
+        # KARAR #464 — OHLC SCHEMA KONTROL (backward compat)
+        # Eski PVH (close-only) -> False, yeni PVH (OHLC) -> devam
+        sample = recent[0]
+        if "high" not in sample or "low" not in sample:
+            return False
+
+        # 1. is_small_drops: ardisik close-to-close ortalama dusus < %1.5
         all_window = [prev_day] + recent
         pct_changes = [
             (all_window[i]["close"] - all_window[i-1]["close"]) / all_window[i-1]["close"] * 100
@@ -703,16 +718,23 @@ def compute_vcp_pass(price_volume_history: Optional[list[dict]]) -> bool:
         avg_drop = sum(drops) / max(len(drops), 1) if drops else 0.0
         is_small_drops = avg_drop < VCP_AVG_DROP_THRESHOLD
 
-        # 2. volume_drying: son gün hacim < 50-gün MA × 0.70
+        # 2. volume_drying: son gun hacim < 50-gun MA * 0.70 (muhafazakar)
         avg_50d_volume = sum(d["volume"] for d in last_50) / len(last_50)
         if avg_50d_volume <= 0:
             return False
         last_volume = recent[-1]["volume"]
         volume_drying = last_volume < avg_50d_volume * VCP_VOL_DRY_RATIO
 
-        # 3. tight_closes: ardışık close değişim < %2 (range_pct proxy)
-        close_changes_abs = [abs(c) for c in pct_changes]
-        tight_closes = all(c < VCP_TIGHT_RANGE_PCT for c in close_changes_abs)
+        # 3. tight_closes: GUN-ICI range_pct < %2 (KARAR #464 — gercek hesap)
+        # range_pct = (high - low) / close * 100 — Bonus FMP matematik formul
+        # Mark canon "Trade Like a Stock Market Wizard" Bolum 10 intraday range
+        range_pcts = []
+        for d in recent:
+            close_val = d["close"]
+            if close_val <= 0:
+                return False
+            range_pcts.append((d["high"] - d["low"]) / close_val * 100)
+        tight_closes = all(rp < VCP_TIGHT_RANGE_PCT for rp in range_pcts)
 
         return bool(is_small_drops and volume_drying and tight_closes)
     except (KeyError, TypeError, ValueError, ZeroDivisionError):

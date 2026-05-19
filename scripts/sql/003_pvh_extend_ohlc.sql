@@ -1,0 +1,59 @@
+-- ============================================================================
+-- Migration 003 — KARAR #464 PVH JSONB OHLC genislemesi (3 kanal onay)
+-- ============================================================================
+--
+-- KARAR #464 (19 May 2026 ~23:45) — 3 KANAL CROSS-CHECK SONUCU:
+--   Master NotebookLM + Quanfina Minervini NotebookLM (4 kitap kanonu)
+--   + Bonus FMP/ASX hepsi ONAYLADI.
+--
+-- Karar: price_volume_history JSONB formati genisletilir.
+--   ESKI: [{"date": ..., "close": ..., "volume": ...}, ...]
+--   YENI: [{"date": ..., "open": ..., "high": ..., "low": ...,
+--          "close": ..., "volume": ...}, ...]
+--
+-- Gerekce: Brandon "tight_range_pct = 2.0" kuralinda gun-ici (intraday)
+-- high/low gerekli. Sadece close kullanmak Inside Day / Outside Day
+-- Negative Reversal / Pivot hesaplarinda kor noktalar yaratir.
+-- Master: "KESINLIKLE KABUL EDILEMEZ". Mark canon "Trade Like a Stock
+-- Market Wizard" Bolum 10 + "Think and Trade Like a Champion" Bolum 1
+-- intraday range zorunlu.
+-- ============================================================================
+--
+-- ÖNEMLI: JSONB SCHEMA-LESS
+-- PostgreSQL JSONB veri tipi schema dayatmiyor. Migration 003 aslinda
+-- SQL DDL DEGISIKLIGI ICERMIYOR — kolon hala JSONB. Format degisikligi
+-- scanner.py'nin yazdigi JSON yapisinda olur:
+--
+--   scanner.py:  pvh_val = [{"date":..., "open":..., "high":...,
+--                            "low":..., "close":..., "volume":...}]
+--
+--   quanfina_math.compute_vcp_pass — gercek range_pct hesabi:
+--     range_pct = (high - low) / close * 100
+--
+-- ============================================================================
+-- BACKWARD COMPAT:
+-- Eski tarama gunlerinden kalan PVH kayitlari (close-only) kalir.
+-- compute_vcp_pass eski format icin False doner (yetersiz veri) —
+-- KARAR #464 cumlesi 4. madde net.
+-- ============================================================================
+
+-- Bu migration SQL gercek bir DDL icermiyor. Sadece dokumantasyon ve
+-- baska bir migration runner ile birlikte calistirildiginda "OK"
+-- mesaji vermesi icin no-op SELECT 1 var.
+SELECT 1 AS migration_003_pvh_ohlc_documented;
+
+-- Dogrulama sorgusu (Sn. Ferit veya DBA manuel kontrol icin):
+-- SELECT
+--   ticker,
+--   scan_date,
+--   jsonb_array_length(price_volume_history) AS gun_sayisi,
+--   jsonb_typeof(price_volume_history->0) AS ilk_eleman_tip,
+--   price_volume_history->0 AS ilk_eleman
+-- FROM minervini_scans
+-- WHERE scan_date = (SELECT MAX(scan_date) FROM minervini_scans)
+--   AND price_volume_history IS NOT NULL
+-- LIMIT 5;
+--
+-- Yeni format ornek (Migration 003 sonrasi yazilan kayitlarda):
+--   {"date":"2026-05-19","open":145.20,"high":146.50,"low":144.80,
+--    "close":145.90,"volume":2_500_000}
