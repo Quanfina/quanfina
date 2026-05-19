@@ -15,7 +15,7 @@
 #   .\scripts\drive_sync.ps1 -ScheduledTask   # Windows task kayit (saatlik)
 #   .\scripts\drive_sync.ps1 -UnregisterTask  # Task sil
 #
-# Versiyon: v2.2 (19 May 2026, .txt orphan temizligi eklendi)
+# Versiyon: v2.3 (19 May 2026 ~05:30, .txt'ler ayri _txt/ alt klasore (Sn. Ferit talebi))
 # Kural uyumu: #15 (ASCII-only), #16 (native exe 2>&1 yok)
 #
 # v2.1 degisiklikleri (H#8 pattern - NotebookLM Plus .md gormez):
@@ -225,13 +225,23 @@ if ($rc -le 3) {
 Write-Host ""
 Write-Host "=== v2.1 .txt paralel kopya uretimi ===" -ForegroundColor Cyan
 
+# v2.3 (19 May 2026 ~05:30): .txt'leri _txt/ alt klasorune DUZ hiyerarsi
+# Sn. Ferit talebi: Drive arayuzu temiz, .md insan icin / .txt NotebookLM icin ayri
+# NotebookLM Master kurulumu icin tek klasor (_txt/) hedefi
+$txtKlasoru = Join-Path $Hedef "_txt"
+if (-not (Test-Path $txtKlasoru)) {
+    Write-Host "[setup] _txt/ klasoru olusturuluyor" -ForegroundColor Yellow
+    New-Item -ItemType Directory -Path $txtKlasoru -Force | Out-Null
+}
+
 $mdDosyalari = Get-ChildItem -Path $Hedef -Recurse -File -Filter "*.md" -ErrorAction SilentlyContinue
 $txtUretildi = 0
 $txtAtlandi = 0
 $txtHata = 0
 
 foreach ($md in $mdDosyalari) {
-    $txtYolu = $md.FullName -replace '\.md$', '.txt'
+    # v2.3: hedef _txt/ duz (BaseName, alt klasor hiyerarsisi yok)
+    $txtYolu = Join-Path $txtKlasoru "$($md.BaseName).txt"
     try {
         if ($KuruCalisma) {
             # Dry-run: sadece ne uretilecegini raporla
@@ -277,23 +287,24 @@ if ($txtHata -gt 0) {
 }
 
 # ============================================================
-# v2.2 Orphan .txt temizligi (19 May 2026)
+# v2.3 Orphan .txt temizligi (19 May 2026 ~05:30)
 # ============================================================
-# Sebep: drive_sync.ps1 /XF *.txt ile robocopy .txt'leri korur.
-# Ancak lokal'de .md silindiginde Drive'da .txt paraleli orphan kalir.
-# Cozum: hedefteki her .txt icin paralel .md var mi kontrol et,
-# yoksa orphan .txt'yi sil.
+# Sebep: .md silinince _txt/ icinde orphan .txt kalmasin.
+# v2.3 fix: .txt'ler _txt/ altinda DUZ, .md kaynagi BaseName ile bulunur
 
 Write-Host ""
-Write-Host "=== v2.2 Orphan .txt temizligi ===" -ForegroundColor Cyan
+Write-Host "=== v2.3 Orphan .txt temizligi (_txt/ altinda) ===" -ForegroundColor Cyan
 
-$txtDosyalari = Get-ChildItem -Path $Hedef -Recurse -File -Filter "*.txt" -ErrorAction SilentlyContinue
+$txtDosyalari = Get-ChildItem -Path $txtKlasoru -File -Filter "*.txt" -ErrorAction SilentlyContinue
 $orphanSilindi = 0
 $orphanTespit = 0
 
+# Tum .md BaseName'leri set olarak topla (kok + alt klasorler)
+$mdBaseNames = @{}
+foreach ($md in $mdDosyalari) { $mdBaseNames[$md.BaseName] = $true }
+
 foreach ($txt in $txtDosyalari) {
-    $mdYolu = $txt.FullName -replace '\.txt$', '.md'
-    if (-not (Test-Path $mdYolu)) {
+    if (-not $mdBaseNames.ContainsKey($txt.BaseName)) {
         $orphanTespit++
         if ($KuruCalisma) {
             Write-Host "  [kuru-orphan] $($txt.Name)" -ForegroundColor Yellow
