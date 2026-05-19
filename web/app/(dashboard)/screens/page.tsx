@@ -160,10 +160,37 @@ function VcpQualityCell(p: ICellRendererParams<ScreenResultRow>) {
 
 // === AG Grid ColDef (KARAR ADAY #455 standart pattern) ===
 
-// KARAR #466 + #465 — VCP slug'larinda Kalite + Ready Score kolonlari
+// KARAR #466 + #465 + #467 — VCP slug'larinda Kalite + Ready + Power Play kolonlari
 const VCP_SLUGS = new Set<string>([
-  "tight_low_volume", "tight_low_vol_excellent", "vcp_ready_high"
+  "tight_low_volume", "tight_low_vol_excellent",
+  "vcp_ready_high", "power_play_ready"
 ]);
+
+// KARAR #467 — Power Play (HTF) rozet
+function PowerPlayCell(p: ICellRendererParams<ScreenResultRow>) {
+  const pass = p.value as boolean | null | undefined;
+  if (pass === null || pass === undefined) return <span style={{ color: "#888" }}>—</span>;
+  if (pass) {
+    return (
+      <span
+        style={{
+          display: "inline-block",
+          padding: "2px 10px",
+          borderRadius: "9999px",
+          background: "#f59e0b",  // amber/turuncu — momentum gold
+          color: "#1a1a1a",
+          fontWeight: 700,
+          fontSize: "11px",
+          textAlign: "center",
+        }}
+        title="Power Play / High Tight Flag (KARAR #467 Mark canon) — POLE 8 hafta %100+ yükseliş + FLAG 2-6 hafta %10-25 düzeltme. Trade Like a Stock Market Wizard Bölüm 10."
+      >
+        ⚡ Power Play
+      </span>
+    );
+  }
+  return <span style={{ color: "#888", fontSize: "11px" }}>—</span>;
+}
 
 function buildColDefs(slug: string | null): ColDef<ScreenResultRow>[] {
   const isVcpSlug = slug ? VCP_SLUGS.has(slug) : false;
@@ -188,6 +215,16 @@ function buildColDefs(slug: string | null): ColDef<ScreenResultRow>[] {
       width: 90,
       type: "numericColumn",
       cellRenderer: VcpReadyCell,
+      cellStyle: { display: "flex", alignItems: "center", justifyContent: "center" },
+    },
+    {
+      field: "power_play_pass" as keyof ScreenResultRow,
+      headerName: "HTF",
+      headerTooltip:
+        "Power Play / High Tight Flag (KARAR #467) — Mark canon: POLE 8 hafta %100+ " +
+        "yukselis + FLAG 2-6 hafta %10-25 duzeltme. Trade Like a Stock Market Wizard Bolum 10.",
+      width: 120,
+      cellRenderer: PowerPlayCell,
       cellStyle: { display: "flex", alignItems: "center", justifyContent: "center" },
     },
   ];
@@ -350,7 +387,7 @@ export default function ScreensPage() {
       <div className="space-y-2">
         <h1 className="text-2xl font-bold">Hisse Tarama (Screens)</h1>
         <p className="text-sm text-muted-foreground">
-          24 tarama: 11 Ready (saf SQL) + 7 Parse (text-parse) + 6 Scan-Diff (Self-JOIN).
+          25 tarama: 12 Ready (saf SQL) + 7 Parse (text-parse) + 6 Scan-Diff (Self-JOIN).
           Strateji-bağımsız fırsat keşfi.
         </p>
       </div>
@@ -367,8 +404,8 @@ export default function ScreensPage() {
           className="px-3 py-2 border rounded-md bg-background min-w-[300px]"
           disabled={metaQ.isLoading}
         >
-          {/* Sprint 4-bis.5 KARAR #465 — Ready 10 → 11 (vcp_ready_high eklendi) */}
-          <optgroup label="✅ Ready (11) — Saf SQL filtre">
+          {/* Sprint 4-bis.5 KARAR #467 — Ready 11 → 12 (power_play_ready eklendi) */}
+          <optgroup label="✅ Ready (12) — Saf SQL filtre">
             {metaQ.data?.filter((m) => m.category === "ready").map((meta) => (
               <option key={meta.slug} value={meta.slug}>
                 {SCREEN_CATEGORIES[meta.slug]} — {meta.label}

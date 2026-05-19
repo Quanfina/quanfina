@@ -974,6 +974,104 @@ def compute_vcp_ready_score(price_volume_history: Optional[list[dict]],
 
 
 # =============================================================================
+# Sprint 4-bis.5 KARAR #467 — Power Play (High Tight Flag)
+# Kaynak: Trade Like a Stock Market Wizard Bolum 10 + FMP_Matematik.md Konu 20
+# Mark canon KESIN esikler (lokal birikim, Kural #22 hafiza taramasi sonucu)
+# =============================================================================
+
+# POLE (direk) esikleri
+POWER_PLAY_POLE_MAX_WEEKS = 8           # KESIN: max sure
+POWER_PLAY_POLE_MAX_DAYS = POWER_PLAY_POLE_MAX_WEEKS * 5  # 40 trading gun
+POWER_PLAY_POLE_MIN_RISE_PCT = 100      # KESIN: min %100 yukselis
+
+# FLAG (bayrak) esikleri
+POWER_PLAY_FLAG_MIN_WEEKS = 2           # KESIN: min sure (10 gun)
+POWER_PLAY_FLAG_MAX_WEEKS = 6           # KESIN: max sure (30 gun)
+POWER_PLAY_FLAG_MAX_PULLBACK_PCT = 25   # KESIN: max duzeltme
+POWER_PLAY_FLAG_MIN_PULLBACK_PCT = 10   # KESIN: alti = zaten sikismis
+
+
+def compute_power_play_pass(price_volume_history: Optional[list[dict]]) -> bool:
+    """Power Play / High Tight Flag tespit (KARAR #467, 20 May 2026).
+
+    Mark canon KESIN esikler (Trade Like a Stock Market Wizard Bolum 10,
+    FMP_Matematik.md Konu 20 hazir kod referansi):
+
+    POLE (direk):
+      - Sure: 8 hafta veya daha KISA (40 trading gun max)
+      - Yukselis: minimum %100 (altinda Power Play DEGIL, siradan VCP)
+
+    FLAG (bayrak):
+      - Sure: 2-6 hafta (10-30 trading gun)
+      - Duzeltme: %10-25 araliginda (alti zaten sikismis, ustu reddet)
+
+    BREAKOUT (pivot):
+      - Pivot = Flag High (KESIN)
+
+    Args:
+        price_volume_history: OHLC formatinda PVH (Migration 003 sonrasi)
+                              En az 80 gun gerekli (POLE 40 + FLAG 30 + marj)
+
+    Returns:
+        bool: True = Power Play setup'i (POLE + FLAG kosullari saglandi)
+
+    Backward compat: Eski close-only PVH veya kisa veri -> False
+    """
+    required_days = POWER_PLAY_POLE_MAX_DAYS + POWER_PLAY_FLAG_MAX_WEEKS * 5  # 70
+    if not price_volume_history or len(price_volume_history) < required_days:
+        return False
+
+    try:
+        sample = price_volume_history[-1]
+        if "high" not in sample or "low" not in sample:
+            return False  # backward compat — OHLC yok
+
+        flag_days = POWER_PLAY_FLAG_MAX_WEEKS * 5  # 30
+
+        # POLE bolgesi: en eski (POLE_MAX_DAYS + FLAG_MAX_DAYS) ile flag oncesi
+        pole_period = price_volume_history[-(POWER_PLAY_POLE_MAX_DAYS + flag_days):-flag_days]
+        if len(pole_period) < POWER_PLAY_POLE_MAX_DAYS // 2:  # en az yari
+            return False
+
+        pole_lows = [d["low"] for d in pole_period if d["low"] > 0]
+        pole_highs = [d["high"] for d in pole_period if d["high"] > 0]
+        if not pole_lows or not pole_highs:
+            return False
+        pole_low = min(pole_lows)
+        pole_high = max(pole_highs)
+
+        if pole_low <= 0:
+            return False
+        pole_rise_pct = (pole_high - pole_low) / pole_low * 100
+
+        # KESIN: %100 alti Power Play DEGIL
+        if pole_rise_pct < POWER_PLAY_POLE_MIN_RISE_PCT:
+            return False
+
+        # FLAG bolgesi: son 30 gun
+        flag_period = price_volume_history[-flag_days:]
+        flag_lows = [d["low"] for d in flag_period if d["low"] > 0]
+        if not flag_lows:
+            return False
+        flag_low = min(flag_lows)
+
+        # FLAG duzeltme: pole_high'dan flag_low'a dusus yuzdesi
+        if pole_high <= 0:
+            return False
+        flag_pullback_pct = (pole_high - flag_low) / pole_high * 100
+
+        # KESIN aralik: %10-25 (alti zaten sikismis = PASS, ustu reddet)
+        if flag_pullback_pct > POWER_PLAY_FLAG_MAX_PULLBACK_PCT:
+            return False
+        # Alti = zaten sikismis = Power Play TRUE (Mark canon: VCP daralmasi
+        # aranmaya gerek yok, direkt pivot Flag High'da)
+
+        return True
+    except (KeyError, TypeError, ValueError, ZeroDivisionError):
+        return False
+
+
+# =============================================================================
 # Konu 14 — RBA Result Based Analysis (Mark Minervini Bölüm 4)
 # =============================================================================
 

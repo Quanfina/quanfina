@@ -49,6 +49,10 @@ from quanfina_math import (
     compute_vcp_ready_score,
     OUTSIDE_DAY_VOLUME_RATIO,
     VCP_READY_SCORE_HIGH_THRESHOLD,
+    # Sprint 4-bis.5 KARAR #467 — Power Play (HTF) Mark canon
+    compute_power_play_pass,
+    POWER_PLAY_POLE_MIN_RISE_PCT,
+    POWER_PLAY_FLAG_MAX_PULLBACK_PCT,
 )
 
 
@@ -1221,6 +1225,94 @@ class TestComputeVcpReadyScore:
     def test_threshold_constants_exposed(self):
         assert VCP_READY_SCORE_HIGH_THRESHOLD == 70
         assert OUTSIDE_DAY_VOLUME_RATIO == 1.5
+
+
+# ===========================================================================
+# Sprint 4-bis.5 KARAR #467 — Power Play (High Tight Flag) Mark canon
+# Kaynak: Trade Like a Stock Market Wizard Bolum 10 + FMP_Matematik.md Konu 20
+# ===========================================================================
+
+
+class TestComputePowerPlayPass:
+    """Power Play (HTF): POLE %100+ yukselis (8 hafta) + FLAG %10-25 duzeltme (2-6 hafta)."""
+
+    def _build_pole_flag(self, pole_rise_pct: float, flag_pullback_pct: float,
+                         days: int = 80) -> list[dict]:
+        """POLE+FLAG senaryosu PVH üreticisi.
+
+        İlk 40 gün (POLE): low=50 → high = low * (1 + rise%/100)
+        Son 30 gün (FLAG): high'den pullback% kadar düşüş
+        Gün-içi range: %1.5 (sade tutuldu)
+        """
+        pvh = []
+        pole_low = 50.0
+        pole_high = pole_low * (1 + pole_rise_pct / 100)
+
+        # POLE: linear yukselis (sade)
+        pole_days = 40
+        for i in range(pole_days):
+            close = pole_low + (pole_high - pole_low) * (i / max(pole_days - 1, 1))
+            rng = close * 0.015
+            pvh.append({
+                "date": f"2026-01-{i+1:02d}",
+                "open": close - rng/4, "high": close + rng/2, "low": close - rng/2,
+                "close": close, "volume": 2_000_000,
+            })
+
+        # FLAG: pullback (pole_high -> flag_low)
+        flag_low = pole_high * (1 - flag_pullback_pct / 100)
+        flag_days = 30
+        for i in range(flag_days):
+            # Yumuşak iniş + flat tutunma
+            close = pole_high - (pole_high - flag_low) * (i / max(flag_days - 1, 1))
+            rng = close * 0.015
+            pvh.append({
+                "date": f"2026-02-{i+1:02d}",
+                "open": close - rng/4, "high": close + rng/2, "low": close - rng/2,
+                "close": close, "volume": 1_000_000,
+            })
+
+        # Yetersiz veri kontrolu için days < 70 ise kısalt
+        if days < len(pvh):
+            return pvh[-days:]
+        return pvh
+
+    def test_power_play_pass_when_pole_100_flag_15(self):
+        # %100 yukselis + %15 flag pullback = Power Play TRUE
+        pvh = self._build_pole_flag(pole_rise_pct=110, flag_pullback_pct=15)
+        assert compute_power_play_pass(pvh) is True
+
+    def test_fail_when_pole_below_100(self):
+        # %75 yukselis < %100 -> Power Play DEGIL (sıradan VCP adayı)
+        pvh = self._build_pole_flag(pole_rise_pct=75, flag_pullback_pct=15)
+        assert compute_power_play_pass(pvh) is False
+
+    def test_fail_when_flag_pullback_above_25(self):
+        # %30 pullback > %25 max -> reddet
+        pvh = self._build_pole_flag(pole_rise_pct=120, flag_pullback_pct=30)
+        assert compute_power_play_pass(pvh) is False
+
+    def test_pass_when_flag_pullback_below_10_already_tight(self):
+        # %5 pullback < %10 = "zaten sikismis" Mark canon: TRUE
+        pvh = self._build_pole_flag(pole_rise_pct=120, flag_pullback_pct=5)
+        assert compute_power_play_pass(pvh) is True
+
+    def test_fail_for_short_history(self):
+        pvh = self._build_pole_flag(pole_rise_pct=120, flag_pullback_pct=15, days=40)
+        assert compute_power_play_pass(pvh) is False
+
+    def test_fail_for_close_only_backward_compat(self):
+        days = 80
+        pvh = [{"date": f"d{i}", "close": 100.0, "volume": 1_000_000} for i in range(days)]
+        assert compute_power_play_pass(pvh) is False
+
+    def test_none_or_empty_returns_false(self):
+        assert compute_power_play_pass(None) is False
+        assert compute_power_play_pass([]) is False
+
+    def test_threshold_constants_exposed(self):
+        assert POWER_PLAY_POLE_MIN_RISE_PCT == 100
+        assert POWER_PLAY_FLAG_MAX_PULLBACK_PCT == 25
 
     def test_threshold_constants_exposed(self):
         # Kalibrasyon noktaları dışarıdan erişilebilir olmalı

@@ -20,6 +20,7 @@ export type ScreenSlug =
   | "tight_low_volume"  // KARAR #461 Sprint 4-bis.4 — pre-compute, Ready'ye tasindi
   | "tight_low_vol_excellent"  // KARAR #466 Sprint 4-bis.5 — A+ Kalite (EXCELLENT filtre)
   | "vcp_ready_high"  // KARAR #465 Sprint 4-bis.5 — Ready Score >= 70 (Inside Day + V-Dry + Tight)
+  | "power_play_ready"  // KARAR #467 Sprint 4-bis.5 — Power Play (HTF) Mark canon POLE %100+ FLAG %10-25
   // Sprint 4-bis.2 — Parse (7, confirmations/violations text-parse)
   | "stage2_loose_10p"
   | "stage2_loose_below"
@@ -58,6 +59,8 @@ export interface ScreenResultRow {
   vcp_quality_score?: "EXCELLENT" | "PASS" | null;
   // KARAR #465 (20 May 2026) — VCP Ready Score 0-100, vcp_ready_high + tight_low_vol* slug'larinda
   vcp_ready_score?: number | null;
+  // KARAR #467 (20 May 2026) — Power Play (HTF) Mark canon
+  power_play_pass?: boolean | null;
 }
 
 /** Kategoriler — Notebook_C1 SCREENS tuple'dan */
@@ -74,6 +77,7 @@ export const SCREEN_CATEGORIES: Record<ScreenSlug, string> = {
   tight_low_volume: "Pattern (VCP)",  // KARAR #461 — Ready'ye taşındı
   tight_low_vol_excellent: "Pattern (VCP A+)",  // KARAR #466 — EXCELLENT filtre
   vcp_ready_high: "Pattern (VCP Ready)",  // KARAR #465 — Ready Score 70+
+  power_play_ready: "Pattern (Power Play)",  // KARAR #467 — HTF Mark canon
   // Parse (7)
   stage2_loose_10p: "Stage (Loose)",
   stage2_loose_below: "Stage (Loose)",

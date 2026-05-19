@@ -14,7 +14,11 @@ from db_connection import get_connection
 # Sprint 4-bis.4 KARAR #461 — Pre-Compute tek motor felsefesi (Kural #22 lokal birikim kullan)
 # Sprint 4-bis.5 KARAR #466 — VCP Kalite Skoru (3 kanal sentezi)
 # Sprint 4-bis.5 KARAR #465 — Inside Day + Outside Day Negative Reversal + Ready Score
-from quanfina_math import compute_vcp_pass, compute_vcp_quality, compute_vcp_ready_score
+# Sprint 4-bis.5 KARAR #467 — Power Play (HTF) Mark canon
+from quanfina_math import (
+    compute_vcp_pass, compute_vcp_quality, compute_vcp_ready_score,
+    compute_power_play_pass,
+)
 
 load_dotenv()
 FINVIZ_KEY = os.getenv("FINVIZ_API_KEY")
@@ -93,6 +97,8 @@ def init_db():
         "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS vcp_quality_score TEXT DEFAULT NULL",
         # Sprint 4-bis.5 KARAR #465 — VCP Ready Score 0-100 (Inside Day + V-Dry + Tight)
         "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS vcp_ready_score INTEGER DEFAULT NULL",
+        # Sprint 4-bis.5 KARAR #467 — Power Play (HTF) Mark canon: POLE %100+ FLAG %10-25
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS power_play_pass BOOLEAN DEFAULT FALSE",
     ]:
         c.execute(col_sql)
     c.execute("""
@@ -892,13 +898,14 @@ def check_ma200_slope(tickers):
                 # YENI: {date, open, high, low, close, volume}
                 # Sebep: Brandon range_pct gun-ici, Mark canon Inside/Outside Day +
                 # Pivot intraday high/low gerektirir (3 kanal onay).
-                # Kapsam genisledi: 25 -> 60 gun (compute_vcp_pass 50d MA + 5g pencere)
+                # Sprint 4-bis.5 KARAR #467 — Power Play icin POLE 40 + FLAG 30 = 70
+                # gun gerekli, 80 gun marjli (compute_vcp_pass + power_play_pass yeter)
                 try:
-                    tail_o = open_.tail(60)
-                    tail_h = high.tail(60)
-                    tail_l = low.tail(60)
-                    tail_c = close.tail(60)
-                    tail_v = volume.tail(60)
+                    tail_o = open_.tail(80)
+                    tail_h = high.tail(80)
+                    tail_l = low.tail(80)
+                    tail_c = close.tail(80)
+                    tail_v = volume.tail(80)
                     pvh_val = [
                         {"date": str(d.date()),
                          "open": float(o_), "high": float(h_), "low": float(l_),
@@ -978,6 +985,8 @@ def save_results(df_finviz, slopes, scan_date):
         vcp_quality_score = compute_vcp_quality(pvh)
         # Sprint 4-bis.5 KARAR #465 — VCP Ready Score 0-100
         vcp_ready_score = compute_vcp_ready_score(pvh)
+        # Sprint 4-bis.5 KARAR #467 — Power Play (HTF) Mark canon
+        power_play_pass = compute_power_play_pass(pvh)
 
         # Kural 3: MA200 yükselişte (slope > 0)
         passed = 1 if slope is not None and slope > 0 else 0
@@ -989,10 +998,10 @@ def save_results(df_finviz, slopes, scan_date):
                  price, change_pct, volume, market_cap, pe,
                  ma200_slope, passed, high52, sma50, atr14,
                  price_volume_history, tight_low_vol_pass, vcp_quality_score,
-                 vcp_ready_score,
+                 vcp_ready_score, power_play_pass,
                  confirmations, violations,
                  rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mansfield)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 ON CONFLICT(scan_date, ticker) DO UPDATE SET
                     company               = EXCLUDED.company,
                     sector                = EXCLUDED.sector,
@@ -1011,6 +1020,7 @@ def save_results(df_finviz, slopes, scan_date):
                     tight_low_vol_pass    = EXCLUDED.tight_low_vol_pass,
                     vcp_quality_score     = EXCLUDED.vcp_quality_score,
                     vcp_ready_score       = EXCLUDED.vcp_ready_score,
+                    power_play_pass       = EXCLUDED.power_play_pass,
                     confirmations         = EXCLUDED.confirmations,
                     violations            = EXCLUDED.violations,
                     rs_ibd                = EXCLUDED.rs_ibd,
@@ -1026,6 +1036,7 @@ def save_results(df_finviz, slopes, scan_date):
                 row.get("Market Cap", 0), row.get("P/E", 0),
                 slope, passed, high52, sma50, atr14,
                 pvh_json, tight_low_vol_pass, vcp_quality_score, vcp_ready_score,
+                power_play_pass,
                 confs, viols,
                 rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mf,
             ))
@@ -1181,6 +1192,8 @@ def run_scan(scan_date_override: str = None):
         "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS vcp_quality_score TEXT DEFAULT NULL",
         # Sprint 4-bis.5 KARAR #465 — VCP Ready Score 0-100 (Inside Day + V-Dry + Tight)
         "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS vcp_ready_score INTEGER DEFAULT NULL",
+        # Sprint 4-bis.5 KARAR #467 — Power Play (HTF) Mark canon: POLE %100+ FLAG %10-25
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS power_play_pass BOOLEAN DEFAULT FALSE",
     ]:
         c.execute(col_sql)
 

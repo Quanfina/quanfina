@@ -273,6 +273,11 @@ SCREENS_READY_9 = {
         "label": "VCP Ready Score 70+",
         "filter": "vcp_ready_score >= 70",
     },
+    # KARAR #467 (20 May 2026) — Power Play (HTF) Mark canon: POLE %100+ FLAG %10-25
+    "power_play_ready": {
+        "label": "⚡ Power Play (HTF)",
+        "filter": "power_play_pass = TRUE",
+    },
 }
 
 # Geriye dönük alias — Sprint 4-bis.1b'de SCREENS_READY_8 ismiyle bilinen
@@ -309,12 +314,11 @@ def screen_get_results(slug: str, limit: int = 500) -> list[dict]:
     # NOT: minervini_scans tablosunda kolon adi 'ticker', frontend uyumu icin 'symbol' alias
     # rs_ibd double precision (TEXT degil) - Python tarafinda float kabul edilir
     # scan_date TEXT (TIMESTAMP degil) - .isoformat() cagrilmaz
-    # KARAR #466 + #465 (20 May 2026) — vcp_quality_score + vcp_ready_score
-    # TUM ready screens'te donulur. UI tarafi slug-baglamli kolon gosterir
-    # (VCP slug'larda Kalite + Ready rozet/skor, digerlerinde gizli).
+    # KARAR #466 + #465 + #467 — VCP/Power Play kolon dependable
+    # TUM ready screens'te donulur. UI tarafi slug-baglamli kolon gosterir.
     query = f"""
         SELECT ticker AS symbol, grade, rs_ibd, price, passed, scan_date,
-               vcp_quality_score, vcp_ready_score
+               vcp_quality_score, vcp_ready_score, power_play_pass
         FROM minervini_scans
         WHERE scan_date = (SELECT MAX(scan_date) FROM minervini_scans)
           AND {sql_filter}
@@ -338,7 +342,7 @@ def screen_get_results(slug: str, limit: int = 500) -> list[dict]:
 
 def screen_list_available() -> list[dict]:
     """Screen meta listesini doner (frontend dropdown icin).
-    Sprint 4-bis.5 KARAR #465 sonrasi kategori sayim: 11 ready + 7 parse + 6 diff + 0 deferred = 24 ekran.
+    Sprint 4-bis.5 KARAR #467 sonrasi kategori sayim: 12 ready + 7 parse + 6 diff + 0 deferred = 25 ekran.
     """
     out = [
         {"slug": slug, "label": meta["label"], "filter_summary": meta["filter"],

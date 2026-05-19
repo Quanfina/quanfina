@@ -249,6 +249,9 @@ class ScreenResultRow(BaseModel):
     # KARAR #465 (20 May 2026) — VCP Ready Score 0-100 (Inside Day + V-Dry + Tight)
     # vcp_ready_high slug + tight_low_volume slug'larda anlamli
     vcp_ready_score: Optional[int] = None
+    # KARAR #467 (20 May 2026) — Power Play (HTF) Mark canon
+    # power_play_ready slug + tight_low_volume slug'larda anlamli
+    power_play_pass: Optional[bool] = None
 
 
 @app.get("/api/screens", response_model=list[ScreenMeta])
@@ -290,30 +293,38 @@ def get_screen_results(slug: str, limit: int = 500) -> list[ScreenResultRow]:
         )
 
     # MOCK fallback (dev ortam, db_connected=false)
-    # KARAR #466+#465 — VCP slug'larinda vcp_quality_score + vcp_ready_score sahte
+    # KARAR #466+#465+#467 — VCP/Power Play slug'larinda kalite+ready+power_play sahte
     if not db_health_check():
-        is_quality_slug = slug in ("tight_low_volume", "tight_low_vol_excellent", "vcp_ready_high")
+        is_quality_slug = slug in (
+            "tight_low_volume", "tight_low_vol_excellent",
+            "vcp_ready_high", "power_play_ready"
+        )
         mock_rows = [
             ScreenResultRow(symbol="NVDA", grade="A", rs_ibd=99,
                             price=145.20, passed=1, scan_date="2026-05-19",
                             vcp_quality_score="EXCELLENT" if is_quality_slug else None,
-                            vcp_ready_score=85 if is_quality_slug else None),
+                            vcp_ready_score=85 if is_quality_slug else None,
+                            power_play_pass=True if is_quality_slug else None),
             ScreenResultRow(symbol="AAPL", grade="A", rs_ibd=87,
                             price=212.50, passed=1, scan_date="2026-05-19",
                             vcp_quality_score="PASS" if is_quality_slug else None,
-                            vcp_ready_score=62 if is_quality_slug else None),
+                            vcp_ready_score=62 if is_quality_slug else None,
+                            power_play_pass=False if is_quality_slug else None),
             ScreenResultRow(symbol="MSFT", grade="B", rs_ibd=91,
                             price=425.30, passed=1, scan_date="2026-05-19",
                             vcp_quality_score="EXCELLENT" if is_quality_slug else None,
-                            vcp_ready_score=78 if is_quality_slug else None),
+                            vcp_ready_score=78 if is_quality_slug else None,
+                            power_play_pass=True if is_quality_slug else None),
             ScreenResultRow(symbol="GOOGL", grade="B", rs_ibd=88,
                             price=178.40, passed=1, scan_date="2026-05-19",
                             vcp_quality_score="PASS" if is_quality_slug else None,
-                            vcp_ready_score=55 if is_quality_slug else None),
+                            vcp_ready_score=55 if is_quality_slug else None,
+                            power_play_pass=False if is_quality_slug else None),
             ScreenResultRow(symbol="AMD", grade="C", rs_ibd=85,
                             price=158.20, passed=1, scan_date="2026-05-19",
                             vcp_quality_score=None,
-                            vcp_ready_score=42 if is_quality_slug else None),
+                            vcp_ready_score=42 if is_quality_slug else None,
+                            power_play_pass=False if is_quality_slug else None),
         ]
         # Slug bazli filtre
         if slug == "tight_low_vol_excellent":
@@ -321,13 +332,15 @@ def get_screen_results(slug: str, limit: int = 500) -> list[ScreenResultRow]:
         elif slug == "vcp_ready_high":
             mock_rows = [r for r in mock_rows
                          if r.vcp_ready_score is not None and r.vcp_ready_score >= 70]
+        elif slug == "power_play_ready":
+            mock_rows = [r for r in mock_rows if r.power_play_pass is True]
         return mock_rows[:limit]
 
     # Gerçek DB sorgusu — ready VEYA parse VEYA diff (dispatch)
     rows = screen_get_results_dispatch(slug, limit=limit)
     return [ScreenResultRow(**{k: r.get(k) for k in
                                 ("symbol","grade","rs_ibd","price","passed","scan_date",
-                                 "vcp_quality_score","vcp_ready_score")})
+                                 "vcp_quality_score","vcp_ready_score","power_play_pass")})
             for r in rows]
 
 
