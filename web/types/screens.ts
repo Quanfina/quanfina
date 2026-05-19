@@ -19,6 +19,7 @@ export type ScreenSlug =
   | "mom_below_10"
   | "tight_low_volume"  // KARAR #461 Sprint 4-bis.4 — pre-compute, Ready'ye tasindi
   | "tight_low_vol_excellent"  // KARAR #466 Sprint 4-bis.5 — A+ Kalite (EXCELLENT filtre)
+  | "vcp_ready_high"  // KARAR #465 Sprint 4-bis.5 — Ready Score >= 70 (Inside Day + V-Dry + Tight)
   // Sprint 4-bis.2 — Parse (7, confirmations/violations text-parse)
   | "stage2_loose_10p"
   | "stage2_loose_below"
@@ -55,6 +56,8 @@ export interface ScreenResultRow {
   scan_date: string | null;
   // KARAR #466 (20 May 2026) — VCP Kalite Skoru, tight_low_vol* slug'larinda anlamli
   vcp_quality_score?: "EXCELLENT" | "PASS" | null;
+  // KARAR #465 (20 May 2026) — VCP Ready Score 0-100, vcp_ready_high + tight_low_vol* slug'larinda
+  vcp_ready_score?: number | null;
 }
 
 /** Kategoriler — Notebook_C1 SCREENS tuple'dan */
@@ -70,6 +73,7 @@ export const SCREEN_CATEGORIES: Record<ScreenSlug, string> = {
   mom_below_10: "Momentum",
   tight_low_volume: "Pattern (VCP)",  // KARAR #461 — Ready'ye taşındı
   tight_low_vol_excellent: "Pattern (VCP A+)",  // KARAR #466 — EXCELLENT filtre
+  vcp_ready_high: "Pattern (VCP Ready)",  // KARAR #465 — Ready Score 70+
   // Parse (7)
   stage2_loose_10p: "Stage (Loose)",
   stage2_loose_below: "Stage (Loose)",

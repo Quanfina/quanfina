@@ -13,7 +13,8 @@ from datetime import date, datetime, timedelta
 from db_connection import get_connection
 # Sprint 4-bis.4 KARAR #461 — Pre-Compute tek motor felsefesi (Kural #22 lokal birikim kullan)
 # Sprint 4-bis.5 KARAR #466 — VCP Kalite Skoru (3 kanal sentezi)
-from quanfina_math import compute_vcp_pass, compute_vcp_quality
+# Sprint 4-bis.5 KARAR #465 — Inside Day + Outside Day Negative Reversal + Ready Score
+from quanfina_math import compute_vcp_pass, compute_vcp_quality, compute_vcp_ready_score
 
 load_dotenv()
 FINVIZ_KEY = os.getenv("FINVIZ_API_KEY")
@@ -90,6 +91,8 @@ def init_db():
         "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS tight_low_vol_pass BOOLEAN DEFAULT FALSE",
         # Sprint 4-bis.5 KARAR #466 — VCP Kalite Skoru (EXCELLENT/PASS/NULL, 3 kanal sentezi)
         "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS vcp_quality_score TEXT DEFAULT NULL",
+        # Sprint 4-bis.5 KARAR #465 — VCP Ready Score 0-100 (Inside Day + V-Dry + Tight)
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS vcp_ready_score INTEGER DEFAULT NULL",
     ]:
         c.execute(col_sql)
     c.execute("""
@@ -973,6 +976,8 @@ def save_results(df_finviz, slopes, scan_date):
         tight_low_vol_pass = compute_vcp_pass(pvh)
         # Sprint 4-bis.5 KARAR #466 — VCP Kalite Skoru (EXCELLENT/PASS/None)
         vcp_quality_score = compute_vcp_quality(pvh)
+        # Sprint 4-bis.5 KARAR #465 — VCP Ready Score 0-100
+        vcp_ready_score = compute_vcp_ready_score(pvh)
 
         # Kural 3: MA200 yükselişte (slope > 0)
         passed = 1 if slope is not None and slope > 0 else 0
@@ -984,9 +989,10 @@ def save_results(df_finviz, slopes, scan_date):
                  price, change_pct, volume, market_cap, pe,
                  ma200_slope, passed, high52, sma50, atr14,
                  price_volume_history, tight_low_vol_pass, vcp_quality_score,
+                 vcp_ready_score,
                  confirmations, violations,
                  rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mansfield)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 ON CONFLICT(scan_date, ticker) DO UPDATE SET
                     company               = EXCLUDED.company,
                     sector                = EXCLUDED.sector,
@@ -1004,6 +1010,7 @@ def save_results(df_finviz, slopes, scan_date):
                     price_volume_history  = EXCLUDED.price_volume_history,
                     tight_low_vol_pass    = EXCLUDED.tight_low_vol_pass,
                     vcp_quality_score     = EXCLUDED.vcp_quality_score,
+                    vcp_ready_score       = EXCLUDED.vcp_ready_score,
                     confirmations         = EXCLUDED.confirmations,
                     violations            = EXCLUDED.violations,
                     rs_ibd                = EXCLUDED.rs_ibd,
@@ -1018,7 +1025,8 @@ def save_results(df_finviz, slopes, scan_date):
                 row.get("Price", 0), row.get("Change", ""), row.get("Volume", 0),
                 row.get("Market Cap", 0), row.get("P/E", 0),
                 slope, passed, high52, sma50, atr14,
-                pvh_json, tight_low_vol_pass, vcp_quality_score, confs, viols,
+                pvh_json, tight_low_vol_pass, vcp_quality_score, vcp_ready_score,
+                confs, viols,
                 rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mf,
             ))
             saved += 1
@@ -1171,6 +1179,8 @@ def run_scan(scan_date_override: str = None):
         "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS tight_low_vol_pass BOOLEAN DEFAULT FALSE",
         # Sprint 4-bis.5 KARAR #466 — VCP Kalite Skoru (EXCELLENT/PASS/NULL, 3 kanal sentezi)
         "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS vcp_quality_score TEXT DEFAULT NULL",
+        # Sprint 4-bis.5 KARAR #465 — VCP Ready Score 0-100 (Inside Day + V-Dry + Tight)
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS vcp_ready_score INTEGER DEFAULT NULL",
     ]:
         c.execute(col_sql)
 

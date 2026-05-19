@@ -835,6 +835,145 @@ def compute_vcp_quality(price_volume_history: Optional[list[dict]]) -> Optional[
 
 
 # =============================================================================
+# Sprint 4-bis.5 — Inside Day + Outside Day + VCP Ready Score
+# KARAR #465 (Minervini Uzmani onerisi, 20 May 2026)
+# Kaynak: Trade Like a Stock Market Wizard Bolum 10 (Inside Day "arzin
+# tukenmesinin kesin kaniti") + Think and Trade Like a Champion Bolum 1
+# (Outside Day Negative Reversal "Violations Soon After a Breakout")
+# =============================================================================
+
+
+# Eşikler (KARAR #465)
+OUTSIDE_DAY_VOLUME_RATIO = 1.5    # Outside Day yuksek hacim esigi (vol > prev * 1.5)
+VCP_READY_SCORE_INSIDE_WEIGHT = 50  # max puan (Inside Day orani)
+VCP_READY_SCORE_VOL_WEIGHT = 30     # max puan (V-Dry hacim)
+VCP_READY_SCORE_TIGHT_WEIGHT = 20   # max puan (intraday tight)
+VCP_READY_SCORE_HIGH_THRESHOLD = 70  # >= bu deger -> "ready" filtre
+
+
+def compute_inside_day(prev_day: dict, today: dict) -> bool:
+    """Inside Day = bugun gun-ici range tamamen dunkunun icinde.
+    Mark canon (Trade Like a Stock Market Wizard Bolum 10):
+      "Inside Day = arzin tukendiginin ve firtina oncesi sessizligin kesin kaniti"
+
+    Formul: today.high <= prev.high AND today.low >= prev.low
+
+    Args:
+        prev_day: {"high": ..., "low": ...}
+        today: {"high": ..., "low": ...}
+
+    Returns:
+        bool: True = Inside Day (volatilite sıkışmasi sinyali)
+    """
+    try:
+        return bool(today["high"] <= prev_day["high"]
+                    and today["low"] >= prev_day["low"])
+    except (KeyError, TypeError):
+        return False
+
+
+def compute_outside_day_negative_reversal(prev_day: dict, today: dict,
+                                          vol_ratio: float = OUTSIDE_DAY_VOLUME_RATIO) -> bool:
+    """Outside Day Negative Reversal = breakout sonrasi "Violation" sinyali.
+    Mark canon (Think and Trade Like a Champion Bolum 1 - Violations):
+      Geniş range (outside) + dusuk kapanis (negative) + yuksek hacim
+      = breakout basarisizligi, otomatik pozisyon kuculme tetigi
+
+    3 kosul AND:
+      1. Outside: today.high > prev.high AND today.low < prev.low
+      2. Negative: today.close < prev.close
+      3. High volume: today.volume > prev.volume * vol_ratio (default 1.5)
+
+    Args:
+        prev_day: {"high","low","close","volume"}
+        today: {"high","low","close","volume"}
+        vol_ratio: hacim catma esigi (default 1.5 = %50 fazla)
+
+    Returns:
+        bool: True = Negative Reversal (Violation, pozisyon kuculme tetigi)
+    """
+    try:
+        outside = today["high"] > prev_day["high"] and today["low"] < prev_day["low"]
+        negative = today["close"] < prev_day["close"]
+        high_vol = today["volume"] > prev_day["volume"] * vol_ratio
+        return bool(outside and negative and high_vol)
+    except (KeyError, TypeError):
+        return False
+
+
+def compute_vcp_ready_score(price_volume_history: Optional[list[dict]],
+                            lookback: int = 3) -> Optional[int]:
+    """VCP Ready Score (0-100) — Minervini Uzmani KARAR #465 onerisi.
+
+    Pivot bolgesinde son `lookback` gun (default 3) icinde:
+      - Kac Inside Day var (max 50 puan, "arzin tukenmesi")
+      - Hacim 50d MA'ya gore ne kadar dustu (max 30 puan, V-Dry)
+      - Son 5 gun intraday range ne kadar tight (max 20 puan)
+
+    Score = inside_score + vol_score + tight_score
+
+    Hedef: >= VCP_READY_SCORE_HIGH_THRESHOLD (70) -> "Ready" filtresi
+    (11. Ready screen `vcp_ready_high` SQL: WHERE vcp_ready_score >= 70).
+
+    Args:
+        price_volume_history: OHLC formatinda PVH (Migration 003 sonrasi)
+        lookback: Inside Day kontrolu icin gun sayisi (default 3)
+
+    Returns:
+        int 0-100: Ready Score
+        None: yetersiz veri / OHLC yok / hata
+
+    Backward compat: Eski close-only PVH -> None
+    """
+    if not price_volume_history or len(price_volume_history) < VCP_MIN_HISTORY:
+        return None
+
+    try:
+        sample = price_volume_history[-1]
+        if "high" not in sample or "low" not in sample:
+            return None  # backward compat — OHLC yok
+
+        # 1. Inside Day sayisi (son `lookback` gun)
+        recent_for_inside = price_volume_history[-(lookback + 1):]
+        inside_count = 0
+        for i in range(1, len(recent_for_inside)):
+            if compute_inside_day(recent_for_inside[i - 1], recent_for_inside[i]):
+                inside_count += 1
+        inside_score = int((inside_count / lookback) * VCP_READY_SCORE_INSIDE_WEIGHT)
+
+        # 2. V-Dry hacim seviyesi (50d MA karsilastirma)
+        last_50 = price_volume_history[-VCP_MIN_HISTORY:]
+        avg_50d_volume = sum(d["volume"] for d in last_50) / len(last_50)
+        if avg_50d_volume <= 0:
+            return None
+        last_volume = price_volume_history[-1]["volume"]
+        vol_ratio = last_volume / avg_50d_volume
+
+        if vol_ratio < VCP_VOL_DRY_RATIO_EXCELLENT:  # 0.50 -> 30 puan (full)
+            vol_score = VCP_READY_SCORE_VOL_WEIGHT
+        elif vol_ratio < VCP_VOL_DRY_RATIO:           # 0.70 -> 20 puan
+            vol_score = int(VCP_READY_SCORE_VOL_WEIGHT * 2 / 3)
+        elif vol_ratio < 1.0:                          # 1.00 alti -> 10 puan
+            vol_score = int(VCP_READY_SCORE_VOL_WEIGHT / 3)
+        else:
+            vol_score = 0
+
+        # 3. Intraday tight (son 5 gun)
+        last_5 = price_volume_history[-VCP_LOOKBACK_DAYS:]
+        tight_count = 0
+        for d in last_5:
+            if d["close"] > 0:
+                range_pct = (d["high"] - d["low"]) / d["close"] * 100
+                if range_pct < VCP_TIGHT_RANGE_PCT:
+                    tight_count += 1
+        tight_score = int((tight_count / VCP_LOOKBACK_DAYS) * VCP_READY_SCORE_TIGHT_WEIGHT)
+
+        return inside_score + vol_score + tight_score
+    except (KeyError, TypeError, ValueError, ZeroDivisionError):
+        return None
+
+
+# =============================================================================
 # Konu 14 — RBA Result Based Analysis (Mark Minervini Bölüm 4)
 # =============================================================================
 

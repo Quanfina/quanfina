@@ -246,6 +246,9 @@ class ScreenResultRow(BaseModel):
     # KARAR #466 (20 May 2026) — VCP Kalite Skoru: "EXCELLENT" | "PASS" | None
     # tight_low_volume slug'inda anlamli, digerlerinde None (UI rozet gizlenir)
     vcp_quality_score: Optional[str] = None
+    # KARAR #465 (20 May 2026) — VCP Ready Score 0-100 (Inside Day + V-Dry + Tight)
+    # vcp_ready_high slug + tight_low_volume slug'larda anlamli
+    vcp_ready_score: Optional[int] = None
 
 
 @app.get("/api/screens", response_model=list[ScreenMeta])
@@ -287,36 +290,44 @@ def get_screen_results(slug: str, limit: int = 500) -> list[ScreenResultRow]:
         )
 
     # MOCK fallback (dev ortam, db_connected=false)
-    # KARAR #466 — tight_low_volume slug'inda vcp_quality_score sahte verisi
+    # KARAR #466+#465 — VCP slug'larinda vcp_quality_score + vcp_ready_score sahte
     if not db_health_check():
-        is_quality_slug = slug in ("tight_low_volume", "tight_low_vol_excellent")
+        is_quality_slug = slug in ("tight_low_volume", "tight_low_vol_excellent", "vcp_ready_high")
         mock_rows = [
             ScreenResultRow(symbol="NVDA", grade="A", rs_ibd=99,
                             price=145.20, passed=1, scan_date="2026-05-19",
-                            vcp_quality_score="EXCELLENT" if is_quality_slug else None),
+                            vcp_quality_score="EXCELLENT" if is_quality_slug else None,
+                            vcp_ready_score=85 if is_quality_slug else None),
             ScreenResultRow(symbol="AAPL", grade="A", rs_ibd=87,
                             price=212.50, passed=1, scan_date="2026-05-19",
-                            vcp_quality_score="PASS" if is_quality_slug else None),
+                            vcp_quality_score="PASS" if is_quality_slug else None,
+                            vcp_ready_score=62 if is_quality_slug else None),
             ScreenResultRow(symbol="MSFT", grade="B", rs_ibd=91,
                             price=425.30, passed=1, scan_date="2026-05-19",
-                            vcp_quality_score="EXCELLENT" if is_quality_slug else None),
+                            vcp_quality_score="EXCELLENT" if is_quality_slug else None,
+                            vcp_ready_score=78 if is_quality_slug else None),
             ScreenResultRow(symbol="GOOGL", grade="B", rs_ibd=88,
                             price=178.40, passed=1, scan_date="2026-05-19",
-                            vcp_quality_score="PASS" if is_quality_slug else None),
+                            vcp_quality_score="PASS" if is_quality_slug else None,
+                            vcp_ready_score=55 if is_quality_slug else None),
             ScreenResultRow(symbol="AMD", grade="C", rs_ibd=85,
                             price=158.20, passed=1, scan_date="2026-05-19",
-                            vcp_quality_score=None),
+                            vcp_quality_score=None,
+                            vcp_ready_score=42 if is_quality_slug else None),
         ]
-        # tight_low_vol_excellent slug'inda sadece EXCELLENT olanlari don
+        # Slug bazli filtre
         if slug == "tight_low_vol_excellent":
             mock_rows = [r for r in mock_rows if r.vcp_quality_score == "EXCELLENT"]
+        elif slug == "vcp_ready_high":
+            mock_rows = [r for r in mock_rows
+                         if r.vcp_ready_score is not None and r.vcp_ready_score >= 70]
         return mock_rows[:limit]
 
     # Gerçek DB sorgusu — ready VEYA parse VEYA diff (dispatch)
     rows = screen_get_results_dispatch(slug, limit=limit)
     return [ScreenResultRow(**{k: r.get(k) for k in
                                 ("symbol","grade","rs_ibd","price","passed","scan_date",
-                                 "vcp_quality_score")})
+                                 "vcp_quality_score","vcp_ready_score")})
             for r in rows]
 
 

@@ -101,6 +101,35 @@ function PassedCell(p: ICellRendererParams<ScreenResultRow>) {
   return <span style={{ color: "#888" }}>—</span>;
 }
 
+// KARAR #465 — VCP Ready Score 0-100 sayisal renk bandı
+function VcpReadyCell(p: ICellRendererParams<ScreenResultRow>) {
+  const score = p.value as number | null | undefined;
+  if (score === null || score === undefined) return <span style={{ color: "#888" }}>—</span>;
+  // Renk bandı: 70+ koyu yeşil, 50-69 sarı, <50 gri
+  let style: { bg: string; color: string };
+  if (score >= 70) style = { bg: "#0f5132", color: "#fff" };
+  else if (score >= 50) style = { bg: "#eab308", color: "#1a1a1a" };
+  else style = { bg: "#6b7280", color: "#fff" };
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        padding: "2px 10px",
+        borderRadius: "4px",
+        background: style.bg,
+        color: style.color,
+        fontWeight: 600,
+        fontSize: "12px",
+        minWidth: "40px",
+        textAlign: "center",
+      }}
+      title="VCP Ready Score (KARAR #465) — 50 puan Inside Day + 30 puan V-Dry + 20 puan tight closes. 70+ = Ready filtre."
+    >
+      {score}
+    </span>
+  );
+}
+
 // KARAR #466 — VCP Kalite Skoru rozeti (EXCELLENT/PASS/None)
 function VcpQualityCell(p: ICellRendererParams<ScreenResultRow>) {
   const score = p.value as "EXCELLENT" | "PASS" | null | undefined;
@@ -131,24 +160,36 @@ function VcpQualityCell(p: ICellRendererParams<ScreenResultRow>) {
 
 // === AG Grid ColDef (KARAR ADAY #455 standart pattern) ===
 
-// KARAR #466 — VCP slug'larinda Kalite kolonu acilir, digerlerinde gizli
-const VCP_SLUGS = new Set<string>(["tight_low_volume", "tight_low_vol_excellent"]);
+// KARAR #466 + #465 — VCP slug'larinda Kalite + Ready Score kolonlari
+const VCP_SLUGS = new Set<string>([
+  "tight_low_volume", "tight_low_vol_excellent", "vcp_ready_high"
+]);
 
 function buildColDefs(slug: string | null): ColDef<ScreenResultRow>[] {
   const isVcpSlug = slug ? VCP_SLUGS.has(slug) : false;
+  if (!isVcpSlug) return [];
   return [
-    ...(isVcpSlug
-      ? [{
-          field: "vcp_quality_score" as keyof ScreenResultRow,
-          headerName: "Kalite",
-          headerTooltip:
-            "VCP Kalite Skoru (KARAR #466) — EXCELLENT: Mark canon %50 alti " +
-            "(A+); PASS: Brandon muhafazakar filtre %70 alti",
-          width: 110,
-          cellRenderer: VcpQualityCell,
-          cellStyle: { display: "flex", alignItems: "center", justifyContent: "center" },
-        }]
-      : []),
+    {
+      field: "vcp_quality_score" as keyof ScreenResultRow,
+      headerName: "Kalite",
+      headerTooltip:
+        "VCP Kalite Skoru (KARAR #466) — EXCELLENT: Mark canon %50 alti (A+); " +
+        "PASS: Brandon muhafazakar filtre %70 alti",
+      width: 110,
+      cellRenderer: VcpQualityCell,
+      cellStyle: { display: "flex", alignItems: "center", justifyContent: "center" },
+    },
+    {
+      field: "vcp_ready_score" as keyof ScreenResultRow,
+      headerName: "Ready",
+      headerTooltip:
+        "VCP Ready Score 0-100 (KARAR #465 Minervini Uzmani) — 50 puan Inside Day + " +
+        "30 V-Dry + 20 tight. 70+ Ready, 50-69 Yaklasan, <50 Hazir degil.",
+      width: 90,
+      type: "numericColumn",
+      cellRenderer: VcpReadyCell,
+      cellStyle: { display: "flex", alignItems: "center", justifyContent: "center" },
+    },
   ];
 }
 
@@ -309,7 +350,7 @@ export default function ScreensPage() {
       <div className="space-y-2">
         <h1 className="text-2xl font-bold">Hisse Tarama (Screens)</h1>
         <p className="text-sm text-muted-foreground">
-          23 tarama: 10 Ready (saf SQL) + 7 Parse (text-parse) + 6 Scan-Diff (Self-JOIN).
+          24 tarama: 11 Ready (saf SQL) + 7 Parse (text-parse) + 6 Scan-Diff (Self-JOIN).
           Strateji-bağımsız fırsat keşfi.
         </p>
       </div>
@@ -326,8 +367,8 @@ export default function ScreensPage() {
           className="px-3 py-2 border rounded-md bg-background min-w-[300px]"
           disabled={metaQ.isLoading}
         >
-          {/* Sprint 4-bis.5 KARAR #466 — Ready 9 → 10 (tight_low_vol_excellent eklendi) */}
-          <optgroup label="✅ Ready (10) — Saf SQL filtre">
+          {/* Sprint 4-bis.5 KARAR #465 — Ready 10 → 11 (vcp_ready_high eklendi) */}
+          <optgroup label="✅ Ready (11) — Saf SQL filtre">
             {metaQ.data?.filter((m) => m.category === "ready").map((meta) => (
               <option key={meta.slug} value={meta.slug}>
                 {SCREEN_CATEGORIES[meta.slug]} — {meta.label}
