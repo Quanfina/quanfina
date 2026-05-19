@@ -17,7 +17,8 @@
 #   .\scripts\drive_pull.ps1 -ScheduledTask   # Windows task kayit (saatlik, drive_sync ile alternat)
 #   .\scripts\drive_pull.ps1 -UnregisterTask  # Task sil
 #
-# Versiyon: v0.5 (19 May 2026, ilk surum)
+# Versiyon: v0.5.1 (19 May 2026 ~04:30, Kural #19 fix — Out-File -> WriteAllText)
+# v0.5  : Ilk surum, Out-File -Encoding UTF8 conflict log BOM ekliyordu
 # Kural uyumu: #15 (ASCII-only), #16 (native exe 2>&1 yok)
 #
 # Davranis:
@@ -263,7 +264,9 @@ if ($conflictList.Count -gt 0 -and -not $KuruCalisma) {
         $logIcerik += "- Cozum  : Manuel diff + birlestir"
         $logIcerik += ""
     }
-    $logIcerik | Out-File -FilePath $conflictLog -Encoding UTF8 -Force
+    # Kural #19 (19 May 2026) — Out-File -Encoding UTF8 BOM + mojibake. WriteAllText kullan.
+    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+    [System.IO.File]::WriteAllText($conflictLog, ($logIcerik -join "`n"), $utf8NoBom)
     Write-Host ""
     Write-Host "[uyari] $($conflictList.Count) conflict tespit edildi" -ForegroundColor Red
     Write-Host "[uyari] Log dosyasi: $conflictLog" -ForegroundColor Red
