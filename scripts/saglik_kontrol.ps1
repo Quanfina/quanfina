@@ -20,8 +20,15 @@ param(
 )
 
 $ErrorActionPreference = "Continue"
-$repoRoot = (git rev-parse --show-toplevel).Trim()
-if (-not $repoRoot) { Write-Host "Git deposu degil." -ForegroundColor Red; exit 1 }
+# v0.5.1 fix (19 May 2026 ~04:00): worktree-aware repo root tespiti
+# $PSScriptRoot pattern (drive_sync.ps1 gibi). git rev-parse worktree'de worktree path donduruyor, ana repoyu degil.
+$scriptPath = $MyInvocation.MyCommand.Path
+$scriptsDir = Split-Path -Parent $scriptPath
+$repoRoot = Split-Path -Parent $scriptsDir
+if (-not (Test-Path (Join-Path $repoRoot "CLAUDE.md"))) {
+    Write-Host "Repo kokunde CLAUDE.md bulunamadi: $repoRoot" -ForegroundColor Red
+    exit 1
+}
 
 # Drive yedek path auto-detect (Kural #15: scriptte Turkce karakter yasak,
 # bu yuzden literal path yazmiyoruz; G:\ kokunde Drive benzeri klasor + Quanfina_Backup ara)

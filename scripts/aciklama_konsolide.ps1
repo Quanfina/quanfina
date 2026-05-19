@@ -26,8 +26,14 @@ param(
 )
 
 $ErrorActionPreference = "Continue"
-$repoRoot = (git rev-parse --show-toplevel).Trim()
-if (-not $repoRoot) { Write-Host "Git deposu degil." -ForegroundColor Red; exit 1 }
+# v0.5.1 fix (19 May 2026 ~04:00): worktree-aware repo root tespiti
+$scriptPath = $MyInvocation.MyCommand.Path
+$scriptsDir = Split-Path -Parent $scriptPath
+$repoRoot = Split-Path -Parent $scriptsDir
+if (-not (Test-Path (Join-Path $repoRoot "notebook\Notebook_A_Vizyon.md"))) {
+    Write-Host "Vizyon dosyasi bulunamadi: $(Join-Path $repoRoot 'notebook\Notebook_A_Vizyon.md')" -ForegroundColor Red
+    exit 1
+}
 
 $vizyon = Join-Path $repoRoot "notebook\Notebook_A_Vizyon.md"
 if (-not (Test-Path $vizyon)) {

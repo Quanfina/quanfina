@@ -865,6 +865,60 @@ Protokolü), KARAR #447 (Yöntem B), `scripts/drive_sync.ps1`,
 `scripts/drive_pull.ps1`, `notebook/_OZET.md` "Bilgi Akışı"
 bölümü.
 
+### Kural 19 — PowerShell `Out-File -Encoding UTF8` Türkçe İçerikte Yasak (19 May 2026 ~04:00 yeni)
+
+Windows PowerShell 5.1'de Türkçe (veya diğer non-ASCII) içerikli
+markdown/text dosyaları yazarken **`Out-File -Encoding UTF8` YASAK**.
+Bu cmdlet **UTF-8 BOM** ekler + içeriği önce Windows console encoding
+(cp1254 — Türkçe Windows-1252 türevi) ile yorumlayıp UTF-8'e
+dönüştürür → **çift dönüşüm = mojibake** (örn: "Özet" → "Ã–zet",
+emoji 🤝 → "ğŸ¤").
+
+**Yasak pattern:**
+```powershell
+$icerik | Out-File -FilePath $f -Encoding UTF8 -Force        # YANLIS
+Set-Content -Path $f -Value $icerik -Encoding UTF8            # YANLIS
+```
+
+**Doğru pattern — `[System.IO.File]::WriteAllText` UTF-8 BOM-less:**
+```powershell
+$utf8NoBom = New-Object System.Text.UTF8Encoding $false
+[System.IO.File]::WriteAllText($f, $icerik, $utf8NoBom)       # OK
+```
+
+**Pattern keşfi:** 2 ortaya çıkış aynı gece (19 May 2026):
+1. `drive_sync.ps1` v2.1 C1 arşivleme — `_DEVIR.md` mojibake
+2. `satir_sayim_otomatik.ps1` v0.5 -Uygula — `_OZET.md` mojibake
+
+Eşik 2 aşıldı → Kural #14 doğrudan tescil. _HATALAR.md H#11 kayıt.
+
+**Mojibake düzeltme (zaten oluşmuş için):**
+```powershell
+$bytes = [System.IO.File]::ReadAllBytes($f)
+$bomYok = if ($bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) { $bytes[3..($bytes.Count-1)] } else { $bytes }
+$decode1 = [System.Text.Encoding]::UTF8.GetString($bomYok)
+$cp1252 = [System.Text.Encoding]::GetEncoding(1252)
+$bytesGercek = $cp1252.GetBytes($decode1)
+$gercekIcerik = [System.Text.Encoding]::UTF8.GetString($bytesGercek)
+$utf8NoBom = New-Object System.Text.UTF8Encoding $false
+[System.IO.File]::WriteAllText($f, $gercekIcerik, $utf8NoBom)
+```
+
+**İstisna:**
+- ASCII-only içerik → `Out-File -Encoding ascii` güvenli (Kural #15 zaten ASCII-only `scripts/*.ps1`'i kapsıyor)
+- PowerShell **7+** (Core) → `Out-File -Encoding utf8NoBOM` parametresi var, ama hâlâ console encoding bug'ı olabilir → **yine `[System.IO.File]::WriteAllText` tercih edilir**
+
+**Script audit listesi (sabah Sn. Ferit):**
+- `saglik_kontrol.ps1 -Uygula` Out-File kullanıyor mu? → kontrol et, varsa v0.5.1 fix
+- `notebook_yedekle.ps1` Out-File yok (ZIP)
+- `drive_sync.ps1` v2.2 Out-File yok (robocopy + Copy-Item)
+- `pasif_tara.ps1` Out-File yok (Write-Host only)
+- `hijyen_paketi.ps1` Out-File yok (wrapper)
+
+**İlişkili:** Kural #13 (commit mesajı + temp dosya UTF-8), Kural #15
+(scripts ASCII-only), Kural #16 (PS native exe 2>&1), Manifesto
+Özellik #8 11. self-correction (yöntem seviyesi — encoding bug).
+
 ---
 
 ## 🤝 Çalışma Mantığı + AI Rol Dağılımı
