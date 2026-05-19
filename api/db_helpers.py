@@ -276,12 +276,15 @@ def screen_get_results(slug: str, limit: int = 500) -> list[dict]:
     # Idempotent + parametre safety:
     # - filter SCREENS_READY_8 sabit dict'ten (SQL injection riski yok)
     # - LIMIT parametrize edildi
+    # NOT: minervini_scans tablosunda kolon adi 'ticker', frontend uyumu icin 'symbol' alias
+    # rs_ibd double precision (TEXT degil) - Python tarafinda float kabul edilir
+    # scan_date TEXT (TIMESTAMP degil) - .isoformat() cagrilmaz
     query = f"""
-        SELECT symbol, grade, rs_ibd, price, passed, scan_date
+        SELECT ticker AS symbol, grade, rs_ibd, price, passed, scan_date
         FROM minervini_scans
         WHERE scan_date = (SELECT MAX(scan_date) FROM minervini_scans)
           AND {sql_filter}
-        ORDER BY rs_ibd DESC NULLS LAST, symbol ASC
+        ORDER BY rs_ibd DESC NULLS LAST, ticker ASC
         LIMIT :limit
     """
 
@@ -290,12 +293,11 @@ def screen_get_results(slug: str, limit: int = 500) -> list[dict]:
         rows = []
         for row in result:
             d = dict(row._mapping)
-            if d.get("scan_date") is not None:
-                d["scan_date"] = d["scan_date"].isoformat()
+            # scan_date TEXT olarak gelir, isoformat gerekmez
             if d.get("price") is not None:
                 d["price"] = float(d["price"])
             if d.get("rs_ibd") is not None:
-                d["rs_ibd"] = int(d["rs_ibd"]) if d["rs_ibd"] is not None else None
+                d["rs_ibd"] = int(round(float(d["rs_ibd"])))
             rows.append(d)
         return rows
 
