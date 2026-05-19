@@ -1003,6 +1003,68 @@ uygula), Kural #17 (Uzman/Yorumcu = NotebookLM), KARAR ADAY #453-#458
 Yönlendirme) + #8 (Öğrenen — Markets360 ham kaynak emeği boşa
 gitmesin), `notebook/Sprint_4_bis_Mimari_Kararlar.md`.
 
+### Kural 21 — Browser Test Disiplini (Hibrit) (19 May 2026 ~20:00 yeni)
+
+UI iş yapan her büyük adımda **görsel doğrulama ZORUNLU.** İki kanal
+hibrit kullanılır — biri çalışmazsa diğerine düşülür, ikisi de
+çalışmazsa adım kapanmaz.
+
+**Kanal A — Chrome MCP (otomatik, ben yönetirim):**
+- Eklenti `Claude for Chrome` pair'li + Site Erişimi "Tüm sitelerde"
+- `mcp__Claude_in_Chrome__tabs_context_mcp` → tab al
+- `mcp__Claude_in_Chrome__browser_batch` ile navigate + wait +
+  screenshot + console_logs + network tek round-trip
+- Use case: regression test, console error/warn yakalama, 4xx/5xx
+  network detection, AG Grid render kontrol, dropdown akış
+- Avantaj: Sn. Ferit zaman kaybetmez, otonom doğrulama
+- **Tercih:** `browser_batch` her zaman (sıralı çağrı yerine tek
+  round-trip — eklenti policy gereği)
+
+**Kanal B — Sn. Ferit screenshot (manuel, fallback):**
+- Win+Shift+S → bölge seç → chat'e yapıştır
+- Use case: Chrome MCP permission'a takıldığında fallback, görsel
+  insan değerlendirmesi (renk/font/dark mode okunabilirlik), "hoşuma
+  gitmedi" tipi geri bildirim
+- Avantaj: gerçek render, gerçek göz; ek altyapı yok
+- **Pratik:** Tek tur döngü — bir Sn. Ferit screenshot atışıyla onaylanır
+
+**TETİKLEYİCİ (test ZORUNLU):**
+- Yeni UI route (`web/app/(dashboard)/<x>/page.tsx`)
+- Mevcut sayfa banner/dropdown/layout/empty-state değişti
+- DB-bağımlı veri akışı değişti (loading/error/skeleton)
+- Sidebar / nav değişti
+- Renk/tema değişti (dark mode kalibrasyon)
+
+**ATLAMA İSTİSNALARI:**
+- Backend-only (`/api/*` endpoint) → `curl` yeterli
+- Notebook/script/markdown değişikliği → browser test gereksiz
+- Sadece dokümantasyon güncellemesi → atlanır
+
+**KARAR ALGORITMI:**
+1. `list_connected_browsers` → boş ise → Kanal B (Sn. Ferit'ten iste)
+2. Kanal A `navigate` → `permission_required` ise → 1 kez bilgilendirme
+   sonra Kanal B'ye geç (Kural #1 + #5 — zaman israfı yok)
+3. Hangi kanalda olursa olsun: kanıt YAPILANLAR.md tarih notuna eklenir
+   (regression diff geçmişi için)
+
+**KURAL #20 ile bağ:**
+- Kural #20 = **ne tasarlanmalı** (Master + Markets360 çift danışma)
+- Kural #21 = **tasarlanan nasıl doğrulanır** (browser test hibrit)
+- İkisi birlikte UI/UX kalite zinciri tam
+
+**Pattern keşfi (Kural #14 doğrudan tescil):**
+19 May 2026 ~19:45-20:00 — Sn. Ferit Chrome eklentisi yükledi, ben
+canlı tarayıcı testi yapacaktım; permission engeline iki kez takıldı
+ama Sn. Ferit screenshot ile asıl kanıt sundu (canlı /screens UI
+çalışıyor — MOCK fallback grade/RS bantlar render OK). Sn. Ferit
+"hibrit çalışma disiplinine ekleyelim" talimatı doğrudan tescil eşiği.
+Manifesto Özellik #8 **13. self-correction.**
+
+**İlişkili:** Kural #1 (Tek Seferde Tek İş), Kural #5 (Prompt Tekrar
+Verilmez), Kural #12 (Önce Keşfet), Kural #14 (Pattern Tescil), Kural
+#20 (UI/UX Çift Danışma), Kural #19 (PS Out-File yasak — encoding
+disiplini paralel motif). Memory: `feedback_chrome_mcp_hibrit`.
+
 ---
 
 ## 🤝 Çalışma Mantığı + AI Rol Dağılımı
