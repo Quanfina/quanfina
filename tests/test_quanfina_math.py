@@ -39,6 +39,10 @@ from quanfina_math import (
     VCP_PULLBACK_EXCELLENT,
     VCP_PULLBACK_GOOD,
     VCP_PULLBACK_ACCEPTABLE,
+    # Sprint 4-bis.5 KARAR #466 — VCP Kalite Skoru (3 kanal sentezi)
+    compute_vcp_quality,
+    VCP_VOL_DRY_RATIO,
+    VCP_VOL_DRY_RATIO_EXCELLENT,
 )
 
 
@@ -986,6 +990,76 @@ class TestComputeVcpPass:
         assert result is False, (
             "KARAR #464 backward compat: eski PVH high/low yok -> False olmali"
         )
+
+
+# ===========================================================================
+# Sprint 4-bis.5 KARAR #466 — VCP Kalite Skoru (3 kanal sentezi)
+# Master (0.70 muhafazakar + 0.50 ideal) + Minervini Uzmani (Mark canon
+# "%50 alti en siki") + Bonus FMP (0.40-0.50 altin standart, ASX deneyimi)
+# ===========================================================================
+
+
+class TestComputeVcpQuality:
+    """Brandon VCP iki seviyeli kalite tespit (EXCELLENT/PASS/None)."""
+
+    def _build_pvh_quality(self, days: int, vol_last: int,
+                           range_pct: float = 0.5) -> list[dict]:
+        """Test PVH OHLC üreticisi - hacim seviyesi parametre."""
+        pvh = []
+        for i in range(days):
+            close = 100.0
+            if i >= days - 5:
+                close = 100.0 + (i - (days - 5)) * 0.3
+            rng = close * range_pct / 100 if i >= days - 5 else close * 2.5 / 100
+            volume = 1_000_000 if i < days - 1 else vol_last
+            pvh.append({
+                "date": f"2026-04-{i+1:02d}",
+                "open": close - rng/4, "high": close + rng/2, "low": close - rng/2,
+                "close": close, "volume": volume,
+            })
+        return pvh
+
+    def test_excellent_when_volume_below_50pct(self):
+        # 50-gun MA ~960K, 0.50 = 480K -> son gun 400K -> EXCELLENT
+        pvh = self._build_pvh_quality(60, vol_last=400_000)
+        assert compute_vcp_quality(pvh) == "EXCELLENT"
+
+    def test_pass_when_volume_between_50_and_70(self):
+        # 50-gun MA ~960K, son gun 600K (0.60 ratio)
+        # 0.50 ile 0.70 arasinda -> PASS
+        pvh = self._build_pvh_quality(60, vol_last=600_000)
+        assert compute_vcp_quality(pvh) == "PASS"
+
+    def test_none_when_volume_above_70pct(self):
+        # 50-gun MA ~960K, son gun 800K (0.83 ratio) -> None (failsafe)
+        pvh = self._build_pvh_quality(60, vol_last=800_000)
+        assert compute_vcp_quality(pvh) is None
+
+    def test_none_when_intraday_range_wide(self):
+        # Hacim 0.40 (EXCELLENT seviye) ama intraday range %2.5 (wide)
+        pvh = self._build_pvh_quality(60, vol_last=400_000, range_pct=2.5)
+        assert compute_vcp_quality(pvh) is None
+
+    def test_none_for_short_history(self):
+        pvh = self._build_pvh_quality(20, vol_last=400_000)
+        assert compute_vcp_quality(pvh) is None
+
+    def test_none_for_none_input(self):
+        assert compute_vcp_quality(None) is None
+        assert compute_vcp_quality([]) is None
+
+    def test_backward_compat_close_only_returns_none(self):
+        # Eski PVH (high/low yok) -> None
+        days = 60
+        pvh = [
+            {"date": f"2026-04-{i+1:02d}", "close": 100.0, "volume": 400_000}
+            for i in range(days)
+        ]
+        assert compute_vcp_quality(pvh) is None
+
+    def test_threshold_constants_exposed(self):
+        assert VCP_VOL_DRY_RATIO == 0.70
+        assert VCP_VOL_DRY_RATIO_EXCELLENT == 0.50
 
     def test_threshold_constants_exposed(self):
         # Kalibrasyon noktaları dışarıdan erişilebilir olmalı

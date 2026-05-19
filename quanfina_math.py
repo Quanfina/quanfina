@@ -617,8 +617,9 @@ def count_distribution_days(
 # Eşikler — Sn. Ferit/Master kalibrasyon noktası (mevcut: Brandon video 10:20 kanonu)
 VCP_LOOKBACK_DAYS = 5            # son N gün incelenir
 VCP_AVG_DROP_THRESHOLD = 1.5     # % - günlük ortalama düşüş üst sınırı
-VCP_VOL_DRY_RATIO = 0.70         # son gün vol < 50-gün MA × bu oran
-VCP_TIGHT_RANGE_PCT = 2.0        # % - ardışık close değişim üst sınırı (range_pct proxy)
+VCP_VOL_DRY_RATIO = 0.70         # son gün vol < 50-gün MA × bu oran (PASS filtre)
+VCP_VOL_DRY_RATIO_EXCELLENT = 0.50  # KARAR #466: Mark canon "%50 alti en siki" — A+ seviye
+VCP_TIGHT_RANGE_PCT = 2.0        # % - intraday range_pct üst sınırı
 VCP_MIN_HISTORY = 50             # 50-gün MA hesabı için gerekli minimum
 VCP_PULLBACK_EXCELLENT = 0.10    # ratio ≤ → score 100
 VCP_PULLBACK_GOOD = 0.25         # ratio ≤ → score 80
@@ -739,6 +740,98 @@ def compute_vcp_pass(price_volume_history: Optional[list[dict]]) -> bool:
         return bool(is_small_drops and volume_drying and tight_closes)
     except (KeyError, TypeError, ValueError, ZeroDivisionError):
         return False
+
+
+def compute_vcp_quality(price_volume_history: Optional[list[dict]]) -> Optional[str]:
+    """VCP Kalite Skoru (KARAR #466, 20 May 2026, 3 kanal sentezi).
+
+    Sn. Ferit'in 3 NotebookLM cross-check sonrasi yetki devri ile (Kural #23
+    otonom mod) tescillenen iki seviyeli VCP kalite tespit fonksiyonu.
+
+    3 kanal sentezi (Master + Minervini Uzmani + Bonus FMP):
+      - Master: "0.70 muhafazakar yansima, 0.50 ideal pivot ani"
+      - Minervini Uzmani: "0.70 guvenli filtre, 0.50 ideal gun hedefi"
+      - Bonus FMP: "0.40-0.50 altin standart, 0.70 gevsek (ASX deneyimi)"
+
+    Sentez: 0.70 = PASS filtre (genis ekran), 0.50 = EXCELLENT (Mark canon
+    "%50 alti en siki" + Bonus FMP "altin standart").
+
+    Bu fonksiyon compute_vcp_pass'a PARALEL — compute_vcp_pass tek seviyeli
+    (True/False), compute_vcp_quality iki seviyeli (EXCELLENT/PASS/None).
+
+    Args:
+        price_volume_history: list[dict] OHLC formatinda
+          [{"date":..., "open":..., "high":..., "low":..., "close":..., "volume":...}, ...]
+
+    Returns:
+        - "EXCELLENT" — Mark canon "en siki gun" + Brandon tum sartlar (VOL_DRY 0.50)
+        - "PASS"      — Brandon muhafazakar filtre (VOL_DRY 0.70)
+        - None        — yetersiz veri veya sartlar saglanmadi (failsafe)
+
+    UI kullanim onerisi (KARAR ADAY #466 frontend):
+        EXCELLENT -> yesil koyu rozet "A+ Kalite"
+        PASS      -> yesil acik rozet "Olgun"
+        None      -> rozet yok
+
+    Backward compat: Eski close-only PVH -> None (high/low yok)
+    """
+    if not price_volume_history or len(price_volume_history) < VCP_MIN_HISTORY:
+        return None
+
+    try:
+        recent = price_volume_history[-VCP_LOOKBACK_DAYS:]
+        prev_day = price_volume_history[-(VCP_LOOKBACK_DAYS + 1)]
+        last_50 = price_volume_history[-VCP_MIN_HISTORY:]
+
+        if len(recent) < VCP_LOOKBACK_DAYS:
+            return None
+
+        # Schema kontrol (backward compat — close-only -> None)
+        sample = recent[0]
+        if "high" not in sample or "low" not in sample:
+            return None
+
+        # 1. is_small_drops (ardisik close-to-close)
+        all_window = [prev_day] + recent
+        pct_changes = [
+            (all_window[i]["close"] - all_window[i-1]["close"]) / all_window[i-1]["close"] * 100
+            for i in range(1, len(all_window))
+            if all_window[i-1]["close"] > 0
+        ]
+        drops = [abs(c) for c in pct_changes if c < 0]
+        avg_drop = sum(drops) / max(len(drops), 1) if drops else 0.0
+        is_small_drops = avg_drop < VCP_AVG_DROP_THRESHOLD
+
+        # 2. tight_closes (intraday range)
+        range_pcts = []
+        for d in recent:
+            close_val = d["close"]
+            if close_val <= 0:
+                return None
+            range_pcts.append((d["high"] - d["low"]) / close_val * 100)
+        tight_closes = all(rp < VCP_TIGHT_RANGE_PCT for rp in range_pcts)
+
+        # is_small_drops VEYA tight_closes saglanmadi -> direkt None
+        if not (is_small_drops and tight_closes):
+            return None
+
+        # 3. Hacim seviyesi (iki seviye karsilastirma)
+        avg_50d_volume = sum(d["volume"] for d in last_50) / len(last_50)
+        if avg_50d_volume <= 0:
+            return None
+        last_volume = recent[-1]["volume"]
+        vol_ratio = last_volume / avg_50d_volume
+
+        # EXCELLENT esik (0.50) — Mark canon "%50 alti en siki gun"
+        if vol_ratio < VCP_VOL_DRY_RATIO_EXCELLENT:
+            return "EXCELLENT"
+        # PASS esik (0.70) — Brandon muhafazakar filtre
+        if vol_ratio < VCP_VOL_DRY_RATIO:
+            return "PASS"
+        # Hacim hala 50d MA *0.70 ustunde -> failsafe None
+        return None
+    except (KeyError, TypeError, ValueError, ZeroDivisionError):
+        return None
 
 
 # =============================================================================
