@@ -303,11 +303,147 @@ def screen_get_results(slug: str, limit: int = 500) -> list[dict]:
 
 
 def screen_list_available() -> list[dict]:
-    """Mevcut 8 ready screen meta listesini döner (frontend dropdown icin)."""
-    return [
-        {"slug": slug, "label": meta["label"], "filter_summary": meta["filter"]}
+    """8 ready + 7 parse + 1 deferred screen meta listesini döner (frontend dropdown icin)."""
+    out = [
+        {"slug": slug, "label": meta["label"], "filter_summary": meta["filter"],
+         "category": "ready"}
         for slug, meta in SCREENS_READY_8.items()
     ]
+    out.extend([
+        {"slug": slug, "label": meta["label"], "filter_summary": meta["filter"],
+         "category": "parse"}
+        for slug, meta in SCREENS_PARSE_7.items()
+    ])
+    out.append({
+        "slug": "tight_low_volume",
+        "label": "Tight Price Low Volume",
+        "filter_summary": "price_volume_history JSONB (deferred: Sprint 4-bis.4)",
+        "category": "deferred",
+    })
+    return out
+
+
+# =============================================================
+# Sprint 4-bis.2: 7 Parse Screen — confirmations/violations text parse
+# Kaynak: notebook/Notebook_C1_Sprint_QuickStart.md SCREENS tuple
+#         notebook/Sprint_4_bis_Mimari_Kararlar.md KARAR ADAY #457
+# DB format: confirmations/violations virgülle ayrilmis TEXT
+#   ornek conf = 'Inside Day,Volume Surge,Up on Volume'
+# Pattern: string_to_array + array_length (PostgreSQL native)
+# Clean-room: Notebook_C1 satir 482 yasakli isim (tescilli marka)
+#             -> Quanfina-ozgu "momentum_5x_rpr_70" (KARAR #459 Kural #20 uyumu)
+# =============================================================
+
+SCREENS_PARSE_7 = {
+    "stage2_loose_10p": {
+        "label": "Stage 2 Loose ($10+)",
+        "filter": "passed=1 AND price>=10 AND confirmations>=6",
+        "sql": """
+            passed = 1
+            AND price >= 10
+            AND COALESCE(array_length(string_to_array(NULLIF(confirmations, ''), ','), 1), 0) >= 6
+        """,
+    },
+    "stage2_loose_below": {
+        "label": "Stage 2 Loose (Below $10)",
+        "filter": "passed=1 AND price<10 AND confirmations>=6",
+        "sql": """
+            passed = 1
+            AND price < 10
+            AND COALESCE(array_length(string_to_array(NULLIF(confirmations, ''), ','), 1), 0) >= 6
+        """,
+    },
+    "stage2_vloose_10p": {
+        "label": "Stage 2 Very Loose ($10+)",
+        "filter": "passed=1 AND price>=10 AND confirmations>=4",
+        "sql": """
+            passed = 1
+            AND price >= 10
+            AND COALESCE(array_length(string_to_array(NULLIF(confirmations, ''), ','), 1), 0) >= 4
+        """,
+    },
+    "stage2_vloose_below": {
+        "label": "Stage 2 Very Loose (Below $10)",
+        "filter": "passed=1 AND price<10 AND confirmations>=4",
+        "sql": """
+            passed = 1
+            AND price < 10
+            AND COALESCE(array_length(string_to_array(NULLIF(confirmations, ''), ','), 1), 0) >= 4
+        """,
+    },
+    "buy_risk_green": {
+        "label": "Buy Risk Green",
+        "filter": "(conf_count - viol_count) >= 2",
+        "sql": """
+            COALESCE(array_length(string_to_array(NULLIF(confirmations, ''), ','), 1), 0) -
+            COALESCE(array_length(string_to_array(NULLIF(violations, ''), ','), 1), 0) >= 2
+        """,
+    },
+    "momentum_5x_rpr_70": {
+        "label": "Momentum 5x (RPR 70+)",  # Quanfina-ozgu adlandirma (clean-room)
+        "filter": "passed=1 AND rs_ibd>=70 AND conf>=3 AND price>=10",
+        "sql": """
+            passed = 1
+            AND rs_ibd >= 70
+            AND price >= 10
+            AND COALESCE(array_length(string_to_array(NULLIF(confirmations, ''), ','), 1), 0) >= 3
+        """,
+    },
+    "mom_qualifier": {
+        "label": "Minervini Qualifier",
+        "filter": "passed=1 AND rs_ibd>=80 (siki momentum)",
+        "sql": """
+            passed = 1
+            AND rs_ibd >= 80
+        """,
+    },
+}
+
+
+def screen_parse_get_results(slug: str, limit: int = 500) -> list[dict]:
+    """Sprint 4-bis.2 parse screen — confirmations/violations text-parse SQL."""
+    if slug not in SCREENS_PARSE_7:
+        raise ValueError(
+            f"Bilinmeyen parse screen slug: '{slug}'. "
+            f"Gecerli: {list(SCREENS_PARSE_7.keys())}"
+        )
+
+    sql_filter = SCREENS_PARSE_7[slug]["sql"].strip()
+
+    query = f"""
+        SELECT ticker AS symbol, grade, rs_ibd, price, passed, scan_date,
+               confirmations, violations
+        FROM minervini_scans
+        WHERE scan_date = (SELECT MAX(scan_date) FROM minervini_scans)
+          AND {sql_filter}
+        ORDER BY rs_ibd DESC NULLS LAST, ticker ASC
+        LIMIT :limit
+    """
+
+    with engine.connect() as conn:
+        result = conn.execute(text(query), {"limit": limit})
+        rows = []
+        for row in result:
+            d = dict(row._mapping)
+            if d.get("price") is not None:
+                d["price"] = float(d["price"])
+            if d.get("rs_ibd") is not None:
+                d["rs_ibd"] = int(round(float(d["rs_ibd"])))
+            rows.append(d)
+        return rows
+
+
+def screen_get_results_dispatch(slug: str, limit: int = 500) -> list[dict]:
+    """Dispatch: slug ready ise screen_get_results, parse ise screen_parse_get_results."""
+    if slug in SCREENS_READY_8:
+        return screen_get_results(slug, limit)
+    if slug in SCREENS_PARSE_7:
+        return screen_parse_get_results(slug, limit)
+    raise ValueError(
+        f"Bilinmeyen screen slug: '{slug}'. "
+        f"Gecerli ready: {list(SCREENS_READY_8.keys())}; "
+        f"parse: {list(SCREENS_PARSE_7.keys())}"
+    )
 
 
 # =============================================================

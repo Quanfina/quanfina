@@ -220,8 +220,10 @@ def get_minervini_stocks() -> list[MinerviniStock]:
 
 from api.db_helpers import (
     screen_get_results,
+    screen_get_results_dispatch,
     screen_list_available,
     SCREENS_READY_8,
+    SCREENS_PARSE_7,
 )
 
 
@@ -229,6 +231,7 @@ class ScreenMeta(BaseModel):
     slug: str
     label: str
     filter_summary: str
+    category: str = "ready"  # "ready" | "parse" | "deferred"
 
 
 class ScreenResultRow(BaseModel):
@@ -249,22 +252,34 @@ def list_screens() -> list[ScreenMeta]:
 @app.get("/api/screens/{slug}", response_model=list[ScreenResultRow])
 def get_screen_results(slug: str, limit: int = 500) -> list[ScreenResultRow]:
     """
-    Sprint 4-bis.1b — Verilen ready screen slug'una gore sonuc dondur.
+    Sprint 4-bis.1b (ready) + Sprint 4-bis.2 (parse) — slug dispatch ile sonuc dondur.
 
-    db_connected=false durumunda MOCK donus (dev ortam, AÇIK KONU #40).
+    - SCREENS_READY_8 (8 ekran, saf SQL)
+    - SCREENS_PARSE_7 (7 ekran, confirmations/violations text-parse SQL)
+    - tight_low_volume (1 ekran, JSONB deferred — Sprint 4-bis.4)
+
+    db_connected=false durumunda MOCK donus (dev ortam).
     db_connected=true → minervini_scans tablosundan gerçek sorgu.
     """
-    if slug not in SCREENS_READY_8:
+    valid_slugs = set(SCREENS_READY_8.keys()) | set(SCREENS_PARSE_7.keys())
+    if slug == "tight_low_volume":
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=501,
+            detail="tight_low_volume: price_volume_history JSONB parse — "
+                   "Sprint 4-bis.4 scanner refactor adayi (AÇIK KONU #69 ailesi)."
+        )
+    if slug not in valid_slugs:
         from fastapi import HTTPException
         raise HTTPException(
             status_code=404,
             detail=f"Screen slug bulunamadi: '{slug}'. "
-                   f"Gecerli: {list(SCREENS_READY_8.keys())}"
+                   f"Gecerli ready: {list(SCREENS_READY_8.keys())}; "
+                   f"parse: {list(SCREENS_PARSE_7.keys())}"
         )
 
     # MOCK fallback (dev ortam, db_connected=false)
     if not db_health_check():
-        # Pattern: api/main.py MOCK_STOCKS gibi - sadece 3-5 ornek satir
         mock_rows = [
             ScreenResultRow(symbol="NVDA", grade="A", rs_ibd=99,
                             price=145.20, passed=1, scan_date="2026-05-19"),
@@ -279,9 +294,11 @@ def get_screen_results(slug: str, limit: int = 500) -> list[ScreenResultRow]:
         ]
         return mock_rows[:limit]
 
-    # Gerçek DB sorgusu (prod + Cloud SQL Auth Proxy ile dev)
-    rows = screen_get_results(slug, limit=limit)
-    return [ScreenResultRow(**r) for r in rows]
+    # Gerçek DB sorgusu — ready VEYA parse (dispatch)
+    rows = screen_get_results_dispatch(slug, limit=limit)
+    return [ScreenResultRow(**{k: r.get(k) for k in
+                                ("symbol","grade","rs_ibd","price","passed","scan_date")})
+            for r in rows]
 
 
 @app.get("/api/health", response_model=HealthResponse)
