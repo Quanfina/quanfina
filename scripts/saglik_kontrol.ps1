@@ -62,8 +62,10 @@ if (Test-Path $claudeMd) {
     $satir = (Get-Content -Path $claudeMd -Encoding UTF8).Count
     # Get-Content + -match Turkce karakter regex sorununu cozer
     $claudeLines = Get-Content -Path $claudeMd -Encoding UTF8
-    $kuralSayim = ($claudeLines | Where-Object { $_ -match '^### Kural \d+' }).Count
-    $ilkeSayim = ($claudeLines | Where-Object { $_ -match '^### .lke \d+' }).Count
+    # v0.5.2 fix (19 May 2026): unique kural numarasi (alt-bolum sayilmasin)
+    # Eski: Where-Object Count → "### Kural 9 v2 alt-bolumu" gibi alt-bolumler dahil sayim sisirilir
+    $kuralSayim = ($claudeLines | ForEach-Object { if ($_ -match '^### Kural (\d+)') { $matches[1] } } | Sort-Object -Unique).Count
+    $ilkeSayim = ($claudeLines | ForEach-Object { if ($_ -match '^### .lke (\d+)') { $matches[1] } } | Sort-Object -Unique).Count
     $githubIlke = $ilkeSayim  # Toplam (Bilgi Mimarisi 5 + GitHub 8 = 13 beklenir)
     Add-Line "| Olcum | Deger |"
     Add-Line "|---|---:|"
