@@ -608,6 +608,118 @@ def count_distribution_days(
 
 
 # =============================================================================
+# Sprint 4-bis.4 — Brandon VCP Olgunluk (Minervini_Video.md sat. 2823-2867, 10:20)
+# KARAR #461 (19 May 2026) — Pre-Compute stratejisi (tek motor felsefesi)
+# Kaynak: Brandon healthy pullback ratio + is_begrudgingly_pulling_back
+# =============================================================================
+
+
+# Eşikler — Sn. Ferit/Master kalibrasyon noktası (mevcut: Brandon video 10:20 kanonu)
+VCP_LOOKBACK_DAYS = 5            # son N gün incelenir
+VCP_AVG_DROP_THRESHOLD = 1.5     # % - günlük ortalama düşüş üst sınırı
+VCP_VOL_DRY_RATIO = 0.70         # son gün vol < 50-gün MA × bu oran
+VCP_TIGHT_RANGE_PCT = 2.0        # % - ardışık close değişim üst sınırı (range_pct proxy)
+VCP_MIN_HISTORY = 50             # 50-gün MA hesabı için gerekli minimum
+VCP_PULLBACK_EXCELLENT = 0.10    # ratio ≤ → score 100
+VCP_PULLBACK_GOOD = 0.25         # ratio ≤ → score 80
+VCP_PULLBACK_ACCEPTABLE = 0.40   # ratio ≤ → score 60
+
+
+def compute_pullback_health(rally_pct: float, pullback_pct: float) -> dict:
+    """Brandon Healthy Pullback Ratio — Minervini_Video.md sat. 2853-2867.
+
+    Pullback'in yükseliş'e oranı sağlıklı mı kontrol eder. Brandon'ın
+    sözü: "%80 ralli yapmış hissede sadece %8'lik geri çekilme görmeyi
+    tercih ederim" (video 10:20).
+
+    Args:
+        rally_pct: Son ralli yüzdesi (pozitif, örn. 80.0 = %80 ralli)
+        pullback_pct: Mevcut geri çekilme yüzdesi (pozitif, örn. 8.0 = %8 düşüş)
+
+    Returns:
+        {"health": "EXCELLENT"|"GOOD"|"ACCEPTABLE"|"TOO_DEEP",
+         "score": 100|80|60|20, "ratio": pullback_pct/rally_pct}
+
+    Örnekler:
+        %80 ralli → %8 düşüş    = ratio 0.10 → EXCELLENT (100)
+        %80 ralli → %20 düşüş   = ratio 0.25 → GOOD (80)
+        %100 ralli → %30+ düşüş = ratio 0.30+ → TOO_DEEP (20)
+    """
+    if rally_pct <= 0:
+        return {"health": "TOO_DEEP", "score": 20, "ratio": 1.0}
+
+    ratio = pullback_pct / rally_pct
+
+    if ratio <= VCP_PULLBACK_EXCELLENT:
+        return {"health": "EXCELLENT", "score": 100, "ratio": ratio}
+    if ratio <= VCP_PULLBACK_GOOD:
+        return {"health": "GOOD", "score": 80, "ratio": ratio}
+    if ratio <= VCP_PULLBACK_ACCEPTABLE:
+        return {"health": "ACCEPTABLE", "score": 60, "ratio": ratio}
+    return {"health": "TOO_DEEP", "score": 20, "ratio": ratio}
+
+
+def compute_vcp_pass(price_volume_history: Optional[list[dict]]) -> bool:
+    """Brandon "Begrudgingly Pull Back" + V-Dry VCP olgunluk tespiti.
+    Minervini_Video.md sat. 2823-2834 (video 10:20) kanon.
+
+    3 koşul aynı anda:
+      1. is_small_drops: Son 5 gün ortalama düşüş < %1.5
+      2. volume_drying: Son gün hacim < 50-gün ortalama × 0.70
+      3. tight_closes: Ardışık close değişim < %2 (PVH range_pct proxy)
+
+    NOT: Brandon orijinal formülünde "range_pct" gün-içi high-low farkı.
+    Quanfina PVH formatı {date, close, volume} - high/low YOK.
+    Proxy: ardışık close değişim < %2 (yaklaşık eşdeğer, Sprint 4-bis.5 adayı
+    PVH genişletme high/low ekleyerek tam doğru ölçüm).
+
+    Args:
+        price_volume_history: list[dict] - [{"date":..., "close":..., "volume":...}, ...]
+                              veya None/kısa liste
+
+    Returns:
+        bool: True = VCP setup'i olgun (Brandon kriteri 3 koşul AND)
+    """
+    if not price_volume_history or len(price_volume_history) < VCP_MIN_HISTORY:
+        return False
+
+    try:
+        recent = price_volume_history[-VCP_LOOKBACK_DAYS:]
+        # Ardışık close değişim için bir önceki gün de gerekli
+        prev_day = price_volume_history[-(VCP_LOOKBACK_DAYS + 1)]
+        last_50 = price_volume_history[-VCP_MIN_HISTORY:]
+
+        if len(recent) < VCP_LOOKBACK_DAYS:
+            return False
+
+        # 1. is_small_drops: ardışık close değişim ortalama düşüş < %1.5
+        all_window = [prev_day] + recent
+        pct_changes = [
+            (all_window[i]["close"] - all_window[i-1]["close"]) / all_window[i-1]["close"] * 100
+            for i in range(1, len(all_window))
+            if all_window[i-1]["close"] > 0
+        ]
+        drops = [abs(c) for c in pct_changes if c < 0]
+        avg_drop = sum(drops) / max(len(drops), 1) if drops else 0.0
+        is_small_drops = avg_drop < VCP_AVG_DROP_THRESHOLD
+
+        # 2. volume_drying: son gün hacim < 50-gün MA × 0.70
+        avg_50d_volume = sum(d["volume"] for d in last_50) / len(last_50)
+        if avg_50d_volume <= 0:
+            return False
+        last_volume = recent[-1]["volume"]
+        volume_drying = last_volume < avg_50d_volume * VCP_VOL_DRY_RATIO
+
+        # 3. tight_closes: ardışık close değişim < %2 (range_pct proxy)
+        close_changes_abs = [abs(c) for c in pct_changes]
+        tight_closes = all(c < VCP_TIGHT_RANGE_PCT for c in close_changes_abs)
+
+        return bool(is_small_drops and volume_drying and tight_closes)
+    except (KeyError, TypeError, ValueError, ZeroDivisionError):
+        return False
+
+
+# =============================================================================
 # Konu 14 — RBA Result Based Analysis (Mark Minervini Bölüm 4)
 # =============================================================================
 

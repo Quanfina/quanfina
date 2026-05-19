@@ -33,6 +33,12 @@ from quanfina_math import (
     suggest_loss_grade,
     suggest_exit_grade,
     compute_grade_distribution,
+    # Sprint 4-bis.4 KARAR #461 — Brandon VCP (quanfina_math motoru)
+    compute_pullback_health,
+    compute_vcp_pass,
+    VCP_PULLBACK_EXCELLENT,
+    VCP_PULLBACK_GOOD,
+    VCP_PULLBACK_ACCEPTABLE,
 )
 
 
@@ -813,3 +819,161 @@ class TestShouldDropSetup:
         rec = should_drop_setup(rba)
         assert rec.severity == "OK"
         assert "sağlıklı" in rec.message
+
+
+# ===========================================================================
+# Sprint 4-bis.4 KARAR #461 — Brandon VCP Olgunluk
+# Kaynak: Minervini_Video.md sat. 2823-2867 (Brandon video 10:20)
+# ===========================================================================
+
+
+class TestComputePullbackHealth:
+    """Brandon healthy pullback ratio (rally % vs pullback %)."""
+
+    def test_excellent_ratio_010(self):
+        # %80 ralli → %8 düşüş = 0.10 ratio → EXCELLENT
+        result = compute_pullback_health(rally_pct=80.0, pullback_pct=8.0)
+        assert result["health"] == "EXCELLENT"
+        assert result["score"] == 100
+        assert math.isclose(result["ratio"], 0.10, abs_tol=0.001)
+
+    def test_good_ratio_025(self):
+        # %80 ralli → %20 düşüş = 0.25 → GOOD (kabul edilebilir DHT)
+        result = compute_pullback_health(rally_pct=80.0, pullback_pct=20.0)
+        assert result["health"] == "GOOD"
+        assert result["score"] == 80
+
+    def test_acceptable_ratio_040(self):
+        # %50 ralli → %20 düşüş = 0.40 → ACCEPTABLE
+        result = compute_pullback_health(rally_pct=50.0, pullback_pct=20.0)
+        assert result["health"] == "ACCEPTABLE"
+        assert result["score"] == 60
+
+    def test_too_deep_above_040(self):
+        # %100 ralli → %50 düşüş = 0.50 → TOO_DEEP (AAOI tarzı)
+        result = compute_pullback_health(rally_pct=100.0, pullback_pct=50.0)
+        assert result["health"] == "TOO_DEEP"
+        assert result["score"] == 20
+
+    def test_zero_rally_returns_too_deep(self):
+        # Yükseliş yok → ratio tanımsız, güvenli "TOO_DEEP"
+        result = compute_pullback_health(rally_pct=0.0, pullback_pct=5.0)
+        assert result["health"] == "TOO_DEEP"
+
+    def test_negative_rally_returns_too_deep(self):
+        result = compute_pullback_health(rally_pct=-10.0, pullback_pct=5.0)
+        assert result["health"] == "TOO_DEEP"
+
+    def test_zero_pullback_excellent(self):
+        # Hiç düşüş yok → mükemmel
+        result = compute_pullback_health(rally_pct=50.0, pullback_pct=0.0)
+        assert result["health"] == "EXCELLENT"
+        assert result["score"] == 100
+
+
+class TestComputeVcpPass:
+    """Brandon `is_begrudgingly_pulling_back` VCP olgunluk tespiti.
+    3 koşul AND: small_drops (<1.5%) + volume_drying (<50d MA × 0.7) + tight_closes (<2%)
+    """
+
+    def _build_pvh(self, days: int, base_close: float, close_step: float,
+                   vol_avg: int, vol_last: int) -> list[dict]:
+        """Test PVH üreticisi.
+        - İlk N-1 günü stabil close (drift close_step % ile)
+        - Son gün vol_last, diğer günler vol_avg
+        """
+        pvh = []
+        for i in range(days):
+            pct_drift = close_step * (i / max(days - 1, 1))
+            close = base_close * (1 + pct_drift / 100)
+            volume = vol_avg if i < days - 1 else vol_last
+            pvh.append({"date": f"2026-04-{i+1:02d}", "close": close, "volume": volume})
+        return pvh
+
+    def test_short_history_returns_false(self):
+        # 50 günden az → False (yetersiz veri)
+        pvh = self._build_pvh(20, 100.0, 0.0, 1_000_000, 500_000)
+        assert compute_vcp_pass(pvh) is False
+
+    def test_none_returns_false(self):
+        assert compute_vcp_pass(None) is False
+        assert compute_vcp_pass([]) is False
+
+    def test_vcp_pass_when_all_three_conditions_met(self):
+        # 50 gün düz close, son 5 gün tight + low vol → VCP pass
+        # prev_day (day -6) ile recent[0] arası geçiş yumuşak (<%2)
+        days = 60
+        pvh = []
+        for i in range(days):
+            if i < days - 5:
+                close = 100.0  # tam düz baseline
+                volume = 1_000_000
+            else:
+                # Son 5 gün: 100.5 → 100.8 → 101.1 → 101.4 → 101.7 (ardışık ~%0.3)
+                # prev_day 100.0 → recent[0] 100.5 = +%0.5 (tight OK)
+                close = 100.5 + (i - (days - 5)) * 0.3
+                volume = 600_000  # 50d MA ≈ 960K, %70 = 672K → 600K ALTINDA
+            pvh.append({"date": f"2026-04-{i+1:02d}", "close": close, "volume": volume})
+        result = compute_vcp_pass(pvh)
+        assert result is True, f"Beklenen True, gelen {result}"
+
+    def test_vcp_fail_when_volume_not_dry(self):
+        # Tight close OK ama son gün hacim yüksek
+        days = 60
+        pvh = []
+        for i in range(days):
+            close = 100.0 + (i % 3) * 0.3
+            volume = 1_000_000 if i < days - 1 else 2_000_000  # son gün YÜKSEK
+            pvh.append({"date": f"2026-04-{i+1:02d}", "close": close, "volume": volume})
+        assert compute_vcp_pass(pvh) is False
+
+    def test_vcp_fail_when_drops_large(self):
+        # Hacim ve range ok ama son 5 gün büyük düşüşler (>%1.5)
+        days = 60
+        pvh = []
+        for i in range(days):
+            if i < days - 5:
+                close = 100.0
+                volume = 1_000_000
+            else:
+                # Her gün -%3 düşüş — small_drops fail
+                close = 100.0 - (i - (days - 5) + 1) * 3.0
+                volume = 600_000
+            pvh.append({"date": f"2026-04-{i+1:02d}", "close": close, "volume": volume})
+        assert compute_vcp_pass(pvh) is False
+
+    def test_vcp_fail_when_close_range_too_wide(self):
+        # Drops küçük + hacim dry ama close değişimleri >%2 (alterneli +/- 2.5%)
+        days = 60
+        pvh = []
+        for i in range(days):
+            if i < days - 5:
+                close = 100.0
+                volume = 1_000_000
+            else:
+                # Ardışık değişim büyük (~ +%2.5 / -%2.5)
+                shift = 2.5 if (i - (days - 5)) % 2 == 0 else -2.5
+                close = 100.0 * (1 + shift / 100)
+                volume = 600_000
+            pvh.append({"date": f"2026-04-{i+1:02d}", "close": close, "volume": volume})
+        assert compute_vcp_pass(pvh) is False
+
+    def test_vcp_handles_zero_volume_gracefully(self):
+        # 50-gün MA hesabında ZeroDivision koruması
+        days = 60
+        pvh = [
+            {"date": f"2026-04-{i+1:02d}", "close": 100.0, "volume": 0}
+            for i in range(days)
+        ]
+        assert compute_vcp_pass(pvh) is False
+
+    def test_vcp_handles_malformed_entry(self):
+        # Eksik anahtar → False (graceful)
+        pvh = [{"date": "x", "close": 100.0} for _ in range(60)]  # volume yok
+        assert compute_vcp_pass(pvh) is False
+
+    def test_threshold_constants_exposed(self):
+        # Kalibrasyon noktaları dışarıdan erişilebilir olmalı
+        assert VCP_PULLBACK_EXCELLENT == 0.10
+        assert VCP_PULLBACK_GOOD == 0.25
+        assert VCP_PULLBACK_ACCEPTABLE == 0.40

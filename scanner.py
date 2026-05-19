@@ -11,6 +11,8 @@ from datetime import date, datetime, timedelta
 
 
 from db_connection import get_connection
+# Sprint 4-bis.4 KARAR #461 — Pre-Compute tek motor felsefesi (Kural #22 lokal birikim kullan)
+from quanfina_math import compute_vcp_pass
 
 load_dotenv()
 FINVIZ_KEY = os.getenv("FINVIZ_API_KEY")
@@ -508,75 +510,9 @@ def _parse_pct(val):
         return None
 
 
-def _compute_tight_low_vol_pass(price_volume_history):
-    """
-    Sprint 4-bis.4 KARAR #461 — VCP (Volatility Contraction Pattern) pre-compute.
-
-    Master NotebookLM stratejisi: kompleks JSONB SQL yerine Python'da hesapla,
-    minervini_scans tablosuna BOOLEAN olarak yaz. SQL ekran sade
-    WHERE tight_low_vol_pass = TRUE okur.
-
-    Mantik (Minervini standart VCP — TODO_VCP threshold kalibrasyonu):
-      - Lookback: son 25 gun (price_volume_history zaten bu uzunluk)
-      - Hacim kurumasi: son 5 gun ortalama hacim < onceki 15 gun ort * VOL_DRY_RATIO
-      - Fiyat sikismasi: son 5 gun (max-min)/avg < onceki 15 gun (max-min)/avg * RANGE_TIGHT_RATIO
-
-    Args:
-        price_volume_history: list[dict] - [{"date":..., "close":..., "volume":...}, ...]
-                              veya None / kisa liste
-
-    Returns:
-        bool: tight_low_vol_pass (TRUE = VCP setup'i var)
-
-    TODO_VCP (Sn. Ferit/Master kalibrasyon bekliyor):
-      - VOL_DRY_RATIO (default 0.70 — son 5g ort / onceki 15g ort esigi)
-      - RANGE_TIGHT_RATIO (default 0.60 — son 5g range / onceki 15g range esigi)
-      - LOOKBACK_RECENT (default 5 gun — son pencere)
-      - LOOKBACK_PRIOR (default 15 gun — kiyaslama penceresi)
-    """
-    if not price_volume_history or len(price_volume_history) < 20:
-        return False
-
-    # TODO_VCP: Sn. Ferit/Master kalibrasyon eşikleri
-    VOL_DRY_RATIO = 0.70
-    RANGE_TIGHT_RATIO = 0.60
-    LOOKBACK_RECENT = 5
-    LOOKBACK_PRIOR = 15
-
-    try:
-        # Son 5 gun + onceki 15 gun (toplam 20)
-        recent = price_volume_history[-LOOKBACK_RECENT:]
-        prior = price_volume_history[-(LOOKBACK_RECENT + LOOKBACK_PRIOR):-LOOKBACK_RECENT]
-
-        if len(recent) < LOOKBACK_RECENT or len(prior) < LOOKBACK_PRIOR:
-            return False
-
-        # Hacim kurumasi
-        recent_vol_avg = sum(d["volume"] for d in recent) / len(recent)
-        prior_vol_avg = sum(d["volume"] for d in prior) / len(prior)
-        if prior_vol_avg <= 0:
-            return False
-        vol_dried = (recent_vol_avg / prior_vol_avg) < VOL_DRY_RATIO
-
-        # Fiyat sikismasi (range/avg ratio karsilastirma)
-        def _range_ratio(window):
-            closes = [d["close"] for d in window]
-            if not closes:
-                return 0.0
-            avg = sum(closes) / len(closes)
-            if avg <= 0:
-                return 0.0
-            return (max(closes) - min(closes)) / avg
-
-        recent_range = _range_ratio(recent)
-        prior_range = _range_ratio(prior)
-        if prior_range <= 0:
-            return False
-        range_tight = (recent_range / prior_range) < RANGE_TIGHT_RATIO
-
-        return bool(vol_dried and range_tight)
-    except Exception:
-        return False
+# Sprint 4-bis.4 KARAR #461 — Yerel VCP fonksiyonu quanfina_math'e tasindi.
+# Brandon "Begrudgingly Pull Back" formulu (Minervini_Video.md sat. 2823-2867).
+# Tek motor felsefesi: scanner.py import quanfina_math.compute_vcp_pass
 
 
 def _compute_grade(eps_qoq, sales_qoq):
@@ -1018,8 +954,8 @@ def save_results(df_finviz, slopes, scan_date):
         pvh        = slope_info.get("price_volume_history")
         pvh_json   = json.dumps(pvh) if pvh else None
 
-        # Sprint 4-bis.4 KARAR #461 — VCP pre-compute (Python katmaninda hesap)
-        tight_low_vol_pass = _compute_tight_low_vol_pass(pvh)
+        # Sprint 4-bis.4 KARAR #461 — VCP pre-compute (quanfina_math motoru — tek motor)
+        tight_low_vol_pass = compute_vcp_pass(pvh)
 
         # Kural 3: MA200 yükselişte (slope > 0)
         passed = 1 if slope is not None and slope > 0 else 0

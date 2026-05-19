@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { WatchlistRow } from "@/types/watchlist";
 import { demoteStatus } from "@/lib/watchlist-status";
+import { GridLoadingOverlay } from "@/components/ag-grid/LoadingOverlay";
 
 export default function WatchlistPage() {
   const { resolvedTheme } = useTheme();
@@ -152,9 +153,8 @@ export default function WatchlistPage() {
 
       <div className="flex-1 px-6 py-4">
         {isLoading && (
-          <div className="flex flex-col items-center justify-center h-64 gap-2 text-sm text-muted-foreground">
-            <span>Yükleniyor...</span>
-            <span className="text-xs opacity-60">DB bağlantısı (en fazla 8sn)</span>
+          <div className={`${gridClass} h-[600px] w-full`}>
+            <GridLoadingOverlay />
           </div>
         )}
         {isError && (
@@ -180,7 +180,29 @@ export default function WatchlistPage() {
             </div>
           </div>
         )}
-        {!isLoading && !isError && (
+        {!isLoading && !isError && rowData.length === 0 && (data?.length ?? 0) === 0 && (
+          <div className="flex flex-col items-center justify-center gap-3 p-10 border bg-muted/30 rounded-md">
+            <span className="text-3xl">📋</span>
+            <div className="font-medium">Henüz hisse eklemediniz</div>
+            <div className="text-xs text-muted-foreground max-w-md text-center">
+              Sinyaller veya Hisse Tarama sayfasından aday hisseleri tek tıkla Watch listesine ekleyebilirsiniz.
+            </div>
+            <Button size="sm" onClick={() => setAddOpen(true)} className="mt-1">
+              <Plus size={14} className="mr-1.5" />
+              Hisse Ekle
+            </Button>
+          </div>
+        )}
+        {!isLoading && !isError && rowData.length === 0 && (data?.length ?? 0) > 0 && (
+          <div className="flex flex-col items-center justify-center gap-2 p-8 border bg-muted/30 rounded-md text-sm text-muted-foreground">
+            <span className="text-2xl">🔍</span>
+            <div className="font-medium text-foreground">Filtreyle eşleşen hisse yok</div>
+            <div className="text-xs opacity-80">
+              Strateji / Statü / Konsensus filtrelerini gevşet veya arama metnini temizle.
+            </div>
+          </div>
+        )}
+        {!isLoading && !isError && rowData.length > 0 && (
           <div className={gridClass} style={{ height: 600, width: "100%" }}>
             <AgGridReact
               ref={gridRef}

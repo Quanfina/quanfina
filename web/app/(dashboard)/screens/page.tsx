@@ -28,6 +28,7 @@ import { useScreenResults } from "@/hooks/use-screen-results";
 import { useAddWatchlistRow } from "@/hooks/use-watchlist-mutations";
 import type { ScreenSlug, ScreenResultRow } from "@/types/screens";
 import { SCREEN_CATEGORIES } from "@/types/screens";
+import { GridLoadingOverlay } from "@/components/ag-grid/LoadingOverlay";
 
 // === Grade chip renkleri (CSS hex kanıt: chip-long #def2e5, chip-short #ffc7c7) ===
 // KARAR ADAY #453 — Quanfina Theme Sistemi
@@ -356,29 +357,49 @@ export default function ScreensPage() {
         </div>
       )}
 
-      {/* Empty state */}
+      {/* Sayfa-bağlamlı empty state (KARAR #463 — Markets360 4 mesaj varyantından ileri) */}
       {!resultsQ.isLoading && !resultsQ.isError && totalCount === 0 && (
-        <div className="p-4 border bg-muted/50 rounded-md text-sm text-muted-foreground">
-          Bu taramaya uygun hisse bulunamadı. (Son scan_date için filtre eşleşmedi.
-          Olası sebep: grade kolonu NULL — AÇIK KONU #69, scanner.py grade güncellemesi
-          gerekli.)
+        <div className="flex flex-col items-center justify-center gap-3 p-8 border bg-muted/30 rounded-md text-sm text-muted-foreground">
+          <span className="text-2xl">🔍</span>
+          <div className="font-medium text-foreground">
+            {selectedSlug === "tight_low_volume"
+              ? "Bu taramaya uygun VCP setup'ı yok"
+              : "Bu tarama için son scan_date'te eşleşme yok"}
+          </div>
+          <div className="text-xs opacity-80 max-w-md text-center">
+            {selectedSlug === "tight_low_volume"
+              ? "scanner.py tight_low_vol_pass kolonu hesaplanmamış olabilir (KARAR #461 — Sn. Ferit DB ayağa kalkınca migration 002 + tarama tetik)."
+              : "Olası sebep: grade kolonu NULL (AÇIK KONU #69 — scanner.py grade güncellemesi) veya bu eşik son güne uymadı."}
+          </div>
+          <button
+            type="button"
+            onClick={() => refetchResults()}
+            disabled={isRefetchingResults}
+            className="mt-1 px-3 py-1.5 rounded-md border bg-background text-xs hover:bg-muted disabled:opacity-50"
+          >
+            {isRefetchingResults ? "Tekrar deneniyor..." : "Tekrar Dene"}
+          </button>
         </div>
       )}
 
-      {/* AG Grid */}
-      {totalCount > 0 && (
+      {/* AG Grid — Skeleton loading (KARAR #463 B2 uygulaması) + gerçek veri */}
+      {(resultsQ.isLoading || totalCount > 0) && (
         <div className={`${themeClass} h-[600px] w-full`}>
-          <AgGridReact<ScreenResultRow>
-            ref={gridRef}
-            rowData={resultsQ.data ?? []}
-            columnDefs={COL_DEFS}
-            defaultColDef={DEFAULT_COL_DEF}
-            animateRows
-            rowHeight={40}
-            rowSelection="multiple"
-            suppressRowClickSelection={false}
-            // KARAR ADAY #454: Add to Watch multi-select (1c canlı)
-          />
+          {resultsQ.isLoading ? (
+            <GridLoadingOverlay />
+          ) : (
+            <AgGridReact<ScreenResultRow>
+              ref={gridRef}
+              rowData={resultsQ.data ?? []}
+              columnDefs={COL_DEFS}
+              defaultColDef={DEFAULT_COL_DEF}
+              animateRows
+              rowHeight={40}
+              rowSelection="multiple"
+              suppressRowClickSelection={false}
+              // KARAR ADAY #454: Add to Watch multi-select (1c canlı)
+            />
+          )}
         </div>
       )}
     </div>
