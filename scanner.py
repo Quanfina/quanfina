@@ -224,6 +224,37 @@ _SCREENER_REQUIRED_COLS = [
     'Market Cap', 'P/E', 'Price', 'Change', 'Volume',
 ]
 
+# AÇIK KONU #71 (20 May 2026) — Finviz Column Drift Guard
+# Finviz yeni kolon eklerse `c=...` ID'leri kayar -> yanlis veriler DB'ye yazilir.
+# Bu sabit listeler "beklenen header isimleri"dir. Finviz CSV export'unda
+# header adlari gercek kolon adlaridir; ID kaymasi olursa header eslesmesi
+# fail eder ve validate_finviz_response ScannerHealthError firlatir.
+#
+# Kayit: notebook/Notebook_C2_EK1-8.md EK 7 (151 ID Tam Haritasi) +
+#         notebook/Notebook_A_Vizyon.md AÇIK KONU #71 (drift kontrol)
+
+# get_finviz_extras: c=1,22,23,46,33,68
+# Finviz Elite CSV header'lari TAM uzun adlar (rename'den onceki orijinal)
+_EXTRAS_REQUIRED_COLS = [
+    'Ticker',
+    'EPS Growth Quarter Over Quarter',  # c=22
+    'Sales Growth Quarter Over Quarter',  # c=23
+    'Performance (Year)',  # c=46
+    'Return on Equity',  # c=33
+    'Earnings Date',  # c=68
+]
+
+# scan_sectors: c=1,42,43,44,45,46 (Performance haftalik/aylik/quarter/half/yearly)
+# Finviz orijinal header adlari (scan_sectors rename satirini referans alindi)
+_SECTOR_REQUIRED_COLS = [
+    'Ticker',
+    'Performance (Week)',    # c=42
+    'Performance (Month)',   # c=43
+    'Performance (Quarter)', # c=44
+    'Performance (Half Year)',  # c=45
+    'Performance (Year)',    # c=46
+]
+
 
 def health_check_finviz() -> None:
     """Scanner çalışmadan önce Finviz API'sının beklenen kolonları döndürdüğünü
@@ -284,9 +315,65 @@ def health_check_finviz() -> None:
             f"  v=152 view formati bozuk olabilir."
         )
 
-    print(f"[OK] Finviz health check OK")
+    print(f"[OK] Finviz health check (screener) OK")
     print(f"   AAPL: price=${aapl_price}, company={aapl_company!r}")
     print(f"   Kolonlar tam ({len(df.columns)} kolon)")
+
+    # AÇIK KONU #71 — Drift Guard: 3 endpoint preflight probe
+    # Sn. Ferit dikkat: Finviz yeni kolon eklerse `c=...` ID'leri kayar.
+    # Her scan oncesi 3 endpoint icin tek-ticker probe + header eslesmesi.
+
+    # Probe 2 — extras endpoint (c=1,22,23,46,33,68)
+    print("Finviz health check — extras endpoint probe...")
+    try:
+        probe2_url = (
+            f"https://elite.finviz.com/export.ashx?"
+            f"v=152&t=AAPL&c=1,22,23,46,33,68&auth={FINVIZ_KEY}&ft=4"
+        )
+        r2 = requests.get(probe2_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
+        r2.raise_for_status()
+        df2 = pd.read_csv(StringIO(r2.text))
+        missing2 = [c for c in _EXTRAS_REQUIRED_COLS if c not in df2.columns]
+        if missing2:
+            unexpected2 = [c for c in df2.columns if c not in _EXTRAS_REQUIRED_COLS]
+            raise ScannerHealthError(
+                f"Finviz EXTRAS endpoint drift! Eksik: {missing2}\n"
+                f"  Beklenmeyen: {unexpected2}\n"
+                f"  Notebook_C2_EK1-8.md EK 7 ID haritası güncel mi kontrol et.\n"
+                f"  scanner.py `get_finviz_extras` URL'ini güncelle (c=1,22,23,46,33,68)."
+            )
+        print(f"[OK] Finviz health check (extras) OK — {len(df2.columns)} kolon")
+    except ScannerHealthError:
+        raise
+    except Exception as e:
+        raise ScannerHealthError(f"Finviz extras probe hatası: {e}")
+
+    # Probe 3 — sector endpoint (c=1,42,43,44,45,46)
+    print("Finviz health check — sector endpoint probe...")
+    try:
+        probe3_url = (
+            f"https://elite.finviz.com/export.ashx?"
+            f"v=152&t=XLK&c=1,42,43,44,45,46&auth={FINVIZ_KEY}&ft=4"
+        )
+        r3 = requests.get(probe3_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
+        r3.raise_for_status()
+        df3 = pd.read_csv(StringIO(r3.text))
+        missing3 = [c for c in _SECTOR_REQUIRED_COLS if c not in df3.columns]
+        if missing3:
+            unexpected3 = [c for c in df3.columns if c not in _SECTOR_REQUIRED_COLS]
+            raise ScannerHealthError(
+                f"Finviz SECTOR endpoint drift! Eksik: {missing3}\n"
+                f"  Beklenmeyen: {unexpected3}\n"
+                f"  Notebook_C2_EK1-8.md EK 7 ID haritası güncel mi kontrol et.\n"
+                f"  scanner.py `scan_sectors` URL'ini güncelle (c=1,42,43,44,45,46)."
+            )
+        print(f"[OK] Finviz health check (sector) OK — {len(df3.columns)} kolon")
+    except ScannerHealthError:
+        raise
+    except Exception as e:
+        raise ScannerHealthError(f"Finviz sector probe hatası: {e}")
+
+    print("[OK] Finviz Drift Guard: 3 endpoint preflight tamam.")
 
 
 def validate_finviz_response(df: pd.DataFrame, source: str,
@@ -306,12 +393,26 @@ def validate_finviz_response(df: pd.DataFrame, source: str,
     if required_cols is None:
         required_cols = _SCREENER_REQUIRED_COLS
 
-    missing = [c for c in required_cols if c not in df.columns]
+    actual_cols = list(df.columns)
+    missing = [c for c in required_cols if c not in actual_cols]
+    # AÇIK KONU #71 (20 May 2026) — Drift Guard:
+    # Finviz yeni kolon eklerse `c=...` ID kaymasi olur, header degisir.
+    # "Fazla" kolon: c= talebinde olmayan bir kolon geldiyse drift kaniti.
+    unexpected = [c for c in actual_cols if c not in required_cols]
     if missing:
+        # Drift teshisi — eksik VEYA fazla kolon = ID kaymasi sinyali
+        drift_msg = ""
+        if unexpected:
+            drift_msg = (
+                f"\n  DRIFT TESHIS: Beklenmeyen kolonlar geldi: {unexpected}\n"
+                f"  Finviz `c=...` ID'leri kaymis olabilir (yeni kolon eklenmis).\n"
+                f"  Çözüm: notebook/Notebook_C2_EK1-8.md EK 7 (151 ID Haritasi) güncel mi kontrol et,\n"
+                f"  scanner.py URL'lerinde c= parametresini yeni ID'lerle değiştir."
+            )
         raise ScannerHealthError(
             f"[{source}] Kolonlar eksik: {missing}\n"
-            f"  Gelen: {list(df.columns)}\n"
-            f"  c= parametresi URL'de eksik veya yanlis olabilir."
+            f"  Gelen: {actual_cols}\n"
+            f"  c= parametresi URL'de eksik veya yanlis olabilir.{drift_msg}"
         )
 
     if df.empty:
@@ -492,6 +593,10 @@ def get_finviz_extras(tickers: list) -> "pd.DataFrame":
     r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=30)
     r.raise_for_status()
     df = pd.read_csv(StringIO(r.text))
+    # AÇIK KONU #71 — Drift Guard: extras endpoint icin validation
+    # (orijinal header'lar — rename'den ONCE)
+    validate_finviz_response(df, source="get_finviz_extras",
+                              required_cols=_EXTRAS_REQUIRED_COLS)
     df = df.rename(columns={
         "Ticker": "ticker",
         "EPS Growth Quarter Over Quarter": "eps_qoq",
@@ -609,6 +714,10 @@ def scan_sectors(scan_date):
         return None
 
     df = pd.read_csv(StringIO(r.text))
+
+    # AÇIK KONU #71 — Drift Guard: scan_sectors icin de validation
+    validate_finviz_response(df, source="scan_sectors",
+                              required_cols=_SECTOR_REQUIRED_COLS)
 
     if df.empty:
         print("Sektör API'den boş cevap")
