@@ -310,12 +310,75 @@ Sn. Ferit eski promptu aramaz. Sistem insanı yormaz.
 "Sonra temizlerim" yığını yapılmaz.
 Sürdürülebilirlik tetikleyici: bir klasörde 5+ dosya → refactor.
 
-### Kural 8 — Adım Sonu Güncelleme
-Her büyük adım sonu:
-1. Notebook_A_Vizyon.md → ⚡ GÜNCEL DURUM güncellenir
-2. notebook/YAPILANLAR.md → yeni adım kaydı eklenir
-3. Bu, adımın resmî kapanışıdır.
-Kapanış yapılmadan sonraki adıma geçilmez.
+### Kural 8 — Akıllı Kapanış Disiplini (17 May 2026 v1 → 19 May 2026 v2)
+
+**v1 (17 May 2026):** "Adım Sonu Güncelleme" — Her büyük adım sonu
+Vizyon + YAPILANLAR + _DEVIR tam kapanış. ❌ DEPRECATED 19 May 2026.
+
+**v2 (19 May 2026 ~02:00):** **Akıllı Kapanış Disiplini — 4 modlu.**
+
+**Tetikleyici revize (Manifesto Özellik #8 10. self-correction —
+yöntem seviyesi):** Sn. Ferit 19 May 2026 ~01:30 talimatı: *"bu
+kapanışlar yavaşlatı yo nasıl bir çözüm bulabiliriz kpanışı sonra
+yapma durumu olsa sende fikir ver tam hız almışken kapanış
+düzenlemesi için bekleme hızı düşürüyor sistemde."* Pratik gerçek:
+v1'de her küçük iş için tam kapanış (Vizyon sürüm + YAPILANLAR + _DEVIR
++ commit + push + Drive) ~%50 chat zamanı yutuyordu. Karar yorgunluğu
+azaltma felsefesiyle çelişti.
+
+**4 Mod tasarımı:**
+
+| Mod | Tetikleyici | Aksiyon | Süre |
+|---|---|---|---|
+| 🚀 **Akış Modu** (default) | Sn. Ferit ardışık iş söylüyor, kapanış demedi | Sadece dosya değişikliği + commit (background asenkron). **Kanon güncellemesi YOK** | 5-10 sn / iş |
+| 📌 **Mini-Mühür** | İş anlamlı + Sn. Ferit "devam" diyor | ⚡ GÜNCEL DURUM **tek satır** ekle (50 char), tek commit | 10 sn |
+| 🏁 **Tam Kapanış** | Sn. Ferit "kapanış yap" der VEYA yeni Kural/Aşama eklendi VEYA kritik karar tescili | Vizyon sürüm bloğu + YAPILANLAR ek + _DEVIR alt-güncel + _OZET refresh + tek commit + push + Drive | 3-5 dk batched |
+| 🌙 **Otonom Hijyen Modu** ⭐ | Sn. Ferit "yatıyorum, hijyen yap" / "geceyi düzenle" / "uyu modunda devam" | AI bağımsız çalışır, yıkıcı eylemler hariç. Tüm bekleyen + birikmiş işler + hijyen + final mühür. Sabah Sn. Ferit'e _DEVIR ⏳ KUYRUK özet | 30-60 dk |
+
+**Akış Modu disiplini (default):**
+- Dosya değişikliği yap (Edit/Write)
+- Anlamlıysa commit (background, ASCII title)
+- Drive senkron arka planda (`drive_sync.ps1` ScheduledTask saatlik
+  zaten — manuel tetik gerekmez)
+- **Kanon dosyalar (Vizyon ⚡, YAPILANLAR, _DEVIR, _OZET) eskimiş kalır**
+- Sn. Ferit "kapanış yap" deyince batched güncelleme
+
+**Asenkron commit/push (Bash background mode):**
+- Sn. Ferit bir sonraki sözünü beklerken commit/push arkada çalışır
+- Hata olursa task-notification ile bildirim
+- Başarılıysa sessizce tamamlanır
+
+**Otonom Hijyen Modu kapsamı (Sn. Ferit yatınca AI yapar):**
+- Bölüm A — Kanon update (Vizyon sürüm, YAPILANLAR, _DEVIR, _OZET refresh)
+- Bölüm B — Hijyen scriptleri (saglik_kontrol, pattern_ogren,
+  proaktif_oneri, build_index v3.1 sayım refresh)
+- Bölüm C — AÇIK KONU semantik tarama (Kural #18 ile pasif aday)
+- Bölüm D — Cross-reference doğrulama (KARAR/AÇIK KONU/İLKE numara
+  tutarlılık)
+- Bölüm E — Sayım tutarlılık (CLAUDE.md satır, Vizyon KARAR sayım)
+- Bölüm F — Dead link tarama (notebook/'da bahsedilen dosyalar var mı)
+- Bölüm G — Memory pasiflik pre-screen (13+ gün eski)
+- Bölüm H — _DEVIR eski blok arşivleme (>7 gün → _DEVIR_ARSIV.md)
+- Bölüm I — Commit + push (Kural #10 sızma test)
+- Bölüm J — Drive senkron (Web Claude'a hazır)
+- Bölüm K — _DEVIR.md ⏳ KUYRUK sabah özet (Sn. Ferit uyandığında okur)
+
+**Disiplin (Otonom Mod):**
+- **Yıkıcı eylem YASAK** (Kural #4) — silme/rename/mimari değişiklik
+  kuyruğa alınır, sabah Sn. Ferit onayı
+- **Yeni kural önerisi YOK** — Kural #14 sadece Sn. Ferit varken tescil
+- **Stratejik karar YOK** — sadece uygulama + hijyen + analiz
+- Sabah özet: `_DEVIR.md` ⏳ KUYRUK'a 5-10 satırlık rapor
+
+**Kazanım ölçümü (bu chat'in verisi):**
+- v1: 22 task = ~80 dk (toplam) kapanış yüküyle
+- v2 (varsayım): aynı 22 task = ~25 dk akış modu + 5 dk batched kapanış
+- **Hız kazancı: 3-5x** akış modunda
+
+**İlişkili:** Kural #4 (Yıkıcı eylem onayı — Otonom Mod sınırı),
+Kural #9 v2 (Akıllı Dağılım — Web/Code paralel uygulama),
+Kural #18 (Pasif Öğe Çıkarma — Otonom Mod B/C parçası),
+[[feedback_kapanis_disiplini]] (memory karşılığı).
 
 ### Kural 9 — Akıllı Araç Dağılımı + Handoff (17 May 2026 v1 → 18 May 2026 v2)
 

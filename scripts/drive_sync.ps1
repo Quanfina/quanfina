@@ -15,7 +15,7 @@
 #   .\scripts\drive_sync.ps1 -ScheduledTask   # Windows task kayit (saatlik)
 #   .\scripts\drive_sync.ps1 -UnregisterTask  # Task sil
 #
-# Versiyon: v2.1 (18 May 2026, NotebookLM Plus .txt otomasyonu)
+# Versiyon: v2.2 (19 May 2026, .txt orphan temizligi eklendi)
 # Kural uyumu: #15 (ASCII-only), #16 (native exe 2>&1 yok)
 #
 # v2.1 degisiklikleri (H#8 pattern - NotebookLM Plus .md gormez):
@@ -274,6 +274,45 @@ if ($KuruCalisma) {
 }
 if ($txtHata -gt 0) {
     Write-Host "[uyari] Hata sayisi : $txtHata" -ForegroundColor Red
+}
+
+# ============================================================
+# v2.2 Orphan .txt temizligi (19 May 2026)
+# ============================================================
+# Sebep: drive_sync.ps1 /XF *.txt ile robocopy .txt'leri korur.
+# Ancak lokal'de .md silindiginde Drive'da .txt paraleli orphan kalir.
+# Cozum: hedefteki her .txt icin paralel .md var mi kontrol et,
+# yoksa orphan .txt'yi sil.
+
+Write-Host ""
+Write-Host "=== v2.2 Orphan .txt temizligi ===" -ForegroundColor Cyan
+
+$txtDosyalari = Get-ChildItem -Path $Hedef -Recurse -File -Filter "*.txt" -ErrorAction SilentlyContinue
+$orphanSilindi = 0
+$orphanTespit = 0
+
+foreach ($txt in $txtDosyalari) {
+    $mdYolu = $txt.FullName -replace '\.txt$', '.md'
+    if (-not (Test-Path $mdYolu)) {
+        $orphanTespit++
+        if ($KuruCalisma) {
+            Write-Host "  [kuru-orphan] $($txt.Name)" -ForegroundColor Yellow
+        } else {
+            Remove-Item $txt.FullName -Force -ErrorAction SilentlyContinue
+            Write-Host "  [orphan-sil] $($txt.Name)" -ForegroundColor Green
+            $orphanSilindi++
+        }
+    }
+}
+
+if ($orphanTespit -eq 0) {
+    Write-Host "[ok] Orphan .txt yok" -ForegroundColor DarkGray
+} else {
+    if ($KuruCalisma) {
+        Write-Host "[kuru] $orphanTespit orphan tespit edilecek" -ForegroundColor Yellow
+    } else {
+        Write-Host "[ok] $orphanSilindi orphan .txt silindi" -ForegroundColor Green
+    }
 }
 
 # ============================================================
