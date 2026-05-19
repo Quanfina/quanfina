@@ -15,8 +15,10 @@
 #   0 = senkron (envanter güncel)
 #   1 = senkronsuzluk var (rapor üretildi)
 #
-# Surum: 2 (18 May 2026) - yetim tespit + _INDEX.md patch onerisi
-# - scripts/, notebook/*.md ve kok Python icin yetim taramasi
+# Surum: 2.1 (20 May 2026) - worktree-aware repo root tespiti
+# - $PSScriptRoot pattern (saglik_kontrol.ps1 v0.5.1 ile uyumlu)
+# - notebook/ klasoru .gitignore'da, worktree'de bulunmaz; bu durumda
+#   git common-dir uzerinden ana repoya fallback yapilir
 # - Yetim bulunursa OZET bolumunde _INDEX.md icin satir onerisi uretilir
 # - Asama 5'te tam otomatik uretici (mevcut _INDEX.md overwrite) eklenebilir
 # Kural #15 (ASCII-only) + Kural #16 (native exe 2>&1 yasagi) uyumlu
@@ -26,12 +28,40 @@ param(
 )
 
 $ErrorActionPreference = "Continue"
-$repoRoot = (git rev-parse --show-toplevel).Trim()
-if (-not $repoRoot) { Write-Host "Git deposu degil." -ForegroundColor Red; exit 1 }
 
+# v2.1 fix (20 May 2026): worktree-aware repo root tespiti
+# $PSScriptRoot pattern: script'in bulundugu yer = scripts/ klasoru,
+# onun parent'i = repo root (worktree veya ana repo)
+$scriptPath = $MyInvocation.MyCommand.Path
+$scriptsDir = Split-Path -Parent $scriptPath
+$repoRoot = Split-Path -Parent $scriptsDir
+if (-not (Test-Path (Join-Path $repoRoot "CLAUDE.md"))) {
+    Write-Host "Repo kokunde CLAUDE.md bulunamadi: $repoRoot" -ForegroundColor Red
+    exit 1
+}
+
+# notebook/ .gitignore'da -> worktree'de yok. Ana repoya fallback:
 $indexPath = Join-Path $repoRoot "notebook\_INDEX.md"
 if (-not (Test-Path $indexPath)) {
-    Write-Host "[hata] notebook/_INDEX.md bulunamadi." -ForegroundColor Red
+    # Git common-dir uzerinden ana repoyu bul (worktree fallback)
+    $gitCommonDir = (git rev-parse --git-common-dir).Trim()
+    if ($gitCommonDir) {
+        # Ana repo .git path'inden parent al
+        if (-not [System.IO.Path]::IsPathRooted($gitCommonDir)) {
+            $gitCommonDir = Join-Path $repoRoot $gitCommonDir
+        }
+        $mainRepo = Split-Path -Parent $gitCommonDir
+        $mainIndex = Join-Path $mainRepo "notebook\_INDEX.md"
+        if (Test-Path $mainIndex) {
+            Write-Host "[bilgi] worktree icindeyim, ana repo notebook/ kullaniliyor: $mainRepo" -ForegroundColor DarkCyan
+            $repoRoot = $mainRepo
+            $indexPath = $mainIndex
+        }
+    }
+}
+
+if (-not (Test-Path $indexPath)) {
+    Write-Host "[hata] notebook/_INDEX.md bulunamadi (hem worktree hem ana repo tarandi)." -ForegroundColor Red
     exit 1
 }
 
