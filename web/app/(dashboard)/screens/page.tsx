@@ -18,12 +18,14 @@
  *          Strateji-bagimsiz keşif.
  */
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, ICellRendererParams } from "ag-grid-community";
+import { toast } from "sonner";
 import { useScreenMeta } from "@/hooks/use-screen-meta";
 import { useScreenResults } from "@/hooks/use-screen-results";
+import { useAddWatchlistRow } from "@/hooks/use-watchlist-mutations";
 import type { ScreenSlug, ScreenResultRow } from "@/types/screens";
 import { SCREEN_CATEGORIES } from "@/types/screens";
 
@@ -166,9 +168,71 @@ export default function ScreensPage() {
   const [selectedSlug, setSelectedSlug] = useState<ScreenSlug | null>(
     "stage2_10p" // default: en kalabalik ekran (727 satir gercek veri)
   );
+  const gridRef = useRef<AgGridReact<ScreenResultRow>>(null);
+  const [bulkAddInProgress, setBulkAddInProgress] = useState(false);
 
   const metaQ = useScreenMeta();
   const resultsQ = useScreenResults(selectedSlug, 500);
+  const addWatchlistRow = useAddWatchlistRow();
+
+  // Sprint 4-bis.1c — Multi-select Watch'a ekleme (KARAR ADAY #454 sonner toast)
+  const handleAddSelectedToWatch = async () => {
+    const selectedRows = gridRef.current?.api?.getSelectedRows() ?? [];
+    if (selectedRows.length === 0) {
+      toast.warning("Önce hisse seçin", { description: "Tablodan en az 1 hisse seçmelisin (Ctrl/Shift+tıkla)." });
+      return;
+    }
+
+    setBulkAddInProgress(true);
+    const tId = toast.loading(`${selectedRows.length} hisse Watch'a ekleniyor...`);
+
+    let success = 0;
+    let already = 0;
+    let failed = 0;
+    const failedSymbols: string[] = [];
+
+    for (const row of selectedRows) {
+      if (!row.symbol) continue;
+      try {
+        await addWatchlistRow.mutateAsync({
+          symbol: row.symbol,
+          strategy: "minervini",  // Screens sayfası minervini ekol — KARAR #351 (Screen/Recipe ayrımı)
+          status: "watch",         // 4 liste hiyerarşisi en alttan başla (Minervini Konu 5)
+          note: `screens/${selectedSlug} (RS=${row.rs_ibd ?? "—"})`,
+        });
+        success++;
+      } catch (e) {
+        const msg = (e as Error).message ?? "";
+        if (msg.toLowerCase().includes("already") || msg.includes("409")) {
+          already++;
+        } else {
+          failed++;
+          failedSymbols.push(row.symbol);
+        }
+      }
+    }
+
+    setBulkAddInProgress(false);
+    toast.dismiss(tId);
+
+    if (success > 0 && failed === 0) {
+      toast.success(`${success} hisse Watch'a eklendi`, {
+        description: already > 0 ? `(${already} zaten Watch'taydı)` : undefined,
+      });
+    } else if (success > 0 && failed > 0) {
+      toast.warning(`${success} eklendi, ${failed} başarısız`, {
+        description: `Hata: ${failedSymbols.slice(0, 5).join(", ")}${failedSymbols.length > 5 ? "…" : ""}`,
+      });
+    } else if (failed > 0) {
+      toast.error(`${failed} hisse eklenemedi`, {
+        description: failedSymbols.slice(0, 5).join(", "),
+      });
+    } else if (already > 0) {
+      toast.info(`${already} hisse zaten Watch'taydı`, { description: "Yeni ekleme yapılmadı." });
+    }
+
+    gridRef.current?.api?.deselectAll();
+  };
 
   const selectedMeta = useMemo(
     () => metaQ.data?.find((m) => m.slug === selectedSlug),
@@ -232,6 +296,17 @@ export default function ScreensPage() {
             </span>
           )}
         </span>
+
+        {/* Add to Watch (Sprint 4-bis.1c) */}
+        <button
+          type="button"
+          onClick={handleAddSelectedToWatch}
+          disabled={bulkAddInProgress || totalCount === 0}
+          className="px-3 py-2 rounded-md bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+          title="Seçili hisseleri Minervini Watch listesine ekle"
+        >
+          {bulkAddInProgress ? "Ekleniyor..." : "+ Watch'a Ekle"}
+        </button>
       </div>
 
       {/* Hata mesajı */}
@@ -254,6 +329,7 @@ export default function ScreensPage() {
       {totalCount > 0 && (
         <div className={`${themeClass} h-[600px] w-full`}>
           <AgGridReact<ScreenResultRow>
+            ref={gridRef}
             rowData={resultsQ.data ?? []}
             columnDefs={COL_DEFS}
             defaultColDef={DEFAULT_COL_DEF}
@@ -261,7 +337,7 @@ export default function ScreensPage() {
             rowHeight={40}
             rowSelection="multiple"
             suppressRowClickSelection={false}
-            // KARAR ADAY #454 hazırlık: Add to Watch (1c) için multi-select
+            // KARAR ADAY #454: Add to Watch multi-select (1c canlı)
           />
         </div>
       )}
