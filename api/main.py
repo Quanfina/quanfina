@@ -214,6 +214,76 @@ def get_minervini_stocks() -> list[MinerviniStock]:
     return MOCK_STOCKS
 
 
+# ── Sprint 4-bis.1b: Screens (8 ready) ────────────────────────────────────────
+# Kaynak: notebook/Notebook_C1_Sprint_QuickStart.md
+# Pattern: MOCK fallback (db_connected=false → MOCK), gerçek SQL (db_connected=true)
+
+from api.db_helpers import (
+    screen_get_results,
+    screen_list_available,
+    SCREENS_READY_8,
+)
+
+
+class ScreenMeta(BaseModel):
+    slug: str
+    label: str
+    filter_summary: str
+
+
+class ScreenResultRow(BaseModel):
+    symbol: str
+    grade: Optional[str] = None
+    rs_ibd: Optional[int] = None
+    price: Optional[float] = None
+    passed: Optional[int] = None
+    scan_date: Optional[str] = None
+
+
+@app.get("/api/screens", response_model=list[ScreenMeta])
+def list_screens() -> list[ScreenMeta]:
+    """Mevcut 8 ready screen meta listesi (frontend dropdown icin)."""
+    return [ScreenMeta(**m) for m in screen_list_available()]
+
+
+@app.get("/api/screens/{slug}", response_model=list[ScreenResultRow])
+def get_screen_results(slug: str, limit: int = 500) -> list[ScreenResultRow]:
+    """
+    Sprint 4-bis.1b — Verilen ready screen slug'una gore sonuc dondur.
+
+    db_connected=false durumunda MOCK donus (dev ortam, AÇIK KONU #40).
+    db_connected=true → minervini_scans tablosundan gerçek sorgu.
+    """
+    if slug not in SCREENS_READY_8:
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=404,
+            detail=f"Screen slug bulunamadi: '{slug}'. "
+                   f"Gecerli: {list(SCREENS_READY_8.keys())}"
+        )
+
+    # MOCK fallback (dev ortam, db_connected=false)
+    if not db_health_check():
+        # Pattern: api/main.py MOCK_STOCKS gibi - sadece 3-5 ornek satir
+        mock_rows = [
+            ScreenResultRow(symbol="NVDA", grade="A", rs_ibd=99,
+                            price=145.20, passed=1, scan_date="2026-05-19"),
+            ScreenResultRow(symbol="AAPL", grade="A", rs_ibd=87,
+                            price=212.50, passed=1, scan_date="2026-05-19"),
+            ScreenResultRow(symbol="MSFT", grade="B", rs_ibd=91,
+                            price=425.30, passed=1, scan_date="2026-05-19"),
+            ScreenResultRow(symbol="GOOGL", grade="B", rs_ibd=88,
+                            price=178.40, passed=1, scan_date="2026-05-19"),
+            ScreenResultRow(symbol="AMD", grade="C", rs_ibd=85,
+                            price=158.20, passed=1, scan_date="2026-05-19"),
+        ]
+        return mock_rows[:limit]
+
+    # Gerçek DB sorgusu (prod + Cloud SQL Auth Proxy ile dev)
+    rows = screen_get_results(slug, limit=limit)
+    return [ScreenResultRow(**r) for r in rows]
+
+
 @app.get("/api/health", response_model=HealthResponse)
 def health() -> HealthResponse:
     return HealthResponse(

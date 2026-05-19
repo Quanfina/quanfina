@@ -233,6 +233,82 @@ def trades_get_by_id(trade_id: int) -> Optional[dict]:
 
 
 # =============================================================
+# Sprint 4-bis.1b: 8 Ready Screen — saf SQL filtreleri
+# Kaynak: notebook/Notebook_C1_Sprint_QuickStart.md
+# Kural: "Notebook = Hedef Vizyon" (Kalıcı İlke #4) — Notebook neyse SQL onu uygular
+# =============================================================
+
+SCREENS_READY_8 = {
+    "tpr_a":           {"label": "TPR A",                     "filter": "grade = 'A'"},
+    "tpr_a_b":         {"label": "TPR A & B",                 "filter": "grade IN ('A','B')"},
+    "rpr_89_tpr_c":    {"label": "RPR 89+ TPR C+",            "filter": "rs_ibd >= 89 AND grade IN ('A','B','C')"},
+    "stage2_10p":      {"label": "Stage 2 ($10+)",            "filter": "passed = 1 AND price >= 10"},
+    "stage2_below_10": {"label": "Stage 2 (Below $10)",       "filter": "passed = 1 AND price < 10"},
+    "top5_rpr":        {"label": "Top 5% RPR",                "filter": "rs_ibd >= 95"},
+    "mom_10p":         {"label": "Minervini Momentum ($10+)", "filter": "passed = 1 AND price >= 10"},
+    "mom_below_10":    {"label": "Momentum (Below $10)",      "filter": "passed = 1 AND price < 10"},
+}
+
+
+def screen_get_results(slug: str, limit: int = 500) -> list[dict]:
+    """
+    Sprint 4-bis.1b — Verilen ready screen slug'una göre minervini_scans tablosundan
+    en son scan_date için filtrelenmiş hisseleri döner.
+
+    Args:
+        slug: SCREENS_READY_8 anahtar (ör. "tpr_a", "rpr_89_tpr_c")
+        limit: Sonuç limit (default 500)
+
+    Returns:
+        [{symbol, grade, rs_ibd, price, passed, scan_date}, ...]
+
+    Raises:
+        ValueError: slug SCREENS_READY_8'de yoksa
+    """
+    if slug not in SCREENS_READY_8:
+        raise ValueError(
+            f"Bilinmeyen screen slug: '{slug}'. "
+            f"Gecerli: {list(SCREENS_READY_8.keys())}"
+        )
+
+    sql_filter = SCREENS_READY_8[slug]["filter"]
+
+    # Idempotent + parametre safety:
+    # - filter SCREENS_READY_8 sabit dict'ten (SQL injection riski yok)
+    # - LIMIT parametrize edildi
+    query = f"""
+        SELECT symbol, grade, rs_ibd, price, passed, scan_date
+        FROM minervini_scans
+        WHERE scan_date = (SELECT MAX(scan_date) FROM minervini_scans)
+          AND {sql_filter}
+        ORDER BY rs_ibd DESC NULLS LAST, symbol ASC
+        LIMIT :limit
+    """
+
+    with engine.connect() as conn:
+        result = conn.execute(text(query), {"limit": limit})
+        rows = []
+        for row in result:
+            d = dict(row._mapping)
+            if d.get("scan_date") is not None:
+                d["scan_date"] = d["scan_date"].isoformat()
+            if d.get("price") is not None:
+                d["price"] = float(d["price"])
+            if d.get("rs_ibd") is not None:
+                d["rs_ibd"] = int(d["rs_ibd"]) if d["rs_ibd"] is not None else None
+            rows.append(d)
+        return rows
+
+
+def screen_list_available() -> list[dict]:
+    """Mevcut 8 ready screen meta listesini döner (frontend dropdown icin)."""
+    return [
+        {"slug": slug, "label": meta["label"], "filter_summary": meta["filter"]}
+        for slug, meta in SCREENS_READY_8.items()
+    ]
+
+
+# =============================================================
 # Health check
 # =============================================================
 
