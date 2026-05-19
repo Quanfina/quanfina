@@ -919,6 +919,90 @@ $utf8NoBom = New-Object System.Text.UTF8Encoding $false
 (scripts ASCII-only), Kural #16 (PS native exe 2>&1), Manifesto
 Özellik #8 11. self-correction (yöntem seviyesi — encoding bug).
 
+### Kural 20 — UI/UX Tasarım Kararında Çift Danışma Protokolü (19 May 2026 ~08:00 yeni)
+
+**Felsefe:** UI/UX bileşen tasarım/değişiklik kararlarında **iki kaynak
+ZORUNLU tarama** + Quanfina-özgü soyutlama. Sn. Ferit'in geçmiş
+araştırma birikimi (Markets360 ham kaynak + Notebook_B6 + Master
+NotebookLM) atlanırsa **sürtünme + tekrar tasarım**. Kural #14
+doğrudan tescil (2 ortaya çıkış 19 May 2026):
+1. Sabah ~07:00 — Sn. Ferit "tasarım kararlarında Master'a danış"
+2. Sabah ~08:00 — Sn. Ferit "Markets360 CSS/JS sürekli kontrol"
+
+**Zorunlu Çift Tarama:**
+
+**A. Master NotebookLM (Quanfina Notebook)**
+- Soyut motif + KARAR referansı + 33 .txt cross-strateji sentez
+- Kural #17 uyarınca uzman/yorumcu rolü
+- Cevap "KARAR/AÇIK KONU/İLKE — KAYNAK DOSYA — DETAY" formatında
+
+**B. Markets360 Ham Kaynak Tarama**
+- CSS: `notebook/B2_Markets360_main-BeC9yeif.css` (768.5 KB)
+- JS: `notebook/B2_Markets360_main-Dis3UGIE.js` (7.36 MB)
+- Yöntem: PowerShell regex + frequency analiz (örnek paterler aşağıda)
+
+**Tarama Pattern Repertuar (19 May 2026 3 dalga sentezinden):**
+
+```powershell
+# CSS hex renk paleti
+$hex = [regex]::Matches($css, '#[0-9a-fA-F]{6}\b')
+
+# CSS class isim
+$classes = [regex]::Matches($css, '\.[a-zA-Z][a-zA-Z0-9_-]+')
+
+# CSS spacing/typography
+$padding = [regex]::Matches($css, '(?:padding|margin)[^;]*?(\d+\.?\d*)(px|rem|em)')
+
+# CSS pseudo-class
+$pseudo = [regex]::Matches($css, ':hover|:focus|:active|:disabled')
+
+# JS component pattern
+$comp = [regex]::Matches($js, '\b([A-Z][a-zA-Z]+(Panel|Drawer|Modal|Dialog|Menu))\b')
+
+# JS library frequency
+$libs = @{ "sonner" = ([regex]::Matches($js, 'sonner|toast\.')).Count; ... }
+
+# JS AG Grid pattern
+$ag = @{ "pinnedColumn" = ([regex]::Matches($js, 'pinned')).Count; ... }
+
+# JS trading sabit
+$trade = @{ "Pivot" = ([regex]::Matches($js, '\bpivot\b')).Count; ... }
+```
+
+**Soyutlama Disiplini (Clean-Room — `_CLEAN_ROOM.md`):**
+- Yasaklı isim doğrudan **KOPYALANMAZ** (Markets 360, SEPA®, MonAlert,
+  MAI, Vd, Wp, valueGetter, aB(), chip-long, chip-short kod-içi YASAK)
+- Motif **soyut anlatılır**: "rakip platform yapısı", "referans yaklaşım"
+- Quanfina-özgü adlandırma: `TrendTemplateScanner`, `WatchlistPanel`,
+  `MomentumScanner`, `FocusList`, `ColumnConfigMenu`, `RowActionMenu`
+
+**Eylem Sıralaması (her UI/UX kararda):**
+1. **Master'a danış** — soyut motif + KARAR/AÇIK KONU referans
+2. **Ham CSS/JS tara** — somut kanıt (hex, frequency, pattern)
+3. **Notebook_B6 + Notebook_C1 + analizler/Markets360_*.md** — geçmiş özet kontrol
+4. **Quanfina-özgü soyutla** — clean-room disiplinli
+5. **KARAR ADAY tescili** (gerekirse) — Vizyon + mimari belge
+6. **Uygula** — TypeScript + AG Grid + Tailwind
+
+**Canlı kanıt (Kural #20 doğuş anı — 19 May 2026 ~06:30→08:00):**
+- screens/page.tsx ilk versiyon (basit) Master danışılmadan + ham tarama yapılmadan yazıldı
+- Sn. Ferit dikkat çekti: "Bu tarz tasarım kodlama işlerinde Quanfina Notebook'a sorular soralım"
+- Master 5 motif + Quanfina-özgü adlandırma önerdi (Test 4 v1.1 paterni — clean-room self-correction)
+- Sn. Ferit: "Markets 360'ın css ve js de de tarama fikir çıkarmanı istiyorum"
+- 3 dalga ham tarama: 1984 class + 107 hex + 86 API endpoint + 30K+ filter operator
+- Sentez: `notebook/Sprint_4_bis_Mimari_Kararlar.md` (~310 satır, 6 KARAR ADAY #453-#458)
+- Uygulama: screens/page.tsx Katman 1 UX zirvesi (chip + RS bandı + sayaç + multi-select + 4 toast tipi)
+
+**İstisna:** Sadece **mimari değişiklik** olmayan **küçük string/etiket
+güncelleme** (örn. button label tek satır) için çift tarama zorunlu
+değil — Sn. Ferit kararı.
+
+**İlişkili:** Kural #9 v2 (Akıllı Dağılım — Master strateji, Code
+uygula), Kural #17 (Uzman/Yorumcu = NotebookLM), KARAR ADAY #453-#458
+(Sprint 4-bis mimari sentez), Manifesto Özellik #4 (Proaktif
+Yönlendirme) + #8 (Öğrenen — Markets360 ham kaynak emeği boşa
+gitmesin), `notebook/Sprint_4_bis_Mimari_Kararlar.md`.
+
 ---
 
 ## 🤝 Çalışma Mantığı + AI Rol Dağılımı
