@@ -251,7 +251,8 @@ export default function ScreensPage() {
       <div className="space-y-2">
         <h1 className="text-2xl font-bold">Hisse Tarama (Screens)</h1>
         <p className="text-sm text-muted-foreground">
-          8 hazır tarama (Sprint 4-bis.1b). Strateji-bağımsız fırsat keşfi.
+          22 tarama: 8 Ready (saf SQL) + 7 Parse (text-parse) + 6 Scan-Diff (Self-JOIN) + 1 Deferred.
+          Strateji-bağımsız fırsat keşfi.
         </p>
       </div>
 
@@ -277,6 +278,13 @@ export default function ScreensPage() {
           </optgroup>
           <optgroup label="⚙️ Parse (7) — Confirmations/Violations text-parse">
             {metaQ.data?.filter((m) => m.category === "parse").map((meta) => (
+              <option key={meta.slug} value={meta.slug}>
+                {SCREEN_CATEGORIES[meta.slug]} — {meta.label}
+              </option>
+            ))}
+          </optgroup>
+          <optgroup label="📊 Scan-Diff (6) — Önceki scan karşılaştırma (Self-JOIN)">
+            {metaQ.data?.filter((m) => m.category === "diff").map((meta) => (
               <option key={meta.slug} value={meta.slug}>
                 {SCREEN_CATEGORIES[meta.slug]} — {meta.label}
               </option>

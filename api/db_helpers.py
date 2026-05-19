@@ -314,6 +314,12 @@ def screen_list_available() -> list[dict]:
          "category": "parse"}
         for slug, meta in SCREENS_PARSE_7.items()
     ])
+    # Sprint 4-bis.3 — scan_diff (Master danisma: self-JOIN + 6'li grade + tolerant 7g)
+    out.extend([
+        {"slug": slug, "label": meta["label"], "filter_summary": meta["filter"],
+         "category": "diff"}
+        for slug, meta in SCREENS_DIFF_6.items()
+    ])
     out.append({
         "slug": "tight_low_volume",
         "label": "Tight Price Low Volume",
@@ -433,16 +439,145 @@ def screen_parse_get_results(slug: str, limit: int = 500) -> list[dict]:
         return rows
 
 
+# =============================================================
+# Sprint 4-bis.3: 6 scan_diff Screen — onceki scan karsilastirma
+# Kaynak: notebook/Notebook_C1_Sprint_QuickStart.md SCREENS tuple
+#         Master NotebookLM 19 May 2026 ~08:45 danışma cevabi
+#         (Kural #20 cift danisma + KARAR ADAY #457 ailesi)
+#
+# Master kararlari:
+# 1. SQL strateji: Self-JOIN (LAG degil) - performans + index kullanim
+# 2. 7 gun toleransi: ±1 gun BETWEEN + DISTINCT ON sirali fallback
+# 3. Grade ordering: 6'li A+/A/B/C/D/F = 5/4/3/2/1/0 (KARAR #403 + TradeGrader 17 kategori)
+# 4. rs_ibd delta esigi YOK - saf gecis yeterli (Minervini hard cut felsefesi)
+# 5. Mevcut Notebook_B6 s.1725-1734 self-JOIN pattern miras
+# =============================================================
+
+SCREENS_DIFF_6 = {
+    "tpr_moving_up": {
+        "label": "TPR Moving Up",
+        "filter": "grade_rank > prev_grade_rank",
+        "where": "g.grade_rank > p.prev_grade_rank AND p.prev_grade IS NOT NULL",
+    },
+    "tpr_jump_2": {
+        "label": "TPR Jump 2+ Grades",
+        "filter": "grade yukseli si >= 2",
+        "where": "(g.grade_rank - p.prev_grade_rank) >= 2 AND p.prev_grade IS NOT NULL",
+    },
+    "tpr_d_to_b": {
+        "label": "TPR D to B+",
+        "filter": "Onceki D, simdi A+/A/B",
+        "where": "p.prev_grade = 'D' AND g.grade IN ('A+','A','B')",
+    },
+    "new_top5_rpr": {
+        "label": "New Top 5% RPR",
+        "filter": "Onceki rs<95, simdi rs>=95",
+        "where": "p.prev_rs_ibd < 95 AND g.rs_ibd >= 95 AND p.prev_rs_ibd IS NOT NULL",
+    },
+    "new_7d_rpr_10p": {
+        "label": "New 7D RPR ($10+)",
+        "filter": "7g onceki rs<95, simdi rs>=95, $10+",
+        "where": "g.price >= 10 AND p7.prev_7d_rs_ibd < 95 AND g.rs_ibd >= 95 AND p7.prev_7d_rs_ibd IS NOT NULL",
+    },
+    "new_7d_rpr_below": {
+        "label": "New 7D RPR (Below $10)",
+        "filter": "Ayni, $10 alti",
+        "where": "g.price < 10 AND p7.prev_7d_rs_ibd < 95 AND g.rs_ibd >= 95 AND p7.prev_7d_rs_ibd IS NOT NULL",
+    },
+}
+
+
+def screen_diff_get_results(slug: str, limit: int = 500) -> list[dict]:
+    """Sprint 4-bis.3 scan_diff — Self-JOIN ile onceki scan karsilastirma.
+
+    Master danisma (Kural #20):
+    - Self-JOIN (LAG performans degil, B-Tree index dostu)
+    - 6'li grade rank (A+/A/B/C/D/F = 5/4/3/2/1/0)
+    - 7 gun toleransi ±1 (haftasonu + tatil fallback)
+    """
+    if slug not in SCREENS_DIFF_6:
+        raise ValueError(
+            f"Bilinmeyen scan_diff slug: '{slug}'. "
+            f"Gecerli: {list(SCREENS_DIFF_6.keys())}"
+        )
+
+    sql_filter = SCREENS_DIFF_6[slug]["where"]
+
+    # Grade rank CASE — A+/A/B/C/D/F = 5/4/3/2/1/0
+    grade_rank_expr = """
+        CASE grade
+            WHEN 'A+' THEN 5 WHEN 'A' THEN 4 WHEN 'B' THEN 3
+            WHEN 'C' THEN 2  WHEN 'D' THEN 1 WHEN 'F' THEN 0
+            ELSE NULL
+        END
+    """
+
+    # Self-JOIN pattern (Master Notebook_B6 s.1725-1734 miras)
+    query = f"""
+        WITH current_scan AS (
+            SELECT ticker, scan_date, grade, rs_ibd, price, passed,
+                   ({grade_rank_expr}) AS grade_rank
+            FROM minervini_scans
+            WHERE scan_date = (SELECT MAX(scan_date) FROM minervini_scans)
+        ),
+        previous_scan AS (
+            SELECT DISTINCT ON (ticker)
+                   ticker,
+                   grade AS prev_grade,
+                   rs_ibd AS prev_rs_ibd,
+                   ({grade_rank_expr}) AS prev_grade_rank,
+                   scan_date AS prev_scan_date
+            FROM minervini_scans
+            WHERE scan_date < (SELECT MAX(scan_date) FROM minervini_scans)
+            ORDER BY ticker, scan_date DESC
+        ),
+        prev_7d AS (
+            -- 7 gun once ±1 toleransi (Master karar: Tolerant + Fallback)
+            SELECT DISTINCT ON (ticker)
+                   ticker,
+                   rs_ibd AS prev_7d_rs_ibd,
+                   scan_date AS prev_7d_scan_date
+            FROM minervini_scans
+            WHERE scan_date::date BETWEEN
+                  ((SELECT MAX(scan_date)::date FROM minervini_scans) - INTERVAL '8 days')
+              AND ((SELECT MAX(scan_date)::date FROM minervini_scans) - INTERVAL '6 days')
+            ORDER BY ticker, scan_date DESC
+        )
+        SELECT g.ticker AS symbol, g.grade, g.rs_ibd, g.price, g.passed, g.scan_date
+        FROM current_scan g
+        LEFT JOIN previous_scan p ON g.ticker = p.ticker
+        LEFT JOIN prev_7d p7 ON g.ticker = p7.ticker
+        WHERE {sql_filter}
+        ORDER BY g.rs_ibd DESC NULLS LAST, g.ticker ASC
+        LIMIT :limit
+    """
+
+    with engine.connect() as conn:
+        result = conn.execute(text(query), {"limit": limit})
+        rows = []
+        for row in result:
+            d = dict(row._mapping)
+            if d.get("price") is not None:
+                d["price"] = float(d["price"])
+            if d.get("rs_ibd") is not None:
+                d["rs_ibd"] = int(round(float(d["rs_ibd"])))
+            rows.append(d)
+        return rows
+
+
 def screen_get_results_dispatch(slug: str, limit: int = 500) -> list[dict]:
-    """Dispatch: slug ready ise screen_get_results, parse ise screen_parse_get_results."""
+    """Dispatch: ready / parse / diff slug'a gore otomatik."""
     if slug in SCREENS_READY_8:
         return screen_get_results(slug, limit)
     if slug in SCREENS_PARSE_7:
         return screen_parse_get_results(slug, limit)
+    if slug in SCREENS_DIFF_6:
+        return screen_diff_get_results(slug, limit)
     raise ValueError(
         f"Bilinmeyen screen slug: '{slug}'. "
         f"Gecerli ready: {list(SCREENS_READY_8.keys())}; "
-        f"parse: {list(SCREENS_PARSE_7.keys())}"
+        f"parse: {list(SCREENS_PARSE_7.keys())}; "
+        f"diff: {list(SCREENS_DIFF_6.keys())}"
     )
 
 

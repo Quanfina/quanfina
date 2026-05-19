@@ -22,10 +22,17 @@ export type ScreenSlug =
   | "buy_risk_green"
   | "momentum_5x_rpr_70"
   | "mom_qualifier"
+  // Sprint 4-bis.3 — Scan-Diff (6, Self-JOIN onceki scan karsilastirma)
+  | "tpr_moving_up"
+  | "tpr_jump_2"
+  | "tpr_d_to_b"
+  | "new_top5_rpr"
+  | "new_7d_rpr_10p"
+  | "new_7d_rpr_below"
   // Sprint 4-bis.4 — Deferred (1, JSONB)
   | "tight_low_volume";
 
-export type ScreenCategory = "ready" | "parse" | "deferred";
+export type ScreenCategory = "ready" | "parse" | "diff" | "deferred";
 
 export interface ScreenMeta {
   slug: ScreenSlug;
@@ -62,6 +69,13 @@ export const SCREEN_CATEGORIES: Record<ScreenSlug, string> = {
   buy_risk_green: "Pattern",
   momentum_5x_rpr_70: "Momentum 5x",
   mom_qualifier: "Momentum",
+  // Scan-Diff (6)
+  tpr_moving_up: "TPR-Bazli (Diff)",
+  tpr_jump_2: "TPR-Bazli (Diff)",
+  tpr_d_to_b: "TPR-Bazli (Diff)",
+  new_top5_rpr: "RPR-Bazli (Diff)",
+  new_7d_rpr_10p: "RPR-Bazli (Diff)",
+  new_7d_rpr_below: "RPR-Bazli (Diff)",
   // Deferred (1)
   tight_low_volume: "Pattern (Deferred)",
 };

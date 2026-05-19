@@ -224,6 +224,7 @@ from api.db_helpers import (
     screen_list_available,
     SCREENS_READY_8,
     SCREENS_PARSE_7,
+    SCREENS_DIFF_6,
 )
 
 
@@ -261,7 +262,11 @@ def get_screen_results(slug: str, limit: int = 500) -> list[ScreenResultRow]:
     db_connected=false durumunda MOCK donus (dev ortam).
     db_connected=true → minervini_scans tablosundan gerçek sorgu.
     """
-    valid_slugs = set(SCREENS_READY_8.keys()) | set(SCREENS_PARSE_7.keys())
+    valid_slugs = (
+        set(SCREENS_READY_8.keys()) |
+        set(SCREENS_PARSE_7.keys()) |
+        set(SCREENS_DIFF_6.keys())
+    )
     if slug == "tight_low_volume":
         from fastapi import HTTPException
         raise HTTPException(
@@ -275,7 +280,8 @@ def get_screen_results(slug: str, limit: int = 500) -> list[ScreenResultRow]:
             status_code=404,
             detail=f"Screen slug bulunamadi: '{slug}'. "
                    f"Gecerli ready: {list(SCREENS_READY_8.keys())}; "
-                   f"parse: {list(SCREENS_PARSE_7.keys())}"
+                   f"parse: {list(SCREENS_PARSE_7.keys())}; "
+                   f"diff: {list(SCREENS_DIFF_6.keys())}"
         )
 
     # MOCK fallback (dev ortam, db_connected=false)
