@@ -1065,6 +1065,84 @@ Verilmez), Kural #12 (Önce Keşfet), Kural #14 (Pattern Tescil), Kural
 #20 (UI/UX Çift Danışma), Kural #19 (PS Out-File yasak — encoding
 disiplini paralel motif). Memory: `feedback_chrome_mcp_hibrit`.
 
+### Kural 22 — Proaktif Sistem Hafıza Taraması (19 May 2026 ~22:00 yeni)
+
+> Sn. Ferit talimatı (Kural #14 doğrudan tescil eşiği): "**böyle sana
+> hatırlatmak istemiyorum artık bu çalışmalar zamanında bugün için
+> yapıldı kendi hafızanı yani sistemin hafızasını bilgi kullanımını
+> akışa iyi oturtmalıyız**"
+
+Manifesto Özellik #3 (Bilgi Haritası) + #4 (Proaktif Yönlendirme) +
+#8 (Öğrenen) somut anayasal disiplini. Sn. Ferit aylarca/yıllarca
+emek vermiş notebook/'a — AI **kendi inisiyatifi** ile bu birikimi
+tarayıp kullanmalı. "Şu dosyaya bak" hatırlatması ihlal.
+
+**TETİKLEYİCİ — Sn. Ferit yeni bir konu sorduğunda:**
+- Yeni algoritma / formül / eşik kararı ("VCP threshold nedir?")
+- Yeni UI deseni / UX kalibrasyon ("skeleton loading mantığı")
+- Yeni karar / mimari soru ("DB strateji secenekleri")
+- Mevcut kod refactor önerisi
+- Sprint planı / öncelik tartışması
+
+**ZORUNLU SIRALI TARAMA (önce lokal, sonra harici):**
+
+```
+1. LOKAL BİRİKİM (sistemde yıllardır biriktirilen emek)
+   ├── notebook/kitaplar/      → Minervini.md (2592), Carr.md (738), Minervini_Video.md (5158)
+   ├── notebook/analizler/     → Markets360_Bundle.md (5128), Gorsel_1/2, FMP_Matematik
+   ├── notebook/Notebook_B6_*  → Sprint protokol + KARAR günlüğü (4165 satır)
+   ├── notebook/Notebook_C2_*  → EK1-8 teknik formüller (Pine Screener, hazır script'ler)
+   ├── notebook/EK10_*         → TradeGrader sentezi
+   ├── notebook/Sprint_4_bis_* → Mimari kararlar
+   ├── quanfina_math.py        → ⭐ Minervini matematik motoru (903 satır)
+   ├── scanner.py              → tarama logic (1400+ satır)
+   ├── api/db_helpers.py       → DB CRUD + SCREENS dict
+   └── notebook/Notebook_A_Vizyon.md → KARAR günlüğü (7614 satır)
+
+2. MASTER NOTEBOOKLM (33 .txt sentez — Drive Connector indekslemis)
+   Yukarida bulunmayan + cross-strateji + tarihsel kanit gerekirse
+
+3. MARKETS360 HAM CSS/JS (Kural #20 — UI/UX'a ozel)
+   UI motif / class isim / animation pattern arama
+
+4. HARİCİ KAYNAK (en son)
+   Minervini kitap referansi, Brandon video transkripti,
+   Pine Screener acik kaynak (LevelUp, ravihls VCP+PP, vishnuv SEPA)
+```
+
+**ARAMA STRATEJİSİ:**
+- TR + EN ikili semantik arama (`grep -E "(volatility|volatil|sıkış)"`)
+- Kavram-bazlı (VCP, contraction, drying, tight, range)
+- Fonksiyon adı (`def *VCP*`, `compute_*`, `_compute_*`)
+- KARAR # arama (geçmiş tescil)
+- Sat. sayısı / boyut envanteri (büyük dosya = derin birikim)
+
+**RAPOR DİSİPLİNİ (Sn. Ferit'e sunum):**
+- Bulgu tablosu (Kaynak | İçerik özet | Satır referansı)
+- Sayısal eşikler kanıtlı (örn. Brandon video 10:20)
+- Quanfina'da mevcut altyapı (örn. `quanfina_math.v50_pct` zaten hazır)
+- Eksik kısımlar net (örn. `compute_pullback_health` yok)
+- Mimari öneri (entegrasyon yeri, refactor ihtiyacı)
+
+**PATTERN KEŞFİ — 19 May 2026 ~21:30→22:00:**
+- 1. ortaya çıkış: Sn. Ferit "sistemdeki Minervini Markets360 dosyalarını tara, etiket bazlı tarama yap direk çıkmaz çoğu zaman... bu bilgiler boşuna biriktirilmedi"
+- 2. ortaya çıkış: Sn. Ferit "matematik motoru diye birşey hatırlıyorum onuda derin tara" + "**böyle sana hatırlatmak istemiyorum artık**"
+- Doğrudan tescil eşiği aşıldı → Kural #22 doğdu
+
+**İSTİSNA:**
+- Sn. Ferit zaten net bir dosya verdiyse ("X.md'ye bak" diye) → o dosyayı önce oku
+- Yıkıcı eylem (Kural #4) hâlâ manuel onay ister
+- "Tek seferde tek iş" (Kural #1) hâlâ aktif — tarama sonrası TEK rapor + TEK öneri
+
+**MANIFESTO BAĞI:**
+- **Özellik #3 (Bilgi Haritası)** — somut canlı uygulama
+- **Özellik #4 (Proaktif Yönlendirme)** — "Şu dosyaya bakalım" demek yerine doğrudan AÇ + OKU + RAPORLA
+- **Özellik #8 (Öğrenen)** — 16. self-correction tetikleyicisi
+
+**İLİŞKİLİ:** Kural #11 (Notebook Proaktif Tarama — bu kuralın atası, sadece notebook/ kapsıyordu), Kural #12 (Önce Keşfet — registry/API tarafı), Kural #14 (Pattern Tescil), Kural #17 (NotebookLM Plus yardımcı), Kural #20 (UI/UX Çift Danışma). Memory: `feedback_proaktif_hafiza_tarama`.
+
+**Bu kural Kural #11'i KAPSAR ama GENİŞLETİR.** Kural #11 sadece notebook/ proaktif tarama der; Kural #22 tüm sistem birikim (notebook + quanfina_math.py + scanner.py + api/ + web/) için sıralı disiplin tanımlar.
+
 ---
 
 ## 🤝 Çalışma Mantığı + AI Rol Dağılımı
