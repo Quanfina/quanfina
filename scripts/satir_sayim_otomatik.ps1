@@ -7,7 +7,10 @@
 # Hijyen scripti _BASLAT.md, _INDEX.md, _OZET.md, _SAGLIK_KONTROL.md
 # icindeki "X satir" literal'lerini auto-update eder.
 #
-# Versiyon: v0.5 (19 May 2026, Otonom Hijyen Mod ilk uretim)
+# Versiyon: v0.5.2 (19 May 2026, BOM-less UTF-8 + mojibake fix)
+# v0.5  : Ilk surum, Out-File -Encoding UTF8 BOM ekliyordu
+# v0.5.1: PowerShell array syntax fix (@((Join-Path...), (Join-Path...)))
+# v0.5.2: [System.IO.File]::WriteAllText UTF-8 BOM-less, mojibake yok
 # Kural #15 + #16 uyumlu
 #
 # Kullanim:
@@ -43,9 +46,9 @@ Write-Host ""
 
 # Hedef dosyalar + sayim pattern degisimleri
 $hedefler = @(
-    Join-Path $repoRoot "notebook\_BASLAT.md",
-    Join-Path $repoRoot "notebook\_INDEX.md",
-    Join-Path $repoRoot "notebook\_OZET.md"
+    (Join-Path $repoRoot "notebook\_BASLAT.md"),
+    (Join-Path $repoRoot "notebook\_INDEX.md"),
+    (Join-Path $repoRoot "notebook\_OZET.md")
 )
 
 $toplamGuncellenenSatir = 0
@@ -72,7 +75,9 @@ foreach ($hedef in $hedefler) {
     if ($degisikSayisi -gt 0) {
         Write-Host "  [$dosyaAdi] $degisikSayisi guncellenebilir" -ForegroundColor Yellow
         if ($Uygula) {
-            $icerik | Out-File -FilePath $hedef -Encoding UTF8 -NoNewline -Force
+            # v0.5.2 fix: Out-File -Encoding UTF8 BOM ekliyor + mojibake. Kullan: [System.IO.File]::WriteAllText UTF-8 BOM-less
+            $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+            [System.IO.File]::WriteAllText($hedef, $icerik, $utf8NoBom)
             Write-Host "    [OK] Uygulandi" -ForegroundColor Green
             $toplamGuncellenenSatir += $degisikSayisi
         }
