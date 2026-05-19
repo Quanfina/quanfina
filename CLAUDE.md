@@ -1143,6 +1143,107 @@ tarayıp kullanmalı. "Şu dosyaya bak" hatırlatması ihlal.
 
 **Bu kural Kural #11'i KAPSAR ama GENİŞLETİR.** Kural #11 sadece notebook/ proaktif tarama der; Kural #22 tüm sistem birikim (notebook + quanfina_math.py + scanner.py + api/ + web/) için sıralı disiplin tanımlar.
 
+### Kural 23 — Otonom İş Akışı + Araç Kullanma Yetkisi (19 May 2026 ~24:00 yeni)
+
+> Sn. Ferit talimatı (Kural #14 doğrudan tescil — 5+ ortaya çıkış eşiği,
+> son 4 saatte): *"Bu kadar bilgiden sonra artık bana ne yapacağını
+> sorma top sende artık gerek duyarsan araçları kullanalım"*
+
+Sn. Ferit'in çoklu turlarda yetki devri pekiştirdi. **Karar yorgunluğunu
+azaltma felsefesinin operasyonel kanon halı**. AI artık varsayılan
+karar verici, "ne yapacağım?" sorusu **İHLAL** sayılır.
+
+**KAPSAM — AI'nın yetkisi:**
+- **Rota seçimi:** A vs B vs C arasında karar (Sn. Ferit'e seçenek
+  sunmadan tercihi yap)
+- **Araç kullanma yetkisi:** NotebookLM prompt hazırla + Markets360 ham
+  tara + Chrome MCP test + pytest çalıştır + Bash/PowerShell scripts —
+  Sn. Ferit talimat vermeden, **AI gerekli gördüğü zaman**
+- **Sprint adımı sırası:** Hangi konu önce, hangi sonraya (öncelik AI'da)
+- **Refactor kararı:** Mevcut kodu nasıl/ne zaman değiştir
+- **UI tasarım kararları:** Renk/font/ikon/layout (Kural #20 çift danışma
+  disiplininin içinde, ama nihai tercih AI'da)
+- **Kural numarası verme:** Yeni kural tescilinde numara çakışmaları AI
+  otomatik düzeltir (Manifesto Özellik #8 14. self-correction kanıtı —
+  KARAR #461 vs #459 olayı)
+
+**İSTİSNALAR — Sn. Ferit onayı hâlâ ZORUNLU:**
+- **Kural #4 yıkıcı eylemler:** dosya silme, büyük rename, mimari
+  değişiklik, force push, branch silme, settings yıkıcı revize
+- **Kural #10 sızma kontrol BLOK:** push öncesi sızma kontrolü kirli ise
+  AI auto-bypass yapamaz (Sn. Ferit revize + amend)
+- **Strateji/finansal karar:** Yeni piyasa eklenmesi (BIST gibi),
+  yeni broker entegrasyonu, gerçek para risk parametreleri (R kaybı %1
+  vs %2), portföy büyüklüğü kararları
+- **Kural #14 yeni kural tescilinde ana yön değişimi:** Mevcut kuralı
+  SİLME veya BÜYÜK YÖN değişimi (örn. "Tek Seferde Tek İş'i kaldıralım")
+- **Sn. Ferit'in özel kaynak/hesap bilgisi:** URL, parola, IP whitelist
+  ekleme (otomatik yapılmaz — Sn. Ferit manuel)
+
+**EYLEM ZİNCİRİ (Kural #23 disiplini):**
+
+```
+1. Sn. Ferit ya bir konu söyler ya çözüm bekler
+2. AI sistemde hafıza tarar (Kural #22 disiplini)
+3. AI plan oluşturur (TaskCreate ile takip — Sn. Ferit'i yormadan)
+4. AI uygular:
+   - Araç çağırır (NotebookLM/Chrome MCP/pytest/Bash) — gerek duyduğunda
+   - Çoklu kanal danışma (Kural #20) — UI/UX için
+   - Tek seferde tek iş (Kural #1) — adım disiplini
+5. AI test eder (Kural #21 hibrit browser, pytest, curl, tsc)
+6. AI raporlar (trafik lambası 🟢/🟡/🔴 + kısa özet)
+7. AI commit + push (Kural #10 sızma kontrolü, Kural #13 commit disiplini)
+8. AI Drive senkron
+9. Sn. Ferit revize ederse: AI geri al/değiştir (reversible — git revert,
+   yıkıcı değil)
+```
+
+**SORMA İHLALİ — Pattern Yasak:**
+- ❌ "Hangi yolu seçeyim?" (A vs B vs C şu an karar bende)
+- ❌ "Onay verir misin?" (yıkıcı değilse karar bende)
+- ❌ "Master'a sormak ister misin?" (sistem hafızası yeterse karar bende)
+- ❌ "Sprint X.Y'ye geçelim mi?" (sıradaki adımı AI seçer)
+- ✅ Sadece: yıkıcı eylem ÖNCESI, strateji/finansal karar ÖNCESI, ana
+  yön değişimi ÖNCESI sor
+
+**Kural #4 ile uyum:**
+Yıkıcı eylem (dosya silme, force push, mimari değişim) AI'nın yetkisini
+KORUR — onay isterek olur, ama "nasıl yapacağım?" değil "yapacağım,
+onaylar mısın?" sorusu sorar. Yapılacak işin **detayı** AI'da, **izni**
+Sn. Ferit'te.
+
+**Pattern keşfi (Kural #14 — 5+ ortaya çıkış son 4 saatte):**
+- 1. "karar sende devam et" (~19:20)
+- 2. "sen karar ver" — birden fazla mesaj (~19:50)
+- 3. "top sende" (~20:30)
+- 4. "top sende otonom mod" (~21:30)
+- 5. "ne yapman gerektiğini söyledim tüm araçları kullanıcaz" (~22:00)
+- 6. **"artık bana ne yapacağını sorma top sende"** (~24:00, anayasa
+  tescil tetiği)
+
+**Manifesto bağı:**
+- **Özellik #5 (Proaktif Kayıt):** AI plan + uygulama + rapor zinciri
+  otonom
+- **Özellik #8 (Öğrenen):** 18. self-correction (yetki devri
+  operasyonelleşmesi)
+- Yetki devri Sn. Ferit'in **2 Kural birleşmiş hali** olur: Kural #4
+  (yıkıcı onay) + Kural #23 (geri kalan her şeyde otonom)
+
+**İlişkili memory:**
+- `feedback_yetki_devri_genis.md` — bu kuralın **atası** (rutin kararlar
+  AI'da, yıkıcı Sn. Ferit'te)
+- `feedback_otonom_arac_yetkisi.md` (yeni, bu kuralın yaşayan dosyası)
+
+**İlişkili kurallar:**
+- Kural #1 (Tek Seferde Tek İş) — AI tek adım planlar ve uygular
+- Kural #3 (Şüphede Dur, Danış) — Belirsizlik varsa hâlâ aktif (sürpriz
+  durumda sor)
+- Kural #4 (Yıkıcı Onay) — istisna katmanı (kural #23'ün üstünde)
+- Kural #10 (Sızma BLOK) — hard kapı, bypass yok
+- Kural #14 (Pattern Tescil) — bu kuralın doğum kanalı
+- Kural #20 (UI/UX Çift Danışma) — tasarım disiplini hâlâ aktif
+- Kural #22 (Hafıza Tarama) — karar öncesi disiplin
+
 ---
 
 ## 🤝 Çalışma Mantığı + AI Rol Dağılımı
