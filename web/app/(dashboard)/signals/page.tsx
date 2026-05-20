@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
-import { Activity, Plus } from "lucide-react";
+import { Activity, Plus, X, RotateCcw } from "lucide-react";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, ICellRendererParams } from "ag-grid-community";
 import { useSignals } from "@/hooks/use-signals";
@@ -10,6 +10,8 @@ import { AddTradeDialog } from "@/components/journal/AddTradeDialog";
 import { Button } from "@/components/ui/button";
 import { GridLoadingOverlay } from "@/components/ag-grid/LoadingOverlay";
 import { formatDateTR } from "@/lib/format-date";
+import { getPassedSignals, setPassedSignals, signalKey } from "@/lib/passed-signals";
+import { toast } from "sonner";
 import type { Signal } from "@/types/signal";
 
 const SELECT =
@@ -54,9 +56,17 @@ export default function SignalsPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | "buy" | "focus_buy">("all");
   const [strategyFilter, setStrategyFilter] = useState<"all" | "minervini" | "carr">("all");
   const [newTodayOnly, setNewTodayOnly] = useState(false);
+  const [showPassed, setShowPassed] = useState(false);
 
   const [tradeOpen, setTradeOpen] = useState(false);
   const [tradeSignal, setTradeSignal] = useState<Signal | null>(null);
+
+  // KARAR #475 (20 May 2026): localStorage-backed passed signals (UX Bölüm 6 "AL/GEÇ").
+  // Initial load: SSR hydration uyumu için useEffect (window guard).
+  const [passedKeys, setPassedKeys] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    setPassedKeys(getPassedSignals());
+  }, []);
 
   const isDark = resolvedTheme === "dark";
   const gridClass = isDark ? "ag-theme-quartz-dark" : "ag-theme-quartz";
@@ -66,11 +76,31 @@ export default function SignalsPage() {
     setTradeOpen(true);
   }
 
-  // Stable callback ref (Watchlist pateni — render sırasında ref update yasak ama
-  // burada tek callback ve closure güvenli, ESLint react-hooks/refs uyarı verebilir,
-  // ileri sprintte refactor için AÇIK KONU #72 kapsamı).
+  function handlePassClick(signal: Signal) {
+    const key = signalKey(signal.symbol, signal.strategy);
+    const next = new Set(passedKeys);
+    next.add(key);
+    setPassedKeys(next);
+    setPassedSignals(next);
+    toast.success(`${signal.symbol} (${signal.strategy}) geçildi`, {
+      action: {
+        label: "Geri Al",
+        onClick: () => {
+          const undo = new Set(next);
+          undo.delete(key);
+          setPassedKeys(undo);
+          setPassedSignals(undo);
+        },
+      },
+      duration: 4000,
+    });
+  }
+
+  // Stable callback refs (Watchlist pateni)
   const tradeClickRef = useRef<(s: Signal) => void>(handleTradeClick);
   tradeClickRef.current = handleTradeClick;
+  const passClickRef = useRef<(s: Signal) => void>(handlePassClick);
+  passClickRef.current = handlePassClick;
 
   const columnDefs = useMemo<ColDef<Signal>[]>(() => [
     {
@@ -197,24 +227,35 @@ export default function SignalsPage() {
     },
     {
       headerName: "",
-      width: 120,
+      width: 130,
       pinned: "right" as const,
       sortable: false,
       resizable: false,
       suppressMovable: true,
+      // KARAR #475 (UX Bölüm 6): AL + GEÇ ikili buton — mekanik karar
       cellRenderer: (p: ICellRendererParams<Signal>) => {
         const signal = p.data;
         if (!signal) return null;
         return (
-          <div className="flex items-center justify-center h-full">
+          <div className="flex items-center justify-center gap-1 h-full">
             <button
               type="button"
               onClick={() => tradeClickRef.current(signal)}
-              className="inline-flex items-center gap-1 h-6 rounded-md bg-primary text-primary-foreground px-2 text-[11px] font-medium hover:bg-primary/90 transition-colors"
+              className="inline-flex items-center gap-1 h-6 rounded-md px-2 text-[11px] font-semibold transition-colors"
+              style={{ background: "#28A745", color: "#fff" }}
               title="Trade aç (form pre-fill ile)"
             >
               <Plus size={11} />
-              Trade
+              AL
+            </button>
+            <button
+              type="button"
+              onClick={() => passClickRef.current(signal)}
+              className="inline-flex items-center gap-1 h-6 rounded-md border px-2 text-[11px] font-medium hover:bg-accent transition-colors text-muted-foreground"
+              title="Bu sinyali geç (gizle)"
+            >
+              <X size={11} />
+              GEÇ
             </button>
           </div>
         );
@@ -230,16 +271,21 @@ export default function SignalsPage() {
 
   const filtered = useMemo(() => {
     let rows = data ?? [];
+    // KARAR #475 — Geçilen sinyaller default gizli (showPassed true ise göster)
+    if (!showPassed) {
+      rows = rows.filter((s) => !passedKeys.has(signalKey(s.symbol, s.strategy)));
+    }
     if (statusFilter === "buy") rows = rows.filter((s) => s.status === "buy");
     if (statusFilter === "focus_buy")
       rows = rows.filter((s) => s.status === "buy" || s.status === "focus");
     if (strategyFilter !== "all") rows = rows.filter((s) => s.strategy === strategyFilter);
     if (newTodayOnly) rows = rows.filter((s) => s.is_new_today);
     return rows;
-  }, [data, statusFilter, strategyFilter, newTodayOnly]);
+  }, [data, statusFilter, strategyFilter, newTodayOnly, passedKeys, showPassed]);
 
   const totalSignals = data?.length ?? 0;
   const newTodayCount = data?.filter((s) => s.is_new_today).length ?? 0;
+  const passedCount = passedKeys.size;
   const strongest = data?.[0];
 
   const tradeInitial = tradeSignal
@@ -313,6 +359,34 @@ export default function SignalsPage() {
           />
           Yeni Bugün
         </label>
+
+        {passedCount > 0 && (
+          <label className="flex items-center gap-1.5 text-xs cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={showPassed}
+              onChange={(e) => setShowPassed(e.target.checked)}
+              className="h-3.5 w-3.5 accent-primary"
+            />
+            Geçilenleri göster ({passedCount})
+          </label>
+        )}
+
+        {passedCount > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              setPassedKeys(new Set());
+              setPassedSignals(new Set());
+              toast.success("Tüm geçilen sinyaller geri alındı");
+            }}
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            title="Tüm geçilen sinyalleri geri al"
+          >
+            <RotateCcw size={11} />
+            Geçişleri sıfırla
+          </button>
+        )}
 
         <span className="text-xs text-muted-foreground ml-1">
           {filtered.length} / {totalSignals} sinyal
