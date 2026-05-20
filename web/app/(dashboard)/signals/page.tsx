@@ -1,15 +1,37 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Activity } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { useTheme } from "next-themes";
+import { Activity, Plus } from "lucide-react";
+import { AgGridReact } from "ag-grid-react";
+import type { ColDef, ICellRendererParams } from "ag-grid-community";
 import { useSignals } from "@/hooks/use-signals";
-import { SignalCard } from "@/components/signals/SignalCard";
 import { AddTradeDialog } from "@/components/journal/AddTradeDialog";
 import { Button } from "@/components/ui/button";
+import { GridLoadingOverlay } from "@/components/ag-grid/LoadingOverlay";
 import type { Signal } from "@/types/signal";
 
 const SELECT =
   "h-8 rounded-md border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring";
+
+const STATUS_LABELS: Record<string, string> = {
+  buy: "Buy",
+  focus: "Focus",
+  on_deck: "On Deck",
+  watch: "Watch",
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  buy: "#28A745",
+  focus: "#4B9CD3",
+  on_deck: "#F59E0B",
+  watch: "var(--muted-foreground)",
+};
+
+const STRATEGY_LABELS: Record<string, string> = {
+  minervini: "Minervini",
+  carr: "Carr",
+};
 
 function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
@@ -20,11 +42,13 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
   );
 }
 
-// KARAR #469 (20 May 2026): Konsensus filtresi kaldırıldı.
-// Her watchlist satırı = 1 sinyal kartı. Sn. Ferit talimat:
-// "konsensus olmasın, tüm sinyaller görünsün".
+// KARAR #470 (20 May 2026): Sinyaller AG Grid tablo (KARAR #423 + #469 revize).
+// Sn. Ferit: "kart şeklinde değil tablo şeklinde olsun". Watchlist/Journal pateni.
+// Konsensus mantığı KARAR #469 ile zaten kaldırıldı — her watchlist satırı 1 sinyal satırı.
 export default function SignalsPage() {
+  const { resolvedTheme } = useTheme();
   const { data, isLoading, isError, error, refetch, isFetching } = useSignals();
+  const gridRef = useRef<AgGridReact<Signal>>(null);
 
   const [statusFilter, setStatusFilter] = useState<"all" | "buy" | "focus_buy">("all");
   const [strategyFilter, setStrategyFilter] = useState<"all" | "minervini" | "carr">("all");
@@ -33,10 +57,127 @@ export default function SignalsPage() {
   const [tradeOpen, setTradeOpen] = useState(false);
   const [tradeSignal, setTradeSignal] = useState<Signal | null>(null);
 
+  const isDark = resolvedTheme === "dark";
+  const gridClass = isDark ? "ag-theme-quartz-dark" : "ag-theme-quartz";
+
   function handleTradeClick(signal: Signal) {
     setTradeSignal(signal);
     setTradeOpen(true);
   }
+
+  // Stable callback ref (Watchlist pateni — render sırasında ref update yasak ama
+  // burada tek callback ve closure güvenli, ESLint react-hooks/refs uyarı verebilir,
+  // ileri sprintte refactor için AÇIK KONU #72 kapsamı).
+  const tradeClickRef = useRef<(s: Signal) => void>(handleTradeClick);
+  tradeClickRef.current = handleTradeClick;
+
+  const columnDefs = useMemo<ColDef<Signal>[]>(() => [
+    {
+      field: "symbol",
+      headerName: "Sembol",
+      width: 110,
+      pinned: "left" as const,
+      cellRenderer: (p: ICellRendererParams<Signal>) => {
+        const s = p.data;
+        if (!s) return null;
+        return (
+          <div className="flex items-center gap-2 h-full">
+            <span className="font-semibold tracking-tight">{s.symbol}</span>
+            {s.is_new_today && (
+              <span
+                className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                style={{ background: "#28A745", color: "#fff" }}
+                title="Bugün eklendi"
+              >
+                YENİ
+              </span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      field: "strategy",
+      headerName: "Strateji",
+      width: 110,
+      valueFormatter: (p) => STRATEGY_LABELS[p.value as string] ?? (p.value as string),
+    },
+    {
+      field: "status",
+      headerName: "Statü",
+      width: 100,
+      cellRenderer: (p: ICellRendererParams<Signal>) => {
+        const s = p.value as string;
+        return (
+          <span
+            className="text-xs font-semibold"
+            style={{ color: STATUS_COLORS[s] ?? "inherit" }}
+          >
+            {STATUS_LABELS[s] ?? s}
+          </span>
+        );
+      },
+    },
+    {
+      field: "setup_type",
+      headerName: "Setup",
+      width: 160,
+      valueFormatter: (p) => (p.value as string | null) ?? "—",
+    },
+    {
+      field: "rs_rating",
+      headerName: "RS",
+      width: 80,
+      type: "rightAligned",
+      valueFormatter: (p) => Math.round(p.value as number).toString(),
+    },
+    {
+      field: "price",
+      headerName: "Fiyat",
+      width: 100,
+      type: "rightAligned",
+      valueFormatter: (p) =>
+        `$${(p.value as number).toFixed(2)}`,
+      cellStyle: { fontFamily: "var(--font-jetbrains-mono, monospace)" },
+    },
+    {
+      field: "added_date",
+      headerName: "Eklenme",
+      width: 110,
+      valueFormatter: (p) => p.value as string,
+    },
+    {
+      headerName: "",
+      width: 120,
+      pinned: "right" as const,
+      sortable: false,
+      resizable: false,
+      suppressMovable: true,
+      cellRenderer: (p: ICellRendererParams<Signal>) => {
+        const signal = p.data;
+        if (!signal) return null;
+        return (
+          <div className="flex items-center justify-center h-full">
+            <button
+              type="button"
+              onClick={() => tradeClickRef.current(signal)}
+              className="inline-flex items-center gap-1 h-6 rounded-md bg-primary text-primary-foreground px-2 text-[11px] font-medium hover:bg-primary/90 transition-colors"
+              title="Trade aç (form pre-fill ile)"
+            >
+              <Plus size={11} />
+              Trade
+            </button>
+          </div>
+        );
+      },
+    },
+  ], []);
+
+  const defaultColDef = useMemo<ColDef<Signal>>(() => ({
+    sortable: true,
+    resizable: true,
+    filter: false,
+  }), []);
 
   const filtered = useMemo(() => {
     let rows = data ?? [];
@@ -50,7 +191,6 @@ export default function SignalsPage() {
 
   const totalSignals = data?.length ?? 0;
   const newTodayCount = data?.filter((s) => s.is_new_today).length ?? 0;
-  // En güçlü: en yüksek RS rating (KARAR #469 konsensus yok)
   const strongest = data?.[0];
 
   const tradeInitial = tradeSignal
@@ -131,10 +271,10 @@ export default function SignalsPage() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 px-6 py-4 overflow-auto">
+      <div className="flex-1 px-6 py-4">
         {isLoading && (
-          <div className="flex items-center justify-center h-64 text-sm text-muted-foreground">
-            Yükleniyor...
+          <div className={`${gridClass} h-[600px] w-full`}>
+            <GridLoadingOverlay />
           </div>
         )}
         {isError && (
@@ -170,14 +310,18 @@ export default function SignalsPage() {
           </div>
         )}
         {!isLoading && !isError && filtered.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {filtered.map((signal) => (
-              <SignalCard
-                key={`${signal.symbol}-${signal.strategy}`}
-                signal={signal}
-                onTradeClick={handleTradeClick}
-              />
-            ))}
+          <div className={gridClass} style={{ height: 600, width: "100%" }}>
+            <AgGridReact<Signal>
+              ref={gridRef}
+              theme="legacy"
+              columnDefs={columnDefs}
+              defaultColDef={defaultColDef}
+              rowData={filtered}
+              rowHeight={36}
+              headerHeight={36}
+              suppressCellFocus={false}
+              getRowId={(p) => `${p.data.symbol}-${p.data.strategy}`}
+            />
           </div>
         )}
       </div>
