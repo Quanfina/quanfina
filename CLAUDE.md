@@ -1050,14 +1050,27 @@ düşülür, hiçbiri çalışmıyorsa adım kapanmaz.
 - Notebook/script/markdown değişikliği → browser test gereksiz
 - Sadece dokümantasyon güncellemesi → atlanır
 
-**KARAR ALGORITMI (20 May 2026 ~10:15 revize — Kanal C öncelikli):**
-1. **Varsayılan: Kanal C** (Playwright `node visual_test_full_site.mjs`) — Chrome MCP permission gerekmez, otonom
-2. Sn. Ferit özel istemezse Kanal A denenmez (permission engeline takılmaz)
-3. Kanal A sadece **Sn. Ferit Chrome eklenti izni verirse** devreye girer (AÇIK KONU #74, gelecek tetik)
-4. Kanal B (Sn. Ferit screenshot) → görsel insan değerlendirmesi gerektiğinde ("hoşuma gitmedi" tipi öznel feedback)
-5. Hangi kanalda olursa olsun: kanıt YAPILANLAR.md tarih notuna eklenir
+**KARAR ALGORITMI (20 May 2026 ~10:30 revize — AI PROAKTİF tetik):**
 
-**AÇIK KONU #74 (gelecek):** Chrome MCP localhost permission Sn. Ferit eli. Çözüldüğünde Kanal A devreye, Kanal C de paralel canlı kalır (regression + ad-hoc kombinasyon).
+**AI Otonom Karar Yetkisi (Kural #23 paralel):**
+Sn. Ferit talimat 20 May ~10:30: *"Screenshot ben demicem, gerek duyduğunda otomatik sen alacaksın"*.
+
+AI screenshot için **proaktif sorumlu** — Sn. Ferit söylemesini beklemez. TETİKLEYİCİ koşullarından biri tetiklendiğinde:
+1. AI kendisi `Bash` tool ile `cd /c/Projeler/Quanfina && node visual_test_full_site.mjs` çalıştırır
+2. `test-screenshots/_full_site/*.png` PNG'lerini `Read` tool ile okur
+3. Görsel analiz raporu hazırlar (her sayfa ✅/⚠️/❌ + bulgular)
+4. Sn. Ferit'e sunar
+
+**"Screenshot alayım mı?" sorusu YASAK** — Kural #23 ihlali. Sadece **alındığını rapor** et.
+
+**Kanal Sırası:**
+1. **Varsayılan: Kanal C** (Playwright, AI otonom çağırır)
+2. Kanal A (Chrome MCP) → Sn. Ferit izin verince paralel
+3. Kanal B (Sn. Ferit screenshot) → AI çağıramaz, Sn. Ferit gönüllü gönderirse
+
+**Kanıt zorunluluğu:** Hangi kanalda olursa olsun YAPILANLAR.md tarih notuna eklenir (regression diff geçmişi için).
+
+**AÇIK KONU #74 (gelecek):** Chrome MCP localhost permission Sn. Ferit eli. Çözüldüğünde Kanal A devreye, Kanal C de paralel canlı kalır.
 
 **KURAL #20 ile bağ:**
 - Kural #20 = **ne tasarlanmalı** (Master + Markets360 çift danışma)
