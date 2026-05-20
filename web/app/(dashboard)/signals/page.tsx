@@ -7,6 +7,7 @@ import { AgGridReact } from "ag-grid-react";
 import type { ColDef, ICellRendererParams } from "ag-grid-community";
 import { useSignals } from "@/hooks/use-signals";
 import { AddTradeDialog } from "@/components/journal/AddTradeDialog";
+import { AddRowDialog } from "@/components/watchlist/AddRowDialog";
 import { Button } from "@/components/ui/button";
 import { GridLoadingOverlay } from "@/components/ag-grid/LoadingOverlay";
 import { formatDateTR } from "@/lib/format-date";
@@ -60,6 +61,9 @@ export default function SignalsPage() {
 
   const [tradeOpen, setTradeOpen] = useState(false);
   const [tradeSignal, setTradeSignal] = useState<Signal | null>(null);
+  // KARAR #478 (UX Bölüm 5): Manuel sinyal ekleme — Watchlist'e satır ekler,
+  // Sinyaller listesi otomatik yenilenir (consensus_count + status hesaplanır).
+  const [manualOpen, setManualOpen] = useState(false);
 
   // KARAR #475 (20 May 2026): localStorage-backed passed signals (UX Bölüm 6 "AL/GEÇ").
   // Initial load: SSR hydration uyumu için useEffect (window guard).
@@ -300,11 +304,17 @@ export default function SignalsPage() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="px-6 py-3 border-b">
-        <h1 className="text-xl font-semibold tracking-tight">Sinyaller</h1>
-        <p className="text-sm text-muted-foreground">
-          Tüm strateji sinyalleri — bugün ne var?
-        </p>
+      <div className="px-6 py-3 border-b flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Sinyaller</h1>
+          <p className="text-sm text-muted-foreground">
+            Tüm strateji sinyalleri — bugün ne var?
+          </p>
+        </div>
+        <Button size="sm" onClick={() => setManualOpen(true)} title="Manuel sinyal ekle (Watchlist üzerinden)">
+          <Plus size={14} className="mr-1.5" />
+          Manuel Sinyal
+        </Button>
       </div>
 
       {/* Stats */}
@@ -456,6 +466,9 @@ export default function SignalsPage() {
         }}
         initialData={tradeInitial}
       />
+
+      {/* KARAR #478: Manuel Sinyal Ekleme (UX Bölüm 5) — AddRowDialog yeniden kullanımı */}
+      <AddRowDialog open={manualOpen} onOpenChange={setManualOpen} />
     </div>
   );
 }
