@@ -4,8 +4,23 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Trade, TradeCreate, TradeUpdate, SetupType } from "@/types/trade";
 
 async function fetchTrades(): Promise<Trade[]> {
-  const res = await fetch("/api/trades");
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  // 8sn timeout + 503 detail parse (Sinyaller/Watchlist pateni — Kural #20 UX)
+  const res = await fetch("/api/trades", { signal: AbortSignal.timeout(8000) });
+  if (!res.ok) {
+    let detail = "";
+    try {
+      const body = await res.text();
+      try {
+        const json = JSON.parse(body) as { detail?: string };
+        detail = json.detail ?? body.slice(0, 160);
+      } catch {
+        detail = body.slice(0, 160);
+      }
+    } catch {
+      /* ignore */
+    }
+    throw new Error(`HTTP ${res.status}${detail ? ` — ${detail}` : ""}`);
+  }
   return res.json() as Promise<Trade[]>;
 }
 

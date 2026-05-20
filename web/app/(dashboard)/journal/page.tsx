@@ -36,7 +36,7 @@ export default function JournalPage() {
   const [search, setSearch]               = useState("");
 
   // Data
-  const { data, isLoading, isError, error } = useTrades();
+  const { data, isLoading, isError, error, refetch, isFetching } = useTrades();
   const deleteMutation = useDeleteTrade();
 
   // Dialog state
@@ -153,8 +153,26 @@ export default function JournalPage() {
           <div className="flex items-center justify-center h-64 text-sm text-muted-foreground">Yükleniyor...</div>
         )}
         {isError && (
-          <div className="flex items-center justify-center h-64 text-sm" style={{ color: "var(--mtp-danger)" }}>
-            Hata: {(error as Error)?.message ?? "Trade verisi alınamadı"}
+          <div className="flex items-center justify-center h-64 px-6">
+            <div
+              className="max-w-xl w-full p-4 border rounded-md"
+              style={{ borderColor: "var(--mtp-danger)", background: "rgba(255, 80, 80, 0.06)" }}
+              role="alert"
+            >
+              <div className="font-semibold mb-1" style={{ color: "var(--mtp-danger)" }}>
+                ⚠️ Trade verisi alınamadı
+              </div>
+              <div className="text-xs mb-3 opacity-80">
+                {(error as Error)?.message ?? "Bilinmeyen hata"}
+              </div>
+              <div className="text-xs mb-3 opacity-70">
+                Olası sebep: Cloud SQL erişilemez (instance durmuş veya IP whitelist eski).
+                GCP Console → SQL → instance durum kontrol et.
+              </div>
+              <Button size="sm" variant="outline" onClick={() => refetch()} disabled={isFetching}>
+                {isFetching ? "Tekrar deneniyor..." : "Tekrar Dene"}
+              </Button>
+            </div>
           </div>
         )}
         {!isLoading && !isError && (
