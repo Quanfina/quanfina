@@ -916,8 +916,22 @@ class WatchlistRow(BaseModel):
 
 @app.get("/api/watchlist", response_model=list[WatchlistRow])
 def get_watchlist() -> list[WatchlistRow]:
-    # DB unreachable durumunda generic 500 yerine 503 + informative body don.
-    # Frontend banner net hata mesaji gosterebilsin (Kural #20 UX disiplini).
+    # DB unreachable -> MOCK fallback (Sinyaller pateni — Kural #20 UX)
+    # Sn. Ferit: DB down ortamda UI demo dolu görünsün, banner sadece API'da
+    if not db_health_check():
+        return [
+            WatchlistRow(symbol="NVDA",  strategy="minervini", status="buy",     price=145.20,  added_date=f"{date.today().isoformat()} 09:32", setup_type="VCP",                pivot_price=148.00,  rs_rating=99, consensus_count=2, consensus_strategies=["minervini","carr"]),
+            WatchlistRow(symbol="NVDA",  strategy="carr",      status="focus",   price=145.20,  added_date="2026-05-19 14:15", setup_type="Pullback",           pivot_price=147.50,  rs_rating=99, consensus_count=2, consensus_strategies=["minervini","carr"]),
+            WatchlistRow(symbol="MSFT",  strategy="minervini", status="buy",     price=425.30,  added_date="2026-05-19 11:23", setup_type="Tight Low Vol",      pivot_price=430.00,  rs_rating=91, consensus_count=2, consensus_strategies=["minervini","carr"]),
+            WatchlistRow(symbol="MSFT",  strategy="carr",      status="watch",   price=425.30,  added_date="2026-05-17 15:58", setup_type="Coiled Spring",      pivot_price=428.00,  rs_rating=91, consensus_count=2, consensus_strategies=["minervini","carr"]),
+            WatchlistRow(symbol="GOOGL", strategy="carr",      status="buy",     price=178.40,  added_date="2026-05-19 13:04", setup_type="Bullish Divergence", pivot_price=180.00,  rs_rating=88, consensus_count=1, consensus_strategies=["carr"]),
+            WatchlistRow(symbol="AAPL",  strategy="minervini", status="focus",   price=212.50,  added_date="2026-05-18 10:47", setup_type="Power Play",         pivot_price=215.00,  rs_rating=87, consensus_count=1, consensus_strategies=["minervini"]),
+            WatchlistRow(symbol="AMD",   strategy="minervini", status="on_deck", price=158.20,  added_date="2026-05-18 16:42", setup_type="Inside Day",         pivot_price=160.00,  rs_rating=85, consensus_count=1, consensus_strategies=["minervini"]),
+            WatchlistRow(symbol="TSLA",  strategy="minervini", status="focus",   price=245.60,  added_date="2026-05-19 09:51", setup_type="Tight Low Vol",      pivot_price=250.00,  rs_rating=82, consensus_count=1, consensus_strategies=["minervini"]),
+            WatchlistRow(symbol="META",  strategy="carr",      status="watch",   price=512.80,  added_date="2026-05-16 12:18", setup_type="Pullback",           pivot_price=518.00,  rs_rating=80, consensus_count=1, consensus_strategies=["carr"]),
+            WatchlistRow(symbol="AVGO",  strategy="minervini", status="buy",     price=1450.30, added_date="2026-05-19 10:09", setup_type="VCP",                pivot_price=1460.00, rs_rating=78, consensus_count=1, consensus_strategies=["minervini"]),
+        ]
+
     try:
         return [WatchlistRow(**r) for r in watchlist_get_all()]
     except OperationalError as e:
@@ -1284,7 +1298,20 @@ def _make_closed(
 
 @app.get("/api/trades", response_model=list[Trade])
 def get_trades() -> list[Trade]:
-    # DB unreachable graceful degradation (watchlist pateni — Kural #20 UX)
+    # DB unreachable -> MOCK fallback (Sinyaller + Watchlist pateni — Kural #20 UX)
+    # 8 trade: 4 açık + 4 kapalı, çeşitli grade/strateji/setup
+    if not db_health_check():
+        return [
+            Trade(id=1, symbol="NVDA",  strategy="minervini", setup_type="VCP",                entry_date="2026-04-22 09:35", entry_price=132.50,  shares=100, status="closed", exit_date="2026-05-15 15:42", exit_price=145.80, pl_dollar=1330.00,  pl_pct=10.04, grade="A",  exit_reason="target",         lessons="VCP pivot kırılımı 3+ daralma sonrası temiz"),
+            Trade(id=2, symbol="MSFT",  strategy="minervini", setup_type="Power Play",         entry_date="2026-05-02 10:12", entry_price=412.00,  shares=50,  status="open",   exit_date=None,                exit_price=None,    pl_dollar=None,     pl_pct=None,  grade=None, exit_reason=None,              lessons=None),
+            Trade(id=3, symbol="AAPL",  strategy="carr",      setup_type="Pullback",           entry_date="2026-04-10 14:28", entry_price=198.50,  shares=80,  status="closed", exit_date="2026-04-25 11:05", exit_price=189.20, pl_dollar=-744.00,  pl_pct=-4.69, grade="C",  exit_reason="stop_loss",      lessons="Pullback dip teyit eksikti, erken giriş"),
+            Trade(id=4, symbol="GOOGL", strategy="carr",      setup_type="Bullish Divergence", entry_date="2026-05-10 13:15", entry_price=172.80,  shares=60,  status="open",   exit_date=None,                exit_price=None,    pl_dollar=None,     pl_pct=None,  grade=None, exit_reason=None,              lessons=None),
+            Trade(id=5, symbol="AMD",   strategy="minervini", setup_type="Inside Day",         entry_date="2026-03-28 09:58", entry_price=145.40,  shares=70,  status="closed", exit_date="2026-04-18 14:33", exit_price=162.10, pl_dollar=1169.00,  pl_pct=11.49, grade="A",  exit_reason="target",         lessons="Inside Day patlama hacim teyitli"),
+            Trade(id=6, symbol="TSLA",  strategy="minervini", setup_type="Tight Low Vol",      entry_date="2026-05-12 10:38", entry_price=238.20,  shares=40,  status="open",   exit_date=None,                exit_price=None,    pl_dollar=None,     pl_pct=None,  grade=None, exit_reason=None,              lessons=None),
+            Trade(id=7, symbol="META",  strategy="carr",      setup_type="Pullback",           entry_date="2026-04-05 11:20", entry_price=485.30,  shares=30,  status="closed", exit_date="2026-04-30 09:47", exit_price=510.20, pl_dollar=747.00,   pl_pct=5.13,  grade="B",  exit_reason="trailing_stop",  lessons="Trailing stop biraz sıkı kalmış, sabırlı kalsaydım daha iyi"),
+            Trade(id=8, symbol="AVGO",  strategy="minervini", setup_type="VCP",                entry_date="2026-05-08 09:42", entry_price=1392.00, shares=10,  status="open",   exit_date=None,                exit_price=None,    pl_dollar=None,     pl_pct=None,  grade=None, exit_reason=None,              lessons=None),
+        ]
+
     try:
         return [Trade(**t) for t in trades_get_all()]
     except OperationalError as e:
