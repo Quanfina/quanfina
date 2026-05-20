@@ -105,20 +105,39 @@ if ($ScheduledTask -or $UnregisterTask) {
     exit 0
 }
 
-# Repo kökünü bul
-try {
-    $repoRoot = (git rev-parse --show-toplevel 2>$null).Trim()
-} catch {
-    $repoRoot = ""
-}
-if (-not $repoRoot) {
-    Write-Host "[hata] Git deposu bulunamadi." -ForegroundColor Red
+# Repo kökünü bul - worktree-aware (saglik_kontrol.ps1 v0.5.1 + build_index v2.1 pateni)
+# $PSScriptRoot pattern: script'in bulundugu yer = scripts/, parent = repo root
+$scriptPath = $MyInvocation.MyCommand.Path
+$scriptsDir = Split-Path -Parent $scriptPath
+$repoRoot = Split-Path -Parent $scriptsDir
+if (-not (Test-Path (Join-Path $repoRoot "CLAUDE.md"))) {
+    Write-Host "[hata] Repo kokunde CLAUDE.md bulunamadi: $repoRoot" -ForegroundColor Red
     exit 1
 }
 
+# notebook/ .gitignore'da -> worktree'de yok. Ana repoya fallback:
 $notebookDir = Join-Path $repoRoot "notebook"
 if (-not (Test-Path $notebookDir)) {
-    Write-Host "[hata] notebook/ klasoru yok: $notebookDir" -ForegroundColor Red
+    # Git common-dir uzerinden ana repoyu bul (worktree fallback)
+    try {
+        $gitCommonDir = (git -C $repoRoot rev-parse --git-common-dir 2>$null).Trim()
+        if ($gitCommonDir) {
+            if (-not [System.IO.Path]::IsPathRooted($gitCommonDir)) {
+                $gitCommonDir = Join-Path $repoRoot $gitCommonDir
+            }
+            $mainRepo = Split-Path -Parent $gitCommonDir
+            $mainNotebook = Join-Path $mainRepo "notebook"
+            if (Test-Path $mainNotebook) {
+                Write-Host "[bilgi] worktree icindeyim, ana repo notebook/ kullaniliyor: $mainRepo" -ForegroundColor DarkCyan
+                $repoRoot = $mainRepo
+                $notebookDir = $mainNotebook
+            }
+        }
+    } catch { }
+}
+
+if (-not (Test-Path $notebookDir)) {
+    Write-Host "[hata] notebook/ klasoru yok (hem worktree hem ana repo tarandi): $notebookDir" -ForegroundColor Red
     exit 1
 }
 
