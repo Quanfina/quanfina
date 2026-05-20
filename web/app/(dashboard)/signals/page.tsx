@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useTheme } from "next-themes";
+import { useGridTheme } from "@/hooks/use-grid-theme";
 import { Activity, Plus, X, RotateCcw } from "lucide-react";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, ICellRendererParams } from "ag-grid-community";
@@ -49,7 +49,7 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
 // Sn. Ferit: "kart şeklinde değil tablo şeklinde olsun". Watchlist/Journal pateni.
 // Konsensus mantığı KARAR #469 ile zaten kaldırıldı — her watchlist satırı 1 sinyal satırı.
 export default function SignalsPage() {
-  const { resolvedTheme } = useTheme();
+  const { gridClass } = useGridTheme();
   const { data, isLoading, isError, error, refetch, isFetching } = useSignals();
   const gridRef = useRef<AgGridReact<Signal>>(null);
 
@@ -68,8 +68,7 @@ export default function SignalsPage() {
     setPassedKeys(getPassedSignals());
   }, []);
 
-  const isDark = resolvedTheme === "dark";
-  const gridClass = isDark ? "ag-theme-quartz-dark" : "ag-theme-quartz";
+  // KARAR #476: gridClass useGridTheme'den (SSR uyumu)
 
   function handleTradeClick(signal: Signal) {
     setTradeSignal(signal);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useTheme } from "next-themes";
+import { useGridTheme } from "@/hooks/use-grid-theme";
 import { AgGridReact } from "ag-grid-react";
 import type { CellValueChangedEvent } from "ag-grid-community";
 import { useMinerviniStocks } from "@/hooks/use-minervini-stocks";
@@ -14,7 +14,7 @@ type FilterKey = ListType | "all";
 const FILTERS: FilterKey[] = ["all", "buy", "focus", "on_deck", "watch"];
 
 export default function MinerviniPage() {
-  const { resolvedTheme } = useTheme();
+  const { gridClass } = useGridTheme();
   const [filter, setFilter] = useState<FilterKey>("all");
   const { data, isLoading, isError, error } = useMinerviniStocks();
   const [localRows, setLocalRows] = useState<MinerviniStock[]>([]);
@@ -49,8 +49,7 @@ export default function MinerviniPage() {
     []
   );
 
-  const isDark = resolvedTheme === "dark";
-  const gridClass = isDark ? "ag-theme-quartz-dark" : "ag-theme-quartz";
+  // KARAR #476: gridClass useGridTheme'den (SSR uyumu)
 
   return (
     <div className="flex flex-col h-full">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { useTheme } from "next-themes";
+import { useGridTheme } from "@/hooks/use-grid-theme";
 import { Plus } from "lucide-react";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef } from "ag-grid-community";
@@ -32,7 +32,7 @@ import { demoteStatus } from "@/lib/watchlist-status";
 import { GridLoadingOverlay } from "@/components/ag-grid/LoadingOverlay";
 
 export default function WatchlistPage() {
-  const { resolvedTheme } = useTheme();
+  const { gridClass } = useGridTheme();
   const [strategy, setStrategy] = useState("all");
   const [status, setStatus] = useState("all");
   const [minConsensus, setMinConsensus] = useState(0);
@@ -118,8 +118,7 @@ export default function WatchlistPage() {
     );
   }, [data, strategy, status, minConsensus, search]);
 
-  const isDark = resolvedTheme === "dark";
-  const gridClass = isDark ? "ag-theme-quartz-dark" : "ag-theme-quartz";
+  // KARAR #476: gridClass useGridTheme'den (SSR uyumu)
 
   return (
     <div className="flex flex-col h-full">

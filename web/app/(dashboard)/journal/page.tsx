@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { useTheme } from "next-themes";
+import { useGridTheme } from "@/hooks/use-grid-theme";
 import { Plus } from "lucide-react";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef } from "ag-grid-community";
@@ -26,7 +26,7 @@ import type { Trade } from "@/types/trade";
 const SELECT = "h-8 rounded-md border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring";
 
 export default function JournalPage() {
-  const { resolvedTheme } = useTheme();
+  const { gridClass } = useGridTheme();
   const gridRef = useRef<AgGridReact<Trade>>(null);
 
   // Filters
@@ -96,8 +96,7 @@ export default function JournalPage() {
     return [...rows].sort((a, b) => b.entry_date.localeCompare(a.entry_date));
   }, [data, statusFilter, strategyFilter, gradeFilter, search]);
 
-  const isDark = resolvedTheme === "dark";
-  const gridClass = isDark ? "ag-theme-quartz-dark" : "ag-theme-quartz";
+  // KARAR #476: gridClass useGridTheme'den (SSR uyumu)
 
   return (
     <div className="flex flex-col h-full">

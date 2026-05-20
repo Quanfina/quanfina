@@ -19,7 +19,7 @@
  */
 
 import { useMemo, useRef, useState } from "react";
-import { useTheme } from "next-themes";
+import { useGridTheme } from "@/hooks/use-grid-theme";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, ICellRendererParams } from "ag-grid-community";
 import { toast } from "sonner";
@@ -292,7 +292,7 @@ const DEFAULT_COL_DEF: ColDef = {
 };
 
 export default function ScreensPage() {
-  const { resolvedTheme } = useTheme();
+  const { gridClass: themeGridClass } = useGridTheme();
   const [selectedSlug, setSelectedSlug] = useState<ScreenSlug | null>(
     "stage2_10p" // default: en kalabalik ekran (727 satir gercek veri)
   );
@@ -379,8 +379,8 @@ export default function ScreensPage() {
   // Sayaç motifi — gelecek: filter sonrası gösterilen satır sayısı (AG Grid api)
   const shownCount = totalCount;
 
-  const themeClass =
-    resolvedTheme === "dark" ? "ag-theme-quartz-dark" : "ag-theme-quartz";
+  // KARAR #476: useGridTheme — SSR uyumu için mounted guard + dark default
+  const themeClass = themeGridClass;
 
   return (
     <div className="p-6 space-y-4">
