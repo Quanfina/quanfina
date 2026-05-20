@@ -13,8 +13,8 @@ import {
 } from "@/components/ui/dialog";
 import { useAddTrade, useSetupTypes } from "@/hooks/use-trades";
 import { calcPL, fmtPLDollar, fmtPLPct } from "@/lib/math";
-import type { TradeCreate, TradeGrade, ExitReason, TradeStatus } from "@/types/trade";
-import { GRADE_OPTIONS, EXIT_REASON_LABELS } from "@/types/trade";
+import type { TradeCreate, TradeGrade, ExitReason, TradeStatus, SignalSource } from "@/types/trade";
+import { GRADE_OPTIONS, EXIT_REASON_LABELS, SIGNAL_SOURCE_LABELS, SIGNAL_SOURCE_DESCRIPTIONS } from "@/types/trade";
 
 const SELECT = "h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring";
 const TEXTAREA = "w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm resize-none focus:outline-none focus:ring-1 focus:ring-ring";
@@ -40,6 +40,9 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
   const [symbol, setSymbol]         = useState("");
   const [strategy, setStrategy]     = useState("minervini");
   const [setupType, setSetupType]   = useState("vcp");
+  // KARAR #477: Sinyal Kaynağı zorunlu (UX Bölüm 7) — initialData varsa
+  // genelde Sinyaller sayfasından AL ile gelir → default "strategy"
+  const [signalSource, setSignalSource] = useState<SignalSource>("strategy");
   const [entryDate, setEntryDate]   = useState("");
   const [entryPrice, setEntryPrice] = useState("");
   const [shares, setShares]         = useState("");
@@ -59,6 +62,8 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
     if (initialData.setup_type !== undefined) setSetupType(initialData.setup_type);
     if (initialData.entry_date !== undefined) setEntryDate(initialData.entry_date);
     if (initialData.entry_price !== undefined) setEntryPrice(String(initialData.entry_price));
+    // KARAR #477: Sinyaller sayfasından AL ile geldiyse default "strategy" (sistem sinyali)
+    setSignalSource("strategy");
   }, [open, initialData]);
 
   const isClosed = status === "closed";
@@ -74,6 +79,7 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
 
   function reset() {
     setSymbol(""); setStrategy("minervini"); setSetupType("vcp");
+    setSignalSource("strategy");
     setEntryDate(""); setEntryPrice(""); setShares("");
     setStatus("open"); setExitDate(""); setExitPrice("");
     setGrade("B"); setExitReason("stop_loss"); setLessons(""); setError(null);
@@ -96,6 +102,7 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
 
     const body: TradeCreate = {
       symbol: sym, strategy, setup_type: setupType,
+      signal_source: signalSource,  // KARAR #477 zorunlu (UX Bölüm 7)
       entry_date: entryDate, entry_price: ep, shares: sh, status,
     };
     if (isClosed) {
@@ -153,6 +160,26 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
                   </>
               }
             </select>
+          </div>
+
+          {/* Row 2.5 — Sinyal Kaynağı (KARAR #477, UX Bölüm 7 ZORUNLU) */}
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="at-source">
+              Sinyal Kaynağı * <span className="text-xs text-muted-foreground font-normal">(disiplin için zorunlu)</span>
+            </Label>
+            <select
+              id="at-source"
+              value={signalSource}
+              onChange={(e) => setSignalSource(e.target.value as SignalSource)}
+              className={SELECT}
+            >
+              <option value="strategy">{SIGNAL_SOURCE_LABELS.strategy}</option>
+              <option value="manual_self">{SIGNAL_SOURCE_LABELS.manual_self}</option>
+              <option value="manual_external">{SIGNAL_SOURCE_LABELS.manual_external}</option>
+            </select>
+            <span className="text-xs text-muted-foreground">
+              {SIGNAL_SOURCE_DESCRIPTIONS[signalSource]}
+            </span>
           </div>
 
           {/* Row 3 — Entry Date + Entry Price + Shares */}

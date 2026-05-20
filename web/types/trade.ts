@@ -7,11 +7,29 @@ export type ExitReason =
   | 'discretionary'
   | 'time_exit';
 
+// KARAR #477 (20 May 2026): Sinyal Kaynağı zorunlu (UX Bölüm 7).
+// "Trade Kayit Formu (Sinyal Kaynagi Vurgusu)" — disiplin için trade'in kökeni izlenir.
+// Sn. Ferit'in trade kalitesi analizi (manuel vs strateji): hangi giriş tipi daha kazançlı?
+export type SignalSource = 'strategy' | 'manual_self' | 'manual_external';
+
+export const SIGNAL_SOURCE_LABELS: Record<SignalSource, string> = {
+  strategy:        'Strateji Sinyali',
+  manual_self:     'Manuel — Kendi Gözlemim',
+  manual_external: 'Manuel — Dış Kaynak',
+};
+
+export const SIGNAL_SOURCE_DESCRIPTIONS: Record<SignalSource, string> = {
+  strategy:        'Sistem sinyallerinden (Sinyaller sayfası AL butonu) tetiklendi',
+  manual_self:     'Kendi tarama/analizimle bulduğum giriş',
+  manual_external: 'Başkasından (sosyal medya, forum, tavsiye) gelen fikir',
+};
+
 export interface Trade {
   id: number;
   symbol: string;
   strategy: string;
   setup_type: string;
+  signal_source?: SignalSource | null;  // KARAR #477: UX Bölüm 7 (geriye dönük uyum için optional)
   entry_date: string;
   entry_price: number;
   exit_date: string | null;
@@ -29,6 +47,7 @@ export interface TradeCreate {
   symbol: string;
   strategy: string;
   setup_type: string;
+  signal_source: SignalSource;  // KARAR #477: ZORUNLU — UX Bölüm 7
   entry_date: string;
   entry_price: number;
   shares: number;

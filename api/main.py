@@ -1241,6 +1241,9 @@ class Trade(BaseModel):
     symbol: str
     strategy: str
     setup_type: str
+    # KARAR #477 (20 May 2026, UX Bölüm 7): Sinyal Kaynağı zorunlu.
+    # Disiplin: trade kökeni izlenir, analiz kabiliyeti.
+    signal_source: Optional[Literal["strategy", "manual_self", "manual_external"]] = None
     entry_date: str
     entry_price: float
     exit_date: Optional[str] = None
@@ -1258,6 +1261,9 @@ class TradeCreate(BaseModel):
     symbol: str
     strategy: str
     setup_type: str
+    # KARAR #477: ZORUNLU (UX Bölüm 7) — trade kayıt formunda Sinyal Kaynağı default yok.
+    # DB'de eski trades NULL kalabilir (geriye uyum), yeni kayıtlar zorunlu doldurur.
+    signal_source: Literal["strategy", "manual_self", "manual_external"]
     entry_date: str
     entry_price: float
     shares: int
@@ -1302,14 +1308,14 @@ def get_trades() -> list[Trade]:
     # 8 trade: 4 açık + 4 kapalı, çeşitli grade/strateji/setup
     if not db_health_check():
         return [
-            Trade(id=1, symbol="NVDA",  strategy="minervini", setup_type="VCP",                entry_date="2026-04-22 09:35", entry_price=132.50,  shares=100, status="closed", exit_date="2026-05-15 15:42", exit_price=145.80, pl_dollar=1330.00,  pl_pct=10.04, grade="A",  exit_reason="target",         lessons="VCP pivot kırılımı 3+ daralma sonrası temiz"),
-            Trade(id=2, symbol="MSFT",  strategy="minervini", setup_type="Power Play",         entry_date="2026-05-02 10:12", entry_price=412.00,  shares=50,  status="open",   exit_date=None,                exit_price=None,    pl_dollar=None,     pl_pct=None,  grade=None, exit_reason=None,              lessons=None),
-            Trade(id=3, symbol="AAPL",  strategy="carr",      setup_type="Pullback",           entry_date="2026-04-10 14:28", entry_price=198.50,  shares=80,  status="closed", exit_date="2026-04-25 11:05", exit_price=189.20, pl_dollar=-744.00,  pl_pct=-4.69, grade="C",  exit_reason="stop_loss",      lessons="Pullback dip teyit eksikti, erken giriş"),
-            Trade(id=4, symbol="GOOGL", strategy="carr",      setup_type="Bullish Divergence", entry_date="2026-05-10 13:15", entry_price=172.80,  shares=60,  status="open",   exit_date=None,                exit_price=None,    pl_dollar=None,     pl_pct=None,  grade=None, exit_reason=None,              lessons=None),
-            Trade(id=5, symbol="AMD",   strategy="minervini", setup_type="Inside Day",         entry_date="2026-03-28 09:58", entry_price=145.40,  shares=70,  status="closed", exit_date="2026-04-18 14:33", exit_price=162.10, pl_dollar=1169.00,  pl_pct=11.49, grade="A",  exit_reason="target",         lessons="Inside Day patlama hacim teyitli"),
-            Trade(id=6, symbol="TSLA",  strategy="minervini", setup_type="Tight Low Vol",      entry_date="2026-05-12 10:38", entry_price=238.20,  shares=40,  status="open",   exit_date=None,                exit_price=None,    pl_dollar=None,     pl_pct=None,  grade=None, exit_reason=None,              lessons=None),
-            Trade(id=7, symbol="META",  strategy="carr",      setup_type="Pullback",           entry_date="2026-04-05 11:20", entry_price=485.30,  shares=30,  status="closed", exit_date="2026-04-30 09:47", exit_price=510.20, pl_dollar=747.00,   pl_pct=5.13,  grade="B",  exit_reason="trailing_stop",  lessons="Trailing stop biraz sıkı kalmış, sabırlı kalsaydım daha iyi"),
-            Trade(id=8, symbol="AVGO",  strategy="minervini", setup_type="VCP",                entry_date="2026-05-08 09:42", entry_price=1392.00, shares=10,  status="open",   exit_date=None,                exit_price=None,    pl_dollar=None,     pl_pct=None,  grade=None, exit_reason=None,              lessons=None),
+            Trade(id=1, symbol="NVDA",  strategy="minervini", setup_type="VCP",                signal_source="strategy",        entry_date="2026-04-22 09:35", entry_price=132.50,  shares=100, status="closed", exit_date="2026-05-15 15:42", exit_price=145.80, pl_dollar=1330.00,  pl_pct=10.04, grade="A",  exit_reason="target",         lessons="VCP pivot kırılımı 3+ daralma sonrası temiz"),
+            Trade(id=2, symbol="MSFT",  strategy="minervini", setup_type="Power Play",         signal_source="strategy",        entry_date="2026-05-02 10:12", entry_price=412.00,  shares=50,  status="open",   exit_date=None,                exit_price=None,    pl_dollar=None,     pl_pct=None,  grade=None, exit_reason=None,              lessons=None),
+            Trade(id=3, symbol="AAPL",  strategy="carr",      setup_type="Pullback",           signal_source="manual_self",     entry_date="2026-04-10 14:28", entry_price=198.50,  shares=80,  status="closed", exit_date="2026-04-25 11:05", exit_price=189.20, pl_dollar=-744.00,  pl_pct=-4.69, grade="C",  exit_reason="stop_loss",      lessons="Pullback dip teyit eksikti, erken giriş"),
+            Trade(id=4, symbol="GOOGL", strategy="carr",      setup_type="Bullish Divergence", signal_source="manual_external", entry_date="2026-05-10 13:15", entry_price=172.80,  shares=60,  status="open",   exit_date=None,                exit_price=None,    pl_dollar=None,     pl_pct=None,  grade=None, exit_reason=None,              lessons=None),
+            Trade(id=5, symbol="AMD",   strategy="minervini", setup_type="Inside Day",         signal_source="strategy",        entry_date="2026-03-28 09:58", entry_price=145.40,  shares=70,  status="closed", exit_date="2026-04-18 14:33", exit_price=162.10, pl_dollar=1169.00,  pl_pct=11.49, grade="A",  exit_reason="target",         lessons="Inside Day patlama hacim teyitli"),
+            Trade(id=6, symbol="TSLA",  strategy="minervini", setup_type="Tight Low Vol",      signal_source="strategy",        entry_date="2026-05-12 10:38", entry_price=238.20,  shares=40,  status="open",   exit_date=None,                exit_price=None,    pl_dollar=None,     pl_pct=None,  grade=None, exit_reason=None,              lessons=None),
+            Trade(id=7, symbol="META",  strategy="carr",      setup_type="Pullback",           signal_source="manual_self",     entry_date="2026-04-05 11:20", entry_price=485.30,  shares=30,  status="closed", exit_date="2026-04-30 09:47", exit_price=510.20, pl_dollar=747.00,   pl_pct=5.13,  grade="B",  exit_reason="trailing_stop",  lessons="Trailing stop biraz sıkı kalmış, sabırlı kalsaydım daha iyi"),
+            Trade(id=8, symbol="AVGO",  strategy="minervini", setup_type="VCP",                signal_source="strategy",        entry_date="2026-05-08 09:42", entry_price=1392.00, shares=10,  status="open",   exit_date=None,                exit_price=None,    pl_dollar=None,     pl_pct=None,  grade=None, exit_reason=None,              lessons=None),
         ]
 
     try:
