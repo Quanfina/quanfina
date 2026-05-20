@@ -143,8 +143,9 @@ export default function SignalsPage() {
     {
       field: "added_date",
       headerName: "Eklenme",
-      width: 110,
-      valueFormatter: (p) => p.value as string,
+      width: 150,
+      valueFormatter: (p) => (p.value as string | null) ?? "—",
+      cellStyle: { fontFamily: "var(--font-jetbrains-mono, monospace)", fontSize: "12px" },
     },
     {
       headerName: "",

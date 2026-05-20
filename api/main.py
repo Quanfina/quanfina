@@ -1371,19 +1371,21 @@ def get_signals() -> list[Signal]:
 
     # DB unreachable -> MOCK fallback (KARAR #469 + /api/screens pateni — Kural #20 UX)
     # Sn. Ferit: "sinyal varmış gibi yap mock ile sinyal sayfasında" (20 May 2026 ~06:00)
+    # Sn. Ferit: "tarihlerin yanında saatte olsun" (20 May 2026 ~06:45) — added_date "YYYY-MM-DD HH:MM"
     # Her watchlist satırı 1 sinyal felsefesi korundu — çoklu strateji × çoklu hisse
     if not db_health_check():
+        # is_new_today bugünün tarih prefix'i ile eşleşme (saat kısmı YYYY-MM-DD'den sonra)
         mock_signals = [
-            Signal(symbol="NVDA",  strategy="minervini", status="buy",     setup_type="VCP",                 rs_rating=99.0, price=145.20, added_date=today,         is_new_today=True),
-            Signal(symbol="NVDA",  strategy="carr",      status="focus",   setup_type="Pullback",            rs_rating=99.0, price=145.20, added_date="2026-05-19",  is_new_today=False),
-            Signal(symbol="AAPL",  strategy="minervini", status="focus",   setup_type="Power Play",          rs_rating=87.0, price=212.50, added_date="2026-05-18",  is_new_today=False),
-            Signal(symbol="MSFT",  strategy="minervini", status="buy",     setup_type="Tight Low Vol",       rs_rating=91.0, price=425.30, added_date="2026-05-19",  is_new_today=False),
-            Signal(symbol="MSFT",  strategy="carr",      status="watch",   setup_type="Coiled Spring",       rs_rating=91.0, price=425.30, added_date="2026-05-17",  is_new_today=False),
-            Signal(symbol="GOOGL", strategy="carr",      status="buy",     setup_type="Bullish Divergence",  rs_rating=88.0, price=178.40, added_date="2026-05-19",  is_new_today=False),
-            Signal(symbol="AMD",   strategy="minervini", status="on_deck", setup_type="Inside Day",          rs_rating=85.0, price=158.20, added_date="2026-05-18",  is_new_today=False),
-            Signal(symbol="TSLA",  strategy="minervini", status="focus",   setup_type="Tight Low Vol",      rs_rating=82.0, price=245.60, added_date="2026-05-19",  is_new_today=False),
-            Signal(symbol="META",  strategy="carr",      status="watch",   setup_type="Pullback",            rs_rating=80.0, price=512.80, added_date="2026-05-16",  is_new_today=False),
-            Signal(symbol="AVGO",  strategy="minervini", status="buy",     setup_type="VCP",                 rs_rating=78.0, price=1450.30, added_date="2026-05-19", is_new_today=False),
+            Signal(symbol="NVDA",  strategy="minervini", status="buy",     setup_type="VCP",                 rs_rating=99.0, price=145.20, added_date=f"{today} 09:32",        is_new_today=True),
+            Signal(symbol="NVDA",  strategy="carr",      status="focus",   setup_type="Pullback",            rs_rating=99.0, price=145.20, added_date="2026-05-19 14:15",     is_new_today=False),
+            Signal(symbol="AAPL",  strategy="minervini", status="focus",   setup_type="Power Play",          rs_rating=87.0, price=212.50, added_date="2026-05-18 10:47",     is_new_today=False),
+            Signal(symbol="MSFT",  strategy="minervini", status="buy",     setup_type="Tight Low Vol",       rs_rating=91.0, price=425.30, added_date="2026-05-19 11:23",     is_new_today=False),
+            Signal(symbol="MSFT",  strategy="carr",      status="watch",   setup_type="Coiled Spring",       rs_rating=91.0, price=425.30, added_date="2026-05-17 15:58",     is_new_today=False),
+            Signal(symbol="GOOGL", strategy="carr",      status="buy",     setup_type="Bullish Divergence",  rs_rating=88.0, price=178.40, added_date="2026-05-19 13:04",     is_new_today=False),
+            Signal(symbol="AMD",   strategy="minervini", status="on_deck", setup_type="Inside Day",          rs_rating=85.0, price=158.20, added_date="2026-05-18 16:42",     is_new_today=False),
+            Signal(symbol="TSLA",  strategy="minervini", status="focus",   setup_type="Tight Low Vol",      rs_rating=82.0, price=245.60, added_date="2026-05-19 09:51",     is_new_today=False),
+            Signal(symbol="META",  strategy="carr",      status="watch",   setup_type="Pullback",            rs_rating=80.0, price=512.80, added_date="2026-05-16 12:18",     is_new_today=False),
+            Signal(symbol="AVGO",  strategy="minervini", status="buy",     setup_type="VCP",                 rs_rating=78.0, price=1450.30, added_date="2026-05-19 10:09",    is_new_today=False),
         ]
         # Sıralama: RS rating descending
         mock_signals.sort(key=lambda s: -s.rs_rating)
@@ -1399,8 +1401,11 @@ def get_signals() -> list[Signal]:
         ) from e
 
     # KARAR #469: her watchlist satırı = 1 sinyal (NO grouping)
+    # is_new_today: added_date prefix (ilk 10 char) bugüne eşit mi
+    #   — added_date "YYYY-MM-DD" veya "YYYY-MM-DD HH:MM" formatında olabilir
     signals: list[Signal] = []
     for row in all_rows:
+        added_prefix = (row.added_date or "")[:10]
         signals.append(Signal(
             symbol=row.symbol,
             strategy=row.strategy,
@@ -1409,7 +1414,7 @@ def get_signals() -> list[Signal]:
             rs_rating=row.rs_rating,
             price=row.price,
             added_date=row.added_date,
-            is_new_today=(row.added_date >= today),
+            is_new_today=(added_prefix == today),
         ))
 
     # Sıralama: RS rating descending (UX Bölüm 4 madde 6 ile uyumlu — sonra R/R sırası)
