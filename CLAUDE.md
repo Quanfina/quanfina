@@ -1072,6 +1072,25 @@ AI screenshot için **proaktif sorumlu** — Sn. Ferit söylemesini beklemez. TE
 
 **AÇIK KONU #74 (gelecek):** Chrome MCP localhost permission Sn. Ferit eli. Çözüldüğünde Kanal A devreye, Kanal C de paralel canlı kalır.
 
+**PNG Gösterme Disiplini (20 May 2026 ~10:45 yeni):**
+Sn. Ferit talimat: *"Çok gerekli olmadıkça ekran görüntülerini chate yansıtmana gerek yok"*.
+
+**Default: DOM Analiz (metin)** — Token ekonomik, chat temiz:
+- Playwright `page.evaluate()` + `get_page_text()` + `read_page()` ile metin/DOM oku
+- Console log + HTTP status JSON rapor
+- PNG dosyaya yazılır (`test-screenshots/_full_site/*.png`) ama `Read` tool ile **chat'e yapıştırılmaz**
+- Rapor: "Dashboard 5 quick stat ✅, Sinyaller 10 satır ✅, R/R sıralama ✅"
+
+**İstisna: PNG Gerekli — AI'nın `Read` tool ile PNG'yi gösterdiği durumlar:**
+1. **Sn. Ferit explicit görsel bulgu söylerse:** "stil farklı", "beyaz arka plan", "hizalama bozuk", "renk yanlış", "buton kayıp" tipi
+2. **Sn. Ferit "göster" / "screenshot at" derse**
+3. **AI metin analizi yetersiz, görsel teyit gerekli** (renk/spacing/dark mode kalibrasyon, layout overlap)
+4. **Yeni UI bileşeni ilk doğrulama** (büyük tasarım değişikliği — örn. yeni sayfa, yeni component)
+
+**Pratik:** AI varsayılan B (DOM) ile başlar, gerekirse C (PNG) tetikler. "PNG yapıştırayım mı?" sorusu YASAK (Kural #23).
+
+**Token ekonomisi:** Chat'te resim = ~1500 token. Smoke test 9 sayfa = 13,500 token. DOM raporu ~500 token. **27× tasarruf.**
+
 **KURAL #20 ile bağ:**
 - Kural #20 = **ne tasarlanmalı** (Master + Markets360 çift danışma)
 - Kural #21 = **tasarlanan nasıl doğrulanır** (browser test hibrit)
