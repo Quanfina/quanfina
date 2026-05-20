@@ -5,6 +5,7 @@ import { Activity } from "lucide-react";
 import { useSignals } from "@/hooks/use-signals";
 import { SignalCard } from "@/components/signals/SignalCard";
 import { AddTradeDialog } from "@/components/journal/AddTradeDialog";
+import { Button } from "@/components/ui/button";
 import type { Signal } from "@/types/signal";
 
 const SELECT =
@@ -23,7 +24,7 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
 // Her watchlist satırı = 1 sinyal kartı. Sn. Ferit talimat:
 // "konsensus olmasın, tüm sinyaller görünsün".
 export default function SignalsPage() {
-  const { data, isLoading, isError, error } = useSignals();
+  const { data, isLoading, isError, error, refetch, isFetching } = useSignals();
 
   const [statusFilter, setStatusFilter] = useState<"all" | "buy" | "focus_buy">("all");
   const [strategyFilter, setStrategyFilter] = useState<"all" | "minervini" | "carr">("all");
@@ -137,11 +138,26 @@ export default function SignalsPage() {
           </div>
         )}
         {isError && (
-          <div
-            className="flex items-center justify-center h-64 text-sm"
-            style={{ color: "var(--mtp-danger)" }}
-          >
-            Hata: {(error as Error)?.message ?? "Sinyal verisi alınamadı"}
+          <div className="flex items-center justify-center h-64 px-6">
+            <div
+              className="max-w-xl w-full p-4 border rounded-md"
+              style={{ borderColor: "var(--mtp-danger)", background: "rgba(255, 80, 80, 0.06)" }}
+              role="alert"
+            >
+              <div className="font-semibold mb-1" style={{ color: "var(--mtp-danger)" }}>
+                ⚠️ Sinyal verisi alınamadı
+              </div>
+              <div className="text-xs mb-3 opacity-80">
+                {(error as Error)?.message ?? "Bilinmeyen hata"}
+              </div>
+              <div className="text-xs mb-3 opacity-70">
+                Olası sebep: Cloud SQL erişilemez (instance durmuş veya IP whitelist eski).
+                GCP Console → SQL → instance durum kontrol et.
+              </div>
+              <Button size="sm" variant="outline" onClick={() => refetch()} disabled={isFetching}>
+                {isFetching ? "Tekrar deneniyor..." : "Tekrar Dene"}
+              </Button>
+            </div>
           </div>
         )}
         {!isLoading && !isError && filtered.length === 0 && (
