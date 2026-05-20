@@ -138,13 +138,22 @@ export default function SignalsPage() {
       type: "rightAligned",
       valueFormatter: (p) =>
         `$${(p.value as number).toFixed(2)}`,
-      cellStyle: { fontFamily: "var(--font-jetbrains-mono, monospace)" },
+      cellStyle: { fontFamily: "var(--font-jetbrains-mono, monospace)", fontSize: "13px" },
     },
     {
       field: "added_date",
       headerName: "Eklenme",
       width: 150,
-      valueFormatter: (p) => (p.value as string | null) ?? "—",
+      // KARAR #471 (20 May 2026): TR tarih formatı (DD.MM.YYYY HH:MM).
+      // Sn. Ferit: "tarih Gün Ay Yıl formatında olsun".
+      // Backend ISO "YYYY-MM-DD[ HH:MM]" tutar (sort + uluslararası standart),
+      // frontend kullanıcıya TR formatında gösterir.
+      valueFormatter: (p) => {
+        const val = p.value as string | null;
+        if (!val) return "—";
+        const m = val.match(/^(\d{4})-(\d{2})-(\d{2})(.*)$/);
+        return m ? `${m[3]}.${m[2]}.${m[1]}${m[4]}` : val;
+      },
       cellStyle: { fontFamily: "var(--font-jetbrains-mono, monospace)", fontSize: "12px" },
     },
     {
