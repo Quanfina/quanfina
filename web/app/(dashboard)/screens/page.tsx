@@ -523,6 +523,7 @@ export default function ScreensPage() {
           ) : (
             <AgGridReact<ScreenResultRow>
               ref={gridRef}
+              theme="legacy"
               rowData={resultsQ.data ?? []}
               columnDefs={dynamicColDefs}
               defaultColDef={DEFAULT_COL_DEF}
