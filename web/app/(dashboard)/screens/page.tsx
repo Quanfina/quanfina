@@ -29,6 +29,9 @@ import { useAddWatchlistRow } from "@/hooks/use-watchlist-mutations";
 import type { ScreenSlug, ScreenResultRow } from "@/types/screens";
 import { SCREEN_CATEGORIES } from "@/types/screens";
 import { GridLoadingOverlay } from "@/components/ag-grid/LoadingOverlay";
+// İş #1: Watchlist + Journal patternine eşitleme - Sembol clickable Link
+// (hisse detay sayfasına gider). DRY: components/watchlist/SymbolCellRenderer
+import { SymbolCellRenderer } from "@/components/watchlist/SymbolCellRenderer";
 // KARAR #488 v4 (20 May 2026 ~14:45): Sn. Ferit talimat - "bir baska
 // sayfadaki kodlari analiz yap karsilastir". Sinyaller (/signals) YAN YANA
 // karsilastirma sonucu Hisse Tarama'da EKSIK olanlar:
@@ -247,20 +250,12 @@ const COL_DEFS: ColDef<ScreenResultRow>[] = [
   {
     field: "symbol",
     headerName: "Sembol",
-    headerTooltip: "Hisse sembolü (NYSE/NASDAQ/ARCA)",
+    headerTooltip: "Hisse sembolü (NYSE/NASDAQ/ARCA) — tıkla: hisse detay",
     pinned: "left",
     width: 110,
-    // Sinyaller pateni: cellRenderer ile span font-semibold tracking-tight.
-    // Bu div sayesinde sembol hucresinde tutarli height + dikey hizalama.
-    cellRenderer: (p: ICellRendererParams<ScreenResultRow>) => {
-      const s = p.value as string | null;
-      if (!s) return null;
-      return (
-        <div className="flex items-center gap-2 h-full">
-          <span className="font-semibold tracking-tight">{s}</span>
-        </div>
-      );
-    },
+    // KARAR #490 (20 May ~16:00): Watchlist + Journal pateniyle eşitleme.
+    // Sembol clickable Link -> hisse detay sayfası. DRY: ortak component.
+    cellRenderer: SymbolCellRenderer,
   },
   {
     field: "grade",
