@@ -1284,7 +1284,14 @@ def _make_closed(
 
 @app.get("/api/trades", response_model=list[Trade])
 def get_trades() -> list[Trade]:
-    return [Trade(**t) for t in trades_get_all()]
+    # DB unreachable graceful degradation (watchlist pateni — Kural #20 UX)
+    try:
+        return [Trade(**t) for t in trades_get_all()]
+    except OperationalError as e:
+        raise HTTPException(
+            status_code=503,
+            detail="Veritabanına ulaşılamıyor (Cloud SQL). GCP Console → SQL → instance durum/Authorized Networks kontrol et."
+        ) from e
 
 
 @app.post("/api/trades", response_model=Trade, status_code=201)
@@ -1365,7 +1372,14 @@ class Signal(BaseModel):
 def get_signals() -> list[Signal]:
     today = date.today().isoformat()
 
-    all_rows = [WatchlistRow(**r) for r in watchlist_get_all()]
+    # DB unreachable graceful degradation (watchlist pateni — Kural #20 UX)
+    try:
+        all_rows = [WatchlistRow(**r) for r in watchlist_get_all()]
+    except OperationalError as e:
+        raise HTTPException(
+            status_code=503,
+            detail="Veritabanına ulaşılamıyor (Cloud SQL). GCP Console → SQL → instance durum/Authorized Networks kontrol et."
+        ) from e
     grouped: dict[str, list[WatchlistRow]] = {}
     for row in all_rows:
         grouped.setdefault(row.symbol, []).append(row)
