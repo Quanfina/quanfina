@@ -4,7 +4,17 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useGridTheme } from "@/hooks/use-grid-theme";
 import { Activity, Plus, X, RotateCcw } from "lucide-react";
 import { AgGridReact } from "ag-grid-react";
-import type { ColDef, ICellRendererParams } from "ag-grid-community";
+import type { ColDef, ICellRendererParams, CellStyle } from "ag-grid-community";
+
+// KARAR #479 (20 May 2026): DRY MONO style — Watchlist/Journal pateni.
+// fontVariantNumeric: tabular-nums sayısal hizalama (Markets360 tabular yok ama
+// bizim için kritik, Quanfina sayısal disiplin). fontSize 12 = tüm tablolar uyumlu.
+const MONO: CellStyle = {
+  fontFamily: "var(--font-jetbrains-mono, monospace)",
+  fontVariantNumeric: "tabular-nums",
+  fontSize: "12px",
+};
+const MONO_RIGHT: CellStyle = { ...MONO, textAlign: "right" };
 import { useSignals } from "@/hooks/use-signals";
 import { AddTradeDialog } from "@/components/journal/AddTradeDialog";
 import { AddRowDialog } from "@/components/watchlist/AddRowDialog";
@@ -172,7 +182,7 @@ export default function SignalsPage() {
       type: "rightAligned",
       valueFormatter: (p) =>
         `$${(p.value as number).toFixed(2)}`,
-      cellStyle: { fontFamily: "var(--font-jetbrains-mono, monospace)", fontSize: "13px", color: "inherit" },
+      cellStyle: MONO_RIGHT,
     },
     {
       field: "stop_loss",
@@ -181,7 +191,7 @@ export default function SignalsPage() {
       type: "rightAligned",
       valueFormatter: (p) =>
         p.value != null ? `$${(p.value as number).toFixed(2)}` : "—",
-      cellStyle: { fontFamily: "var(--font-jetbrains-mono, monospace)", fontSize: "12px", color: "var(--mtp-danger)" },
+      cellStyle: { ...MONO_RIGHT, color: "var(--mtp-danger)" },
     },
     {
       field: "target_price",
@@ -190,7 +200,7 @@ export default function SignalsPage() {
       type: "rightAligned",
       valueFormatter: (p) =>
         p.value != null ? `$${(p.value as number).toFixed(2)}` : "—",
-      cellStyle: { fontFamily: "var(--font-jetbrains-mono, monospace)", fontSize: "12px", color: "var(--mtp-excellent)" },
+      cellStyle: { ...MONO_RIGHT, color: "var(--mtp-excellent)" },
     },
     {
       field: "risk_reward",
@@ -210,7 +220,7 @@ export default function SignalsPage() {
         return (
           <span
             className="font-semibold tabular-nums"
-            style={{ color, fontFamily: "var(--font-jetbrains-mono, monospace)", fontSize: "13px" }}
+            style={{ color, fontFamily: "var(--font-jetbrains-mono, monospace)", fontSize: "12px" }}
             title={`Risk/Reward = (hedef-fiyat) / (fiyat-stop) = ${v.toFixed(2)}`}
           >
             {v.toFixed(2)}
@@ -226,7 +236,7 @@ export default function SignalsPage() {
       // Backend ISO "YYYY-MM-DD[ HH:MM]" tutar, frontend formatDateTR helper kullanır
       // (web/lib/format-date.ts — DRY, Bilgi Mimarisi İlke #4 Tekrarsızlık).
       valueFormatter: (p) => formatDateTR(p.value as string | null),
-      cellStyle: { fontFamily: "var(--font-jetbrains-mono, monospace)", fontSize: "12px", color: "inherit" },
+      cellStyle: MONO,
     },
     {
       headerName: "",
