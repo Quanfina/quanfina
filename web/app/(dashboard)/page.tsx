@@ -1,12 +1,14 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Activity, ListChecks, NotebookText, Globe, TrendingUp, TrendingDown } from "lucide-react";
+import { ArrowRight, Activity, ListChecks, NotebookText, Globe, TrendingUp, TrendingDown, CheckCircle2, Circle, Sunrise } from "lucide-react";
 import { useSignals } from "@/hooks/use-signals";
 import { useTrades } from "@/hooks/use-trades";
 import { useMarketStatus } from "@/hooks/use-market-status";
 import { useWatchlist } from "@/hooks/use-watchlist";
 import { formatDateTR } from "@/lib/format-date";
+import { getDoneItems, toggleItem } from "@/lib/daily-checklist";
 
 // KARAR #474 (20 May 2026 ~08:15): Ana sayfa POC → Gerçek Dashboard.
 // UX Bölüm 3: "Sn. Ferit Quanfina'yı açtığında üstten alta: bakiye + piyasa + sinyaller"
@@ -66,6 +68,25 @@ export default function Home() {
   const market = useMarketStatus();
   const watchlist = useWatchlist();
 
+  // KARAR #480 (UX Bölüm 8): Pazar Günü Hazırlık Paneli (Aksiyon Modu)
+  // Tarih bazlı checklist, localStorage persistence (SSR hydration guard)
+  const [doneItems, setDoneItems] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    setDoneItems(getDoneItems());
+  }, []);
+
+  function handleToggle(itemId: string) {
+    const next = new Set(doneItems);
+    if (next.has(itemId)) {
+      next.delete(itemId);
+      toggleItem(itemId, false);
+    } else {
+      next.add(itemId);
+      toggleItem(itemId, true);
+    }
+    setDoneItems(next);
+  }
+
   // Quick stats hesaplamaları
   const openTrades = (trades.data ?? []).filter((t) => t.status === "open");
   const closedTrades = (trades.data ?? []).filter((t) => t.status === "closed");
@@ -89,6 +110,58 @@ export default function Home() {
   const marketHealthColor = HEALTH_COLORS[marketHealth] ?? "inherit";
   const marketScore = market.data?.market_health_score ?? null;
   const marketMode = market.data?.suggested_mode ?? "—";
+
+  // KARAR #480: Aksiyon Modu dinamik checklist (UX Bölüm 8)
+  // Veri-bağlamlı 5 madde — Sn. Ferit sabah ne yapacağını görür
+  const checklistItems = [
+    {
+      id: "review-new-signals",
+      label: newTodayCount > 0
+        ? `${newTodayCount} yeni sinyal incelendi (R/R kontrol + AL/GEÇ)`
+        : "Yeni sinyaller kontrol edildi",
+      detail: "Sinyaller sayfası → R/R desc sıralı, top 5 değerlendir",
+      href: "/signals",
+      priority: newTodayCount > 0 ? "high" : "normal",
+    },
+    {
+      id: "check-open-positions",
+      label: openTrades.length > 0
+        ? `${openTrades.length} açık pozisyon stop loss güncellendi (trailing)`
+        : "Açık pozisyon yok",
+      detail: openTrades.length > 0
+        ? "Trade Journal → her trade için trailing stop seviyesi gözden geçir"
+        : "Bugün için aktif risk yok",
+      href: "/journal",
+      priority: openTrades.length > 0 ? "high" : "low",
+    },
+    {
+      id: "market-mode-check",
+      label: `Piyasa modu doğrulandı (${marketMode}, sağlık ${marketScore ?? "—"})`,
+      detail: marketMode === "LONG"
+        ? "Long setupları öncelikli, short sinyaller bypass"
+        : marketMode === "SHORT"
+        ? "Short setupları öncelikli, long pozisyonlar dikkatli"
+        : "Mod kararı belirsiz — manuel değerlendirme",
+      href: "/piyasa-durumu",
+      priority: "normal",
+    },
+    {
+      id: "watchlist-hygiene",
+      label: `Watchlist hijyen — ${watchlistCount} satır gözden geçirildi`,
+      detail: "Focus/Buy listesi temiz mi, kaldırılacak hisse var mı?",
+      href: "/watchlist",
+      priority: "normal",
+    },
+    {
+      id: "screens-scan",
+      label: "Hisse Tarama — günlük scan sonuçları incelendi",
+      detail: "25 ekran içinde Stage 2 + RS 90+ adaylar var mı?",
+      href: "/screens",
+      priority: "low",
+    },
+  ];
+  const doneCount = checklistItems.filter((i) => doneItems.has(i.id)).length;
+  const completionPct = Math.round((doneCount / checklistItems.length) * 100);
 
   return (
     <div className="p-6 flex flex-col gap-6">
@@ -344,6 +417,96 @@ export default function Home() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+      </div>
+
+      {/* KARAR #480 (UX Bölüm 8): Pazar Günü Hazırlık Paneli — Aksiyon Modu */}
+      <div className="rounded-lg border bg-card p-4 flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sunrise size={16} className="text-muted-foreground" />
+            <h2 className="text-sm font-semibold">Bugün için Aksiyon Listesi</h2>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-24 h-1.5 bg-muted rounded-full overflow-hidden">
+              <div
+                className="h-full transition-all"
+                style={{
+                  width: `${completionPct}%`,
+                  background:
+                    completionPct === 100 ? "var(--mtp-excellent)" :
+                    completionPct >= 60 ? "var(--mtp-good)" :
+                    "var(--mtp-neutral)",
+                }}
+              />
+            </div>
+            <span className="text-xs text-muted-foreground tabular-nums">
+              {doneCount} / {checklistItems.length}
+            </span>
+          </div>
+        </div>
+        <div className="flex flex-col gap-1">
+          {checklistItems.map((item) => {
+            const done = doneItems.has(item.id);
+            const priorityColor =
+              item.priority === "high" ? "var(--mtp-danger)" :
+              item.priority === "low" ? "var(--muted-foreground)" :
+              "inherit";
+            return (
+              <div
+                key={item.id}
+                className="flex items-start gap-3 py-2 px-2 rounded hover:bg-accent/30 transition-colors group"
+              >
+                <button
+                  type="button"
+                  onClick={() => handleToggle(item.id)}
+                  className="mt-0.5 shrink-0"
+                  title={done ? "İşareti kaldır" : "Tamamlandı işaretle"}
+                >
+                  {done ? (
+                    <CheckCircle2 size={18} style={{ color: "var(--mtp-excellent)" }} />
+                  ) : (
+                    <Circle size={18} className="text-muted-foreground group-hover:text-foreground transition-colors" />
+                  )}
+                </button>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span
+                      className={`text-sm ${done ? "line-through text-muted-foreground" : "font-medium"}`}
+                      style={{ color: done ? undefined : priorityColor }}
+                    >
+                      {item.label}
+                    </span>
+                    {item.priority === "high" && !done && (
+                      <span
+                        className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                        style={{ background: "rgba(255,80,80,0.15)", color: "var(--mtp-danger)" }}
+                      >
+                        ÖNCELİK
+                      </span>
+                    )}
+                  </div>
+                  {!done && (
+                    <Link
+                      href={item.href}
+                      className="text-xs text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1 mt-0.5"
+                    >
+                      {item.detail}
+                      <ArrowRight size={10} />
+                    </Link>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {completionPct === 100 && (
+          <div
+            className="text-xs text-center py-2 rounded"
+            style={{ background: "rgba(40,167,69,0.1)", color: "var(--mtp-excellent)" }}
+          >
+            ✅ Bugünün rutini tamamlandı — disiplin kazanıyor!
           </div>
         )}
       </div>
