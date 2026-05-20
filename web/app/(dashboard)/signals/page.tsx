@@ -19,11 +19,14 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
   );
 }
 
+// KARAR #469 (20 May 2026): Konsensus filtresi kaldırıldı.
+// Her watchlist satırı = 1 sinyal kartı. Sn. Ferit talimat:
+// "konsensus olmasın, tüm sinyaller görünsün".
 export default function SignalsPage() {
   const { data, isLoading, isError, error } = useSignals();
 
-  const [minConsensus, setMinConsensus] = useState<"all" | "2" | "3">("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "buy" | "focus_buy">("all");
+  const [strategyFilter, setStrategyFilter] = useState<"all" | "minervini" | "carr">("all");
   const [newTodayOnly, setNewTodayOnly] = useState(false);
 
   const [tradeOpen, setTradeOpen] = useState(false);
@@ -36,24 +39,24 @@ export default function SignalsPage() {
 
   const filtered = useMemo(() => {
     let rows = data ?? [];
-    if (minConsensus === "2") rows = rows.filter((s) => s.consensus_count >= 2);
-    if (minConsensus === "3") rows = rows.filter((s) => s.consensus_count >= 3);
-    if (statusFilter === "buy") rows = rows.filter((s) => s.max_status === "buy");
+    if (statusFilter === "buy") rows = rows.filter((s) => s.status === "buy");
     if (statusFilter === "focus_buy")
-      rows = rows.filter((s) => s.max_status === "buy" || s.max_status === "focus");
+      rows = rows.filter((s) => s.status === "buy" || s.status === "focus");
+    if (strategyFilter !== "all") rows = rows.filter((s) => s.strategy === strategyFilter);
     if (newTodayOnly) rows = rows.filter((s) => s.is_new_today);
     return rows;
-  }, [data, minConsensus, statusFilter, newTodayOnly]);
+  }, [data, statusFilter, strategyFilter, newTodayOnly]);
 
   const totalSignals = data?.length ?? 0;
   const newTodayCount = data?.filter((s) => s.is_new_today).length ?? 0;
+  // En güçlü: en yüksek RS rating (KARAR #469 konsensus yok)
   const strongest = data?.[0];
 
   const tradeInitial = tradeSignal
     ? {
         symbol: tradeSignal.symbol,
-        strategy: tradeSignal.strategies[0]?.strategy,
-        setup_type: tradeSignal.strategies[0]?.setup_type ?? undefined,
+        strategy: tradeSignal.strategy,
+        setup_type: tradeSignal.setup_type ?? undefined,
         entry_date: new Date().toISOString().split("T")[0],
         entry_price: tradeSignal.price,
       }
@@ -65,7 +68,7 @@ export default function SignalsPage() {
       <div className="px-6 py-3 border-b">
         <h1 className="text-xl font-semibold tracking-tight">Sinyaller</h1>
         <p className="text-sm text-muted-foreground">
-          Konsensus sinyalleri — bugün ne var?
+          Tüm strateji sinyalleri — bugün ne var?
         </p>
       </div>
 
@@ -78,7 +81,7 @@ export default function SignalsPage() {
             label="En Güçlü"
             value={
               strongest
-                ? `${strongest.symbol} (${strongest.consensus_count} strateji)`
+                ? `${strongest.symbol} (RS ${Math.round(strongest.rs_rating)})`
                 : "—"
             }
           />
@@ -87,16 +90,6 @@ export default function SignalsPage() {
 
       {/* Filters */}
       <div className="px-6 py-2 border-b flex flex-wrap items-center gap-2">
-        <select
-          value={minConsensus}
-          onChange={(e) => setMinConsensus(e.target.value as "all" | "2" | "3")}
-          className={SELECT}
-        >
-          <option value="all">Min Konsensus: Tümü</option>
-          <option value="2">2+</option>
-          <option value="3">3+</option>
-        </select>
-
         <select
           value={statusFilter}
           onChange={(e) =>
@@ -107,6 +100,18 @@ export default function SignalsPage() {
           <option value="all">Statü: Tümü</option>
           <option value="buy">Sadece Buy</option>
           <option value="focus_buy">Buy ve Focus</option>
+        </select>
+
+        <select
+          value={strategyFilter}
+          onChange={(e) =>
+            setStrategyFilter(e.target.value as "all" | "minervini" | "carr")
+          }
+          className={SELECT}
+        >
+          <option value="all">Strateji: Tümü</option>
+          <option value="minervini">Minervini</option>
+          <option value="carr">Carr</option>
         </select>
 
         <label className="flex items-center gap-1.5 text-xs cursor-pointer select-none">
@@ -152,7 +157,7 @@ export default function SignalsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {filtered.map((signal) => (
               <SignalCard
-                key={signal.symbol}
+                key={`${signal.symbol}-${signal.strategy}`}
                 signal={signal}
                 onTradeClick={handleTradeClick}
               />

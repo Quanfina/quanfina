@@ -1351,20 +1351,17 @@ def delete_trade(trade_id: int) -> Response:
 _STATUS_RANK: dict[str, int] = {s: i for i, s in enumerate(_STATUS_HIERARCHY)}
 
 
-class StrategyEntry(BaseModel):
+class Signal(BaseModel):
+    # KARAR #469 (20 May 2026) revize: konsensus mantığı kaldırıldı.
+    # Her watchlist satırı = 1 Signal (NVDA-Minervini ayrı, NVDA-Carr ayrı).
+    # UX Bölüm 4 madde 5 ("Her satır ayrı trade: kendi stop, kendi hedef, kendi R/R") ile uyumlu.
+    symbol: str
     strategy: str
     status: str
     setup_type: Optional[str] = None
-
-
-class Signal(BaseModel):
-    symbol: str
-    strategies: list[StrategyEntry]
-    consensus_count: int
-    max_status: str
-    avg_rs_rating: float
+    rs_rating: float
     price: float
-    latest_added: str
+    added_date: str
     is_new_today: bool
 
 
@@ -1380,29 +1377,21 @@ def get_signals() -> list[Signal]:
             status_code=503,
             detail="Veritabanına ulaşılamıyor (Cloud SQL). GCP Console → SQL → instance durum/Authorized Networks kontrol et."
         ) from e
-    grouped: dict[str, list[WatchlistRow]] = {}
-    for row in all_rows:
-        grouped.setdefault(row.symbol, []).append(row)
 
+    # KARAR #469: her watchlist satırı = 1 sinyal (NO grouping)
     signals: list[Signal] = []
-    for symbol, rows in grouped.items():
-        strategies = [
-            StrategyEntry(strategy=r.strategy, status=r.status, setup_type=r.setup_type)
-            for r in rows
-        ]
-        max_status = max(rows, key=lambda r: _STATUS_RANK.get(r.status, -1)).status
-        avg_rs = sum(r.rs_rating for r in rows) / len(rows)
-        latest = max(r.added_date for r in rows)
+    for row in all_rows:
         signals.append(Signal(
-            symbol=symbol,
-            strategies=strategies,
-            consensus_count=len(rows),
-            max_status=max_status,
-            avg_rs_rating=round(avg_rs, 1),
-            price=rows[0].price,
-            latest_added=latest,
-            is_new_today=(latest >= today),
+            symbol=row.symbol,
+            strategy=row.strategy,
+            status=row.status,
+            setup_type=row.setup_type,
+            rs_rating=row.rs_rating,
+            price=row.price,
+            added_date=row.added_date,
+            is_new_today=(row.added_date >= today),
         ))
 
-    signals.sort(key=lambda s: (-s.consensus_count, -s.avg_rs_rating))
+    # Sıralama: RS rating descending (UX Bölüm 4 madde 6 ile uyumlu — sonra R/R sırası)
+    signals.sort(key=lambda s: -s.rs_rating)
     return signals
