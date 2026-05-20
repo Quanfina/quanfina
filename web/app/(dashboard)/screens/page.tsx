@@ -29,10 +29,11 @@ import { useAddWatchlistRow } from "@/hooks/use-watchlist-mutations";
 import type { ScreenSlug, ScreenResultRow } from "@/types/screens";
 import { SCREEN_CATEGORIES } from "@/types/screens";
 import { GridLoadingOverlay } from "@/components/ag-grid/LoadingOverlay";
-// KARAR #484 (20 May 2026 ~12:45): Hisse Tarama tablo stil hizalama
-// Sinyaller (KARAR #479) pateniyle MONO + tabular-nums + 12px.
-// DRY: lib/grid-styles ortak helper kullaniliyor.
-import { MONO, MONO_RIGHT, MONO_CENTER, SYMBOL_CELL } from "@/lib/grid-styles";
+// KARAR #487 (20 May 2026 ~13:30): WW paket (KARAR #484) revize - geri al.
+// DOM karsilastirma kanit: Sinyaller/Watchlist/Journal IBM Plex Sans 14px 400 default
+// kullaniyor (signal'in MONO_RIGHT cellStyle'ari cellRenderer override ediyor).
+// Hisse Tarama tek MONO uygulanan sayfa idi - Sn. Ferit "uyumlu degil" haklilik kanit.
+// Cozum: Default Plex Sans cellStyle'a geri don + rowHeight 40 -> 36 (Sinyaller paten).
 
 // === Grade chip renkleri (CSS hex kanıt: chip-long #def2e5, chip-short #ffc7c7) ===
 // KARAR ADAY #453 — Quanfina Theme Sistemi
@@ -208,7 +209,7 @@ function buildColDefs(slug: string | null): ColDef<ScreenResultRow>[] {
         "PASS: Brandon muhafazakar filtre %70 alti",
       width: 110,
       cellRenderer: VcpQualityCell,
-      cellStyle: MONO_CENTER,
+      cellStyle: { display: "flex", alignItems: "center", justifyContent: "center" },
     },
     {
       field: "vcp_ready_score" as keyof ScreenResultRow,
@@ -219,7 +220,7 @@ function buildColDefs(slug: string | null): ColDef<ScreenResultRow>[] {
       width: 90,
       type: "numericColumn",
       cellRenderer: VcpReadyCell,
-      cellStyle: MONO_CENTER,
+      cellStyle: { display: "flex", alignItems: "center", justifyContent: "center" },
     },
     {
       field: "power_play_pass" as keyof ScreenResultRow,
@@ -229,7 +230,7 @@ function buildColDefs(slug: string | null): ColDef<ScreenResultRow>[] {
         "yukselis + FLAG 2-6 hafta %10-25 duzeltme. Trade Like a Stock Market Wizard Bolum 10.",
       width: 120,
       cellRenderer: PowerPlayCell,
-      cellStyle: MONO_CENTER,
+      cellStyle: { display: "flex", alignItems: "center", justifyContent: "center" },
     },
   ];
 }
@@ -241,7 +242,7 @@ const COL_DEFS: ColDef<ScreenResultRow>[] = [
     headerTooltip: "Hisse sembolü (NYSE/NASDAQ/ARCA)",
     pinned: "left",
     width: 110,
-    cellStyle: SYMBOL_CELL,
+    cellStyle: { fontWeight: 600 },
   },
   {
     field: "grade",
@@ -249,7 +250,7 @@ const COL_DEFS: ColDef<ScreenResultRow>[] = [
     headerTooltip: "TPR letter grade (A/B/C/D) — Minervini kavramı",
     width: 100,
     cellRenderer: GradeCell,
-    cellStyle: { ...MONO, display: "flex", alignItems: "center", padding: "0 8px" },
+    cellStyle: { display: "flex", alignItems: "center", padding: "0 8px" },
   },
   {
     field: "rs_ibd",
@@ -258,7 +259,7 @@ const COL_DEFS: ColDef<ScreenResultRow>[] = [
     width: 110,
     type: "numericColumn",
     cellRenderer: RsIbdCell,
-    cellStyle: { ...MONO, display: "flex", alignItems: "center", padding: "0 8px" },
+    cellStyle: { display: "flex", alignItems: "center", padding: "0 8px" },
   },
   {
     field: "price",
@@ -266,7 +267,6 @@ const COL_DEFS: ColDef<ScreenResultRow>[] = [
     headerTooltip: "Son scan_date fiyatı (USD)",
     width: 110,
     type: "numericColumn",
-    cellStyle: MONO_RIGHT,
     valueFormatter: (p) =>
       p.value !== null && p.value !== undefined
         ? `$${Number(p.value).toFixed(2)}`
@@ -279,14 +279,13 @@ const COL_DEFS: ColDef<ScreenResultRow>[] = [
     width: 90,
     type: "numericColumn",
     cellRenderer: PassedCell,
-    cellStyle: MONO_CENTER,
+    cellStyle: { display: "flex", alignItems: "center", justifyContent: "center" },
   },
   {
     field: "scan_date",
     headerName: "Scan Tarihi",
     headerTooltip: "scanner.py son çalıştırma tarihi (YYYY-MM-DD)",
     width: 130,
-    cellStyle: MONO,
   },
 ];
 
@@ -534,7 +533,7 @@ export default function ScreensPage() {
               columnDefs={dynamicColDefs}
               defaultColDef={DEFAULT_COL_DEF}
               animateRows
-              rowHeight={40}
+              rowHeight={36}
               rowSelection="multiple"
               suppressRowClickSelection={false}
               // KARAR ADAY #454: Add to Watch multi-select (1c canlı)
