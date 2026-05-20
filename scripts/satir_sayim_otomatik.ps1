@@ -7,11 +7,15 @@
 # Hijyen scripti _BASLAT.md, _INDEX.md, _OZET.md, _SAGLIK_KONTROL.md
 # icindeki "X satir" literal'lerini auto-update eder.
 #
-# Versiyon: v0.5.2 (19 May 2026, BOM-less UTF-8 + mojibake fix)
+# Versiyon: v0.5.3 (21 May 2026, READ tarafi UTF-8 fix - H#11 2. ortaya cikis)
 # v0.5  : Ilk surum, Out-File -Encoding UTF8 BOM ekliyordu
 # v0.5.1: PowerShell array syntax fix (@((Join-Path...), (Join-Path...)))
 # v0.5.2: [System.IO.File]::WriteAllText UTF-8 BOM-less, mojibake yok
-# Kural #15 + #16 uyumlu
+# v0.5.3: Get-Content -Raw cp1254 ile okuyordu (Windows PS 5.1 default) ->
+#         Turkce karakterler bozuluyor. Fix: [System.IO.File]::ReadAllText
+#         + Text.Encoding UTF8 explicit. H#11 pattern 2. ortaya cikis (Kural #14
+#         pekistir). _HATALAR.md H#11'e ek not dusulecek.
+# Kural #15 + #16 + #19 uyumlu
 #
 # Kullanim:
 #   .\scripts\satir_sayim_otomatik.ps1            # Dry-run rapor
@@ -56,7 +60,9 @@ $toplamGuncellenenSatir = 0
 foreach ($hedef in $hedefler) {
     if (-not (Test-Path $hedef)) { continue }
     $dosyaAdi = Split-Path $hedef -Leaf
-    $icerik = Get-Content $hedef -Raw
+    # v0.5.3 fix: Get-Content -Raw Windows PS 5.1 cp1254 default kullanir, Turkce
+    # karakterleri bozar. [System.IO.File]::ReadAllText + UTF8 explicit kullan.
+    $icerik = [System.IO.File]::ReadAllText($hedef, [System.Text.Encoding]::UTF8)
     $degisikSayisi = 0
 
     # CLAUDE.md sayim pattern'leri (en yaygin formlar)

@@ -631,7 +631,11 @@ sistem kullanıldıkça kendi pattern kütüphanesini büyütür.
 Proaktif Tarama), Kural #12 (Önce Keşfet), Kural #13 (Commit Disiplini),
 Bilgi Mimarisi İlke #3 (Yaşayan Sistem) + #5 (Klasör Bağlamı).
 
-### Kural 15 — PowerShell Script Encoding (17 May 2026 yeni)
+### Kural 15 — PowerShell Script Encoding (sadece `.ps1`, 17 May 2026 yeni)
+**Kapsam:** Yalnızca `scripts/*.ps1` ve `.ps1` uzantılı dosyalar.
+Bash scriptleri (`.sh`, `.git/hooks/*`) ve Markdown (`*.md`) **kapsam dışı** —
+UTF-8 native, Türkçe karakter parse'i etkilemiyor.
+
 `scripts/*.ps1` dosyaları **ASCII-only içerik** kullanır. Write tool ile
 yazılan .ps1 dosyaları BOM-less UTF-8'dir; PowerShell default encoding
 (cp1254 Windows Turkish) bekler ve Türkçe karakterlerde "missing
