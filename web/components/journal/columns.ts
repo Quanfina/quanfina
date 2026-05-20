@@ -5,12 +5,10 @@ import { GradeBadge } from "./GradeBadge";
 import { TradeStatusBadge } from "./TradeStatusBadge";
 import { SymbolCellRenderer } from "@/components/watchlist/SymbolCellRenderer";
 import { formatDateTR } from "@/lib/format-date";
-
-const MONO: CellStyle = {
-  fontFamily: "var(--font-jetbrains-mono, monospace)",
-  fontVariantNumeric: "tabular-nums",
-  textAlign: "right",
-};
+// KARAR #492 (20 May 2026 ~16:45): DRY hijyen - yerel MONO -> @/lib/grid-styles
+// 4 sayfa tek noktada toplandi (signals/screens/watchlist/journal). fontSize 12px
+// MONO_RIGHT global tutarlilik (Sinyaller pateniyle exact match).
+import { MONO_RIGHT as MONO } from "@/lib/grid-styles";
 
 // KARAR #471 + #472 (20 May 2026): TR tarih formatı — ortak helper
 // (eski 2-digit year "26" karışıklığı giderildi, full DD.MM.YYYY).

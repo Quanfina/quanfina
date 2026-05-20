@@ -6,12 +6,10 @@ import { StrategyCellRenderer } from "./StrategyCellRenderer";
 import { SetupCellRenderer } from "./SetupCellRenderer";
 import { SymbolCellRenderer } from "./SymbolCellRenderer";
 import { TermHeaderComponent } from "@/components/terminology/TermHeaderComponent";
-
-const MONO: CellStyle = {
-  fontFamily: "var(--font-jetbrains-mono, monospace)",
-  fontVariantNumeric: "tabular-nums",
-  textAlign: "right",
-};
+// KARAR #492 (20 May 2026 ~16:45): DRY hijyen - yerel MONO -> @/lib/grid-styles
+// Sinyaller + Hisse Tarama paterniyle eşitleme. Davranış: fontSize 13px global ->
+// 12px MONO_RIGHT (Sinyaller exact). Tüm tablolarda fiyat 12px tutarlı.
+import { MONO_RIGHT as MONO } from "@/lib/grid-styles";
 
 function fmtPrice(p: ValueFormatterParams<WatchlistRow>) {
   return p.value != null ? `$${(p.value as number).toFixed(2)}` : "—";
