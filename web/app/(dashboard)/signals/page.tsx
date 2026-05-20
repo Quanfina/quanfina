@@ -4,17 +4,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useGridTheme } from "@/hooks/use-grid-theme";
 import { Activity, Plus, X, RotateCcw } from "lucide-react";
 import { AgGridReact } from "ag-grid-react";
-import type { ColDef, ICellRendererParams, CellStyle } from "ag-grid-community";
+import type { ColDef, ICellRendererParams } from "ag-grid-community";
 
 // KARAR #479 (20 May 2026): DRY MONO style — Watchlist/Journal pateni.
-// fontVariantNumeric: tabular-nums sayısal hizalama (Markets360 tabular yok ama
-// bizim için kritik, Quanfina sayısal disiplin). fontSize 12 = tüm tablolar uyumlu.
-const MONO: CellStyle = {
-  fontFamily: "var(--font-jetbrains-mono, monospace)",
-  fontVariantNumeric: "tabular-nums",
-  fontSize: "12px",
-};
-const MONO_RIGHT: CellStyle = { ...MONO, textAlign: "right" };
+// KARAR #484 (20 May 2026): lib/grid-styles ortak helper'a tasindi (Hisse Tarama
+// ile birlikte DRY birlestirme — sayfa-ici kopyalama yasak).
+import { MONO, MONO_RIGHT } from "@/lib/grid-styles";
 import { useSignals } from "@/hooks/use-signals";
 import { AddTradeDialog } from "@/components/journal/AddTradeDialog";
 import { AddRowDialog } from "@/components/watchlist/AddRowDialog";
