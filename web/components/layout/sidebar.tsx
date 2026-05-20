@@ -7,15 +7,17 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { NavLink } from "@/components/layout/nav-link";
 
-// KARAR #347 + KARAR #359: Sinyaller > Screens > Watchlist > Piyasa Durumu > diğerleri
-// Sprint 4-bis.1b+: /screens — hisse tarama (22 ekran), Sinyaller ile Watchlist arası akış adımı
+// KARAR #485 (20 May 2026): Sn. Ferit gozlem - "Piyasa Durumu cok altlarda" -> usta cikti.
+// Sira: Trader sabah is akisi. Once makro (Piyasa Durumu) -> sonra aksiyon (Sinyaller)
+// -> kesif (Hisse Tarama) -> takip (Watchlist) -> gecmis (Journal) -> referans (Minervini/Carr).
+// KARAR #347 + #359 revize: Piyasa Durumu Ana Sayfa'dan hemen sonra (2. sira).
 const NAV_ITEMS = [
   { href: "/",               label: "Ana Sayfa",      icon: Home         },
+  { href: "/piyasa-durumu",  label: "Piyasa Durumu",  icon: Globe         },
   { href: "/signals",        label: "Sinyaller",      icon: Activity     },
   { href: "/screens",        label: "Hisse Tarama",   icon: ScanLine     },
   { href: "/watchlist",      label: "Watchlist",      icon: ListChecks    },
   { href: "/journal",        label: "Trade Journal",  icon: NotebookText  },
-  { href: "/piyasa-durumu",  label: "Piyasa Durumu",  icon: Globe         },
   { href: "/minervini",      label: "Minervini",      icon: BarChart2    },
   { href: "/carr",           label: "Carr",           icon: TrendingUp   },
   { href: "/api-test",       label: "API Test",       icon: FlaskConical },
