@@ -13,8 +13,14 @@
 #   .\scripts\proaktif_oneri.ps1 -ToFile
 #   .\scripts\proaktif_oneri.ps1 -DriveYazma  # Drive'a haftalik rapor
 #
-# Versiyon: v0.5 (18 May 2026, Asama 5.6 ilk uretim)
-# Kural uyumu: #15 (ASCII-only), #16 (native exe 2>&1 yok)
+# Versiyon: v0.6 (21 May 2026, Sonraki kuyruk DINAMIK guncellendi)
+# v0.5 (18 May 2026): Asama 5.6 ilk uretim
+# v0.6 (21 May 2026): "Sonraki kuyruk" statik listesi guncellendi.
+#   Asama 1-5 TUMU TAMAMLANDI. Eski script "Asama 2.3 + Asama 2 RESMI KAPANIS"
+#   diye eski tamamlanmis isleri oneriyordu (P#3 izlenen pattern). Yeni statik
+#   liste Sprint 4-bis.7+ kuyruk + Sn. Ferit stratejik eli + AI otonom rezerv.
+#   Tam dinamik _ROADMAP parse Asama 6'da (gelecek).
+# Kural uyumu: #15 (ASCII-only), #16 (native exe 2>&1 yok), #19 (UTF8 BOM-less)
 
 param(
     [switch]$ToFile,
@@ -258,17 +264,27 @@ $patternScript = Join-Path $repoRoot "scripts\pattern_ogren.ps1"
 $asama5Tamam = (Test-Path $saglikDosya) -and (Test-Path $hatalarDosya) -and (Test-Path $felsefeDosya) -and (Test-Path $saglikScript) -and (Test-Path $patternScript)
 
 if ($asama5Tamam) {
-    Add-Line "**Asama 5 altyapi tamam** (5.1+5.2+5.3+5.4+5.5+5.7 ✅, bu script 5.6'nin kendisi)."
+    Add-Line "**Asama 1-5 TUMU TAMAMLANDI** (5.7 yaşayan sistem zirvesi 18 May, bu script 5.6'nin kendisi)."
+    Add-Line "**Sprint 4-bis.6 'Sistem otursun' stabilizasyon aktif** (20-21 May): 60+ paket boyunca anayasa 23 Kural sabit."
     Add-Line ""
-    Add-Line "**Sonraki kuyruk (kodlamaya gecmeden):**"
-    Add-Line "1. Asama 2.3 NotebookLM Plus 2 notebook (Sn. Ferit - Minervini + Vizyon Bekcisi)"
-    Add-Line "2. Asama 2 RESMI KAPANIS (AI - 2.4 Gem IPTAL, NotebookLM'e tasindi)"
-    Add-Line "3. Asama 3 MCP genisleme (5 alt-adim, 3.1 zaten canli)"
-    Add-Line "4. Asama 4 Cilalama Gem'leri (6 alt-adim, 4.3 IPTAL)"
-    Add-Line "5. ACIK KONU #22 cevabi (Carr 1./2. baski - 8+ alt-konu kilidi)"
-    Add-Line "6. 6 PENDING soru + 3 yikici karar (Sn. Ferit onay)"
+    Add-Line "**Sn. Ferit Stratejik Eli (oncelik sirasi):**"
+    Add-Line "1. ACIK KONU #70 Cloud SQL erisim stratejisi (Auth Proxy / Connector / IP Whitelist) - DB up site canli demek"
+    Add-Line "2. ACIK KONU #22 Carr 1./2. baski oncelik (8+ alt-konu kilidi)"
+    Add-Line "3. Risk Academy NotebookLM 8 PDF (Tharp/Basso/Vince/Elder) - KARAR ADAY #455 bagim"
+    Add-Line "4. ACIK KONU #72 React 19 ESLint 13 stratejik error (UI mimari sprint)"
+    Add-Line "5. ACIK KONU #74 Chrome MCP localhost permission (eklenti Site Erisimi)"
+    Add-Line "6. 6 PENDING soru (bildirim/evren/saat/risk%/heat%/Polygon)"
     Add-Line ""
-    Add-Line "Sonra: **Sprint 4-bis kod tarafi maraton**"
+    Add-Line "**Sprint 4-bis.7+ Kuyruk (KARAR ADAY, Sn. Ferit yon gerek):**"
+    Add-Line "- #453 lightweight-charts (hisse detay TradingView yerine)"
+    Add-Line "- #455 Risk-Merkez UI (Risk Academy PDF gerekli)"
+    Add-Line "- #456 Filter Operator (Watchlist filtreleme)"
+    Add-Line "- #457 Superscreen ❌ IPTAL (tek kullanici)"
+    Add-Line ""
+    Add-Line "**AI Otonom Rezerve (talimat bekler):**"
+    Add-Line "- scanner.py refactor 1955 -> moduller (~2-3 saat)"
+    Add-Line "- Sektor Rotasyonu / Portfolio Risk / Istatistikler sayfasi (Streamlit'ten port)"
+    Add-Line "- Hisse detay TradingView timeout fix"
 }
 Add-Line ""
 
@@ -277,7 +293,7 @@ Add-Line ""
 # ============================================================
 Add-Line "---"
 Add-Line ""
-Add-Line "_Bu rapor proaktif_oneri.ps1 v0.5 tarafindan uretildi._"
+Add-Line "_Bu rapor proaktif_oneri.ps1 v0.6 tarafindan uretildi._"
 Add-Line "_Asama 5.6 ciktisi - Manifesto Ozellik #8 (Ogrenen) tam canli kanit._"
 Add-Line "_Girdi: scripts/saglik_kontrol.ps1 + scripts/pattern_ogren.ps1_"
 
