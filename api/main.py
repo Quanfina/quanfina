@@ -1369,7 +1369,27 @@ class Signal(BaseModel):
 def get_signals() -> list[Signal]:
     today = date.today().isoformat()
 
-    # DB unreachable graceful degradation (watchlist pateni — Kural #20 UX)
+    # DB unreachable -> MOCK fallback (KARAR #469 + /api/screens pateni — Kural #20 UX)
+    # Sn. Ferit: "sinyal varmış gibi yap mock ile sinyal sayfasında" (20 May 2026 ~06:00)
+    # Her watchlist satırı 1 sinyal felsefesi korundu — çoklu strateji × çoklu hisse
+    if not db_health_check():
+        mock_signals = [
+            Signal(symbol="NVDA",  strategy="minervini", status="buy",     setup_type="VCP",                 rs_rating=99.0, price=145.20, added_date=today,         is_new_today=True),
+            Signal(symbol="NVDA",  strategy="carr",      status="focus",   setup_type="Pullback",            rs_rating=99.0, price=145.20, added_date="2026-05-19",  is_new_today=False),
+            Signal(symbol="AAPL",  strategy="minervini", status="focus",   setup_type="Power Play",          rs_rating=87.0, price=212.50, added_date="2026-05-18",  is_new_today=False),
+            Signal(symbol="MSFT",  strategy="minervini", status="buy",     setup_type="Tight Low Vol",       rs_rating=91.0, price=425.30, added_date="2026-05-19",  is_new_today=False),
+            Signal(symbol="MSFT",  strategy="carr",      status="watch",   setup_type="Coiled Spring",       rs_rating=91.0, price=425.30, added_date="2026-05-17",  is_new_today=False),
+            Signal(symbol="GOOGL", strategy="carr",      status="buy",     setup_type="Bullish Divergence",  rs_rating=88.0, price=178.40, added_date="2026-05-19",  is_new_today=False),
+            Signal(symbol="AMD",   strategy="minervini", status="on_deck", setup_type="Inside Day",          rs_rating=85.0, price=158.20, added_date="2026-05-18",  is_new_today=False),
+            Signal(symbol="TSLA",  strategy="minervini", status="focus",   setup_type="Tight Low Vol",      rs_rating=82.0, price=245.60, added_date="2026-05-19",  is_new_today=False),
+            Signal(symbol="META",  strategy="carr",      status="watch",   setup_type="Pullback",            rs_rating=80.0, price=512.80, added_date="2026-05-16",  is_new_today=False),
+            Signal(symbol="AVGO",  strategy="minervini", status="buy",     setup_type="VCP",                 rs_rating=78.0, price=1450.30, added_date="2026-05-19", is_new_today=False),
+        ]
+        # Sıralama: RS rating descending
+        mock_signals.sort(key=lambda s: -s.rs_rating)
+        return mock_signals
+
+    # Gerçek DB yolu (db_connected=true)
     try:
         all_rows = [WatchlistRow(**r) for r in watchlist_get_all()]
     except OperationalError as e:
