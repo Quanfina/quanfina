@@ -4,6 +4,7 @@ import { SETUP_LABELS } from "@/types/trade";
 import { GradeBadge } from "./GradeBadge";
 import { TradeStatusBadge } from "./TradeStatusBadge";
 import { SymbolCellRenderer } from "@/components/watchlist/SymbolCellRenderer";
+import { formatDateTR } from "@/lib/format-date";
 
 const MONO: CellStyle = {
   fontFamily: "var(--font-jetbrains-mono, monospace)",
@@ -11,14 +12,10 @@ const MONO: CellStyle = {
   textAlign: "right",
 };
 
+// KARAR #471 + #472 (20 May 2026): TR tarih formatı — ortak helper
+// (eski 2-digit year "26" karışıklığı giderildi, full DD.MM.YYYY).
 function fmtDate(p: ValueFormatterParams<Trade>): string {
-  const v = p.value as string | null;
-  if (!v) return "—";
-  return new Date(v).toLocaleDateString("tr-TR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "2-digit",
-  });
+  return formatDateTR(p.value as string | null);
 }
 
 function fmtPrice(p: ValueFormatterParams<Trade>): string {

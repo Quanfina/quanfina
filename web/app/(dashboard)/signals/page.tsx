@@ -9,6 +9,7 @@ import { useSignals } from "@/hooks/use-signals";
 import { AddTradeDialog } from "@/components/journal/AddTradeDialog";
 import { Button } from "@/components/ui/button";
 import { GridLoadingOverlay } from "@/components/ag-grid/LoadingOverlay";
+import { formatDateTR } from "@/lib/format-date";
 import type { Signal } from "@/types/signal";
 
 const SELECT =
@@ -145,15 +146,9 @@ export default function SignalsPage() {
       headerName: "Eklenme",
       width: 150,
       // KARAR #471 (20 May 2026): TR tarih formatı (DD.MM.YYYY HH:MM).
-      // Sn. Ferit: "tarih Gün Ay Yıl formatında olsun".
-      // Backend ISO "YYYY-MM-DD[ HH:MM]" tutar (sort + uluslararası standart),
-      // frontend kullanıcıya TR formatında gösterir.
-      valueFormatter: (p) => {
-        const val = p.value as string | null;
-        if (!val) return "—";
-        const m = val.match(/^(\d{4})-(\d{2})-(\d{2})(.*)$/);
-        return m ? `${m[3]}.${m[2]}.${m[1]}${m[4]}` : val;
-      },
+      // Backend ISO "YYYY-MM-DD[ HH:MM]" tutar, frontend formatDateTR helper kullanır
+      // (web/lib/format-date.ts — DRY, Bilgi Mimarisi İlke #4 Tekrarsızlık).
+      valueFormatter: (p) => formatDateTR(p.value as string | null),
       cellStyle: { fontFamily: "var(--font-jetbrains-mono, monospace)", fontSize: "12px" },
     },
     {
