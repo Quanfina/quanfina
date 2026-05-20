@@ -1151,7 +1151,11 @@ def get_stock_info(symbol: str) -> StockInfo:
     sym = symbol.upper()
     stock = _STOCK_BY_SYM.get(sym)
     meta  = _STOCK_META.get(sym, {})
-    active = [WatchlistRow(**r) for r in watchlist_get_all() if r["symbol"] == sym]
+    # DB down ortamda hisse detay sayfasi calismali — watchlist bos liste fallback
+    try:
+        active = [WatchlistRow(**r) for r in watchlist_get_all() if r["symbol"] == sym]
+    except OperationalError:
+        active = []
 
     if not stock and not active:
         raise HTTPException(status_code=404, detail=f"Symbol '{sym}' not found")
@@ -1190,7 +1194,10 @@ def get_stock_ohlcv(symbol: str) -> list[OhlcvBar]:
     if stock:
         price = stock.price
     else:
-        wl = [r for r in watchlist_get_all() if r["symbol"] == sym]
+        try:
+            wl = [r for r in watchlist_get_all() if r["symbol"] == sym]
+        except OperationalError:
+            wl = []
         if not wl:
             raise HTTPException(status_code=404, detail=f"Symbol '{sym}' not found")
         price = float(wl[0]["price"])
