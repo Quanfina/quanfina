@@ -29,11 +29,15 @@ import { useAddWatchlistRow } from "@/hooks/use-watchlist-mutations";
 import type { ScreenSlug, ScreenResultRow } from "@/types/screens";
 import { SCREEN_CATEGORIES } from "@/types/screens";
 import { GridLoadingOverlay } from "@/components/ag-grid/LoadingOverlay";
-// KARAR #487 (20 May 2026 ~13:30): WW paket (KARAR #484) revize - geri al.
-// DOM karsilastirma kanit: Sinyaller/Watchlist/Journal IBM Plex Sans 14px 400 default
-// kullaniyor (signal'in MONO_RIGHT cellStyle'ari cellRenderer override ediyor).
-// Hisse Tarama tek MONO uygulanan sayfa idi - Sn. Ferit "uyumlu degil" haklilik kanit.
-// Cozum: Default Plex Sans cellStyle'a geri don + rowHeight 40 -> 36 (Sinyaller paten).
+// KARAR #488 v4 (20 May 2026 ~14:45): Sn. Ferit talimat - "bir baska
+// sayfadaki kodlari analiz yap karsilastir". Sinyaller (/signals) YAN YANA
+// karsilastirma sonucu Hisse Tarama'da EKSIK olanlar:
+//   1. headerHeight={36} (Sinyaller set ediyor, biz etmedik -> default 48 kalin)
+//   2. Sembol cellRenderer (<span className="font-semibold tracking-tight">)
+//   3. Fiyat cellStyle: MONO_RIGHT (lib/grid-styles 12px right-aligned)
+//   4. Scan Tarihi cellStyle: MONO (12px monospace)
+// Sinyaller'in BIREBIR paternini uyguluyoruz.
+import { MONO, MONO_RIGHT } from "@/lib/grid-styles";
 
 // === Grade chip renkleri (CSS hex kanıt: chip-long #def2e5, chip-short #ffc7c7) ===
 // KARAR ADAY #453 — Quanfina Theme Sistemi
@@ -165,28 +169,9 @@ function VcpQualityCell(p: ICellRendererParams<ScreenResultRow>) {
 
 // === AG Grid ColDef (KARAR ADAY #455 standart pattern) ===
 
-// KARAR #488 v3 (20 May 2026): Fiyat hucresi font sorun KESIN cozum.
-// Sn. Ferit "3 turdur basaramadin" -> ben yuzeysel CSS override yapiyordum.
-// Asil sorun: AG Grid valueFormatter cikti React tree disindaki text node,
-// global CSS + cellStyle inline + cellStyle wrapper hicbiri ezmiyor.
-// Cozum: cellRenderer React component'i ile inline <span style> - bu
-// kullanici-tarayicisi DOM'unda her zaman en yuksek priority.
-function PriceCell(p: ICellRendererParams<ScreenResultRow>) {
-  if (p.value === null || p.value === undefined) {
-    return <span style={{ color: "#888" }}>—</span>;
-  }
-  return (
-    <span
-      style={{
-        fontFamily: "var(--font-jetbrains-mono), 'JetBrains Mono', 'Courier New', monospace",
-        fontVariantNumeric: "tabular-nums",
-        fontSize: "13px",
-      }}
-    >
-      ${Number(p.value).toFixed(2)}
-    </span>
-  );
-}
+// PriceCell artik gerekli degil - Sinyaller pateni valueFormatter + cellStyle:
+// MONO_RIGHT yeterli (lib/grid-styles 12px right-aligned monospace).
+// Sinyaller cellRenderer kullanmiyor price icin, sadece valueFormatter + cellStyle.
 
 // KARAR #466 + #465 + #467 — VCP slug'larinda Kalite + Ready + Power Play kolonlari
 const VCP_SLUGS = new Set<string>([
@@ -265,7 +250,17 @@ const COL_DEFS: ColDef<ScreenResultRow>[] = [
     headerTooltip: "Hisse sembolü (NYSE/NASDAQ/ARCA)",
     pinned: "left",
     width: 110,
-    cellStyle: { fontWeight: 600 },
+    // Sinyaller pateni: cellRenderer ile span font-semibold tracking-tight.
+    // Bu div sayesinde sembol hucresinde tutarli height + dikey hizalama.
+    cellRenderer: (p: ICellRendererParams<ScreenResultRow>) => {
+      const s = p.value as string | null;
+      if (!s) return null;
+      return (
+        <div className="flex items-center gap-2 h-full">
+          <span className="font-semibold tracking-tight">{s}</span>
+        </div>
+      );
+    },
   },
   {
     field: "grade",
@@ -289,11 +284,13 @@ const COL_DEFS: ColDef<ScreenResultRow>[] = [
     headerName: "Fiyat",
     headerTooltip: "Son scan_date fiyatı (USD)",
     width: 110,
-    type: "numericColumn",
-    // KARAR #488 v3: cellRenderer (React component) ile inline span style.
-    // valueFormatter pure text DOM seviyesinde font alamiyordu - bu component
-    // inline <span style={{ fontFamily }}> uretir, hicbir cascade ezmez.
-    cellRenderer: PriceCell,
+    type: "rightAligned",
+    // Sinyaller pateni: valueFormatter + cellStyle: MONO_RIGHT (12px right mono).
+    cellStyle: MONO_RIGHT,
+    valueFormatter: (p) =>
+      p.value !== null && p.value !== undefined
+        ? `$${Number(p.value).toFixed(2)}`
+        : "—",
   },
   {
     field: "passed",
@@ -309,6 +306,8 @@ const COL_DEFS: ColDef<ScreenResultRow>[] = [
     headerName: "Scan Tarihi",
     headerTooltip: "scanner.py son çalıştırma tarihi (YYYY-MM-DD)",
     width: 130,
+    // Sinyaller "Eklenme" kolonu paten: cellStyle: MONO (12px monospace).
+    cellStyle: MONO,
   },
 ];
 
@@ -319,19 +318,7 @@ const DEFAULT_COL_DEF: ColDef = {
   floatingFilter: false,
 };
 
-// KARAR #488 v2 (20 May 2026 ~14:30): Sn. Ferit "hala duzelmemis derin
-// arastirma yap" - globals.css !important YETMEDI. AG Grid Theming API'sinin
-// --ag-font-family CSS variable'i theme="legacy" altinda Quartz CSS'in
-// kendi tanimladigi variable'i ezmiyor. Cozum: AG Grid wrapper div'ine
-// INLINE style olarak --ag-font-family set et - bu DOM seviyesinde en
-// yuksek priority, hicbir cascade ezmez. AG Grid Quartz CSS'i bu variable'i
-// .ag-cell, .ag-header-cell, .ag-cell-value icin kullanir.
-const GRID_FONT_STYLE: React.CSSProperties = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ["--ag-font-family" as any]: "var(--font-jetbrains-mono), 'JetBrains Mono', 'Courier New', monospace",
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ["--ag-font-size" as any]: "13px",
-};
+// GRID_FONT_STYLE artik gerekli degil - Sinyaller pateni cellStyle ile.
 
 export default function ScreensPage() {
   const { gridClass: themeGridClass } = useGridTheme();
@@ -559,7 +546,7 @@ export default function ScreensPage() {
 
       {/* AG Grid — Skeleton loading (KARAR #463 B2 uygulaması) + gerçek veri */}
       {(resultsQ.isLoading || totalCount > 0) && (
-        <div className={`${themeClass} h-[600px] w-full`} style={GRID_FONT_STYLE}>
+        <div className={`${themeClass} h-[600px] w-full`}>
           {resultsQ.isLoading ? (
             <GridLoadingOverlay />
           ) : (
@@ -571,6 +558,7 @@ export default function ScreensPage() {
               defaultColDef={DEFAULT_COL_DEF}
               animateRows
               rowHeight={36}
+              headerHeight={36}
               rowSelection="multiple"
               suppressRowClickSelection={false}
               // KARAR ADAY #454: Add to Watch multi-select (1c canlı)
