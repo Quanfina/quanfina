@@ -26,20 +26,26 @@ async function snapshot(path, label) {
       });
     }
     const cellSample = [];
-    for (let i = 0; i < Math.min(6, cells.length); i++) {
-      const cs = window.getComputedStyle(cells[i]);
+    // Tum kolon tiplerini gormek icin daha cesitli ornek al
+    const seen = new Set();
+    for (const cell of cells) {
+      const colId = cell.getAttribute("col-id");
+      if (seen.has(colId)) continue;
+      seen.add(colId);
+      const cs = window.getComputedStyle(cell);
+      // Cell ICINDEKI ilk eleman (renderer cikti)
+      const innerEl = cell.querySelector("*") || cell;
+      const innerCs = window.getComputedStyle(innerEl);
       cellSample.push({
-        colId: cells[i].getAttribute("col-id"),
+        colId,
         font: cs.fontFamily.slice(0, 25),
+        innerFont: innerCs.fontFamily.slice(0, 25),
         size: cs.fontSize,
+        innerSize: innerCs.fontSize,
         weight: cs.fontWeight,
-        align: cs.textAlign,
-        display: cs.display,
-        justify: cs.justifyContent,
-        items: cs.alignItems,
-        bg: cs.backgroundColor,
-        text: cells[i].textContent?.trim().slice(0, 18),
+        text: cell.textContent?.trim().slice(0, 18),
       });
+      if (cellSample.length >= 8) break;
     }
     // Row arka plan
     const row = document.querySelector(".ag-row");
@@ -55,8 +61,11 @@ async function snapshot(path, label) {
   console.log(`Row bg=${info.rowBg} h=${info.rowH}`);
   console.log("Headers (ilk 6):");
   info.headerSample.forEach(h => console.log(`  [${h.colId}] bg=${h.bg} font=${h.font} size=${h.size} w=${h.weight} align=${h.align}`));
-  console.log("Cells (ilk 6):");
-  info.cellSample.forEach(c => console.log(`  [${c.colId}] font=${c.font} size=${c.size} w=${c.weight} align=${c.align} disp=${c.display} just=${c.justify} text="${c.text}"`));
+  console.log("Cells (her col 1 ornek):");
+  info.cellSample.forEach(c => {
+    const innerDif = c.innerFont !== c.font ? ` INNER=${c.innerFont}/${c.innerSize}` : "";
+    console.log(`  [${c.colId}] font=${c.font} size=${c.size} w=${c.weight}${innerDif} text="${c.text}"`);
+  });
   await tab.close();
 }
 

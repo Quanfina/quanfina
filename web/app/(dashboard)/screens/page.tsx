@@ -165,6 +165,29 @@ function VcpQualityCell(p: ICellRendererParams<ScreenResultRow>) {
 
 // === AG Grid ColDef (KARAR ADAY #455 standart pattern) ===
 
+// KARAR #488 v3 (20 May 2026): Fiyat hucresi font sorun KESIN cozum.
+// Sn. Ferit "3 turdur basaramadin" -> ben yuzeysel CSS override yapiyordum.
+// Asil sorun: AG Grid valueFormatter cikti React tree disindaki text node,
+// global CSS + cellStyle inline + cellStyle wrapper hicbiri ezmiyor.
+// Cozum: cellRenderer React component'i ile inline <span style> - bu
+// kullanici-tarayicisi DOM'unda her zaman en yuksek priority.
+function PriceCell(p: ICellRendererParams<ScreenResultRow>) {
+  if (p.value === null || p.value === undefined) {
+    return <span style={{ color: "#888" }}>—</span>;
+  }
+  return (
+    <span
+      style={{
+        fontFamily: "var(--font-jetbrains-mono), 'JetBrains Mono', 'Courier New', monospace",
+        fontVariantNumeric: "tabular-nums",
+        fontSize: "13px",
+      }}
+    >
+      ${Number(p.value).toFixed(2)}
+    </span>
+  );
+}
+
 // KARAR #466 + #465 + #467 — VCP slug'larinda Kalite + Ready + Power Play kolonlari
 const VCP_SLUGS = new Set<string>([
   "tight_low_volume", "tight_low_vol_excellent",
@@ -267,10 +290,10 @@ const COL_DEFS: ColDef<ScreenResultRow>[] = [
     headerTooltip: "Son scan_date fiyatı (USD)",
     width: 110,
     type: "numericColumn",
-    valueFormatter: (p) =>
-      p.value !== null && p.value !== undefined
-        ? `$${Number(p.value).toFixed(2)}`
-        : "—",
+    // KARAR #488 v3: cellRenderer (React component) ile inline span style.
+    // valueFormatter pure text DOM seviyesinde font alamiyordu - bu component
+    // inline <span style={{ fontFamily }}> uretir, hicbir cascade ezmez.
+    cellRenderer: PriceCell,
   },
   {
     field: "passed",
@@ -294,6 +317,20 @@ const DEFAULT_COL_DEF: ColDef = {
   filter: true,
   resizable: true,
   floatingFilter: false,
+};
+
+// KARAR #488 v2 (20 May 2026 ~14:30): Sn. Ferit "hala duzelmemis derin
+// arastirma yap" - globals.css !important YETMEDI. AG Grid Theming API'sinin
+// --ag-font-family CSS variable'i theme="legacy" altinda Quartz CSS'in
+// kendi tanimladigi variable'i ezmiyor. Cozum: AG Grid wrapper div'ine
+// INLINE style olarak --ag-font-family set et - bu DOM seviyesinde en
+// yuksek priority, hicbir cascade ezmez. AG Grid Quartz CSS'i bu variable'i
+// .ag-cell, .ag-header-cell, .ag-cell-value icin kullanir.
+const GRID_FONT_STYLE: React.CSSProperties = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ["--ag-font-family" as any]: "var(--font-jetbrains-mono), 'JetBrains Mono', 'Courier New', monospace",
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ["--ag-font-size" as any]: "13px",
 };
 
 export default function ScreensPage() {
@@ -522,7 +559,7 @@ export default function ScreensPage() {
 
       {/* AG Grid — Skeleton loading (KARAR #463 B2 uygulaması) + gerçek veri */}
       {(resultsQ.isLoading || totalCount > 0) && (
-        <div className={`${themeClass} h-[600px] w-full`}>
+        <div className={`${themeClass} h-[600px] w-full`} style={GRID_FONT_STYLE}>
           {resultsQ.isLoading ? (
             <GridLoadingOverlay />
           ) : (
