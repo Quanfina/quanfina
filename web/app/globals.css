@@ -131,3 +131,37 @@
     @apply font-sans;
   }
 }
+
+/*
+ * KARAR #488 (20 May 2026 ~14:00): AG Grid global tablo font hizalama.
+ * Sn. Ferit talimat: "biçim uygun değil font falan onu demeye çalıştım".
+ * Tüm tablolar (Sinyaller, Hisse Tarama, Watchlist, Journal, Minervini)
+ * tek font ailesi kullansın - sayısal tabloda JetBrains Mono +
+ * tabular-nums (rakam hizalama).
+ *
+ * cellRenderer'lar font set etmiyorsa otomatik inherit eder. Sayfa-içi
+ * inline cellStyle override edebilir (örn. badge'ler). Header de
+ * monospace - tutarlılık.
+ *
+ * Bu globalle hem MONO uyumu (Sn. Ferit istegi) hem de sayfalar arası
+ * birebir tutarlılık (uyumsuz değil) saglandi.
+ */
+.ag-theme-quartz,
+.ag-theme-quartz-dark {
+  --ag-font-family: var(--font-jetbrains-mono), "Courier New", monospace;
+  --ag-font-size: 13px;
+}
+
+/* AG Grid font hierarchy: Tailwind body/html font-sans cell'lere inherit
+   ediyordu. Burada !important ile JetBrains Mono'yu enforce ediyoruz.
+   cellRenderer içindeki React component'ler font-family set etmezse
+   automatik mono'yu alir. */
+.ag-theme-quartz .ag-cell,
+.ag-theme-quartz-dark .ag-cell,
+.ag-theme-quartz .ag-header-cell,
+.ag-theme-quartz-dark .ag-header-cell,
+.ag-theme-quartz .ag-cell *,
+.ag-theme-quartz-dark .ag-cell * {
+  font-family: var(--font-jetbrains-mono), "Courier New", monospace !important;
+  font-variant-numeric: tabular-nums;
+}
