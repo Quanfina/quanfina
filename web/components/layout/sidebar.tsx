@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
 import {
-  Menu, Home, BarChart2, TrendingUp, Activity, FlaskConical, Globe,
+  Menu, Home, BarChart2, TrendingUp, Activity, Globe,
   ListChecks, NotebookText, ScanLine, Layers, ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,10 @@ import { NavLink } from "@/components/layout/nav-link";
 // altinda acilir kapanir sekilde sol menude barindar". Strateji sayfalari grup altinda
 // toplandi. Akilli default: aktif route grup icindeyse acik baslar; manuel toggle
 // localStorage'da saklanir (kullanici tercihi korunur). KARAR #485 sira bozulmadi.
+// KARAR #491 (20 May 2026 ~16:30): /api-test sidebar'dan kaldirildi - dev/debug
+// sayfasi, trader is akisina yabanci. Sayfa SILINMEDI, URL ile (/api-test) erisilebilir.
+// Kural #18 Pasif Oge Cikarma somut uygulama (sidebar nav alanindan cikar, dosya kalir).
+// Tetik: Sn. Ferit "amaci ne" sorusu -> AI karar (Kural #23 otonom).
 type NavLeaf = { kind: "leaf"; href: string; label: string; icon: LucideIcon };
 type NavGroup = { kind: "group"; id: string; label: string; icon: LucideIcon; children: NavLeaf[] };
 type NavItem = NavLeaf | NavGroup;
@@ -37,8 +41,8 @@ const NAV_ITEMS: NavItem[] = [
       { kind: "leaf", href: "/carr",      label: "Carr",      icon: TrendingUp },
     ],
   },
-  { kind: "leaf", href: "/api-test",       label: "API Test",      icon: FlaskConical },
 ];
+// /api-test KARAR #491 ile sidebar'dan kaldirildi - URL ile erisilebilir.
 
 const STORAGE_PREFIX = "sidebar-group-";
 
