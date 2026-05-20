@@ -22,8 +22,34 @@ param(
 )
 
 $ErrorActionPreference = "Continue"
-$repoRoot = (git rev-parse --show-toplevel).Trim()
-if (-not $repoRoot) { Write-Host "Git deposu degil." -ForegroundColor Red; exit 1 }
+
+# Worktree-aware repo root tespiti (saglik_kontrol v0.5.1 + build_index v2.1 + notebook_yedekle pateni)
+# $PSScriptRoot: script'in bulundugu yer = scripts/, parent = repo root
+$scriptPath = $MyInvocation.MyCommand.Path
+$scriptsDir = Split-Path -Parent $scriptPath
+$repoRoot = Split-Path -Parent $scriptsDir
+if (-not (Test-Path (Join-Path $repoRoot "CLAUDE.md"))) {
+    Write-Host "Repo kokunde CLAUDE.md bulunamadi: $repoRoot" -ForegroundColor Red
+    exit 1
+}
+
+# notebook/ + memory/ .gitignore'da, worktree'de yok. Ana repoya fallback
+$notebookCheck = Join-Path $repoRoot "notebook\Notebook_A_Vizyon.md"
+if (-not (Test-Path $notebookCheck)) {
+    try {
+        $gitCommonDir = (git -C $repoRoot rev-parse --git-common-dir 2>$null).Trim()
+        if ($gitCommonDir) {
+            if (-not [System.IO.Path]::IsPathRooted($gitCommonDir)) {
+                $gitCommonDir = Join-Path $repoRoot $gitCommonDir
+            }
+            $mainRepo = Split-Path -Parent $gitCommonDir
+            if (Test-Path (Join-Path $mainRepo "notebook\Notebook_A_Vizyon.md")) {
+                Write-Host "[bilgi] worktree icindeyim, ana repo CLAUDE.md/notebook kullaniliyor: $mainRepo" -ForegroundColor DarkCyan
+                $repoRoot = $mainRepo
+            }
+        }
+    } catch { }
+}
 
 $tarihStr = Get-Date -Format "dd MMM yyyy HH:mm"
 $tarihKisa = Get-Date -Format "yyyyMMdd_HHmm"
@@ -55,7 +81,7 @@ Add-Line ""
 $claudeMd = Join-Path $repoRoot "CLAUDE.md"
 $claudeLines = Get-Content -Path $claudeMd -Encoding UTF8
 $claudeSatir = $claudeLines.Count
-$kuralSayim = ($claudeLines | Where-Object { $_ -match '^### Kural \d+' }).Count
+$kuralSayim = ($claudeLines | Where-Object { $_ -match '^### Kural \d+(?! v\d+ alt)' }).Count
 $ilkeSayim = ($claudeLines | Where-Object { $_ -match '^### .lke \d+' }).Count
 
 $vizyon = Join-Path $repoRoot "notebook\Notebook_A_Vizyon.md"
