@@ -139,7 +139,51 @@ export default function SignalsPage() {
       type: "rightAligned",
       valueFormatter: (p) =>
         `$${(p.value as number).toFixed(2)}`,
-      cellStyle: { fontFamily: "var(--font-jetbrains-mono, monospace)", fontSize: "13px" },
+      cellStyle: { fontFamily: "var(--font-jetbrains-mono, monospace)", fontSize: "13px", color: "inherit" },
+    },
+    {
+      field: "stop_loss",
+      headerName: "Stop",
+      width: 90,
+      type: "rightAligned",
+      valueFormatter: (p) =>
+        p.value != null ? `$${(p.value as number).toFixed(2)}` : "—",
+      cellStyle: { fontFamily: "var(--font-jetbrains-mono, monospace)", fontSize: "12px", color: "var(--mtp-danger)" },
+    },
+    {
+      field: "target_price",
+      headerName: "Hedef",
+      width: 90,
+      type: "rightAligned",
+      valueFormatter: (p) =>
+        p.value != null ? `$${(p.value as number).toFixed(2)}` : "—",
+      cellStyle: { fontFamily: "var(--font-jetbrains-mono, monospace)", fontSize: "12px", color: "var(--mtp-excellent)" },
+    },
+    {
+      field: "risk_reward",
+      headerName: "R/R",
+      width: 80,
+      type: "rightAligned",
+      // KARAR #473: R/R = (hedef - fiyat) / (fiyat - stop). Backend hesaplar.
+      // 1.0+ kabul edilebilir, 2.0+ iyi, 3.0+ mükemmel (mekanik karar referansı).
+      cellRenderer: (p: ICellRendererParams<Signal>) => {
+        const v = p.value as number | null;
+        if (v == null) return <span className="text-muted-foreground">—</span>;
+        const color =
+          v >= 3 ? "var(--mtp-excellent)" :
+          v >= 2 ? "var(--mtp-good)" :
+          v >= 1 ? "var(--mtp-neutral)" :
+                   "var(--mtp-danger)";
+        return (
+          <span
+            className="font-semibold tabular-nums"
+            style={{ color, fontFamily: "var(--font-jetbrains-mono, monospace)", fontSize: "13px" }}
+            title={`Risk/Reward = (hedef-fiyat) / (fiyat-stop) = ${v.toFixed(2)}`}
+          >
+            {v.toFixed(2)}
+          </span>
+        );
+      },
     },
     {
       field: "added_date",
@@ -149,7 +193,7 @@ export default function SignalsPage() {
       // Backend ISO "YYYY-MM-DD[ HH:MM]" tutar, frontend formatDateTR helper kullanır
       // (web/lib/format-date.ts — DRY, Bilgi Mimarisi İlke #4 Tekrarsızlık).
       valueFormatter: (p) => formatDateTR(p.value as string | null),
-      cellStyle: { fontFamily: "var(--font-jetbrains-mono, monospace)", fontSize: "12px" },
+      cellStyle: { fontFamily: "var(--font-jetbrains-mono, monospace)", fontSize: "12px", color: "inherit" },
     },
     {
       headerName: "",

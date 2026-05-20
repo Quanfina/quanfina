@@ -1382,14 +1382,30 @@ class Signal(BaseModel):
     # KARAR #469 (20 May 2026) revize: konsensus mantığı kaldırıldı.
     # Her watchlist satırı = 1 Signal (NVDA-Minervini ayrı, NVDA-Carr ayrı).
     # UX Bölüm 4 madde 5 ("Her satır ayrı trade: kendi stop, kendi hedef, kendi R/R") ile uyumlu.
+    # KARAR #473 (20 May 2026 ~07:30): stop_loss + target_price + risk_reward eklendi
+    # (UX Bölüm 4 madde 6: "R/R'a göre sıralı"). Backend hesaplar, frontend gösterir.
     symbol: str
     strategy: str
     status: str
     setup_type: Optional[str] = None
     rs_rating: float
     price: float
+    stop_loss: Optional[float] = None
+    target_price: Optional[float] = None
+    risk_reward: Optional[float] = None  # (target - price) / (price - stop)
     added_date: str
     is_new_today: bool
+
+
+def _calc_rr(price: float, stop: Optional[float], target: Optional[float]) -> Optional[float]:
+    """Risk/Reward oranı: hedef / risk. price > stop ve target > price gerek."""
+    if stop is None or target is None:
+        return None
+    risk = price - stop
+    reward = target - price
+    if risk <= 0 or reward <= 0:
+        return None
+    return round(reward / risk, 2)
 
 
 @app.get("/api/signals", response_model=list[Signal])
@@ -1401,21 +1417,28 @@ def get_signals() -> list[Signal]:
     # Sn. Ferit: "tarihlerin yanında saatte olsun" (20 May 2026 ~06:45) — added_date "YYYY-MM-DD HH:MM"
     # Her watchlist satırı 1 sinyal felsefesi korundu — çoklu strateji × çoklu hisse
     if not db_health_check():
-        # is_new_today bugünün tarih prefix'i ile eşleşme (saat kısmı YYYY-MM-DD'den sonra)
+        # KARAR #473: stop_loss + target_price + risk_reward (R/R 2:1 ile 3.5:1 arasında gerçekçi dağılım)
+        def s(symbol, strategy, status, setup, rs, price, stop, target, added, new=False):
+            return Signal(
+                symbol=symbol, strategy=strategy, status=status, setup_type=setup,
+                rs_rating=rs, price=price, stop_loss=stop, target_price=target,
+                risk_reward=_calc_rr(price, stop, target),
+                added_date=added, is_new_today=new,
+            )
         mock_signals = [
-            Signal(symbol="NVDA",  strategy="minervini", status="buy",     setup_type="VCP",                 rs_rating=99.0, price=145.20, added_date=f"{today} 09:32",        is_new_today=True),
-            Signal(symbol="NVDA",  strategy="carr",      status="focus",   setup_type="Pullback",            rs_rating=99.0, price=145.20, added_date="2026-05-19 14:15",     is_new_today=False),
-            Signal(symbol="AAPL",  strategy="minervini", status="focus",   setup_type="Power Play",          rs_rating=87.0, price=212.50, added_date="2026-05-18 10:47",     is_new_today=False),
-            Signal(symbol="MSFT",  strategy="minervini", status="buy",     setup_type="Tight Low Vol",       rs_rating=91.0, price=425.30, added_date="2026-05-19 11:23",     is_new_today=False),
-            Signal(symbol="MSFT",  strategy="carr",      status="watch",   setup_type="Coiled Spring",       rs_rating=91.0, price=425.30, added_date="2026-05-17 15:58",     is_new_today=False),
-            Signal(symbol="GOOGL", strategy="carr",      status="buy",     setup_type="Bullish Divergence",  rs_rating=88.0, price=178.40, added_date="2026-05-19 13:04",     is_new_today=False),
-            Signal(symbol="AMD",   strategy="minervini", status="on_deck", setup_type="Inside Day",          rs_rating=85.0, price=158.20, added_date="2026-05-18 16:42",     is_new_today=False),
-            Signal(symbol="TSLA",  strategy="minervini", status="focus",   setup_type="Tight Low Vol",      rs_rating=82.0, price=245.60, added_date="2026-05-19 09:51",     is_new_today=False),
-            Signal(symbol="META",  strategy="carr",      status="watch",   setup_type="Pullback",            rs_rating=80.0, price=512.80, added_date="2026-05-16 12:18",     is_new_today=False),
-            Signal(symbol="AVGO",  strategy="minervini", status="buy",     setup_type="VCP",                 rs_rating=78.0, price=1450.30, added_date="2026-05-19 10:09",    is_new_today=False),
+            s("NVDA",  "minervini", "buy",     "VCP",                 99.0, 145.20,  141.50,  157.00,  f"{today} 09:32",     True),
+            s("NVDA",  "carr",      "focus",   "Pullback",            99.0, 145.20,  142.00,  155.00,  "2026-05-19 14:15"),
+            s("AAPL",  "minervini", "focus",   "Power Play",          87.0, 212.50,  207.00,  228.00,  "2026-05-18 10:47"),
+            s("MSFT",  "minervini", "buy",     "Tight Low Vol",       91.0, 425.30,  418.00,  445.00,  "2026-05-19 11:23"),
+            s("MSFT",  "carr",      "watch",   "Coiled Spring",       91.0, 425.30,  420.00,  None,    "2026-05-17 15:58"),
+            s("GOOGL", "carr",      "buy",     "Bullish Divergence",  88.0, 178.40,  174.50,  189.00,  "2026-05-19 13:04"),
+            s("AMD",   "minervini", "on_deck", "Inside Day",          85.0, 158.20,  154.00,  170.00,  "2026-05-18 16:42"),
+            s("TSLA",  "minervini", "focus",   "Tight Low Vol",       82.0, 245.60,  240.00,  263.00,  "2026-05-19 09:51"),
+            s("META",  "carr",      "watch",   "Pullback",            80.0, 512.80,  None,    None,    "2026-05-16 12:18"),
+            s("AVGO",  "minervini", "buy",     "VCP",                 78.0, 1450.30, 1420.00, 1525.00, "2026-05-19 10:09"),
         ]
-        # Sıralama: RS rating descending
-        mock_signals.sort(key=lambda s: -s.rs_rating)
+        # Sıralama: önce R/R (yüksek), R/R yoksa RS — UX Bölüm 4 madde 6
+        mock_signals.sort(key=lambda x: (-(x.risk_reward or 0), -x.rs_rating))
         return mock_signals
 
     # Gerçek DB yolu (db_connected=true)
@@ -1430,6 +1453,8 @@ def get_signals() -> list[Signal]:
     # KARAR #469: her watchlist satırı = 1 sinyal (NO grouping)
     # is_new_today: added_date prefix (ilk 10 char) bugüne eşit mi
     #   — added_date "YYYY-MM-DD" veya "YYYY-MM-DD HH:MM" formatında olabilir
+    # KARAR #473: stop_loss/target_price şu an web_watchlist'te yok (gelecek migration)
+    #   → None döndürülür, R/R hesaplanmaz. MOCK fallback'te dolu.
     signals: list[Signal] = []
     for row in all_rows:
         added_prefix = (row.added_date or "")[:10]
@@ -1440,6 +1465,9 @@ def get_signals() -> list[Signal]:
             setup_type=row.setup_type,
             rs_rating=row.rs_rating,
             price=row.price,
+            stop_loss=None,
+            target_price=None,
+            risk_reward=None,
             added_date=row.added_date,
             is_new_today=(added_prefix == today),
         ))
