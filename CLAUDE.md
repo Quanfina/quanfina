@@ -1003,11 +1003,21 @@ uygula), Kural #17 (Uzman/Yorumcu = NotebookLM), KARAR ADAY #453-#458
 Yönlendirme) + #8 (Öğrenen — Markets360 ham kaynak emeği boşa
 gitmesin), `notebook/Sprint_4_bis_Mimari_Kararlar.md`.
 
-### Kural 21 — Browser Test Disiplini (Hibrit) (19 May 2026 ~20:00 yeni)
+### Kural 21 — Browser Test Disiplini (Hibrit, 3 Kanal) (19 May 2026 ~20:00 yeni, 20 May 2026 ~10:15 revize)
 
-UI iş yapan her büyük adımda **görsel doğrulama ZORUNLU.** İki kanal
-hibrit kullanılır — biri çalışmazsa diğerine düşülür, ikisi de
-çalışmazsa adım kapanmaz.
+UI iş yapan her büyük adımda **görsel doğrulama ZORUNLU.** **Üç kanal**
+hibrit kullanılır — varsayılan Kanal C, biri çalışmazsa diğerine
+düşülür, hiçbiri çalışmıyorsa adım kapanmaz.
+
+**Kanal C — Playwright Bağımsız ⭐ VARSAYILAN (20 May 2026 ~10:00 RESMÎ TESCİL):**
+- `node visual_test_full_site.mjs` Playwright script
+- `chromium.launch({ headless: true })` — Chrome eklentisine bağımlı değil
+- Dark theme: `newContext({ colorScheme: "dark", viewport: { width: 1366, height: 768 } })`
+- 9 sayfa otomatik dolaşma + fullPage screenshot
+- `test-screenshots/_full_site/<name>.png` → AI Read tool ile okur
+- Avantaj: permission engeli yok, otonom, repeatable, ~15 sn
+- **Sn. Ferit talimatı (20 May ~10:00):** *"VS Code yolu ile Screenshot çözdük, kalıcı iş akışına ekleyelim"* → Kural #14 doğrudan tescil
+- **Pattern:** AI Code agent (ben) `Bash` ile `node ...` çağırır, PNG'leri Read tool ile analiz eder. Manifesto Özellik #8 zafer
 
 **Kanal A — Chrome MCP (otomatik, ben yönetirim):**
 - Eklenti `Claude for Chrome` pair'li + Site Erişimi "Tüm sitelerde"
@@ -1040,12 +1050,14 @@ hibrit kullanılır — biri çalışmazsa diğerine düşülür, ikisi de
 - Notebook/script/markdown değişikliği → browser test gereksiz
 - Sadece dokümantasyon güncellemesi → atlanır
 
-**KARAR ALGORITMI:**
-1. `list_connected_browsers` → boş ise → Kanal B (Sn. Ferit'ten iste)
-2. Kanal A `navigate` → `permission_required` ise → 1 kez bilgilendirme
-   sonra Kanal B'ye geç (Kural #1 + #5 — zaman israfı yok)
-3. Hangi kanalda olursa olsun: kanıt YAPILANLAR.md tarih notuna eklenir
-   (regression diff geçmişi için)
+**KARAR ALGORITMI (20 May 2026 ~10:15 revize — Kanal C öncelikli):**
+1. **Varsayılan: Kanal C** (Playwright `node visual_test_full_site.mjs`) — Chrome MCP permission gerekmez, otonom
+2. Sn. Ferit özel istemezse Kanal A denenmez (permission engeline takılmaz)
+3. Kanal A sadece **Sn. Ferit Chrome eklenti izni verirse** devreye girer (AÇIK KONU #74, gelecek tetik)
+4. Kanal B (Sn. Ferit screenshot) → görsel insan değerlendirmesi gerektiğinde ("hoşuma gitmedi" tipi öznel feedback)
+5. Hangi kanalda olursa olsun: kanıt YAPILANLAR.md tarih notuna eklenir
+
+**AÇIK KONU #74 (gelecek):** Chrome MCP localhost permission Sn. Ferit eli. Çözüldüğünde Kanal A devreye, Kanal C de paralel canlı kalır (regression + ad-hoc kombinasyon).
 
 **KURAL #20 ile bağ:**
 - Kural #20 = **ne tasarlanmalı** (Master + Markets360 çift danışma)
