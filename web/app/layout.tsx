@@ -9,10 +9,19 @@ const inter = Inter({
   subsets: ["latin"],
 });
 
+// KARAR #489 (20 May 2026 ~15:30): next/font/google KOK SORUN
+// 5 tur sonra DOM dump JetBrains Mono diyordu ama gorsel sans-serif. Sebep:
+// next/font/google default adjustFontFallback: true -> synthetic Arial-based
+// fallback yaratir. JetBrains Mono dosyasi yuklenmediginde tarayici
+// "JetBrains Mono Fallback" diye Arial sans-serif gosterir.
+// Cozum: adjustFontFallback: false + explicit fallback chain monospace.
 const jetbrainsMono = JetBrains_Mono({
   variable: "--font-jetbrains-mono",
   subsets: ["latin"],
   weight: ["400", "500", "600"],
+  display: "swap",
+  adjustFontFallback: false,
+  fallback: ["Courier New", "Consolas", "Monaco", "monospace"],
 });
 
 export const metadata: Metadata = {
