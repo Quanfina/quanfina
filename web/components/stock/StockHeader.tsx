@@ -1,4 +1,3 @@
-import { Layers } from "lucide-react";
 import type { StockInfo } from "@/types/stock";
 
 function rsBackground(rs: number): string {
@@ -14,9 +13,11 @@ function rsColor(rs: number): string {
   return "var(--mtp-danger)";
 }
 
+// KARAR ADAY (21 May 2026): Konsensus rozeti kaldirildi. Sn. Ferit talimat:
+// "konsesus kalksin nasil olsa her strateji tabloda farkli satirda gorukucek".
+// Aktif strateji bilgisi alt sekmelerde gosterilebilir (ActiveStrategies komponent).
 export function StockHeader({ info }: { info: StockInfo }) {
   const isPositive = info.change_pct >= 0;
-  const consensus = info.active_strategies.length;
 
   return (
     <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -77,25 +78,7 @@ export function StockHeader({ info }: { info: StockInfo }) {
           </span>
         </div>
 
-        {/* Consensus badge (only when >= 2) */}
-        {consensus >= 2 && (
-          <div
-            className="flex flex-col items-center px-3 py-2 rounded-md min-w-[52px]"
-            style={{
-              background: "color-mix(in srgb, var(--mtp-excellent) 18%, transparent)",
-              color: "var(--mtp-excellent)",
-            }}
-          >
-            <span className="text-xs text-muted-foreground leading-tight">Konsensus</span>
-            <span
-              className="text-lg font-bold leading-tight inline-flex items-center gap-1"
-              style={{ fontFamily: "var(--font-jetbrains-mono, monospace)" }}
-            >
-              {consensus}
-              <Layers size={13} strokeWidth={2} />
-            </span>
-          </div>
-        )}
+        {/* Konsensus rozeti kaldirildi (KARAR ADAY 21 May 2026) */}
       </div>
     </div>
   );

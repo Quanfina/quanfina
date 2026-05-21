@@ -56,7 +56,7 @@ export default function HissePage({
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft size={14} />
-          Watchlist&apos;e dön
+          İzleme Listesi&apos;ne dön
         </Link>
       </div>
     );
@@ -71,7 +71,7 @@ export default function HissePage({
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft size={14} />
-          Watchlist
+          İzleme Listesi
         </Link>
       </div>
 

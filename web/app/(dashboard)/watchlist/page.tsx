@@ -35,7 +35,6 @@ export default function WatchlistPage() {
   const { gridClass } = useGridTheme();
   const [strategy, setStrategy] = useState("all");
   const [status, setStatus] = useState("all");
-  const [minConsensus, setMinConsensus] = useState(0);
   const [search, setSearch] = useState("");
   const { data, isLoading, isError, error, refetch, isFetching } = useWatchlist();
   const gridRef = useRef<AgGridReact<WatchlistRow>>(null);
@@ -102,11 +101,12 @@ export default function WatchlistPage() {
     [] // stable: callbacksRef is a ref, wrapper lambdas don't change
   );
 
+  // KARAR ADAY (21 May 2026): Konsensus filter + siralama kaldirildi. Her strateji
+  // ayri satir kanon. Siralama: strategy > symbol alfabetik (deterministik).
   const rowData = useMemo(() => {
     let rows: WatchlistRow[] = data ?? [];
     if (strategy !== "all") rows = rows.filter((r) => r.strategy === strategy);
     if (status !== "all") rows = rows.filter((r) => r.status === status);
-    if (minConsensus > 0) rows = rows.filter((r) => r.consensus_count >= minConsensus);
     if (search) {
       const q = search.toUpperCase();
       rows = rows.filter(
@@ -114,9 +114,9 @@ export default function WatchlistPage() {
       );
     }
     return [...rows].sort(
-      (a, b) => b.consensus_count - a.consensus_count || a.symbol.localeCompare(b.symbol)
+      (a, b) => a.strategy.localeCompare(b.strategy) || a.symbol.localeCompare(b.symbol)
     );
-  }, [data, strategy, status, minConsensus, search]);
+  }, [data, strategy, status, search]);
 
   // KARAR #476: gridClass useGridTheme'den (SSR uyumu)
 
@@ -124,7 +124,7 @@ export default function WatchlistPage() {
     <div className="flex flex-col h-full">
       <div className="px-6 py-3 border-b flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Watchlist</h1>
+          <h1 className="text-xl font-semibold tracking-tight">İzleme Listesi</h1>
           <p className="text-sm text-muted-foreground">
             Tüm stratejiler — çapraz görünüm (İLKE #44 / KARAR #350)
           </p>
@@ -141,8 +141,6 @@ export default function WatchlistPage() {
           onStrategyChange={setStrategy}
           status={status}
           onStatusChange={setStatus}
-          minConsensus={minConsensus}
-          onMinConsensusChange={setMinConsensus}
           search={search}
           onSearchChange={setSearch}
           totalRows={data?.length ?? 0}
@@ -164,7 +162,7 @@ export default function WatchlistPage() {
               role="alert"
             >
               <div className="font-semibold mb-1" style={{ color: "var(--mtp-danger)" }}>
-                ⚠️ Watchlist verisi alınamadı
+                ⚠️ İzleme Listesi verisi alınamadı
               </div>
               <div className="text-xs mb-3 opacity-80">
                 {(error as Error)?.message ?? "Bilinmeyen hata"}
@@ -184,7 +182,7 @@ export default function WatchlistPage() {
             <span className="text-3xl">📋</span>
             <div className="font-medium">Henüz hisse eklemediniz</div>
             <div className="text-xs text-muted-foreground max-w-md text-center">
-              Sinyaller veya Hisse Tarama sayfasından aday hisseleri tek tıkla Watch listesine ekleyebilirsiniz.
+              Sinyaller veya Tarama sayfasından aday hisseleri tek tıkla Watch listesine ekleyebilirsiniz.
             </div>
             <Button size="sm" onClick={() => setAddOpen(true)} className="mt-1">
               <Plus size={14} className="mr-1.5" />

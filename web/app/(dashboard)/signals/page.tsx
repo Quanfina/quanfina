@@ -316,7 +316,7 @@ export default function SignalsPage() {
             Tüm strateji sinyalleri — bugün ne var?
           </p>
         </div>
-        <Button size="sm" onClick={() => setManualOpen(true)} title="Manuel sinyal ekle (Watchlist üzerinden)">
+        <Button size="sm" onClick={() => setManualOpen(true)} title="Manuel sinyal ekle (İzleme Listesi üzerinden)">
           <Plus size={14} className="mr-1.5" />
           Manuel Sinyal
         </Button>
@@ -442,7 +442,7 @@ export default function SignalsPage() {
             <Activity size={32} strokeWidth={1.5} />
             <p className="text-sm">Bu filtreyle sinyal yok.</p>
             <p className="text-xs">
-              Filtre seçimini değiştirin veya Watchlist üzerinden yeni sinyal ekleyin.
+              Filtre seçimini değiştirin veya İzleme Listesi üzerinden yeni sinyal ekleyin.
             </p>
           </div>
         )}

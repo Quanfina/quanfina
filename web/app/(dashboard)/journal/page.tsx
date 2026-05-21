@@ -103,7 +103,7 @@ export default function JournalPage() {
       {/* Header */}
       <div className="px-6 py-3 border-b flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Trade Journal</h1>
+          <h1 className="text-xl font-semibold tracking-tight">İşlem Günlüğü</h1>
           <p className="text-sm text-muted-foreground">
             Tüm trade kayıtları — grade, P/L, dersler
           </p>

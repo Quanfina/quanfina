@@ -1,7 +1,9 @@
 import type { ColDef, ValueFormatterParams, CellClassParams, CellStyle } from "ag-grid-community";
 import type { WatchlistRow } from "@/types/watchlist";
 import { StatusBadge } from "./StatusBadge";
-import { ConsensusBadge } from "./ConsensusBadge";
+// ConsensusBadge import kaldirildi (KARAR ADAY 21 May 2026): Konsensus kavrami kaldirildi,
+// her strateji ayri satir kanon. Komponent dosyasi (ConsensusBadge.tsx) silinmedi -
+// Kural #18 pasif oge mantigi.
 import { StrategyCellRenderer } from "./StrategyCellRenderer";
 import { SetupCellRenderer } from "./SetupCellRenderer";
 import { SymbolCellRenderer } from "./SymbolCellRenderer";
@@ -82,16 +84,8 @@ export const COL_DEFS: ColDef<WatchlistRow>[] = [
       background: rsBackground(p.value ?? null),
     }),
   },
-  {
-    field: "consensus_count",
-    headerName: "KONSENSUS",
-    headerComponent: TermHeaderComponent,
-    headerComponentParams: { termKey: "consensus" },
-    width: 120,
-    minWidth: 110,
-    cellRenderer: ConsensusBadge,
-    cellStyle: { display: "flex", alignItems: "center" },
-  },
+  // KONSENSUS kolonu kaldirildi (KARAR ADAY 21 May 2026): her strateji ayri satir
+  // kanon, konsensus sayim noise.
   {
     field: "added_date",
     headerName: "EKLENME",

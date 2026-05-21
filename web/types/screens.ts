@@ -1,44 +1,45 @@
 /**
- * Sprint 4-bis Screen tipler
- * Kaynak: notebook/Notebook_C1_Sprint_QuickStart.md (SCREENS tuple)
- *         api/db_helpers.py SCREENS_READY_9 + SCREENS_PARSE_7 + SCREENS_DIFF_6
+ * Sprint 4-bis.6 Screen tipler — ARŞİV MODU
  *
- * KARAR #461 (19 May 2026): tight_low_volume Deferred -> Ready (pre-compute,
- * scanner.py tight_low_vol_pass BOOLEAN yazar). Kategori sayim: 9+7+6+0.
+ * 22 May 2026: 25 screen kaldirildi (UI'dan). Tam envanter:
+ *   notebook/Tarama_Listeleri_Arsiv.md
+ *
+ * Sn. Ferit talimat (22 May 2026): "Adim adim gidicem artik. Notebook kaydet,
+ * tarama sayfasindaki listeleri de kaydederek kaldir."
+ *
+ * Sebep: 5-Kaynak danisma sentezi (Sprint_4_bis_5_Kaynak_Sentez.md). Karar
+ * yorgunlugu somut kanit (Sn. Ferit Vizyon: "Sayfaya bakiyorum neye baktigimi
+ * anlamiyorum"). Kural #18 pasif oge cikarma somut canli.
+ *
+ * Backend KORUNDU:
+ *   - scanner.py 1955 satir
+ *   - quanfina_math.py 903 satir (9 compute_* fonksiyon)
+ *   - api/db_helpers.py SCREENS_READY_12 + SCREENS_PARSE_7 + SCREENS_DIFF_6
+ *   - api/main.py /api/screens/{slug} endpoint
+ *   - DB tablolari (minervini_scans + 6 Migration kolonlari)
+ *
+ * Frontend (bu dosya): ScreenSlug union BOSALDI, SCREEN_CATEGORIES = {}.
+ * Hook'lar (useScreenMeta, useScreenResults) cagrilmaz hale geldi - screens/page.tsx
+ * basit bos state gosterir.
+ *
+ * Yeniden doldurma plani: Sprint 4-bis.7+ olay-tetikli sirali
+ *   1. Cup with Handle (yeni screen)
+ *   2. Pocket Pivot (yeni screen)
+ *   3. Flat Base (Stage 2 alt-filtre)
+ *
+ * Geri getirme: notebook/Tarama_Listeleri_Arsiv.md "Geri Getirme Talimati"
+ *
+ * KARAR ref: #402, #461, #465, #466, #467, KARAR ADAY #442, #468
+ * Kural ref: #4, #18, #23
+ * Ilke ref: #4, #11
  */
 
-export type ScreenSlug =
-  // Sprint 4-bis.1b — Ready (10, saf SQL, KARAR #461 + #466 ile tight_low_vol* dahil)
-  | "tpr_a"
-  | "tpr_a_b"
-  | "rpr_89_tpr_c"
-  | "stage2_10p"
-  | "stage2_below_10"
-  | "top5_rpr"
-  | "mom_10p"
-  | "mom_below_10"
-  | "tight_low_volume"  // KARAR #461 Sprint 4-bis.4 — pre-compute, Ready'ye tasindi
-  | "tight_low_vol_excellent"  // KARAR #466 Sprint 4-bis.5 — A+ Kalite (EXCELLENT filtre)
-  | "vcp_ready_high"  // KARAR #465 Sprint 4-bis.5 — Ready Score >= 70 (Inside Day + V-Dry + Tight)
-  | "power_play_ready"  // KARAR #467 Sprint 4-bis.5 — Power Play (HTF) Mark canon POLE %100+ FLAG %10-25
-  // Sprint 4-bis.2 — Parse (7, confirmations/violations text-parse)
-  | "stage2_loose_10p"
-  | "stage2_loose_below"
-  | "stage2_vloose_10p"
-  | "stage2_vloose_below"
-  | "buy_risk_green"
-  | "momentum_5x_rpr_70"
-  | "mom_qualifier"
-  // Sprint 4-bis.3 — Scan-Diff (6, Self-JOIN onceki scan karsilastirma)
-  | "tpr_moving_up"
-  | "tpr_jump_2"
-  | "tpr_d_to_b"
-  | "new_top5_rpr"
-  | "new_7d_rpr_10p"
-  | "new_7d_rpr_below";
+// ScreenSlug union ARSIVDE - tum 25 slug notebook/Tarama_Listeleri_Arsiv.md'de
+// Tip korunur (hook'lar icin), ileride yeni setup eklendikce union dolar.
+export type ScreenSlug = string;
 
-// Sprint 4-bis.4 KARAR #461: "deferred" kategorisi boşaldı, 30 gün sonra
-// Kural #18 pasif öğe çıkarma adayı (silinebilir).
+// Sprint 4-bis.4 KARAR #461: "deferred" kategorisi bosaldi.
+// Sprint 4-bis.6 (22 May 2026): tum kategoriler de bosaldi (Kural #18 pasif oge cikarma).
 export type ScreenCategory = "ready" | "parse" | "diff" | "deferred";
 
 export interface ScreenMeta {
@@ -55,42 +56,17 @@ export interface ScreenResultRow {
   price: number | null;
   passed: number | null;
   scan_date: string | null;
-  // KARAR #466 (20 May 2026) — VCP Kalite Skoru, tight_low_vol* slug'larinda anlamli
+  // KARAR #466 — VCP Kalite Skoru (slug yeniden eklenince anlamli)
   vcp_quality_score?: "EXCELLENT" | "PASS" | null;
-  // KARAR #465 (20 May 2026) — VCP Ready Score 0-100, vcp_ready_high + tight_low_vol* slug'larinda
+  // KARAR #465 — VCP Ready Score 0-100
   vcp_ready_score?: number | null;
-  // KARAR #467 (20 May 2026) — Power Play (HTF) Mark canon
+  // KARAR #467 — Power Play (HTF) Mark canon
   power_play_pass?: boolean | null;
 }
 
-/** Kategoriler — Notebook_C1 SCREENS tuple'dan */
-export const SCREEN_CATEGORIES: Record<ScreenSlug, string> = {
-  // Ready (8)
-  tpr_a: "TPR-Bazlı",
-  tpr_a_b: "TPR-Bazlı",
-  rpr_89_tpr_c: "TPR-Bazlı",
-  stage2_10p: "Stage",
-  stage2_below_10: "Stage",
-  top5_rpr: "RPR-Bazlı",
-  mom_10p: "Momentum",
-  mom_below_10: "Momentum",
-  tight_low_volume: "Pattern (VCP)",  // KARAR #461 — Ready'ye taşındı
-  tight_low_vol_excellent: "Pattern (VCP A+)",  // KARAR #466 — EXCELLENT filtre
-  vcp_ready_high: "Pattern (VCP Ready)",  // KARAR #465 — Ready Score 70+
-  power_play_ready: "Pattern (Power Play)",  // KARAR #467 — HTF Mark canon
-  // Parse (7)
-  stage2_loose_10p: "Stage (Loose)",
-  stage2_loose_below: "Stage (Loose)",
-  stage2_vloose_10p: "Stage (Very Loose)",
-  stage2_vloose_below: "Stage (Very Loose)",
-  buy_risk_green: "Pattern",
-  momentum_5x_rpr_70: "Momentum 5x",
-  mom_qualifier: "Momentum",
-  // Scan-Diff (6)
-  tpr_moving_up: "TPR-Bazli (Diff)",
-  tpr_jump_2: "TPR-Bazli (Diff)",
-  tpr_d_to_b: "TPR-Bazli (Diff)",
-  new_top5_rpr: "RPR-Bazli (Diff)",
-  new_7d_rpr_10p: "RPR-Bazli (Diff)",
-  new_7d_rpr_below: "RPR-Bazli (Diff)",
-};
+/**
+ * Kategoriler — ARSIV MODU (22 May 2026)
+ * Tum 25 slug -> kategori esleme notebook/Tarama_Listeleri_Arsiv.md'de.
+ * Yeniden ekleme: bu objeye slug + kategori ekle, dropdown'da gozukur.
+ */
+export const SCREEN_CATEGORIES: Record<string, string> = {};

@@ -129,7 +129,7 @@ export default function Home() {
         ? `${openTrades.length} açık pozisyon stop loss güncellendi (trailing)`
         : "Açık pozisyon yok",
       detail: openTrades.length > 0
-        ? "Trade Journal → her trade için trailing stop seviyesi gözden geçir"
+        ? "İşlem Günlüğü → her trade için trailing stop seviyesi gözden geçir"
         : "Bugün için aktif risk yok",
       href: "/journal",
       priority: openTrades.length > 0 ? "high" : "low",
@@ -147,14 +147,14 @@ export default function Home() {
     },
     {
       id: "watchlist-hygiene",
-      label: `Watchlist hijyen — ${watchlistCount} satır gözden geçirildi`,
+      label: `İzleme Listesi hijyen — ${watchlistCount} satır gözden geçirildi`,
       detail: "Focus/Buy listesi temiz mi, kaldırılacak hisse var mı?",
       href: "/watchlist",
       priority: "normal",
     },
     {
       id: "screens-scan",
-      label: "Hisse Tarama — günlük scan sonuçları incelendi",
+      label: "Tarama — günlük scan sonuçları incelendi",
       detail: "25 ekran içinde Stage 2 + RS 90+ adaylar var mı?",
       href: "/screens",
       priority: "low",
@@ -169,7 +169,7 @@ export default function Home() {
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold tracking-tight">Bugün Ne Var?</h1>
         <p className="text-sm text-muted-foreground">
-          Günlük rutin — Sinyaller → Watchlist → Piyasa → Trade Journal
+          Günlük rutin — Sinyaller → İzleme Listesi → Piyasa → İşlem Günlüğü
         </p>
       </div>
 
@@ -183,7 +183,7 @@ export default function Home() {
           color="var(--mtp-excellent)"
         />
         <StatCard
-          label="Watchlist"
+          label="İzleme Listesi"
           value={`${watchlistCount}`}
           subValue="aktif takip"
           href="/watchlist"
@@ -382,7 +382,7 @@ export default function Home() {
             href="/journal"
             className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
           >
-            Trade Journal <ArrowRight size={12} />
+            İşlem Günlüğü <ArrowRight size={12} />
           </Link>
         </div>
         {trades.isLoading && (
@@ -525,14 +525,14 @@ export default function Home() {
           className="flex items-center gap-2 p-3 rounded-md border hover:bg-accent transition-colors text-sm"
         >
           <TrendingUp size={14} className="text-muted-foreground" />
-          <span>Hisse Tarama</span>
+          <span>Tarama</span>
         </Link>
         <Link
           href="/watchlist"
           className="flex items-center gap-2 p-3 rounded-md border hover:bg-accent transition-colors text-sm"
         >
           <ListChecks size={14} className="text-muted-foreground" />
-          <span>Watchlist</span>
+          <span>İzleme Listesi</span>
         </Link>
         <Link
           href="/piyasa-durumu"

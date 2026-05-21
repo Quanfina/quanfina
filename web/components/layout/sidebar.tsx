@@ -28,9 +28,9 @@ const NAV_ITEMS: NavItem[] = [
   { kind: "leaf", href: "/",               label: "Ana Sayfa",     icon: Home         },
   { kind: "leaf", href: "/piyasa-durumu",  label: "Piyasa Durumu", icon: Globe        },
   { kind: "leaf", href: "/signals",        label: "Sinyaller",     icon: Activity     },
-  { kind: "leaf", href: "/screens",        label: "Hisse Tarama",  icon: ScanLine     },
-  { kind: "leaf", href: "/watchlist",      label: "Watchlist",     icon: ListChecks   },
-  { kind: "leaf", href: "/journal",        label: "Trade Journal", icon: NotebookText },
+  { kind: "leaf", href: "/watchlist",      label: "İzleme Listesi", icon: ListChecks  },
+  { kind: "leaf", href: "/screens",        label: "Tarama",         icon: ScanLine    },
+  { kind: "leaf", href: "/journal",        label: "İşlem Günlüğü", icon: NotebookText },
   {
     kind: "group",
     id: "strategies",
