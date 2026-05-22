@@ -15,8 +15,16 @@
 #   .\scripts\drive_sync.ps1 -ScheduledTask   # Windows task kayit (saatlik)
 #   .\scripts\drive_sync.ps1 -UnregisterTask  # Task sil
 #
-# Versiyon: v2.3 (19 May 2026 ~05:30, .txt'ler ayri _txt/ alt klasore (Sn. Ferit talebi))
+# Versiyon: v2.5 (22 May 2026 ~21:00, A: CLAUDE.md de _txt'e yansir + B: alt klasor prefix)
 # Kural uyumu: #15 (ASCII-only), #16 (native exe 2>&1 yok)
+#
+# v2.5 degisiklikleri (Sn. Ferit "Drive senkron kapsam" talebi):
+#   A. CLAUDE.md (repo root) -> _txt/CLAUDE.txt (Vizyon Bekcisi NotebookLM
+#      anayasa denetci rolu icin Drive linkli kaynak)
+#   B. Alt klasor cakisma fix (H#A2 paralel bug):
+#      kitaplar/_INDEX.md ve analizler/_INDEX.md ayni BaseName ile
+#      _txt/_INDEX.txt'e yaziliyordu (biri kayboluyordu). Fix: alt klasor
+#      adi prefix (kitaplar_INDEX.txt, analizler_INDEX.txt).
 #
 # v2.1 degisiklikleri (H#8 pattern - NotebookLM Plus .md gormez):
 #   - Robocopy /XF *.txt ile hedefteki .txt'ler extra sayilmaz (silinme korumasi)
@@ -240,13 +248,46 @@ if (-not (Test-Path $txtKlasoru)) {
 # birikti). Now: kok klasor .md'leri al, _archive/ dahil etme.
 $mdDosyalari = Get-ChildItem -Path $Hedef -Recurse -File -Filter "*.md" -ErrorAction SilentlyContinue |
     Where-Object { $_.FullName -notmatch '[\\/]_archive[\\/]' }
+
+# v2.5-A (22 May 2026): CLAUDE.md de _txt'e yansir (Vizyon Bekcisi NotebookLM
+# anayasa denetci rolu icin Drive linkli kaynak). repoRoot/CLAUDE.md notebook/'da
+# degil ama anayasa kanonu olarak NotebookLM kaynagi olmali.
+$claudeMdPath = Join-Path $repoRoot "CLAUDE.md"
+if (Test-Path $claudeMdPath) {
+    $claudeMdItem = Get-Item $claudeMdPath
+    $mdDosyalari = @($mdDosyalari) + $claudeMdItem
+}
+
 $txtUretildi = 0
 $txtAtlandi = 0
 $txtHata = 0
 
+# v2.5-B (22 May 2026): Alt klasor cakisma fix. Aynı BaseName farkli klasorde
+# (kitaplar/_INDEX vs analizler/_INDEX) cakisma yapmamali.
+function Get-TxtFileName {
+    param($mdItem, $baseDir)
+    # Kok klasor dosyasi mi?
+    $relPath = $mdItem.DirectoryName.Substring($baseDir.Length).Trim('\','/')
+    if (-not $relPath -or $relPath -eq "") {
+        return "$($mdItem.BaseName).txt"
+    }
+    # Alt klasor: subfolder_BaseName.txt formati
+    $subFolder = $relPath -replace '[\\/]', '_'
+    # BaseName onunde underscore varsa (_INDEX gibi) cift _ olusur, temizle
+    $baseName = $mdItem.BaseName -replace '^_+', ''
+    return "${subFolder}_$baseName.txt"
+}
+
 foreach ($md in $mdDosyalari) {
-    # v2.3: hedef _txt/ duz (BaseName, alt klasor hiyerarsisi yok)
-    $txtYolu = Join-Path $txtKlasoru "$($md.BaseName).txt"
+    # v2.5-B: alt klasor cakisma onleme + CLAUDE.md ozel durum
+    if ($md.FullName -eq $claudeMdPath) {
+        # CLAUDE.md repoRoot'tan, ozel isim
+        $txtYolu = Join-Path $txtKlasoru "CLAUDE.txt"
+    } else {
+        # notebook/ icindeki dosyalar
+        $txtFileName = Get-TxtFileName -mdItem $md -baseDir $Hedef
+        $txtYolu = Join-Path $txtKlasoru $txtFileName
+    }
     try {
         if ($KuruCalisma) {
             # Dry-run: sadece ne uretilecegini raporla
@@ -304,12 +345,21 @@ $txtDosyalari = Get-ChildItem -Path $txtKlasoru -File -Filter "*.txt" -ErrorActi
 $orphanSilindi = 0
 $orphanTespit = 0
 
-# Tum .md BaseName'leri set olarak topla (kok + alt klasorler)
-$mdBaseNames = @{}
-foreach ($md in $mdDosyalari) { $mdBaseNames[$md.BaseName] = $true }
+# v2.5: Beklenen .txt isimleri seti (Get-TxtFileName ile uyumlu)
+# Eski sadece BaseName karsilastiryordu, alt klasor cakismasi bug'i vardi.
+# Simdi: her .md icin gercek .txt dosya adi hesaplanir.
+$beklenenTxtBase = @{}
+foreach ($md in $mdDosyalari) {
+    if ($md.FullName -eq $claudeMdPath) {
+        $beklenenTxtBase["CLAUDE"] = $true
+    } else {
+        $txtName = Get-TxtFileName -mdItem $md -baseDir $Hedef
+        $beklenenTxtBase[[System.IO.Path]::GetFileNameWithoutExtension($txtName)] = $true
+    }
+}
 
 foreach ($txt in $txtDosyalari) {
-    if (-not $mdBaseNames.ContainsKey($txt.BaseName)) {
+    if (-not $beklenenTxtBase.ContainsKey($txt.BaseName)) {
         $orphanTespit++
         if ($KuruCalisma) {
             Write-Host "  [kuru-orphan] $($txt.Name)" -ForegroundColor Yellow
