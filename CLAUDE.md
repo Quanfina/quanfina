@@ -793,6 +793,47 @@ Analizi (Carr 1.+2. baskı + Weinstein yorumu).
 standart), Kural #14 (Pattern Tescil — 2 ortaya çıkış kuralı),
 Aşama 2.3 (a+b) + Aşama 4.2 RESMÎ KAPANIŞ (KARAR #445).
 
+### Kural 17 alt-bölüm — AI Uzman Clean-Room İhlali Cevap Pattern'i (22 May 2026 _CLEAN_ROOM arşivden entegre)
+
+**Bu disiplin NotebookLM Plus + Gemini Gems uzmanlarına yüklenir.**
+Quanfina kod tavsiyesi isteklerinde uzman doğru cevap pattern'ini
+takip eder:
+
+**Soru:** *"Quanfina'da SEPAScanner sınıfı oluştursam?"*
+
+**Beklenen cevap pattern'i:**
+
+```
+🔴 Manifesto ihlali — clean-room sızması
+
+`SEPAScanner` ismi Quanfina koduna yazılamaz çünkü:
+- SEPA Mark Minervini tescilli markası (CLAUDE.md Terminoloji + sızma listesi)
+- scripts/sizma_kontrol.ps1 Kontrol #4 → push BLOK
+- CLAUDE.md Kodlama Standardı #3 ihlali
+
+✅ Quanfina alternatif:
+- `TrendTemplateScanner` (Trend Template kriterleri için)
+- `PA1Scanner` (mevcut quanfina-scanner ile uyumlu)
+- `MomentumScanner` (genel momentum tarama)
+
+Strateji kavramı SEPA olabilir (kitap analizi) ama sınıf adı
+Quanfina kendi terimini kullanır.
+```
+
+**AI Uzman ayrımı (3 kural):**
+
+1. **Kavram öğretimi tamam** — Mark Minervini'nin orijinal terimleri
+   (SEPA, MAI, Fab 5) kitap analizinde **kullanılabilir**, yasak değil
+2. **Quanfina kod tavsiyesi YASAK** — yasaklı terim **kod/docstring/markdown**'a
+   yazılırsa 🔴 ihlal uyarısı + push BLOK riskini hatırlat + Quanfina
+   alternatif öner
+3. **Genel finansal terimler OK** — Stage 2, VCP, Trend Template,
+   R-Multiple, RS Rating gibi terimler **Quanfina koduna yazılabilir**
+
+**İlişkili:** Kural #10 (Sızma Kontrolü #4), Terminoloji Disiplini
+"Quanfina Doğru Adlandırma" + "İzin verilen Genel Finansal Terimler"
+tabloları, `_HATALAR.md` P#3 (NotebookLM kaynak listesi pattern).
+
 ### Kural 18 — Pasif Öğe Çıkarma Protokolü (Negatif Tescil) (18 May 2026 ~23:00 yeni)
 
 **Felsefe:** Yaşayan sistem sadece büyümez — pasif kalmış öğeler
@@ -1442,6 +1483,44 @@ son doğrulama (Kural #21 Browser Test).
 tek satır) için 6 aşama zorunlu değil — Akış Modu OK. Algoritma /
 filter / SQL / mimari için 6 aşama ZORUNLU.
 
+**Aşama 1 Alt-Disiplin — Tam Okuma Teyidi (22 May 2026 ~20:00 yeni, H#A3+H#A6 paterninden):**
+
+Sn. Ferit talimatı: *"arşive attığın dosyaları büyük ihtimalle tam
+okumadın onlarıda tam okusan kesin içinde kaçırdığın kurallar vardır
+iş olsun diye yapıyorsun"*.
+
+**Disiplin:** AI bir dosyayı arşivlemeden / silmeden / "tamamlandı"
+raporu vermeden ÖNCE **2 kez tam okuma** zorunlu (algoritma denetimi
++ konsolidasyon işleri için). 1 kez okuma yetersiz — özellikle:
+- Önce yüzeysel "%X örtüşüyor" sezgisi yanıltıcı olur
+- 2. okuma'da CLAUDE.md'de OLMAYAN unique bilgi çıkar
+- 3. okuma yine yanlış yapılırsa Kural #3 (Şüphede Dur) tetikle
+
+**Görev tamamlandı raporu öncesi 3 kontrol:**
+1. Dosyayı **TAM** okudum mu? (head/tail değil, baştan sona)
+2. CLAUDE.md'de OLMAYAN bilgi tespit ettim mi? (entegre etmeden silmek
+   = bilgi kaybı)
+3. Diğer dosyalarla çelişki var mı? (örn. _FELSEFE "Web Claude artık YOK"
+   vs _OZET "Web Claude SEN" — bu çelişkiyi 1. okumada atladım)
+
+**Yasak pattern:**
+- ❌ "Yüzeysel okudum, %70 örtüşüyor, arşivleyelim"
+- ❌ "Görev tamamlandı, sıradaki adıma geç" (TAM okuma teyidi olmadan)
+- ❌ "head -40 yeter, geri kalan tahmin edilebilir"
+
+**Doğru pattern:**
+- ✅ Tüm dosya Read tool ile satır 1'den sona
+- ✅ "Bu dosyada CLAUDE.md'de OLMAYAN bilgi" listesi çıkar
+- ✅ 1. okuma'dan sonra 2. okuma — Sn. Ferit "illa hata yapmışsındır" haklılığı
+
+**Pattern keşfi:** 22 May 2026 ~20:00 — 7 dosyayı arşivledim, sonra
+Sn. Ferit "tam oku" dedi → 2 kritik tablo (Quanfina Doğru Adlandırma +
+İzin verilen Genel Terimler) kaybolacaktı. 2. okuma'da yakaladım.
+Sonra Sn. Ferit "2 defa daha tam oku" dedi → 5 ek kayıp tespit
+(_SISTEM_SEMA Karar Cheat-Sheet, _CLEAN_ROOM AI Uzman pattern,
+_KOD_ENVANTERI Dependency Haritası, _SAGLIK_KONTROL Açık Yıkıcı/Borç,
+_FELSEFE-_OZET çelişki). _HATALAR.md H#A6 olarak tescil.
+
 **Pattern keşfi (Kural #14 doğrudan tescil):**
 - 1. ortaya çıkış: 21 May 2026 Sprint 4-bis.5 — UI/UX Çift Danışma (Kural #20)
 - 2. ortaya çıkış: 22 May 2026 derin kontrol Trend Template — 11 hata
@@ -1520,6 +1599,68 @@ v2 Akış Modu'na alt-satır olarak eklendi (aşağıda revize). -->
 - "Sağlam gidelim, bir daha bir daha uğraşmayalım" — kalıcı çözüm tercih edilir
 - "Yavaş düşün, hızlı uygula" — analiz uzun, eylem net
 - Şüpheli durum → Sn. Ferit'e sor (Kural #3); dürüstlük tercih edilir, yağcılık değil
+
+### Karar Yorgunluğu Azaltma Cheat-Sheet (22 May 2026 _SISTEM_SEMA arşivden entegre)
+
+Her seçimde "hangisi" sorusu **sıfırlanmış** — otomatik cevap kuralı:
+
+| Soru | Otomatik Cevap | Kaynak |
+|---|---|---|
+| Hangi araçla konuşayım? | Strateji → Web Claude, Dosya → Code, Kavram → NotebookLM | Kural #9 v2 |
+| Yeni uzman kurmalı mı? | NotebookLM (Gem değil) | Kural #17 |
+| Tek araç yeter mi? | Hayır — Akıllı Dağılım | Kural #9 v2 (v1 deprecated) |
+| Pattern fark ettim, kural mı? | 2 ortaya çıkışta evet, doğrudan tescil | Kural #14 |
+| Yeni kural öneri öncesi? | 4 kontrol: çiftleme + DRY + Kural #18 + kapsam | Kural #14 alt-bölüm |
+| Bir öğe pasif, çıkarmalı mı? | 30 gün referans yok ise evet | Kural #18 |
+| Commit zamanı? | Anlamlı operasyon sonu | GitHub İlke #1 |
+| Push güvenli mi? | sizma_kontrol.ps1 6/6 PASS ise evet | Kural #10 |
+| AÇIK KONU eklemeli miyim? | Karar bekleyen her belirsizlik | Vizyon |
+| Yıkıcı eylem yapayım mı? | Sn. Ferit onayı zorunlu | Kural #4 |
+| Mola önerisi mi? | YASAK — Sn. Ferit zamanlama otonomu | Kural #25 |
+| Algoritma kararı öncesi? | 6 Aşama (TAM OKU → TABLO → ÇİFT DANIŞMA → ŞÜPHE → PYTEST → GÖRSEL) | Kural #24 |
+| Tasarım kararı (UI/UX)? | Çift Danışma (Quanfina Notebook + Quanfina Minervini) | Kural #20 |
+| Lokal silme/arşivleme sonrası? | drive_sync.ps1 manuel tetik | Kural #8 v2 |
+| "Devam" mesajı yorumu? | Mevcut planı sürdür, YENİ adım açma | Kural #23 |
+
+Sn. Ferit "her seçimde hangisi" sorusu yaşamasın — Cheat-Sheet kanon.
+
+### Sn. Ferit Profili (22 May 2026 user_ferit memory'den entegre + güncellenmiş)
+
+**Teknik Profil:**
+- Deneyimli yazılım geliştirici, kişisel trade/finans platformu inşa ediyor
+- Python, SQL, PostgreSQL konusunda rahat
+- **Vibe coding** yapar — kod yazmaz, kopyala-yapıştır (eski "Streamlit" bilgisi 17 Mayıs öncesi; Aşama 1.D'de Next.js 16 + FastAPI + Cloud Run yapısına geçildi)
+- Türkçe iletişim, teknik terimler orijinal (FastAPI, watchlist, hooks vb.)
+- Git ile çalışıyor, **terminoloji disiplini katı**: "Faz" yasak → "Aşama X" + "Adım X.Y.Z"; "Sprint" yerine "Sprint 4-bis" gibi specific naming
+
+**Çalışma Tarzı:**
+- **Detay odaklı, derin sorgulayıcı** — "illa hata yapmışsındır" 2+ kez doğrudan; AI yüzeysel kalmasın
+- **Önceden karar veren** — tasarım kararlarını sprint başında listeler, AI uygular
+- **Otonom yetki verir + denetler** — "top sende" + sonra "neden yaptın?" (Kural #23 + Kural #4 sınırı)
+- **Adım adım disiplini** — "küçükten adım adım gidiyoruz"; "Devam" = mevcut planı sürdür, **YENİ adım açma**
+- **Hafıza güçlü** — geçmiş kararlar, terminoloji, evren daraltma filtreleri gibi detayları hatırlar; AI atlarsa Sn. Ferit yakalar
+- **Sertlik + Dürüstlük tercihi** — "iş olsun diye yapıyorsun" / "yağcılık yapma" / "şüpheli" gibi doğrudan geri bildirim
+- **Sağlam gidelim** felsefesi — "bir daha bir daha uğraşmayalım", kalıcı çözüm tercih edilir
+
+**İletişim Tercihleri:**
+- **Trafik lambası raporu ZORUNLU** — 🟢/🟡/🔴 (Kural #2)
+- **Tablo + kısa madde** — gereksiz açıklama istemez, "edebiyat değil kodlama"
+- Emoji minimal (trafik lambası + bölüm ikonları OK; süs emoji yasak)
+- "Sanırım, galiba, muhtemelen" YASAK — somut sayı/isim/tarih
+- Övgü yerine kanıt; yanlışı belirtmekten kaçınma yok
+
+**Yetki Disiplini:**
+- **AI yetkisi** (Kural #23): Rutin operasyonel kararlar — commit zamanlaması, .gitignore, küçük edit, hijyen, pattern tespit + doğrudan tescil, kural önerisi (Kural #14)
+- **Sn. Ferit yetkisi** (Kural #4 yıkıcı eylem onayı): Dosya silme, büyük rename, mimari değişiklik, force push, repo public/private, USER settings geniş scope, stratejik/finansal kararlar
+- **Sn. Ferit zamanlama otonomu** (Kural #25): "ne zaman dururuz" AI'nın işi DEĞİL; mola/kapanış önerisi YASAK
+
+**Hesap Matrisi (4 email — `_LINKLER.md` doğrulanmış):**
+- `feritozen@gmail.com` → Google ANA (Drive 5TB + Gemini + NotebookLM)
+- `feritozen@ibu.edu.tr` → Akademik (MS Edu + GitHub Quanfina)
+- `yatirimajandasi@gmail.com` → Anthropic / Claude
+- `ferit_ozen@hotmail.com` → OneDrive Personal (pasif)
+
+**Manifesto Özellik #1 (Tanıma) canlı kanıtı.**
 
 ### AI Rol Dağılımı (18 May 2026 v2 — Kural #9 v2 sonrası: Akıllı Dağılım + Handoff)
 
@@ -2079,18 +2220,18 @@ Yeni oturum başında **son 100 satırı** okumak yeterlidir. Eski kararlar değ
 
 ## Bilgi Haritası — Hangi Konu Nerede?
 
-> 🎯 **Master indeks:** Tüm dosya envanteri için → `notebook/_INDEX.md`
-> (Aşama 1.E.a, 17 May 2026 canlı). Bu tablo en sık başvurulan
-> konuların kısa eşleştirmesi — tam liste için _INDEX.md'ye bak.
-> Doğrulama: `.\scripts\build_index.ps1`
+> 🎯 **Master indeks:** `scripts/build_index.ps1` üretir (otomatik).
+> 22 May 2026 konsolidasyon sonrası `notebook/_INDEX.md` arşivlendi —
+> envanter scripts/ otomatik üretir. Bu tablo en sık başvurulan konuların
+> kısa eşleştirmesi.
 
 | Konu | Dosya/Klasör | Tür |
 |------|--------------|-----|
-| Master indeks (tam dosya envanteri) | `notebook/_INDEX.md` | Sistem |
 | Yeni chat bootstrap | `notebook/_BASLAT.md` | Sistem |
-| Yol haritası (Aşama 1.C → 5) | `notebook/_ROADMAP.md` | Sistem |
-| Hesap/araç matrisi | `notebook/_LINKLER.md` | Sistem |
-| Kod envanteri (sınıflandırma + dependency) | `notebook/_KOD_ENVANTERI.md` | Sistem |
+| Yol haritası | `notebook/_ROADMAP.md` | Sistem |
+| Hesap/araç + URL matrisi | `notebook/_LINKLER.md` | Sistem |
+| Devir notu (Web↔Code handoff) | `notebook/_DEVIR.md` | Sistem |
+| Hata günlüğü | `notebook/_HATALAR.md` | Sistem |
 | Proje vizyonu, kararlar, açık konular | `notebook/Notebook_A_Vizyon.md` | Karar günlüğü |
 | Minervini metodoloji | `notebook/kitaplar/Minervini.md` | Strateji bilgisi |
 | Minervini video analizleri | `notebook/kitaplar/Minervini_Video.md` | Strateji bilgisi |
@@ -2113,6 +2254,13 @@ Yeni oturum başında **son 100 satırı** okumak yeterlidir. Eski kararlar değ
 | ⭐ Minervini matematik motoru (R-Multiple, RBA, TradeGrader, Stop yönetimi) | `quanfina_math.py` | **Aktif kod — kritik** |
 | Streamlit (pasif) | `app.py`, `pages/` | Legacy kod |
 | Tarama motoru | `scanner.py`, `scanner_server.py` | Aktif kod |
+| NotebookLM: Quanfina Notebook (sistem) kurulum | `notebook/Asama_Quanfina_Master_NotebookLM.md` | Uzman kurulum |
+| NotebookLM: Quanfina Minervini kurulum | `notebook/Asama_2_3_a_Minervini_NotebookLM.md` | Uzman kurulum |
+| NotebookLM: Quanfina Vizyon Bekçisi kurulum | `notebook/Asama_2_3_Vizyon_Bekcisi_NotebookLM.md` | Uzman kurulum |
+| NotebookLM: Risk Academy kurulum (PDF bekliyor) | `notebook/Asama_2_3_c_Risk_Academy_NotebookLM.md` | Uzman kurulum |
+| TradeGrader Gem kurulum (17 kategori) | `notebook/Asama_4_1_TradeGrader_Gem.md` | Uzman kurulum |
+| Sprint 4-bis mimari kararlar (Markets360 sentez) | `notebook/Sprint_4_bis_Mimari_Kararlar.md` | Mimari belge |
+| Sprint 4-bis.5 5-Kaynak sentez (kanon doğrulama) | `notebook/Sprint_4_bis_5_Kaynak_Sentez.md` | Mimari belge |
 
 ---
 
