@@ -1579,14 +1579,63 @@ Kural #4 (Yıkıcı Onay), Kural #8 v2 (Kapanış modları — Sn. Ferit
 tetikler, AI önermez), Kural #23 (Otonom Yetki — eylem otonomu,
 zamanlama DEĞİL).
 
-<!-- Kural #26 22 May 2026 ~19:00 ÇIKARILDI (Kural #18 negatif tescil) —
-çiftleme tespit edildi: Drive senkron disiplini Kural #8 v2 Akış Modu
-(satır 341), Kural #8 v2 Otonom Hijyen Bölüm J (satır 363), Kural #9 v2
-ana metni (satır 430), Kural #9 v2 alt-bölüm Otomatik Çift Yönlü Senkron
-(satır 846) — toplam 4 yerde zaten tescilli. Kural #26 5. tekrarı oldu,
-İlke #4 (DRY) ihlali. _HATALAR.md H#A1 kalıcı kayıt. Lokal dosya
-silme/arşivleme sonrası manuel drive_sync.ps1 tetik disiplini Kural #8
-v2 Akış Modu'na alt-satır olarak eklendi (aşağıda revize). -->
+<!-- Kural #26 (eski — Drive Senkron Disiplini) 22 May 2026 ~19:00 ÇIKARILDI
+(Kural #18 negatif tescil) — çiftleme. Numara yeniden kullanıldı: Kural #26
+şimdi "Matematik Uydurmama" (Vizyon KALICI İLKE #4 anayasaya entegre). -->
+
+### Kural 26 — Matematik Uydurmama (Vizyon KALICI İLKE #4 → Anayasa, 22 May 2026 ~21:30 yeni)
+
+> Sn. Ferit'in 5 Mayıs 2026 direktifi (Vizyon sat. 390-410, 7 yerde atıf):
+> *"Önce kitap → Bundle → Video → bulunamazsa veya çelişiyorsa
+> 'GELİŞTİRİLMESİ LAZIM' notu düş. ASLA UYDURMA SAYI/FORMÜL"*.
+
+**Tetikleyici (Agent Vizyon tarama, 22 May 2026 ~21:00):** KALICI İLKE #4
+Vizyon'da 7 yerde atıf yapılan **en kritik felsefe** ama CLAUDE.md
+anayasa katmanında **hiçbir yerde tescil edilmemişti** — manifesto ihlali.
+
+**Disiplin:** Her sayısal eşik, formül, kanon kuralı için kaynak zinciri:
+
+```
+1. Kitap (Mark Minervini "Trade Like a Wizard", Carr, Weinstein, Tharp, vb.)
+   → Sayfa + paragraf alıntı zorunlu
+2. Bundle / NotebookLM (Quanfina Minervini, Quanfina Carr Stage Analizi)
+   → Birebir doğrulama
+3. Video (Mark/Brandon transkriptleri)
+   → Zaman damgası referansı
+4. Bulunamazsa veya çelişiyorsa:
+   → "GELİŞTİRİLMESİ LAZIM" notu + AÇIK KONU tescil
+   → ASLA UYDURMA SAYI/FORMÜL
+```
+
+**Yasak pattern:**
+- ❌ "Şu eşik %25 olsun, mantıklı" — kaynak yok, uydurma
+- ❌ "MA200 slope > 0 olsa yeter" — kitap "1 ay" diyor, atlama
+- ❌ Hardcoded sayı (örn. `if rs >= 70:`) kaynak yorumu olmadan
+- ❌ Mark canon "yaklaşık" yorumu — somut kitap sayfa + alıntı
+
+**Doğru pattern:**
+- ✅ `# Trade Like a Wizard s.79 madde 7: "52W dipten en az %25"` yorumlu
+- ✅ NotebookLM Quanfina Minervini doğrulama (Kural #20)
+- ✅ Kaynak çelişkisi varsa AÇIK KONU + Sn. Ferit eli (Kural #4)
+
+**Sızma Kontrol Listesi #7 eklemesi (`scripts/sizma_kontrol.ps1`):**
+- "Hardcoded sayısal eşik var mı?" tarama (`>=70`, `<=25`, `* 1.25` vb.)
+- Yorum satırında "Kitap s.X" atfı yoksa ⚠️ uyarı
+
+**İLKE #36 (Source Transparency) ile birleşik:**
+quanfina_math.py'de `@source` decorator (gelecek)
+```python
+@source(book="Trade Like a Wizard", page=79, rule="Trend Template madde 7")
+def compute_off_52w_low_pct(price, low52): ...
+```
+
+**Manifesto Özellik #8 (Öğrenen) — 5 Mayıs 2026'dan beri tescil edilmemiş**
+en kritik felsefe. Anayasa nihayet 22 May 2026'da tescil etti (Agent 2-tur
+Vizyon tarama bulgusu).
+
+**İlişkili:** İLKE #4 (Vizyon kanon kaynağı), Kural #10 (Sızma + #4 yasaklı
+isim), Kural #20 (UI/UX Çift Danışma — kitap kanon doğrulama), Kural #24
+(Sağlam Gidelim — 6 Aşama Aşama 1 TAM OKU), Vizyon AÇIK KONU sistemleri.
 
 ---
 
@@ -1661,6 +1710,55 @@ Sn. Ferit "her seçimde hangisi" sorusu yaşamasın — Cheat-Sheet kanon.
 - `ferit_ozen@hotmail.com` → OneDrive Personal (pasif)
 
 **Manifesto Özellik #1 (Tanıma) canlı kanıtı.**
+
+### Mod Geçişleri Disiplini (Vizyon KALICI İLKE #10 → entegre, 22 May 2026 ~21:30)
+
+Sn. Ferit'in trade davranış mod sistemini 4 mod tanımlar (Vizyon sat. 1422-1447):
+
+| Mod | Tetik | Pozisyon Sizing | UX Davranışı |
+|---|---|---|---|
+| **Normal** | Default | Standart R (örn. %1) | Tüm sinyaller AL/GEÇ |
+| **Rehab** | Ardışık 3+ kayıp, drawdown >%10 | %0.5 R (yarıya in) | Yeni pozisyon önce ⚠️ rehab uyarısı |
+| **Defansif** | Piyasa Stage 3-4, Market Health <30 | Pozisyon kapanış öncelik | Yeni AL'lar BLOK, sadece SAT/STOP |
+| **Agresif** | Piyasa Stage 2 başlangıç, MH >70, ardışık 5+ kazanç | %1.5-2 R (artır) | Conviction High sinyaller öncelikli |
+
+**Disiplin = içsel, sistem = dışsal** (Vizyon sat. 1420). Sn. Ferit kuralla TARTIŞMAZ — mod otomatik tetik, sistem öneri.
+
+**Uygulama:** `ModBadge` component standardı UI sağ üstte gösterilir.
+KARAR #475 (AL/GEÇ butonları) bu altyapıya bağlanır. UX Bölüm 6 (Mekanik Karar)
+mod'a göre değişir.
+
+**Kanıt zinciri:** Trading_Mode tablosu (mod_history) — her mod geçişi tarih +
+sebep + portföy snapshot kaydı (Manifesto Özellik #7 Anılı Güncelleme).
+
+### Objektif Ayna Dil Disiplini (Vizyon KALICI İLKE #11 → entegre, 22 May 2026 ~21:30)
+
+Sn. Ferit'in UX dil felsefesi (Vizyon sat. 1449-1470):
+
+> *"Sayılar konuşur, hisler değil. Bloomberg Terminal yağcılık yapmaz —
+> rakamı gösterir, kullanıcı yorumlar."*
+
+**Yasak UX dil:**
+- ❌ "Aferin!", "Üzülme", "İyi gidiyorsun", "Şansın yaver gidiyor"
+- ❌ "Endişelenme, düzelir", "Tebrikler harikasın", "Bunu hak ediyorsun"
+- ❌ Motivasyonel kart / emoji yığını (🎉🥳😊)
+- ❌ "Belki", "muhtemelen", "sanırım" — somut sayı vermeden tahmin
+
+**Doğru UX dil:**
+- ✅ "Pozisyon kapatıldı: +%3.2 (R: 1.6x)" — sayı + birim
+- ✅ "Stop tetiklendi: -%1.0 (-1R)" — net olay + ölçüm
+- ✅ "Win Rate son 30 gün: %42 (target: %55)" — durum + hedef
+- ✅ "Aksiyon: stop güncelle" — direktif, övgü değil
+
+**AI iletişim disiplini de paralel:**
+- ✅ Trafik lambası 🟢/🟡/🔴 (renk = somut durum)
+- ✅ Tablo + madde (yapılandırılmış veri)
+- ✅ "Hatalıyım" / "atladım" (dürüstlük) ≠ "Anlıyorum üzüldüğünüzü"
+- ❌ "Tabii efendim", "Hemen yapayım, harika fikir!" (yağcılık)
+
+**Manifesto Özellik #6 (Çalışma Mantığı'na uyum):** "Sertlik + Dürüstlük,
+Yağcılık YASAK" satırının somut UX karşılığı — bu disiplin **kod katmanına**
+inmeli (string literal taraması, UI komponent yazım rehberi).
 
 ### AI Rol Dağılımı (18 May 2026 v2 — Kural #9 v2 sonrası: Akıllı Dağılım + Handoff)
 
@@ -1755,10 +1853,17 @@ Her push öncesi şu 6 kontrol — hepsi PASS olmadan push yok:
    sk-[A-Za-z0-9]{20+}, BEGIN (RSA|OPENSSH|PRIVATE|CERTIFICATE),
    xoxb-, AIza* (Google API)
 6. **Final commit listesi onayı** — Sn. Ferit'e gösterilir, onay alınır
+7. **Hardcoded sayısal eşik taraması** (22 May 2026 — Kural #26 paralel)
+   — `>=70`, `<=25`, `* 1.25` gibi sabit eşikler yorum satırında "Kitap s.X"
+   atfı yoksa ⚠️ uyarı. Matematik Uydurmama (KALICI İLKE #4) anayasal koruma.
+8. **Dini içerik taraması** (22 May 2026 — KALICI İLKE #34 Faith-Neutral)
+   — Carr 2. baskı Hristiyan satırlar gibi inanç-içerikli paragrafların
+   Quanfina koduna/yorumuna sızması engelle. Quanfina inanç-nötr mimari.
 
-Otomatik script: `scripts/sizma_kontrol.ps1` — bu 6 kontrolü çalıştırır,
+Otomatik script: `scripts/sizma_kontrol.ps1` — bu 8 kontrolü çalıştırır,
 exit 0 = temiz, exit 1 = kirli (rapor üretir). Pre-push hook olarak da
 bağlanabilir (`.git/hooks/pre-push` — 17 May 2026 itibarıyla bağlı).
+(Kontrol #7 ve #8 scripts/ tarafında 22 May 2026 sonrası uygulamada.)
 
 ---
 
