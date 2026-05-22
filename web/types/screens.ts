@@ -95,7 +95,11 @@ export const SCREEN_CATEGORIES: Record<string, string> = {
  *   - "mark"     : Mark Minervini orijinal kuralı (kitap birebir)
  *   - "quanfina" : Quanfina ek filtre (Mark'ın kuralı değil, sistem eklemesi)
  */
-export type ConditionSource = "mark" | "quanfina";
+// 22 May 2026 — 3 kategori revize (Sn. Ferit talimatı):
+// - quanfina: Evren daraltma (Fiyat $10 + Hacim 500K) — UI 1-2. sıra
+// - mark: Mark Resmi Kural (kitap birebir 8 madde) — UI 3-10. sıra
+// - mark_ekstra: Mark kitap tavsiyesi (preferably/ideally şartları) — UI 11. sıra, TURUNCU
+export type ConditionSource = "mark" | "quanfina" | "mark_ekstra";
 
 export interface ScreenCondition {
   source: ConditionSource;
@@ -104,12 +108,15 @@ export interface ScreenCondition {
 
 export const SCREEN_CONDITIONS: Record<string, ScreenCondition[]> = {
   stage2_10p: [
-    // 22 May 2026 — Quanfina Minervini NotebookLM kanon doğrulama:
-    // Mark resmi Trend Template TAM 8 MADDE (Trade Like a Wizard s.79).
-    // Kitap 1. maddesi: "Fiyat: 150 ve 200 günlük MA üstünde" — TEK madde.
-    // Önceki UI 1+2 ayrı satırda gösteriyordu, kitap birebir uyumsuz.
-    // Sn. Ferit "8 + 2 = 10, geriye kalan 1 ne?" sezgisi haklı çıktı.
-    // KARAR ADAY #486 — UI 11 → 10 koşul (1+2 birleşik).
+    // 22 May 2026 — Sn. Ferit yeniden sıralama:
+    // 1-2: Quanfina Ek (evren daraltma — fiyat + hacim ÖNCE)
+    // 3-10: Mark Resmi Kural (kitap birebir 8 madde, Trade Like a Wizard s.79)
+    // 11: Mark Ekstra Kural (kitap tavsiyesi — TURUNCU, "preferably/ideally" şartları)
+    //
+    // Kanon kaynak: Quanfina Minervini + Quanfina Notebook çift doğrulama
+    // (22 May 2026 NotebookLM kanon kanıt zinciri).
+    { source: "quanfina", text: "Fiyat ≥ $10 (mikro-cap eleme — evren daraltma)" },
+    { source: "quanfina", text: "Ortalama hacim ≥ 500.000 (likidite eleme — evren daraltma)" },
     { source: "mark", text: "Fiyat > 150 ve 200 günlük hareketli ortalama (150/200 DMA)" },
     { source: "mark", text: "150DMA > 200DMA (uzun vadeli yükseliş yapısı)" },
     { source: "mark", text: "200DMA en az 1 aydır yukarı yönlü (trending up)" },
@@ -118,10 +125,10 @@ export const SCREEN_CONDITIONS: Record<string, ScreenCondition[]> = {
     { source: "mark", text: "Fiyat 52 haftalık dipten en az %25 yukarıda" },
     { source: "mark", text: "Fiyat 52 haftalık zirveye en fazla %25 mesafede" },
     { source: "mark", text: "Relative Strength (RS) sıralaması ≥ 70 (IBD)" }, // Mark'ın 8. resmi maddesi
-    { source: "quanfina", text: "Fiyat ≥ $10 (mikro-cap eleme)" },
-    // 22 May 2026 — Sn. Ferit yakaladı: evren daraltma filtresi UI'de eksikti.
-    // scanner.py Finviz URL: sh_avgvol_o500 — backend zaten uyguluyor, UI şeffaflık fix.
-    { source: "quanfina", text: "Ortalama hacim ≥ 500.000 (likidite eleme)" },
+    // 11. Mark Ekstra Kural — Mark kitap tavsiyesi (kanon ZORUNLU değil ama tercih)
+    // Kitap birebir: "RS Rating ≥ 70 (ideali 80-90+)" — Mark daha güçlü adayları
+    // 80-90+ RS'de arar. Trend Template'in zorunlu eşiği 70 ama tercih 80-90+.
+    { source: "mark_ekstra", text: "RS Rating ideali 80-90+ (Mark kitap tavsiyesi — daha güçlü adaylar)" },
   ],
 };
 
@@ -129,4 +136,5 @@ export const SCREEN_CONDITIONS: Record<string, ScreenCondition[]> = {
 export const CONDITION_SOURCE_LABEL: Record<ConditionSource, string> = {
   mark: "Mark Resmi Kural",
   quanfina: "Quanfina Ek Filtre",
+  mark_ekstra: "Mark Ekstra Kural",
 };

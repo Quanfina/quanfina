@@ -206,9 +206,15 @@ export default function ScreensPage() {
                         {String(i + 1).padStart(3, "0")}.
                       </span>
                       <span className="font-medium shrink-0" style={{
+                        // 22 May 2026 — 3 kategori renk:
+                        // mark (yeşil — Mark Resmi Kural kitap kanon)
+                        // mark_ekstra (turuncu — Mark kitap tavsiyesi)
+                        // quanfina (nötr — Quanfina Ek Filtre)
                         color: cond.source === "mark"
                           ? "var(--mtp-excellent)"
-                          : "var(--mtp-neutral)",
+                          : cond.source === "mark_ekstra"
+                            ? "#f97316" // turuncu (Tailwind orange-500)
+                            : "var(--mtp-neutral)",
                       }}>
                         {CONDITION_SOURCE_LABEL[cond.source]} —
                       </span>

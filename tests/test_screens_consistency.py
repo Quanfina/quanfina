@@ -70,17 +70,17 @@ class TestStage2_10pConsistency:
         return _read("api/db_helpers.py")
 
     def test_ui_condition_count_matches_documented(self, ts):
-        """UI'de 10 koşul gösterilmeli (8 Mark Resmi + 2 Quanfina Ek).
-        Mark Minervini Trade Like a Wizard s.79 kitap birebir 8 madde.
-        Önceki 11 → 10 düzeltme (22 May 2026 Quanfina Minervini kanon onayı):
-        Kitap 1. maddesi "Fiyat: 150 ve 200 DMA üstünde" tek madde olmalı,
-        eskiden UI 1+2 ayrı satırda gösteriyordu (kayma).
+        """UI'de 11 koşul gösterilmeli (2 Quanfina + 8 Mark + 1 Mark Ekstra).
+        Sıralama (22 May 2026 Sn. Ferit talimat):
+        - 1-2: Quanfina Ek (Fiyat $10 + Hacim 500K, evren daraltma)
+        - 3-10: Mark Resmi Kural (kitap birebir 8 madde, Trade Like a Wizard s.79)
+        - 11: Mark Ekstra Kural (Mark kitap tavsiyesi, turuncu)
         """
         n = _extract_screen_conditions_count(ts, "stage2_10p")
-        assert n == 10, (
-            f"UI condition count = {n}, beklenen 10 "
-            f"(8 Mark Trend Template + 2 Quanfina Ek Filtre). "
-            f"Quanfina Minervini NotebookLM kanon doğrulama 22 May 2026."
+        assert n == 11, (
+            f"UI condition count = {n}, beklenen 11 "
+            f"(2 Quanfina + 8 Mark Resmi + 1 Mark Ekstra). "
+            f"22 May 2026 Sn. Ferit talimat sıralama."
         )
 
     def test_finviz_url_has_volume_filter(self, scanner):
@@ -148,4 +148,18 @@ class TestStage2_10pConsistency:
         assert quanfina_count == 2, (
             f"Quanfina Ek Filtre sayısı = {quanfina_count}, beklenen 2 "
             f"(Fiyat ≥ $10 + Hacim ≥ 500K)."
+        )
+
+    def test_ui_mark_ekstra_count(self, ts):
+        """UI'de tam 1 Mark Ekstra Kural olmalı (turuncu — kitap tavsiyesi).
+        22 May 2026 Sn. Ferit talimat: 11. madde Mark Ekstra Kural.
+        Mark canon ZORUNLU değil ama tercih (preferably/ideally şartları).
+        """
+        pattern = r'stage2_10p:\s*\[(.*?)\]\s*,\s*\};'
+        m = re.search(pattern, ts, re.DOTALL)
+        block = m.group(1)
+        ekstra_count = block.count('source: "mark_ekstra"')
+        assert ekstra_count == 1, (
+            f"Mark Ekstra Kural sayısı = {ekstra_count}, beklenen 1 "
+            f"(Mark kitap tavsiyesi — RS ideali 80-90+)."
         )
