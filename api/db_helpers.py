@@ -256,7 +256,12 @@ SCREENS_READY_9 = {
     "tpr_a":            {"label": "TPR A",                     "filter": "grade = 'A'"},
     "tpr_a_b":          {"label": "TPR A & B",                 "filter": "grade IN ('A','B')"},
     "rpr_89_tpr_c":     {"label": "RPR 89+ TPR C+",            "filter": "rs_ibd >= 89 AND grade IN ('A','B','C')"},
-    "stage2_10p":       {"label": "Stage 2 ($10+)",            "filter": "passed = 1 AND price >= 10"},
+    # KARAR #484 (22 May 2026) — RS >= 70 (IBD) backend filter eklendi.
+    # passed=1 sadece 8 DMA/52W kosulunu kontrol ediyor. UI'de gosterilen 9. Mark
+    # Resmi Kural (RS Rating >= 70 IBD, Trade Like Wizard s.79) backend'de UYGULANMIYORDU.
+    # Sn. Ferit talimati (22 May 2026): "A yap" — filter'a rs_ibd >= 70 ekle.
+    # Etki: 724 satir -> ~225 satir (RS<70 olan 499 hisse cikar). Kitap birebir.
+    "stage2_10p":       {"label": "Stage 2 ($10+)",            "filter": "passed = 1 AND price >= 10 AND rs_ibd >= 70"},
     "stage2_below_10":  {"label": "Stage 2 (Below $10)",       "filter": "passed = 1 AND price < 10"},
     "top5_rpr":         {"label": "Top 5% RPR",                "filter": "rs_ibd >= 95"},
     "mom_10p":          {"label": "Minervini Momentum ($10+)", "filter": "passed = 1 AND price >= 10"},

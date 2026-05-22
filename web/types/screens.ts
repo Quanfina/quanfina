@@ -114,6 +114,9 @@ export const SCREEN_CONDITIONS: Record<string, ScreenCondition[]> = {
     { source: "mark", text: "Fiyat 52 haftalık zirveye en fazla %25 mesafede" },
     { source: "mark", text: "Relative Strength (RS) sıralaması ≥ 70 (IBD)" },
     { source: "quanfina", text: "Fiyat ≥ $10 (mikro-cap eleme)" },
+    // 22 May 2026 — Sn. Ferit yakaladı: evren daraltma filtresi UI'de eksikti.
+    // scanner.py Finviz URL: sh_avgvol_o500 — backend zaten uyguluyor, UI şeffaflık fix.
+    { source: "quanfina", text: "Ortalama hacim ≥ 500.000 (likidite eleme)" },
   ],
 };
 

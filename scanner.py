@@ -503,8 +503,11 @@ def get_finviz_screener():
     - ta_sma50_sa150   : MA50 > MA150
     - ta_sma50_sa200   : MA50 > MA200
     - ta_sma150_sa200  : MA150 > MA200
-    - ta_highlow52w_a25h : 52W High'a %25 içinde
-    - ta_highlow52w_b75l : 52W Low'dan %25 yukarı
+    - ta_highlow52w_a25h : 52W High'tan en fazla %25 altta (Mark canon koşul 8)
+    - ta_highlow52w_b75l : 52W Low'dan en az %75 yukarıda (KARAR ADAY #485, 22 May 2026 —
+                           Mark canon ≥%25 ama Finviz parameter ismi %75. Quanfina Notebook +
+                           Quanfina Minervini onayı: pozitif yön tolerans, gerçek hisseler %1000+
+                           dipten, pratik etki yok. Risk düşük. _HATALAR.md H#13)
     - ta_rsi_o70       : RS > 70 (yaklaşık)
     """
     filters = ",".join([

@@ -1,0 +1,144 @@
+"""
+UI ↔ Backend tutarlılık testi — Kural #24 Aşama 5 (Pytest)
+
+Vibe coding güvencesi: AI yorumundan bağımsız renkler.
+22 May 2026 — Sn. Ferit'in 11 koşullu Trend Template UI'de eksik kalan
+hacim filtresini kendi hafızasıyla yakalaması paterni → bu test kalıcı
+koruma.
+
+Test edilen tutarlılık:
+  - UI listesi (web/types/screens.ts SCREEN_CONDITIONS["stage2_10p"])
+  - Backend Finviz URL filter (scanner.py get_finviz_screener)
+  - SQL filter (api/db_helpers.py SCREENS_READY_9["stage2_10p"])
+"""
+
+import re
+from pathlib import Path
+
+import pytest
+
+
+ROOT = Path(__file__).resolve().parent.parent
+
+
+def _read(rel_path: str) -> str:
+    return (ROOT / rel_path).read_text(encoding="utf-8")
+
+
+def _extract_screen_conditions_count(ts_source: str, slug: str) -> int:
+    """SCREEN_CONDITIONS[slug] içindeki { source: ... } sayısını döndürür."""
+    pattern = rf'{slug}:\s*\[(.*?)\]\s*,\s*\}};?'
+    m = re.search(pattern, ts_source, re.DOTALL)
+    if not m:
+        pytest.fail(f"SCREEN_CONDITIONS['{slug}'] block bulunamadı")
+    block = m.group(1)
+    return len(re.findall(r'\{\s*source:', block))
+
+
+def _extract_finviz_filters(scanner_source: str) -> list[str]:
+    """get_finviz_screener içindeki filters listesini döndürür."""
+    pattern = r'def get_finviz_screener.*?filters\s*=\s*",".join\(\[(.*?)\]\)'
+    m = re.search(pattern, scanner_source, re.DOTALL)
+    if not m:
+        pytest.fail("get_finviz_screener filters list bulunamadı")
+    block = m.group(1)
+    return re.findall(r'"([^"]+)"', block)
+
+
+def _extract_sql_filter(db_helpers_source: str, slug: str) -> str:
+    """SCREENS_READY_9[slug]["filter"] string'ini döndürür."""
+    pattern = rf'"{slug}":\s*\{{[^}}]*"filter":\s*"([^"]+)"'
+    m = re.search(pattern, db_helpers_source)
+    if not m:
+        pytest.fail(f"SCREENS_READY_9['{slug}'] filter bulunamadı")
+    return m.group(1)
+
+
+class TestStage2_10pConsistency:
+    """stage2_10p (Trend Template) — UI ↔ Backend ↔ SQL bire-bir uyum."""
+
+    @pytest.fixture(scope="class")
+    def ts(self) -> str:
+        return _read("web/types/screens.ts")
+
+    @pytest.fixture(scope="class")
+    def scanner(self) -> str:
+        return _read("scanner.py")
+
+    @pytest.fixture(scope="class")
+    def db_helpers(self) -> str:
+        return _read("api/db_helpers.py")
+
+    def test_ui_condition_count_matches_documented(self, ts):
+        """UI'de 11 koşul gösterilmeli (9 Mark Resmi + 2 Quanfina Ek)."""
+        n = _extract_screen_conditions_count(ts, "stage2_10p")
+        assert n == 11, (
+            f"UI condition count = {n}, beklenen 11 "
+            f"(9 Mark Resmi Kural + 2 Quanfina Ek Filtre). "
+            f"22 May 2026 hacim filtresi atlandı paterni — "
+            f"yeni filter eklendiyse UI'ye de ekle."
+        )
+
+    def test_finviz_url_has_volume_filter(self, scanner):
+        """Backend Finviz URL'inde sh_avgvol_o500 (hacim ≥ 500K) olmalı."""
+        filters = _extract_finviz_filters(scanner)
+        assert "sh_avgvol_o500" in filters, (
+            "Backend hacim filtresi (sh_avgvol_o500) atlanmış. "
+            "Mark canon evren daraltma — UI ve backend bire-bir."
+        )
+
+    def test_finviz_url_has_price_filter(self, scanner):
+        """Backend Finviz URL'inde sh_price_o10 (fiyat ≥ $10) olmalı."""
+        filters = _extract_finviz_filters(scanner)
+        assert "sh_price_o10" in filters
+
+    def test_finviz_url_has_8_dma_filters(self, scanner):
+        """Backend 5 SMA filtresi + 2 52W filtresi (toplam Mark canon 7 filter)."""
+        filters = _extract_finviz_filters(scanner)
+        required = [
+            "ta_sma50_pa", "ta_sma200_pa",
+            "ta_sma50_sa150", "ta_sma50_sa200", "ta_sma150_sa200",
+            "ta_highlow52w_a25h", "ta_highlow52w_b75l",
+        ]
+        for f in required:
+            assert f in filters, f"Mark canon filter eksik: {f}"
+
+    def test_sql_filter_has_rs_threshold(self, db_helpers):
+        """SQL filter rs_ibd >= 70 (KARAR #484) içermeli."""
+        sql = _extract_sql_filter(db_helpers, "stage2_10p")
+        assert "rs_ibd >= 70" in sql, (
+            f"SQL filter Mark canon RS≥70 (Koşul 9) içermiyor. "
+            f"Mevcut: {sql!r}"
+        )
+
+    def test_sql_filter_has_price_threshold(self, db_helpers):
+        """SQL filter price >= 10 (Quanfina Ek) içermeli."""
+        sql = _extract_sql_filter(db_helpers, "stage2_10p")
+        assert "price >= 10" in sql
+
+    def test_sql_filter_has_passed_check(self, db_helpers):
+        """SQL filter passed = 1 (MA200 slope) içermeli."""
+        sql = _extract_sql_filter(db_helpers, "stage2_10p")
+        assert "passed = 1" in sql
+
+    def test_ui_mark_kural_count(self, ts):
+        """UI'de tam 9 Mark Resmi Kural olmalı (kitap birebir)."""
+        pattern = r'stage2_10p:\s*\[(.*?)\]\s*,\s*\};'
+        m = re.search(pattern, ts, re.DOTALL)
+        block = m.group(1)
+        mark_count = block.count('source: "mark"')
+        assert mark_count == 9, (
+            f"Mark Resmi Kural sayısı = {mark_count}, beklenen 9 "
+            f"(Trade Like a Wizard, s.79, 8 madde + RS Rating)."
+        )
+
+    def test_ui_quanfina_ek_count(self, ts):
+        """UI'de tam 2 Quanfina Ek Filtre olmalı (Fiyat + Hacim)."""
+        pattern = r'stage2_10p:\s*\[(.*?)\]\s*,\s*\};'
+        m = re.search(pattern, ts, re.DOTALL)
+        block = m.group(1)
+        quanfina_count = block.count('source: "quanfina"')
+        assert quanfina_count == 2, (
+            f"Quanfina Ek Filtre sayısı = {quanfina_count}, beklenen 2 "
+            f"(Fiyat ≥ $10 + Hacim ≥ 500K)."
+        )

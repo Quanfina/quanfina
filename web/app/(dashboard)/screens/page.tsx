@@ -60,7 +60,9 @@ export default function ScreensPage() {
   const [selectedSlug, setSelectedSlug] = useState<ScreenSlug | null>(DEFAULT_SLUG);
 
   const resultsQ = useScreenResults(selectedSlug, 500);
-  const [conditionsOpen, setConditionsOpen] = useState(false);
+  // Default açık — Sn. Ferit talimat (22 May 2026): koşullar her sayfa açılışta görünsün,
+  // toggle butonu var, isteyen kapatır.
+  const [conditionsOpen, setConditionsOpen] = useState(true);
 
   const columnDefs = useMemo<ColDef<ScreenResultRow>[]>(
     () => [

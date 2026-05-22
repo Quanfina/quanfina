@@ -1007,6 +1007,42 @@ uygula), Kural #17 (Uzman/Yorumcu = NotebookLM), KARAR ADAY #453-#458
 Yönlendirme) + #8 (Öğrenen — Markets360 ham kaynak emeği boşa
 gitmesin), `notebook/Sprint_4_bis_Mimari_Kararlar.md`.
 
+### Kural 20 alt-bölüm — NotebookLM Prompt Disiplini: Link Beraberlik + Resmi İsim (22 May 2026 ~16:00 yeni)
+
+Sn. Ferit talimatı: *"Çalışma protokolüne ekle promtu verdin hemen altına linkide ver linkleri boşuna kaydetmedik. Birde Master değil ismi Quanfina Notebooklm"*. Kural #14 doğrudan tescil eşiği (2 ortaya çıkış aynı turda: link verme talebi + isim düzeltme).
+
+**Disiplin:** AI bir NotebookLM'e prompt hazırladığında:
+1. Prompt blok'unun **hemen üstünde** NotebookLM resmi adı + 🔗 emoji ile URL
+2. URL `notebook/_LINKLER.md`'den alınır (yaşayan sistem envanteri — kayıt boşuna değil)
+3. Sn. Ferit URL aramak zorunda kalmaz, tek klikle açar (karar yorgunluğunu azalt)
+
+**Onaylı NotebookLM resmi adları + URL'ler:**
+
+| Resmi ad | URL | Rol |
+|---|---|---|
+| **Quanfina Notebook** ⭐ | https://notebooklm.google.com/notebook/9af21146-113e-49a4-b526-61388ae068a2 | 33 .txt sistem tarayıcı + cross-strateji sentez (KARAR #452) |
+| **Quanfina Minervini** | https://notebooklm.google.com/notebook/c25ce445-0c9e-43a9-8be8-6b7027b6aa07 | Mark kitap birebir + video kavram sözlüğü |
+| **Quanfina Carr Stage Analizi** | https://notebooklm.google.com/notebook/632a8961-a171-4dc0-a7e1-66bfc6ac486a | Carr 1.+2. baskı + Weinstein |
+| **Quanfina Vizyon Bekçisi** | https://notebooklm.google.com/notebook/9332b34e-e332-4c98-abbc-b390d376e9f1 | KARAR/AÇIK KONU/İLKE denetçi |
+
+**Yasak isimler (kullanılmaz):**
+- ❌ "Master NotebookLM" → ✅ "Quanfina Notebook"
+- ❌ "Minervini Uzmanı NotebookLM" → ✅ "Quanfina Minervini"
+- ❌ "Carr Stage NotebookLM" → ✅ "Quanfina Carr Stage Analizi"
+
+**Format (kopyala-yapıştır şablonu):**
+```
+## 📋 PROMPT N — <Resmi NotebookLM adı>
+
+🔗 **<URL>**
+
+\`\`\`
+<prompt içerik>
+\`\`\`
+```
+
+**İlişkili:** Kural #14 (Pattern Tescil — 2 ortaya çıkış eşiği), Kural #17 (Uzman/Yorumcu = NotebookLM Plus varsayılanı), Kural #20 ana metni (Çift Danışma — algoritma denetimi de bu disipline tabi), `notebook/_LINKLER.md` satır 75-78 (NotebookLM envanteri). Manifesto Özellik #3 (Bilgi Haritası — link kayıtları somut canlı kanıt) + #4 (Proaktif Yönlendirme — Sn. Ferit URL aramaz).
+
 ### Kural 21 — Browser Test Disiplini (Hibrit, 3 Kanal) (19 May 2026 ~20:00 yeni, 20 May 2026 ~10:15 revize)
 
 UI iş yapan her büyük adımda **görsel doğrulama ZORUNLU.** **Üç kanal**
@@ -1291,6 +1327,169 @@ Sn. Ferit'te.
 - Kural #14 (Pattern Tescil) — bu kuralın doğum kanalı
 - Kural #20 (UI/UX Çift Danışma) — tasarım disiplini hâlâ aktif
 - Kural #22 (Hafıza Tarama) — karar öncesi disiplin
+
+### Kural 24 — Sağlam Gidelim Disiplini: Algoritma Denetiminde 6 Aşama (22 May 2026 ~17:00 yeni)
+
+> Sn. Ferit talimatı (Kural #14 doğrudan tescil — 11 hata pateni 2 oturumda):
+> *"sağlam gidelim felsefesini unutuyorsun bu doğrultuda tüm çalışma
+> sistemimizi revize etmek istiyorum"* + *"edebiyat kitabı yazmıyoruz
+> kodlama yapıyoruz"*.
+
+**Tetikleyici (2 oturum, 11 hata pateni — _HATALAR.md H#13-H#22):**
+- UI ↔ Backend ayrışması (RS≥70 SQL filter eksik, hacim filtresi UI'de yok)
+- Yüzeysel kaynak okuma (scanner.py 9 filter varken "7 teknik" diye basitleştirme)
+- NotebookLM prompt eksik kanıt (hacim filtresi prompt'ta yoktu)
+- "Devam" mesajını otonom yetki yanlış yorumlama
+
+**FELSEFE:** "Sağlam gidelim, bir daha bir daha uğraşmayalım" disiplini
+algoritma kararlarında **ZORUNLU 6 AŞAMA**. Atlanırsa Kural #3 (Şüphede
+Dur) otomatik tetiklenir. Kural #23 (Otonom Yetki) bu 6 aşamanın
+ÜSTÜNE biner — atlamaz.
+
+**6 Aşama (sırayla — atlama yasak):**
+
+**1. TAM OKU** — İlgili tüm kaynak dosyalar (scanner.py + db_helpers.py
++ types/*.ts + ilgili API endpoint) **bütün, yorumlar dahil**. Özet
+çıkarma YASAK. "Şu kısmı atladım, gerek görmedim" hatası önle.
+
+**2. KARŞILAŞTIRMA TABLOSU** — Dört sütun: UI listesi ↔ Backend filter
+↔ Kitap kanonu ↔ SQL filter. Bire-bir uyum. Eksik satır = kırmızı
+bayrak. Bahane yok.
+
+**3. NOTEBOOKLM ÇİFT DANIŞMA** (Kural #20 genişletme — sadece UI/UX
+değil, **her algoritma kararında**):
+- Quanfina Notebook (sistem perspektifi) + Quanfina Minervini (kanon)
+- Prompt'a **tam Backend kaynak listesi** ekle — eksik soru → eksik cevap
+- Prompt + 🔗 URL beraberlik (Kural #20 alt-bölümü)
+
+**4. AI ŞÜPHE LİSTESİ** — AI sentez yazmadan ÖNCE kendine 3 soru:
+1. "Bir filter/koşul atladım mı? (UI ↔ Backend bire-bir)"
+2. "Yaşayan sistem birikimini yeterince taradım mı?"
+   (notebook + _LINKLER + CLAUDE.md + memory)
+3. "Sn. Ferit'in geçmiş hafızasıyla çelişen nokta var mı?"
+
+Cevap "evet" ise → geri dön Aşama 1.
+
+**5. PYTEST** — UI ↔ Backend uyum testi (mevcut yoksa **yaz**).
+AI yorumundan bağımsız **kırmızı/yeşil renkler** — vibe coding güvencesi.
+`tests/test_*_consistency.py` her screen/algoritma için bir tane.
+
+**6. GÖRSEL** — Sn. Ferit screenshot / DOM rapor / log. AI'dan bağımsız
+son doğrulama (Kural #21 Browser Test).
+
+**İSTİSNA:** Sadece **string/etiket güncellemesi** (örn. button label
+tek satır) için 6 aşama zorunlu değil — Akış Modu OK. Algoritma /
+filter / SQL / mimari için 6 aşama ZORUNLU.
+
+**Pattern keşfi (Kural #14 doğrudan tescil):**
+- 1. ortaya çıkış: 21 May 2026 Sprint 4-bis.5 — UI/UX Çift Danışma (Kural #20)
+- 2. ortaya çıkış: 22 May 2026 derin kontrol Trend Template — 11 hata
+  pateni (RS filter eksik, hacim eksik, NotebookLM prompt eksik, AAOI
+  marjinal sızıntı), Sn. Ferit "edebiyat değil kodlama" + "tüm sistem
+  revize" talimatı
+
+**Manifesto Özellik #8 (Öğrenen) — sistem seviyesi self-correction:**
+Sistem 11 hatadan bir disiplin doğurdu. Kural #14 (ekleme) + Kural #18
+(çıkarma) + Kural #24 (denetim) üç ayaklı: ekle-çıkar-doğrula.
+
+**İlişkili:** Kural #1 (Tek Seferde Tek İş — 6 aşama da tek tek),
+Kural #3 (Şüphede Dur — Aşama 4'ün doğal sonucu), Kural #4 (Yıkıcı
+Onay), Kural #14 (Pattern Tescil — bu kuralın doğum kanalı), Kural #18
+(Pasif Çıkarma — Aşama 1'in dolaylı uygulaması), Kural #20 (Çift
+Danışma — Aşama 3'ün temeli), Kural #21 (Browser Test — Aşama 6),
+Kural #22 (Proaktif Hafıza — Aşama 1+4'ün altyapısı), Kural #23
+(Otonom Yetki — 6 aşamanın ÜSTÜNE biner). `notebook/_HATALAR.md`
+H#13-H#22 (bu kuralın kanıt günlüğü).
+
+### Kural 25 — Mola/Kapanış Önermeme Yasağı (22 May 2026 ~18:00 yeni)
+
+Sn. Ferit talimatı: *"birdaha böyle birşeyde yazma ben nezaman
+duracağımı biliyorum bunuda kurallara ekl ben istediğim zaman dururuz
+seni ilgilendirmez"*. Kural #14 doğrudan tescil (2 ortaya çıkış aynı
+turda: güven krizinde + envanter sonrası).
+
+**AI eylem önerirken "Mola / Yarın / Kapanış / Taze gözle" tipi
+seçenekler SUNMAZ.** Sn. Ferit mola zamanlamasını kendisi belirler,
+AI bu konuda inisiyatif almaz.
+
+**Yasak pattern:**
+- ❌ "Mola — yarın taze gözle..."
+- ❌ "Yorgunsan kapatalım..."
+- ❌ "Şu an X yeterli, devamı yarın..."
+- ❌ "Sıcakken değil, soğukken karar ver..."
+
+**Doğru pattern:**
+- ✅ Eylem seçenekleri sun (A/B/C/D) — hepsi "devam" odaklı
+- ✅ Sn. Ferit "duralım" / "kapanış" / "yorgun" derse → uygula
+- ✅ Yıkıcı eylem öncesi onay sor (Kural #4 sınırı korunur)
+- ✅ Sürpriz durum varsa danış (Kural #3 sınırı korunur)
+
+**İstisna — AI'nın bilgilendirme (mola önerme DEĞİL) yapması gereken:**
+- Token/context limiti yaklaşıyorsa → durum raporu, ama karar Sn. Ferit'in
+- Sandbox/sistem zaman aşımı → teknik durum raporu, mola önermez
+- Sn. Ferit explicit yorgunluk/duraklama belirtirse → uygula
+
+**Manifesto Özellik #8 — kullanıcı düzeyi self-correction:**
+AI'nın "yardımcı olma" eğilimi bazen yanlış inisiyatif şekline döner.
+Yetki dağılımı net: AI **eylem otonomu** (Kural #23), Sn. Ferit
+**zamanlama otonomu**. İkisi karıştırılmaz.
+
+**İlişkili:** Kural #3 (Şüphede Dur — paralel, ters yönü değil),
+Kural #4 (Yıkıcı Onay), Kural #8 v2 (Kapanış modları — Sn. Ferit
+tetikler, AI önermez), Kural #23 (Otonom Yetki — eylem otonomu,
+zamanlama DEĞİL).
+
+### Kural 26 — Drive Senkron Disiplini: Lokal Değişiklik Sonrası Otomatik (22 May 2026 ~18:00 yeni)
+
+Sn. Ferit talimatı: *"drive güncelleme txt yenileme gibi önceki
+kurallarımızıda kontrol et büyük ihtimalle bunuda kaçır mışındır"*.
+Kural #14 doğrudan tescil + Kural #8 v2 Akış Modu eksikliği fix.
+
+**Disiplin:** `notebook/` veya kanon dosyalarda (CLAUDE.md değişikliği,
+_BASLAT yenileme, dosya arşivleme, yeni .md ekleme) her anlamlı
+değişiklik sonrası **`drive_sync.ps1` tetiklenir**:
+
+```powershell
+.\scripts\drive_sync.ps1
+```
+
+**Ne yapar (v2.2):**
+- `notebook/*.md` → `G:\Drive'ım\Quanfina_notebook\*.txt` mirror
+  (NotebookLM picker `.md` görmez, `.txt` görür — H#8)
+- Orphan .txt temizliği (lokal silinen/arşivlenen .md karşılığı Drive'dan silinir)
+- robocopy /MIR mantığı + Copy-Item Türkçe karakter için BOM-less UTF-8
+
+**ScheduledTask:** `Quanfina_Notebook_Drive_Sync` saatlik 09:00
+otomatik (Kural #9 v2 alt-bölüm Çift Yönlü Senkron + KARAR #449).
+**Ama manuel değişikliklerde saat beklenmez** — anlamlı değişiklik
+sonrası AI hemen tetikler.
+
+**Tetikleyici koşullar (AI otomatik çalıştırır):**
+- Yeni notebook/*.md eklendi (örn. Sprint_4_bis_*.md)
+- Mevcut notebook dosyası >50 satır değişti (örn. _DEVIR ⏳ KUYRUK güncelleme)
+- Dosya arşivlendi (örn. _archive/'e taşıma)
+- CLAUDE.md anayasa değişikliği (yeni kural, mevcut revize)
+- _BASLAT.md güncellemesi (sayım refresh)
+
+**Tetikleyici DEĞİL (otomatik saatlik ScheduledTask yeter):**
+- Küçük yazım hatası düzeltme
+- _DEVIR.md tek satır ekleme
+
+**Bypass YASAK:** Kural #4 (Yıkıcı Eylem Onayı) burada **yardımcı** —
+yıkıcı (silme/rename) durumunda drive_pull.ps1 conflict çıkarabilir,
+o zaman Sn. Ferit'e bilgi ver. Ama **commit + push kadar normal akış**
+parçası.
+
+**Pattern keşfi:** 22 May 2026 büyük konsolidasyon turu — 7 dosya
+arşivlendi + _BASLAT yenilendi + Kural #24 + Kural #20 alt-bölüm
+eklendi, ama AI drive_sync tetiklemedi. Sn. Ferit 1. ortaya çıkışta
+doğrudan tescil etti.
+
+**İlişkili:** Kural #8 v2 (Akıllı Kapanış — Akış Modu artık Drive
+senkron dahil), Kural #9 v2 alt-bölüm Çift Yönlü Senkron (drive_sync
++ drive_pull), Kural #10 (Push Öncesi Sızma — Drive ayrı, push'la
+karıştırılmaz), KARAR #449 (otomatik çift yönlü senkron),
+`scripts/drive_sync.ps1` + `scripts/drive_pull.ps1`.
 
 ---
 
