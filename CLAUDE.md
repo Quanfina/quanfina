@@ -1251,6 +1251,73 @@ Verilmez), Kural #12 (Önce Keşfet), Kural #14 (Pattern Tescil), Kural
 #20 (UI/UX Çift Danışma), Kural #19 (PS Out-File yasak — encoding
 disiplini paralel motif). Memory: `feedback_chrome_mcp_hibrit`.
 
+### Kural 21 alt-bölüm — Görsel Test Raporu Standart Formatı (Vizyon İLKE #51 entegre, 22 May 2026 ~22:00)
+
+Sn. Ferit'in tasarım kararlarında görsel test raporu **kanıt zinciri**
+zorunlu (Vizyon sat. 7100):
+
+**Standart format (her test raporu için):**
+
+```
+🟢/🟡/🔴 SAYFA: localhost:3000/<route> — <test başlığı>
+
+Kontrol noktaları:
+- Element: <selector veya kart>
+  - Renk: #RRGGBB (gerçek hex değer, "yeşilimsi" YASAK)
+  - Hücre değeri: "AAOI / RS=99 / Stage 2" (gerçek metin)
+  - Hizalama: piksel ölçümü (sol/sağ/üst/alt)
+- KARAR # referansı: KARAR #XYZ — niçin böyle (kanon kaynak)
+- Manifesto Özellik referansı: #X (varsa)
+```
+
+**Yasak rapor:**
+- ❌ "Sayfa güzel görünüyor" (subjektif)
+- ❌ "Renkler uyumlu" (somut hex yok)
+- ❌ "Çalışıyor sanırım" (test kanıtı yok)
+
+**Doğru rapor:**
+- ✅ "Trend Template 224 hisse, RS≥70 filter (KARAR #484), 11 koşul açık"
+- ✅ "AAOI satır: #def2e5 grade chip, RS bandı #58bd7d (95+), $173.70"
+- ✅ "Pre-push hook ✓ canlı, sızma 6/6 PASS, son commit `7d7d244`"
+
+**Kanal C (Playwright) Otomatik Format:**
+- `test-screenshots/_full_site/<page>.png` + DOM rapor JSON
+- Console log + HTTP status → otomatik raporda
+- AI'dan bağımsız kanıt (vibe coding güvencesi)
+
+**İlişkili:** Kural #21 ana metin (Browser Test Hibrit 3 Kanal), Vizyon
+KALICI İLKE #51 (sat. 7100), KARAR #481-#483 (Kural #21 evrimi).
+
+### Kural 20 alt-bölüm — UI'da Notebook Referansı Patterni (Vizyon İLKE #45 entegre, 22 May 2026 ~22:00)
+
+Sn. Ferit'in UI yazım kararı (Vizyon sat. 5958): **Sayfa başlığı altında
+KARAR # referansı zorunlu** (kaynak şeffaflığı, kullanıcı "niçin böyle"
+sorduğunda kanon link bulur).
+
+**Pattern:**
+```tsx
+<h1>Sinyaller</h1>
+<p className="text-xs text-muted-foreground">
+  KARAR #470 (AG Grid tablo) + #473 (R/R sütunu) + #479 (stil hizalama)
+</p>
+```
+
+**Sayfa-Karar eşleştirme tablosu (mevcut):**
+
+| Sayfa | İlişkili KARAR'lar |
+|---|---|
+| `/` (Dashboard) | KARAR #474 |
+| `/screens` (Tarama) | KARAR #461-#467, #484-#485 |
+| `/signals` | KARAR #469-#473, #478-#479 |
+| `/watchlist` | KARAR #469 (konsensus kaldırma) |
+| `/journal` | KARAR #475, #477 |
+| `/piyasa-durumu` | KARAR (Sprint 4-bis.7 ABD Borsa Takvim) |
+
+**Manifesto Özellik #3 (Bilgi Haritası) UI seviyesi.**
+
+**İlişkili:** Kural #20 ana metin (UI/UX Çift Danışma), Vizyon KALICI
+İLKE #45 (sat. 5958), `notebook/Sprint_4_bis_Mimari_Kararlar.md`.
+
 ### Kural 22 — Proaktif Sistem Hafıza Taraması (19 May 2026 ~22:00 yeni)
 
 > Sn. Ferit talimatı (Kural #14 doğrudan tescil eşiği): "**böyle sana
