@@ -60,13 +60,65 @@ export interface ScreenResultRow {
   vcp_quality_score?: "EXCELLENT" | "PASS" | null;
   // KARAR #465 — VCP Ready Score 0-100
   vcp_ready_score?: number | null;
-  // KARAR #467 — Power Play (HTF) Mark canon
+  // KARAR #467 — Power Play (HTF) Mark resmi kuralı
   power_play_pass?: boolean | null;
 }
 
 /**
- * Kategoriler — ARSIV MODU (22 May 2026)
- * Tum 25 slug -> kategori esleme notebook/Tarama_Listeleri_Arsiv.md'de.
+ * Kategoriler — Sprint 4-bis.7 Adim Adim Yeniden Ekleme (22 May 2026)
+ * Tum 25 eski slug -> kategori esleme notebook/Tarama_Listeleri_Arsiv.md'de.
+ *
  * Yeniden ekleme: bu objeye slug + kategori ekle, dropdown'da gozukur.
+ * Backend zaten /api/screens + /api/screens/{slug} canli (db_helpers.SCREENS_READY_9).
+ *
+ * Adim 1 (22 May 2026): stage2_10p — Minervini Trend Template (Mark resmi kuralı 8 kosul).
+ * Notebook_A satir 846 kanon: passed=1 = Trend Template PASS.
+ * Web Claude 5-Kaynak sentez: "Must-Have Setup #1 ZATEN CANLI."
  */
-export const SCREEN_CATEGORIES: Record<string, string> = {};
+export const SCREEN_CATEGORIES: Record<string, string> = {
+  stage2_10p: "Trend Template",
+};
+
+// SCREEN_DESCRIPTIONS kaldirildi (22 May 2026) — Sn. Ferit "bunu sil" talimati.
+// Kosullar listesi yeterli aciklayici, ek metin gerekmiyor. Gelecekte istenirse
+// tekrar eklenir.
+
+/**
+ * Filtre kosullari — Mark resmi kuralı eşikler liste halinde.
+ * Kullanici tam olarak hangi kurallarin uygulandigini gorur.
+ * Kaynak: notebook/kitaplar/Minervini.md (Trade Like a Stock Market Wizard).
+ *
+ * stage2_10p — Trade Like a Stock Market Wizard, Bölüm 5 (s. 79) birebir sırası.
+ * Kitap madde sırası = Mark Minervini'nin önem hiyerarşisi.
+ *
+ * Her koşul kaynak tipiyle etiketlenir:
+ *   - "mark"     : Mark Minervini orijinal kuralı (kitap birebir)
+ *   - "quanfina" : Quanfina ek filtre (Mark'ın kuralı değil, sistem eklemesi)
+ */
+export type ConditionSource = "mark" | "quanfina";
+
+export interface ScreenCondition {
+  source: ConditionSource;
+  text: string;
+}
+
+export const SCREEN_CONDITIONS: Record<string, ScreenCondition[]> = {
+  stage2_10p: [
+    { source: "mark", text: "Fiyat > 150 günlük hareketli ortalama (150DMA)" },
+    { source: "mark", text: "Fiyat > 200 günlük hareketli ortalama (200DMA)" },
+    { source: "mark", text: "150DMA > 200DMA (uzun vadeli yükseliş yapısı)" },
+    { source: "mark", text: "200DMA en az 1 aydır yukarı yönlü (trending up)" },
+    { source: "mark", text: "50DMA > 150DMA > 200DMA (sıralı piramit dizilimi)" },
+    { source: "mark", text: "Fiyat > 50 günlük hareketli ortalama (50DMA)" },
+    { source: "mark", text: "Fiyat 52 haftalık dipten en az %25 yukarıda" },
+    { source: "mark", text: "Fiyat 52 haftalık zirveye en fazla %25 mesafede" },
+    { source: "mark", text: "Relative Strength (RS) sıralaması ≥ 70 (IBD)" },
+    { source: "quanfina", text: "Fiyat ≥ $10 (mikro-cap eleme)" },
+  ],
+};
+
+/** Görsel etiket — frontend render için kaynak tipini insan-okunabilir yapar. */
+export const CONDITION_SOURCE_LABEL: Record<ConditionSource, string> = {
+  mark: "Mark Resmi Kural",
+  quanfina: "Quanfina Ek Filtre",
+};

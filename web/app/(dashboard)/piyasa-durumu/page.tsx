@@ -5,6 +5,7 @@ import { StageCard } from "@/components/market/StageCard";
 import { HealthScoreCard } from "@/components/market/HealthScoreCard";
 import { ModeSuggestionCard } from "@/components/market/ModeSuggestionCard";
 import { SectorSummaryCard } from "@/components/market/SectorSummaryCard";
+import { MarketStatusBadge } from "@/components/market/MarketStatusBadge";
 
 export default function PiyasaDurumuPage() {
   const { data, isLoading, isError, error } = useMarketStatus();
@@ -30,11 +31,15 @@ export default function PiyasaDurumuPage() {
 
   return (
     <div className="p-6 flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Piyasa Durumu</h1>
-        <p className="text-sm text-muted-foreground">
-          SPY / QQQ / IWM stage analizi + Market Health Score
-        </p>
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-semibold tracking-tight">Piyasa Durumu</h1>
+          <p className="text-sm text-muted-foreground">
+            SPY / QQQ / IWM stage analizi + Market Health Score
+          </p>
+        </div>
+        {/* ABD borsa açık/kapalı + TR/ET saat + sonraki açılış (Sprint 4-bis.7) */}
+        <MarketStatusBadge />
       </div>
 
       {/* Stage kartları */}

@@ -314,11 +314,15 @@ def screen_get_results(slug: str, limit: int = 500) -> list[dict]:
     # NOT: minervini_scans tablosunda kolon adi 'ticker', frontend uyumu icin 'symbol' alias
     # rs_ibd double precision (TEXT degil) - Python tarafinda float kabul edilir
     # scan_date TEXT (TIMESTAMP degil) - .isoformat() cagrilmaz
-    # KARAR #466 + #465 + #467 — VCP/Power Play kolon dependable
-    # TUM ready screens'te donulur. UI tarafi slug-baglamli kolon gosterir.
+    #
+    # KARAR ADAY (22 May 2026): Migration 004-006 (vcp_quality_score, vcp_ready_score,
+    # power_play_pass) Cloud SQL'e UYGULANMAMIS. ACIK KONU #70 ile baglantili.
+    # Gecici patch: bu 3 kolon SELECT'ten cikarildi. Frontend NULL/undefined olarak goruyor
+    # (ScreenResultRow tipinde optional). Migration uygulandiginda geri eklenecek.
+    # Sn. Ferit talimat (22 May 2026): "Adim 1 + Cup-Handle + Pocket Pivot tumu calisir...
+    # bunlarida yapicaz ama hemen degil" -> B patch.
     query = f"""
-        SELECT ticker AS symbol, grade, rs_ibd, price, passed, scan_date,
-               vcp_quality_score, vcp_ready_score, power_play_pass
+        SELECT ticker AS symbol, grade, rs_ibd, price, passed, scan_date
         FROM minervini_scans
         WHERE scan_date = (SELECT MAX(scan_date) FROM minervini_scans)
           AND {sql_filter}

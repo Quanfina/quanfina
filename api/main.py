@@ -898,6 +898,65 @@ def get_market_status() -> MarketStatus:
     return MOCK_MARKET_STATUS
 
 
+# ─── ABD Borsa Takvim Status (Sprint 4-bis.7, 22 May 2026) ───────────────────
+# Sn. Ferit talimat: "veri çekme saati ABD borsa saatleri ABD tatiller veri
+# çekme sistemini geliştirelim Türkiye'de yaşadığımı unutma."
+# market_calendar.py utility — TR + ET saatleri, tatil tespiti, sonraki açılış.
+
+class MarketCalendarStatus(BaseModel):
+    is_open: bool                  # Ana seans (9:30-16:00 ET) açık mı?
+    session: str                   # "regular" | "pre_market" | "post_market" | "closed"
+    reason: Optional[str] = None   # Kapalıysa sebep (Türkçe)
+    is_early_close: bool = False   # Yarı gün mü (13:00 ET kapanış)?
+    now_et: str                    # "2026-05-22 09:32 EDT"
+    now_tr: str                    # "2026-05-22 16:32 +03"
+    next_open_et: str              # "2026-05-26 09:30 EDT"
+    next_open_tr: str              # "2026-05-26 16:30 +03"
+    last_trading_day: str          # "2026-05-22" (ISO date)
+
+
+@app.get("/api/market/calendar/status", response_model=MarketCalendarStatus)
+def get_market_calendar_status() -> MarketCalendarStatus:
+    """
+    ABD borsa takvim durumu — hafta sonu/tatil/yarı gün tespiti ile TR + ET saatleri.
+    Frontend'de MarketStatusBadge bu endpoint'i poll eder (30 sn refresh).
+    """
+    try:
+        # Repo root'a path ekle (api/ alt klasör, market_calendar.py kök'te)
+        import sys
+        from pathlib import Path
+        repo_root = Path(__file__).parent.parent
+        if str(repo_root) not in sys.path:
+            sys.path.insert(0, str(repo_root))
+
+        from market_calendar import market_status_now
+        s = market_status_now()
+        return MarketCalendarStatus(
+            is_open=s.is_open,
+            session=s.session,
+            reason=s.reason,
+            is_early_close=s.is_early_close,
+            now_et=s.now_et.strftime("%Y-%m-%d %H:%M %Z"),
+            now_tr=s.now_tr.strftime("%Y-%m-%d %H:%M %Z"),
+            next_open_et=s.next_open_et.strftime("%Y-%m-%d %H:%M %Z"),
+            next_open_tr=s.next_open_tr.strftime("%Y-%m-%d %H:%M %Z"),
+            last_trading_day=s.last_trading_day.isoformat(),
+        )
+    except Exception as e:
+        from datetime import datetime, timezone
+        now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        return MarketCalendarStatus(
+            is_open=False,
+            session="closed",
+            reason=f"Takvim modülü hata: {e!s}",
+            now_et=now_iso,
+            now_tr=now_iso,
+            next_open_et=now_iso,
+            next_open_tr=now_iso,
+            last_trading_day=datetime.now(timezone.utc).date().isoformat(),
+        )
+
+
 # ── Watchlist ────────────────────────────────────────────────────────────────
 
 class WatchlistRow(BaseModel):

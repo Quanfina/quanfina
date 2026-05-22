@@ -9,6 +9,20 @@ from io import StringIO
 from dotenv import load_dotenv
 from datetime import date, datetime, timedelta
 
+# Windows cp1254 console "→" gibi non-ASCII karakteri encode edemez (UnicodeEncodeError).
+# Cloud Run UTF-8 default ama lokal calistirmada lazim. 22 May 2026 manuel scan trigger
+# sirasinda yakalandi (Sn. Ferit Tarama 14 gun eski veri sorgu -> manuel scan baslat).
+if sys.stdout and hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+if sys.stderr and hasattr(sys.stderr, "reconfigure"):
+    try:
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 
 from db_connection import get_connection
 # Sprint 4-bis.4 KARAR #461 — Pre-Compute tek motor felsefesi (Kural #22 lokal birikim kullan)
@@ -22,6 +36,35 @@ from quanfina_math import (
 
 load_dotenv()
 FINVIZ_KEY = os.getenv("FINVIZ_API_KEY")
+
+
+# ─── HTTP Session with Retry (Sprint 4-bis.7, 22 May 2026) ───────────────────
+# Finviz Elite SSL kopmalarına karşı otomatik retry. 22 May 2026'da scanner manuel
+# 3 kez fail oldu (SSLError: UNEXPECTED_EOF_WHILE_READING) — Sn. Ferit talimat:
+# "veri çekme sistemini geliştirelim". Çözüm: Session + Retry adapter, exponential
+# backoff (1s, 2s, 4s, 8s, 16s) max 5 deneme. SSL + connection error + 429/503'a uygulanır.
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+
+def _make_finviz_session() -> requests.Session:
+    """Finviz çağrıları için retry'lı session — SSL/connection/rate-limit dayanıklı."""
+    session = requests.Session()
+    retry_strategy = Retry(
+        total=5,
+        backoff_factor=1.0,  # 1s, 2s, 4s, 8s, 16s exponential
+        status_forcelist=[429, 500, 502, 503, 504],  # rate-limit + server hata
+        allowed_methods=["GET", "HEAD"],
+        raise_on_status=False,
+    )
+    adapter = HTTPAdapter(max_retries=retry_strategy, pool_connections=10, pool_maxsize=20)
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    return session
+
+
+# Modül-seviyesi session — tüm Finviz çağrılarında reuse (connection pool + retry)
+FINVIZ_SESSION = _make_finviz_session()
 
 
 class ScannerHealthError(Exception):
@@ -484,7 +527,7 @@ def get_finviz_screener():
         f"v=152&f={filters}&c=1,2,3,4,6,7,65,66,67&auth={FINVIZ_KEY}&ft=4"
     )
     
-    r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
+    r = FINVIZ_SESSION.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
     df = pd.read_csv(StringIO(r.text))
     validate_finviz_response(df, source="get_finviz_screener")
     print(f"Finviz filtresi geçti: {len(df)} hisse")
@@ -520,7 +563,7 @@ def get_finviz_fundamental():
         f"v=152&f={filters}&c=1,2,3,4,6,7,65,66,67&auth={FINVIZ_KEY}&ft=4"
     )
 
-    r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
+    r = FINVIZ_SESSION.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
     df = pd.read_csv(StringIO(r.text))
     validate_finviz_response(df, source="get_finviz_fundamental")
     print(f"Fundamental filtresi geçti: {len(df)} hisse")
@@ -549,7 +592,7 @@ def get_finviz_fundamental_only():
         f"v=152&f={filters}&c=1,2,3,4,6,7,65,66,67&auth={FINVIZ_KEY}&ft=4"
     )
 
-    r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
+    r = FINVIZ_SESSION.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
     df = pd.read_csv(StringIO(r.text))
     validate_finviz_response(df, source="get_finviz_fundamental_only")
     print(f"Temel filtresi geçti: {len(df)} hisse")
@@ -573,7 +616,7 @@ def get_finviz_52w_high():
         f"https://elite.finviz.com/export.ashx?"
         f"v=152&f={filters}&c=1,2,3,4,6,7,65,66,67&auth={FINVIZ_KEY}&ft=4"
     )
-    r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
+    r = FINVIZ_SESSION.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
     df = pd.read_csv(StringIO(r.text))
     validate_finviz_response(df, source="get_finviz_52w_high")
     print(f"52W Yüksek filtresi geçti: {len(df)} hisse")
@@ -590,7 +633,7 @@ def get_finviz_extras(tickers: list) -> "pd.DataFrame":
         f"https://elite.finviz.com/export.ashx?"
         f"v=152&t={','.join(tickers)}&c=1,22,23,46,33,68&auth={FINVIZ_KEY}&ft=4"
     )
-    r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=30)
+    r = FINVIZ_SESSION.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=30)
     r.raise_for_status()
     df = pd.read_csv(StringIO(r.text))
     # AÇIK KONU #71 — Drift Guard: extras endpoint icin validation
@@ -707,7 +750,7 @@ def scan_sectors(scan_date):
     )
 
     try:
-        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=30)
+        r = FINVIZ_SESSION.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=30)
         r.raise_for_status()
     except Exception as e:
         print(f"Finviz API hatası (sektör): {e}")
@@ -1159,7 +1202,37 @@ def save_results(df_finviz, slopes, scan_date):
     return saved
 
 # --- ANA AKIŞ ---
-def run_scan(scan_date_override: str = None):
+def run_scan(scan_date_override: str = None, force: bool = False):
+    """
+    Ana scan fonksiyonu.
+
+    Args:
+        scan_date_override: Belirli bir tarih için scan (test/backfill)
+        force: True ise hafta sonu/tatil kontrolünü atla (manuel zorlama)
+
+    Sprint 4-bis.7 (22 May 2026): ABD borsa takvim entegrasyonu —
+    Hafta sonu + ABD tatil günlerinde scan ATLANIR (Sn. Ferit talimat:
+    "veri çekme saati ABD borsa saatleri ABD tatiller").
+    Manuel override için force=True veya scan_date_override kullan.
+    """
+    # ABD borsa takvim kısa devre (Sprint 4-bis.7 — market_calendar.py)
+    if scan_date_override is None and not force:
+        try:
+            from market_calendar import should_scan_today, now_tr, now_et
+            ok, reason = should_scan_today()
+            if not ok:
+                tr = now_tr().strftime("%Y-%m-%d %H:%M %Z")
+                et = now_et().strftime("%Y-%m-%d %H:%M %Z")
+                print("=== QUANFINA SCANNER — SKIP ===")
+                print(f"TR: {tr}")
+                print(f"ET: {et}")
+                print(f"[SKIP] Bugun scan ATLANDI. Sebep: {reason}")
+                print("[INFO] Manuel zorlama icin: run_scan(force=True)")
+                print("[INFO] Belirli tarih icin: run_scan(scan_date_override='YYYY-MM-DD')")
+                return
+        except ImportError:
+            print("[WARN] market_calendar modulu bulunamadi - takvim kontrolu atlandi.")
+
     try:
         health_check_finviz()
     except ScannerHealthError as e:
