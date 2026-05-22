@@ -104,15 +104,20 @@ export interface ScreenCondition {
 
 export const SCREEN_CONDITIONS: Record<string, ScreenCondition[]> = {
   stage2_10p: [
-    { source: "mark", text: "Fiyat > 150 günlük hareketli ortalama (150DMA)" },
-    { source: "mark", text: "Fiyat > 200 günlük hareketli ortalama (200DMA)" },
+    // 22 May 2026 — Quanfina Minervini NotebookLM kanon doğrulama:
+    // Mark resmi Trend Template TAM 8 MADDE (Trade Like a Wizard s.79).
+    // Kitap 1. maddesi: "Fiyat: 150 ve 200 günlük MA üstünde" — TEK madde.
+    // Önceki UI 1+2 ayrı satırda gösteriyordu, kitap birebir uyumsuz.
+    // Sn. Ferit "8 + 2 = 10, geriye kalan 1 ne?" sezgisi haklı çıktı.
+    // KARAR ADAY #486 — UI 11 → 10 koşul (1+2 birleşik).
+    { source: "mark", text: "Fiyat > 150 ve 200 günlük hareketli ortalama (150/200 DMA)" },
     { source: "mark", text: "150DMA > 200DMA (uzun vadeli yükseliş yapısı)" },
     { source: "mark", text: "200DMA en az 1 aydır yukarı yönlü (trending up)" },
     { source: "mark", text: "50DMA > 150DMA > 200DMA (sıralı piramit dizilimi)" },
     { source: "mark", text: "Fiyat > 50 günlük hareketli ortalama (50DMA)" },
     { source: "mark", text: "Fiyat 52 haftalık dipten en az %25 yukarıda" },
     { source: "mark", text: "Fiyat 52 haftalık zirveye en fazla %25 mesafede" },
-    { source: "mark", text: "Relative Strength (RS) sıralaması ≥ 70 (IBD)" },
+    { source: "mark", text: "Relative Strength (RS) sıralaması ≥ 70 (IBD)" }, // Mark'ın 8. resmi maddesi
     { source: "quanfina", text: "Fiyat ≥ $10 (mikro-cap eleme)" },
     // 22 May 2026 — Sn. Ferit yakaladı: evren daraltma filtresi UI'de eksikti.
     // scanner.py Finviz URL: sh_avgvol_o500 — backend zaten uyguluyor, UI şeffaflık fix.
