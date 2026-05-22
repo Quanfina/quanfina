@@ -330,7 +330,7 @@ azaltma felsefesiyle çelişti.
 
 | Mod | Tetikleyici | Aksiyon | Süre |
 |---|---|---|---|
-| 🚀 **Akış Modu** (default) | Sn. Ferit ardışık iş söylüyor, kapanış demedi | Sadece dosya değişikliği + commit (background asenkron). **Kanon güncellemesi YOK** | 5-10 sn / iş |
+| 🚀 **Akış Modu** (default) | Sn. Ferit ardışık iş söylüyor, kapanış demedi | Sadece dosya değişikliği + commit (background asenkron). **Anayasa güncellemesi YOK** | 5-10 sn / iş |
 | 📌 **Mini-Mühür** | İş anlamlı + Sn. Ferit "devam" diyor | ⚡ GÜNCEL DURUM **tek satır** ekle (50 char), tek commit | 10 sn |
 | 🏁 **Tam Kapanış** | Sn. Ferit "kapanış yap" der VEYA yeni Kural/Aşama eklendi VEYA kritik karar tescili | Vizyon sürüm bloğu + YAPILANLAR ek + _DEVIR alt-güncel + _OZET refresh + tek commit + push + Drive | 3-5 dk batched |
 | 🌙 **Otonom Hijyen Modu** ⭐ | Sn. Ferit "yatıyorum, hijyen yap" / "geceyi düzenle" / "uyu modunda devam" | AI bağımsız çalışır, yıkıcı eylemler hariç. Tüm bekleyen + birikmiş işler + hijyen + final mühür. Sabah Sn. Ferit'e _DEVIR ⏳ KUYRUK özet | 30-60 dk |
@@ -344,7 +344,7 @@ azaltma felsefesiyle çelişti.
   - Lokal dosya **silme/arşivleme/rename** (saatlik bekleme orphan bırakır)
   - CLAUDE.md anayasa değişikliği (yeni kural, mevcut revize)
   - _BASLAT.md güncellemesi (sayım refresh)
-- **Kanon dosyalar (Vizyon ⚡, YAPILANLAR, _DEVIR) eskimiş kalır**
+- **Anayasa dosyalar (Vizyon ⚡, YAPILANLAR, _DEVIR) eskimiş kalır**
 - Sn. Ferit "kapanış yap" deyince batched güncelleme
 
 **Asenkron commit/push (Bash background mode):**
@@ -353,7 +353,7 @@ azaltma felsefesiyle çelişti.
 - Başarılıysa sessizce tamamlanır
 
 **Otonom Hijyen Modu kapsamı (Sn. Ferit yatınca AI yapar):**
-- Bölüm A — Kanon update (Vizyon sürüm, YAPILANLAR, _DEVIR, _OZET refresh)
+- Bölüm A — Anayasa update (Vizyon sürüm, YAPILANLAR, _DEVIR, _OZET refresh)
 - Bölüm B — Hijyen scriptleri (saglik_kontrol, pattern_ogren,
   proaktif_oneri, build_index v3.1 sayım refresh)
 - Bölüm C — AÇIK KONU semantik tarama (Kural #18 ile pasif aday)
@@ -471,7 +471,7 @@ ekle" der → Code günceller, commit, drive_sync.ps1 mirror.
 
 Web Claude Drive yazma yetkisi VAR (create_file, copy_file) ama
 KULLANILMAZ — drive_sync.ps1 /MIR Drive yazımını sonraki turda
-silebilir, lokal kanon bozulur, .md vs .txt çift gerçeklik tuzağı.
+silebilir, lokal asıl bozulur, .md vs .txt çift gerçeklik tuzağı.
 Manuel tek-kopya akış mevcut altyapıyla bütünleşik, yeni script
 gerekmez.
 
@@ -650,7 +650,7 @@ grep -n "anahtar konu kelimeleri" CLAUDE.md
 Mevcut bir kural zaten kapsıyorsa **yeni kural YASAK**, mevcudu revize et.
 
 **2. DRY (İlke #4) kontrolü:**
-Aynı bilgi 2+ yerde söylenecekse → ÇİFTLEME. Tek yer kanon kalır,
+Aynı bilgi 2+ yerde söylenecekse → ÇİFTLEME. Tek yer asıl kalır,
 diğerleri referans verir.
 
 **3. KURAL #18 hijyen kontrolü:**
@@ -927,7 +927,7 @@ kanıtı). Sadece "PASİF" notu eklenir, içeriği kalır.
 Aşama 3.3 GitHub MCP iptal kararı doğrulandı — 5 dk önce `gh
 auth login` ile Bash üzerinden tam GitHub yetkisi (gist + read:org
 + repo + workflow scopes). MCP çiftlemesi gereksizdi, `gh` CLI
-yeterli. Negatif tescil canlı — kanon iptal, gerçeklik destekledi.
+yeterli. Negatif tescil canlı — resmî iptal, gerçeklik destekledi.
 Aşama 3 RESMÎ KAPANIŞ ile aynı turda. Bu, Web Claude turunda
 yakalanan "Kural #18 metnine ilk uygulama referansı" disiplinine
 karşılık geliyor.
@@ -1266,7 +1266,7 @@ Kontrol noktaları:
   - Renk: #RRGGBB (gerçek hex değer, "yeşilimsi" YASAK)
   - Hücre değeri: "AAOI / RS=99 / Stage 2" (gerçek metin)
   - Hizalama: piksel ölçümü (sol/sağ/üst/alt)
-- KARAR # referansı: KARAR #XYZ — niçin böyle (kanon kaynak)
+- KARAR # referansı: KARAR #XYZ — niçin böyle (resmî kaynak)
 - Manifesto Özellik referansı: #X (varsa)
 ```
 
@@ -1292,7 +1292,7 @@ KALICI İLKE #51 (sat. 7100), KARAR #481-#483 (Kural #21 evrimi).
 
 Sn. Ferit'in UI yazım kararı (Vizyon sat. 5958): **Sayfa başlığı altında
 KARAR # referansı zorunlu** (kaynak şeffaflığı, kullanıcı "niçin böyle"
-sorduğunda kanon link bulur).
+sorduğunda resmî link bulur).
 
 **Pattern:**
 ```tsx
@@ -1403,7 +1403,7 @@ tarayıp kullanmalı. "Şu dosyaya bak" hatırlatması ihlal.
 > sorma top sende artık gerek duyarsan araçları kullanalım"*
 
 Sn. Ferit'in çoklu turlarda yetki devri pekiştirdi. **Karar yorgunluğunu
-azaltma felsefesinin operasyonel kanon halı**. AI artık varsayılan
+azaltma felsefesinin operasyonel anayasa hâli**. AI artık varsayılan
 karar verici, "ne yapacağım?" sorusu **İHLAL** sayılır.
 
 **KAPSAM — AI'nın yetkisi:**
@@ -1522,12 +1522,12 @@ Dur) otomatik tetiklenir. Kural #23 (Otonom Yetki) bu 6 aşamanın
 çıkarma YASAK. "Şu kısmı atladım, gerek görmedim" hatası önle.
 
 **2. KARŞILAŞTIRMA TABLOSU** — Dört sütun: UI listesi ↔ Backend filter
-↔ Kitap kanonu ↔ SQL filter. Bire-bir uyum. Eksik satır = kırmızı
+↔ kitap birebiru ↔ SQL filter. Bire-bir uyum. Eksik satır = kırmızı
 bayrak. Bahane yok.
 
 **3. NOTEBOOKLM ÇİFT DANIŞMA** (Kural #20 genişletme — sadece UI/UX
 değil, **her algoritma kararında**):
-- Quanfina Notebook (sistem perspektifi) + Quanfina Minervini (kanon)
+- Quanfina Notebook (sistem perspektifi) + Quanfina Minervini (resmî kaynak)
 - Prompt'a **tam Backend kaynak listesi** ekle — eksik soru → eksik cevap
 - Prompt + 🔗 URL beraberlik (Kural #20 alt-bölümü)
 
@@ -1660,7 +1660,7 @@ zamanlama DEĞİL).
 Vizyon'da 7 yerde atıf yapılan **en kritik felsefe** ama CLAUDE.md
 anayasa katmanında **hiçbir yerde tescil edilmemişti** — manifesto ihlali.
 
-**Disiplin:** Her sayısal eşik, formül, kanon kuralı için kaynak zinciri:
+**Disiplin:** Her sayısal eşik, formül, resmî kuralı için kaynak zinciri:
 
 ```
 1. Kitap (Mark Minervini "Trade Like a Wizard", Carr, Weinstein, Tharp, vb.)
@@ -1678,7 +1678,7 @@ anayasa katmanında **hiçbir yerde tescil edilmemişti** — manifesto ihlali.
 - ❌ "Şu eşik %25 olsun, mantıklı" — kaynak yok, uydurma
 - ❌ "MA200 slope > 0 olsa yeter" — kitap "1 ay" diyor, atlama
 - ❌ Hardcoded sayı (örn. `if rs >= 70:`) kaynak yorumu olmadan
-- ❌ Mark canon "yaklaşık" yorumu — somut kitap sayfa + alıntı
+- ❌ Mark Resmi Kural "yaklaşık" yorumu — somut kitap sayfa + alıntı
 
 **Doğru pattern:**
 - ✅ `# Trade Like a Wizard s.79 madde 7: "52W dipten en az %25"` yorumlu
@@ -1700,8 +1700,8 @@ def compute_off_52w_low_pct(price, low52): ...
 en kritik felsefe. Anayasa nihayet 22 May 2026'da tescil etti (Agent 2-tur
 Vizyon tarama bulgusu).
 
-**İlişkili:** İLKE #4 (Vizyon kanon kaynağı), Kural #10 (Sızma + #4 yasaklı
-isim), Kural #20 (UI/UX Çift Danışma — kitap kanon doğrulama), Kural #24
+**İlişkili:** İLKE #4 (Vizyon resmî kaynağı), Kural #10 (Sızma + #4 yasaklı
+isim), Kural #20 (UI/UX Çift Danışma — kitap kitap birebir doğrulama), Kural #24
 (Sağlam Gidelim — 6 Aşama Aşama 1 TAM OKU), Vizyon AÇIK KONU sistemleri.
 
 ---
@@ -1738,7 +1738,7 @@ Her seçimde "hangisi" sorusu **sıfırlanmış** — otomatik cevap kuralı:
 | Lokal silme/arşivleme sonrası? | drive_sync.ps1 manuel tetik | Kural #8 v2 |
 | "Devam" mesajı yorumu? | Mevcut planı sürdür, YENİ adım açma | Kural #23 |
 
-Sn. Ferit "her seçimde hangisi" sorusu yaşamasın — Cheat-Sheet kanon.
+Sn. Ferit "her seçimde hangisi" sorusu yaşamasın — Cheat-Sheet resmî.
 
 ### Sn. Ferit Profili (22 May 2026 user_ferit memory'den entegre + güncellenmiş)
 
@@ -1846,7 +1846,7 @@ hali görür.
 
 **Yaşayan sistem köprüsü:** `drive_sync.ps1` saatlik mirror →
 NotebookLM otomatik yeniden indeks + Web Claude Drive Connector
-canlı kaynak. **Aynı bilgi 3 araçta paralel** (lokal canon +
+canlı kaynak. **Aynı bilgi 3 araçta paralel** (lokal asıl +
 Drive ayna + NotebookLM canlı).
 
 ### Yetki Devri Prensipleri
@@ -1944,7 +1944,7 @@ bağlanabilir (`.git/hooks/pre-push` — 17 May 2026 itibarıyla bağlı).
 | Sprint X | **Adım X.Y** veya **Aşama X.Y** | Yeni sistemde sprint kullanılmaz |
 | Phase | Aşama | Türkçe |
 
-Eski commit mesajlarında "Faz" veya "Sprint" geçebilir — bunlar geçmiş, kanon
+Eski commit mesajlarında "Faz" veya "Sprint" geçebilir — bunlar geçmiş, resmî
 değil. Yeni metinde tekrar etme.
 
 ### Yasaklı İsimler ve Markalar (Sızma Kontrolü #4 ile birebir)
@@ -2432,7 +2432,7 @@ Yeni oturum başında **son 100 satırı** okumak yeterlidir. Eski kararlar değ
 | NotebookLM: Risk Academy kurulum (PDF bekliyor) | `notebook/Asama_2_3_c_Risk_Academy_NotebookLM.md` | Uzman kurulum |
 | TradeGrader Gem kurulum (17 kategori) | `notebook/Asama_4_1_TradeGrader_Gem.md` | Uzman kurulum |
 | Sprint 4-bis mimari kararlar (Markets360 sentez) | `notebook/Sprint_4_bis_Mimari_Kararlar.md` | Mimari belge |
-| Sprint 4-bis.5 5-Kaynak sentez (kanon doğrulama) | `notebook/Sprint_4_bis_5_Kaynak_Sentez.md` | Mimari belge |
+| Sprint 4-bis.5 5-Kaynak sentez (kitap birebir doğrulama) | `notebook/Sprint_4_bis_5_Kaynak_Sentez.md` | Mimari belge |
 
 ---
 

@@ -72,7 +72,7 @@ export interface ScreenResultRow {
  * Backend zaten /api/screens + /api/screens/{slug} canli (db_helpers.SCREENS_READY_9).
  *
  * Adim 1 (22 May 2026): stage2_10p — Minervini Trend Template (Mark resmi kuralı 8 kosul).
- * Notebook_A satir 846 kanon: passed=1 = Trend Template PASS.
+ * Notebook_A satir 846 kitap birebir: passed=1 = Trend Template PASS.
  * Web Claude 5-Kaynak sentez: "Must-Have Setup #1 ZATEN CANLI."
  */
 export const SCREEN_CATEGORIES: Record<string, string> = {
@@ -114,7 +114,7 @@ export const SCREEN_CONDITIONS: Record<string, ScreenCondition[]> = {
     // 11: Mark Ekstra Kural (kitap tavsiyesi — TURUNCU, "preferably/ideally" şartları)
     //
     // Kanon kaynak: Quanfina Minervini + Quanfina Notebook çift doğrulama
-    // (22 May 2026 NotebookLM kanon kanıt zinciri).
+    // (22 May 2026 NotebookLM kitap birebir kanıt zinciri).
     { source: "quanfina", text: "Fiyat ≥ $10 (mikro-cap eleme — evren daraltma)" },
     { source: "quanfina", text: "Ortalama hacim ≥ 500.000 (likidite eleme — evren daraltma)" },
     { source: "mark", text: "Fiyat > 150 ve 200 günlük hareketli ortalama (150/200 DMA)" },
@@ -125,7 +125,7 @@ export const SCREEN_CONDITIONS: Record<string, ScreenCondition[]> = {
     { source: "mark", text: "Fiyat 52 haftalık dipten en az %25 yukarıda" },
     { source: "mark", text: "Fiyat 52 haftalık zirveye en fazla %25 mesafede" },
     { source: "mark", text: "Relative Strength (RS) sıralaması ≥ 70 (IBD)" }, // Mark'ın 8. resmi maddesi
-    // 11. Mark Ekstra Kural — Mark kitap tavsiyesi (kanon ZORUNLU değil ama tercih)
+    // 11. Mark Ekstra Kural — Mark kitap tavsiyesi (kitap birebir ZORUNLU değil ama tercih)
     // Kitap birebir: "RS Rating ≥ 70 (ideali 80-90+)" — Mark daha güçlü adayları
     // 80-90+ RS'de arar. Trend Template'in zorunlu eşiği 70 ama tercih 80-90+.
     { source: "mark_ekstra", text: "RS Rating ideali 80-90+ (Mark kitap tavsiyesi — daha güçlü adaylar)" },

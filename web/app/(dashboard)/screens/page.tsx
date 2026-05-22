@@ -42,7 +42,7 @@ const GRADE_STYLE: Record<string, { bg: string; color: string }> = {
   D: { bg: "#ffc7c7", color: "#842029" },
 };
 
-// RS IBD renk bandı (TPR/RPR eşik — Mark Minervini kanon)
+// RS IBD renk bandı (TPR/RPR eşik — Mark Resmi Kural)
 function getRsBandStyle(rs: number | null): { bg: string; color: string } {
   if (rs === null || rs === undefined) return { bg: "transparent", color: "inherit" };
   if (rs >= 95) return { bg: "#58bd7d", color: "#fff" };
@@ -207,7 +207,7 @@ export default function ScreensPage() {
                       </span>
                       <span className="font-medium shrink-0" style={{
                         // 22 May 2026 — 3 kategori renk:
-                        // mark (yeşil — Mark Resmi Kural kitap kanon)
+                        // mark (yeşil — Mark Resmi Kural kitap birebir)
                         // mark_ekstra (turuncu — Mark kitap tavsiyesi)
                         // quanfina (nötr — Quanfina Ek Filtre)
                         color: cond.source === "mark"

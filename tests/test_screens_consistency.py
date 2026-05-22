@@ -88,7 +88,7 @@ class TestStage2_10pConsistency:
         filters = _extract_finviz_filters(scanner)
         assert "sh_avgvol_o500" in filters, (
             "Backend hacim filtresi (sh_avgvol_o500) atlanmış. "
-            "Mark canon evren daraltma — UI ve backend bire-bir."
+            "Mark Resmi Kural evren daraltma — UI ve backend bire-bir."
         )
 
     def test_finviz_url_has_price_filter(self, scanner):
@@ -97,7 +97,7 @@ class TestStage2_10pConsistency:
         assert "sh_price_o10" in filters
 
     def test_finviz_url_has_8_dma_filters(self, scanner):
-        """Backend 5 SMA filtresi + 2 52W filtresi (toplam Mark canon 7 filter)."""
+        """Backend 5 SMA filtresi + 2 52W filtresi (toplam Mark Resmi Kural 7 filter)."""
         filters = _extract_finviz_filters(scanner)
         required = [
             "ta_sma50_pa", "ta_sma200_pa",
@@ -105,13 +105,13 @@ class TestStage2_10pConsistency:
             "ta_highlow52w_a25h", "ta_highlow52w_b75l",
         ]
         for f in required:
-            assert f in filters, f"Mark canon filter eksik: {f}"
+            assert f in filters, f"Mark Resmi Kural filter eksik: {f}"
 
     def test_sql_filter_has_rs_threshold(self, db_helpers):
         """SQL filter rs_ibd >= 70 (KARAR #484) içermeli."""
         sql = _extract_sql_filter(db_helpers, "stage2_10p")
         assert "rs_ibd >= 70" in sql, (
-            f"SQL filter Mark canon RS≥70 (Koşul 9) içermiyor. "
+            f"SQL filter Mark Resmi Kural RS≥70 (Koşul 9) içermiyor. "
             f"Mevcut: {sql!r}"
         )
 
@@ -153,7 +153,7 @@ class TestStage2_10pConsistency:
     def test_ui_mark_ekstra_count(self, ts):
         """UI'de tam 1 Mark Ekstra Kural olmalı (turuncu — kitap tavsiyesi).
         22 May 2026 Sn. Ferit talimat: 11. madde Mark Ekstra Kural.
-        Mark canon ZORUNLU değil ama tercih (preferably/ideally şartları).
+        Mark Resmi Kural ZORUNLU değil ama tercih (preferably/ideally şartları).
         """
         pattern = r'stage2_10p:\s*\[(.*?)\]\s*,\s*\};'
         m = re.search(pattern, ts, re.DOTALL)
