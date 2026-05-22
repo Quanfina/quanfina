@@ -340,7 +340,11 @@ azaltma felsefesiyle çelişti.
 - Anlamlıysa commit (background, ASCII title)
 - Drive senkron arka planda (`drive_sync.ps1` ScheduledTask saatlik
   zaten — manuel tetik gerekmez)
-- **Kanon dosyalar (Vizyon ⚡, YAPILANLAR, _DEVIR, _OZET) eskimiş kalır**
+- **İSTİSNA — manuel `drive_sync.ps1` tetik ZORUNLU** (22 May 2026 revize, H#A1):
+  - Lokal dosya **silme/arşivleme/rename** (saatlik bekleme orphan bırakır)
+  - CLAUDE.md anayasa değişikliği (yeni kural, mevcut revize)
+  - _BASLAT.md güncellemesi (sayım refresh)
+- **Kanon dosyalar (Vizyon ⚡, YAPILANLAR, _DEVIR) eskimiş kalır**
 - Sn. Ferit "kapanış yap" deyince batched güncelleme
 
 **Asenkron commit/push (Bash background mode):**
@@ -631,6 +635,49 @@ sistem kullanıldıkça kendi pattern kütüphanesini büyütür.
 Proaktif Tarama), Kural #12 (Önce Keşfet), Kural #13 (Commit Disiplini),
 Bilgi Mimarisi İlke #3 (Yaşayan Sistem) + #5 (Klasör Bağlamı).
 
+### Kural 14 alt-bölüm — Yeni Kural Önerisi Öncesi 4 Kontrol (22 May 2026 ~19:00 yeni, H#A1 paterninden)
+
+Sn. Ferit talimatı: *"şişme olmasın kuralı yaptığını zannetmiyorum"* +
+*"birdaha olmaması açısından iş akışı kurallarımıza ekle"*.
+
+**AI yeni Kural öneriden ÖNCE 4 ZORUNLU kontrol** (Kural #18 + İlke #4
+ile birlikte çalışır):
+
+**1. ÇİFTLEME taraması:**
+```bash
+grep -n "anahtar konu kelimeleri" CLAUDE.md
+```
+Mevcut bir kural zaten kapsıyorsa **yeni kural YASAK**, mevcudu revize et.
+
+**2. DRY (İlke #4) kontrolü:**
+Aynı bilgi 2+ yerde söylenecekse → ÇİFTLEME. Tek yer kanon kalır,
+diğerleri referans verir.
+
+**3. KURAL #18 hijyen kontrolü:**
+Yeni kural eklerken aynı konuda pasif/şişmiş bir kuralı çıkarmak
+gerekiyor mu? "Ekle + çıkar" çift mekanizma birlikte düşünülür.
+
+**4. KAPSAM kontrolü — gerçekten yeni konsept mi?**
+- ✅ Tamamen yeni konsept → yeni kural OK (örn. Kural #25 Mola Önermeme)
+- ❌ Mevcut kuralların **şemsiyesi/özeti** → alt-bölüm yeter, yeni numara YASAK
+- ❌ Mevcut bir kuralın alt-uygulaması → revize et, yeni numara YASAK
+
+**Bu kontroller AI OTOMATİK yapar**, Sn. Ferit'e raporlar. İhlal
+tespit edilirse yeni kural önerisi geri çekilir.
+
+**Pattern keşfi (22 May 2026 ~19:00):** Kural #26 (Drive Senkron
+Disiplini) çiftleme yapıldı — Drive senkron 4 yerde zaten vardı
+(Kural #8 v2 Akış + Otonom Hijyen + Kural #9 v2 ana + alt-bölüm).
+5. tekrar Kural #26 oldu → Kural #18 negatif tescil ile ÇIKARILDI.
+Bu pattern bir daha olmaması için 4 kontrol kalıcı disiplin.
+
+**Manifesto Özellik #8:** Sistem kendi şişmesini fark edip durdurur.
+Kural #14 (ekleme) + Kural #18 (çıkarma) + Kural #14 alt-bölüm (önleme).
+
+**İlişkili:** Kural #14 ana metin (Pattern Tespit), Kural #18 (Pasif
+Çıkarma), İlke #4 (DRY/Tekrarsızlık), `_HATALAR.md` H#A1 (Kural #26
+çiftleme kanıt günlüğü).
+
 ### Kural 15 — PowerShell Script Encoding (sadece `.ps1`, 17 May 2026 yeni)
 **Kapsam:** Yalnızca `scripts/*.ps1` ve `.ps1` uzantılı dosyalar.
 Bash scriptleri (`.sh`, `.git/hooks/*`) ve Markdown (`*.md`) **kapsam dışı** —
@@ -752,6 +799,20 @@ Aşama 2.3 (a+b) + Aşama 4.2 RESMÎ KAPANIŞ (KARAR #445).
 toplanır, sınırlı dikkati tüketir, AI'a gereksiz bağlam yükler.
 Kural #14 ile **eklenir**, Kural #18 ile **çıkarılır**. Sistem
 nefes alır.
+
+**Felsefi temel (22 May 2026 _FELSEFE arşivden entegre — F#NEW):**
+
+1. **Yetenek Minimalizmi** (KARAR ADAY #442): *"Çok yetenek yanlışa
+   sebep olabiliyor."* Kullanılmayan yetenek, kullanılan yeteneklerin
+   görünürlüğünü zayıflatır.
+
+2. **Karar yorgunluğu azaltma:** Pasif öğeler "hangisini seçeyim"
+   yorgunluğu yaratır. 26 kural arasından 3'ü pasif ise AI tarama
+   süresi artar, doğru kural bulma süresi düşer.
+
+3. **Yaşayan ≠ ölmeyen:** Yaşayan organizma hücre yenileler, ölmüş
+   hücreler atılır. Bir sistem **her şeyi tutarsa** yaşamaz, **sadece
+   birikir**. Yaşayan sistem = ekleyen + çıkaran çift mekanizma.
 
 **Why (Sn. Ferit talimatı 18 May 2026 ~23:00):** *"kural ekleme
 varsa kural çıkarma protokolü kuralı da eklicem masaüstüne
@@ -1439,57 +1500,14 @@ Kural #4 (Yıkıcı Onay), Kural #8 v2 (Kapanış modları — Sn. Ferit
 tetikler, AI önermez), Kural #23 (Otonom Yetki — eylem otonomu,
 zamanlama DEĞİL).
 
-### Kural 26 — Drive Senkron Disiplini: Lokal Değişiklik Sonrası Otomatik (22 May 2026 ~18:00 yeni)
-
-Sn. Ferit talimatı: *"drive güncelleme txt yenileme gibi önceki
-kurallarımızıda kontrol et büyük ihtimalle bunuda kaçır mışındır"*.
-Kural #14 doğrudan tescil + Kural #8 v2 Akış Modu eksikliği fix.
-
-**Disiplin:** `notebook/` veya kanon dosyalarda (CLAUDE.md değişikliği,
-_BASLAT yenileme, dosya arşivleme, yeni .md ekleme) her anlamlı
-değişiklik sonrası **`drive_sync.ps1` tetiklenir**:
-
-```powershell
-.\scripts\drive_sync.ps1
-```
-
-**Ne yapar (v2.2):**
-- `notebook/*.md` → `G:\Drive'ım\Quanfina_notebook\*.txt` mirror
-  (NotebookLM picker `.md` görmez, `.txt` görür — H#8)
-- Orphan .txt temizliği (lokal silinen/arşivlenen .md karşılığı Drive'dan silinir)
-- robocopy /MIR mantığı + Copy-Item Türkçe karakter için BOM-less UTF-8
-
-**ScheduledTask:** `Quanfina_Notebook_Drive_Sync` saatlik 09:00
-otomatik (Kural #9 v2 alt-bölüm Çift Yönlü Senkron + KARAR #449).
-**Ama manuel değişikliklerde saat beklenmez** — anlamlı değişiklik
-sonrası AI hemen tetikler.
-
-**Tetikleyici koşullar (AI otomatik çalıştırır):**
-- Yeni notebook/*.md eklendi (örn. Sprint_4_bis_*.md)
-- Mevcut notebook dosyası >50 satır değişti (örn. _DEVIR ⏳ KUYRUK güncelleme)
-- Dosya arşivlendi (örn. _archive/'e taşıma)
-- CLAUDE.md anayasa değişikliği (yeni kural, mevcut revize)
-- _BASLAT.md güncellemesi (sayım refresh)
-
-**Tetikleyici DEĞİL (otomatik saatlik ScheduledTask yeter):**
-- Küçük yazım hatası düzeltme
-- _DEVIR.md tek satır ekleme
-
-**Bypass YASAK:** Kural #4 (Yıkıcı Eylem Onayı) burada **yardımcı** —
-yıkıcı (silme/rename) durumunda drive_pull.ps1 conflict çıkarabilir,
-o zaman Sn. Ferit'e bilgi ver. Ama **commit + push kadar normal akış**
-parçası.
-
-**Pattern keşfi:** 22 May 2026 büyük konsolidasyon turu — 7 dosya
-arşivlendi + _BASLAT yenilendi + Kural #24 + Kural #20 alt-bölüm
-eklendi, ama AI drive_sync tetiklemedi. Sn. Ferit 1. ortaya çıkışta
-doğrudan tescil etti.
-
-**İlişkili:** Kural #8 v2 (Akıllı Kapanış — Akış Modu artık Drive
-senkron dahil), Kural #9 v2 alt-bölüm Çift Yönlü Senkron (drive_sync
-+ drive_pull), Kural #10 (Push Öncesi Sızma — Drive ayrı, push'la
-karıştırılmaz), KARAR #449 (otomatik çift yönlü senkron),
-`scripts/drive_sync.ps1` + `scripts/drive_pull.ps1`.
+<!-- Kural #26 22 May 2026 ~19:00 ÇIKARILDI (Kural #18 negatif tescil) —
+çiftleme tespit edildi: Drive senkron disiplini Kural #8 v2 Akış Modu
+(satır 341), Kural #8 v2 Otonom Hijyen Bölüm J (satır 363), Kural #9 v2
+ana metni (satır 430), Kural #9 v2 alt-bölüm Otomatik Çift Yönlü Senkron
+(satır 846) — toplam 4 yerde zaten tescilli. Kural #26 5. tekrarı oldu,
+İlke #4 (DRY) ihlali. _HATALAR.md H#A1 kalıcı kayıt. Lokal dosya
+silme/arşivleme sonrası manuel drive_sync.ps1 tetik disiplini Kural #8
+v2 Akış Modu'na alt-satır olarak eklendi (aşağıda revize). -->
 
 ---
 
@@ -1625,6 +1643,33 @@ değil. Yeni metinde tekrar etme.
 | Vd, Wp, valueGetter, aB() | Yabancı platform minified internal isimler |
 
 Otomatik kontrol: `scripts/sizma_kontrol.ps1` kontrol #4 + pre-push hook.
+
+### Quanfina Doğru Adlandırma (yasaklı yerine ne kullanılacak — 22 May 2026 _CLEAN_ROOM arşivden entegre)
+
+| Yasak terim (referans) | ✅ Quanfina alternatif | Açıklama |
+|---|---|---|
+| ~~SEPA Scanner~~ | `TrendTemplateScanner`, `MomentumScanner`, `PA1Scanner` | Mevcut `quanfina-scanner` Cloud Run bunu yapıyor — PA1 = "Price Action 1" Quanfina kendi terimi |
+| ~~MAI~~ | `MomentumIndex`, `TrendStrengthIndex`, `MarketStrengthScore` | Skor bazlı metrikler için |
+| ~~MonAlert~~ | `MarketAlertEngine`, `TrendAlertSystem` | Alert sistemi |
+| ~~Fab 5~~ | `TopMomentumPicks`, `ConvictionList`, `FocusList` | Watchlist hiyerarşisinde "Focus" zaten kullanılıyor |
+| ~~Markets 360~~ | (Quanfina kendi ismi) | Platformun kendisi |
+
+### İzin verilen Genel Finansal Terimler (Mark/Yabancı'dan önce literatürde mevcut — kod-içi OK)
+
+Bu terimler Mark Minervini'den ÖNCE finansal literatürde mevcut — Quanfina koduna yazılabilir:
+
+| Genel terim | Kaynak | Quanfina kullanımı |
+|---|---|---|
+| `Stage 2`, `STAGE_2` | Weinstein "Stage Analysis" (1988) | enum değeri, sınıf adı OK |
+| `Trend Template` | Genel teknik analiz terimi | scanner kriterleri |
+| `VCP` (Volatility Contraction Pattern) | Genel teknik analiz | pattern sınıf adı OK |
+| `Cup & Handle`, `Pivot Point` | William O'Neil + genel TA | pattern detector |
+| `R-Multiple`, `Risk:Reward` | Van Tharp + genel risk yönetimi | TradeGrader hesaplama |
+| `RS Rating`, `Relative Strength` | IBD (Investor's Business Daily) | scanner kriteri |
+| `Distribution Day` | William O'Neil + genel | market health |
+| `Pyramiding` | Genel pozisyon yönetimi | trade_legs tablosu |
+
+**Mantık:** Mark Minervini'nin **tescil ettiği isim** (SEPA, MAI, MonAlert, Fab 5) yasak, ama **literatürde paylaşılan genel kavramlar** (Stage, VCP, Trend Template) Quanfina'nın kendi kodunda kullanılabilir. AI bu ayrımı net yapar — Sn. Ferit "Quanfina'da SEPAScanner sınıfı oluştursam?" diye sorduğunda 🔴 ihlal uyarısı + Quanfina alternatif önerisi.
 
 ### Piyasa Bağlamı
 - **Quanfina ABD piyasasında işlem yapar** (NYSE / NASDAQ / ARCA)

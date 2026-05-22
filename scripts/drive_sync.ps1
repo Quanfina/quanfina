@@ -234,7 +234,12 @@ if (-not (Test-Path $txtKlasoru)) {
     New-Item -ItemType Directory -Path $txtKlasoru -Force | Out-Null
 }
 
-$mdDosyalari = Get-ChildItem -Path $Hedef -Recurse -File -Filter "*.md" -ErrorAction SilentlyContinue
+# v2.4 fix (22 May 2026, H#A2): _archive/ haric tut. Eskiden Recurse
+# tum alt klasorleri kapsadigi icin arsivlenen .md'ler orphan logic'inde
+# "kaynak var" olarak gozukup karsiligi .txt'ler silinmiyordu (8 orphan
+# birikti). Now: kok klasor .md'leri al, _archive/ dahil etme.
+$mdDosyalari = Get-ChildItem -Path $Hedef -Recurse -File -Filter "*.md" -ErrorAction SilentlyContinue |
+    Where-Object { $_.FullName -notmatch '[\\/]_archive[\\/]' }
 $txtUretildi = 0
 $txtAtlandi = 0
 $txtHata = 0
