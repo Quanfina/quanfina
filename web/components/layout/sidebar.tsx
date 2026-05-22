@@ -4,9 +4,13 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
 import {
-  Menu, Home, BarChart2, TrendingUp, Activity, Globe,
-  ListChecks, NotebookText, ScanLine, Layers, ChevronDown,
+  Menu, Home, Activity, Globe,
+  ListChecks, NotebookText, ScanLine, ChevronDown,
 } from "lucide-react";
+// KARAR ADAY (22 May 2026): BarChart2, TrendingUp, Layers ikonlari kaldirildi -
+// Stratejiler grup sidebar'dan cikti (Secenek E). NavGroup tip ve rendering KORUNDU
+// (Kural #18 pasif kod - ileride yeni grup eklenirse hazir). /minervini + /carr
+// route'lari URL ile erisilebilir, sayfalari arsivlenmedi.
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
@@ -31,17 +35,12 @@ const NAV_ITEMS: NavItem[] = [
   { kind: "leaf", href: "/watchlist",      label: "İzleme Listesi", icon: ListChecks  },
   { kind: "leaf", href: "/screens",        label: "Tarama",         icon: ScanLine    },
   { kind: "leaf", href: "/journal",        label: "İşlem Günlüğü", icon: NotebookText },
-  {
-    kind: "group",
-    id: "strategies",
-    label: "Stratejiler",
-    icon: Layers,
-    children: [
-      { kind: "leaf", href: "/minervini", label: "Minervini", icon: BarChart2  },
-      { kind: "leaf", href: "/carr",      label: "Carr",      icon: TrendingUp },
-    ],
-  },
 ];
+// KARAR ADAY (22 May 2026): Stratejiler grup (Minervini + Carr) kaldirildi (Secenek E).
+// Sebep: Minervini akisi mevcut sayfalarda zaten coziluyor (Tarama -> Izleme Listesi
+// -> Sinyaller -> Islem Gunlugu). DRY temiz, karar yorgunlugu min, 20 strateji
+// felsefesine olceklenir. Bilgi katmani NotebookLM (Kural #17).
+// /minervini + /carr route'lari KORUNDU (URL ile erisilebilir, Kural #18 pasif oge).
 // /api-test KARAR #491 ile sidebar'dan kaldirildi - URL ile erisilebilir.
 
 const STORAGE_PREFIX = "sidebar-group-";
