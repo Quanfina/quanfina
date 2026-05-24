@@ -1995,3 +1995,143 @@ class TestDetectDarvasBox:
     def test_constants(self):
         assert DARVAS_MIN_WEEKS == 4
         assert DARVAS_MAX_RANGE_PCT == 15.0
+
+
+# =============================================================================
+# Faz 2 Genisletme 3 — Wait for Pivot + 20-DMA Hold
+# Tests for: check_pivot_trigger, check_20dma_hold
+# Tescil: Vizyon v22.05 (24 May 2026)
+# =============================================================================
+
+from quanfina_math import (
+    check_pivot_trigger,
+    check_20dma_hold,
+    PIVOT_TRIGGER_VOLUME_MULTIPLIER,
+    TWENTY_DMA_BREACH_DAYS_EXIT,
+)
+
+
+class TestCheckPivotTrigger:
+    """KARAR ADAY #885 - Mark Wait for Pivot Discipline (TTLC s.243)."""
+
+    def test_full_trigger_3_of_3(self):
+        # Pivot $50, current $51 (>%0.2 above), high vol, upper half close
+        result = check_pivot_trigger(
+            current_price=51.0,
+            pivot_price=50.0,
+            today_volume=200000,
+            avg_volume_50d=100000,
+            today_high=51.5,
+            today_low=49.5,
+            today_close=51.0,  # ust yari
+        )
+        assert result["should_buy"] is True
+        assert result["tier"] == "triggered"
+        assert result["above_pivot"] is True
+        assert result["volume_expanded"] is True
+        assert result["upper_half_close"] is True
+
+    def test_almost_2_of_3_low_volume(self):
+        # Above pivot + upper half, low volume
+        result = check_pivot_trigger(
+            current_price=51.0,
+            pivot_price=50.0,
+            today_volume=80000,  # 100K * 1.5 = 150K esigin altinda
+            avg_volume_50d=100000,
+            today_high=51.5,
+            today_low=49.5,
+            today_close=51.0,
+        )
+        assert result["should_buy"] is False
+        assert result["tier"] == "almost"
+        assert result["volume_expanded"] is False
+
+    def test_wait_below_pivot(self):
+        # Pivot altinda
+        result = check_pivot_trigger(
+            current_price=49.5,
+            pivot_price=50.0,
+            today_volume=200000,
+            avg_volume_50d=100000,
+            today_high=49.8,
+            today_low=49.2,
+            today_close=49.5,
+        )
+        assert result["should_buy"] is False
+        assert result["tier"] == "wait"
+        assert result["above_pivot"] is False
+
+    def test_wait_lower_half_close(self):
+        # Above pivot + vol OK, but close lower half (bearish)
+        result = check_pivot_trigger(
+            current_price=51.0,
+            pivot_price=50.0,
+            today_volume=200000,
+            avg_volume_50d=100000,
+            today_high=52.0,
+            today_low=49.5,
+            today_close=50.2,  # %30 lower
+        )
+        assert result["upper_half_close"] is False
+
+    def test_invalid_zero_pivot(self):
+        result = check_pivot_trigger(0, 50, 100000, 100000, 50, 49, 50)
+        assert result["tier"] == "invalid"
+
+    def test_constants(self):
+        assert PIVOT_TRIGGER_VOLUME_MULTIPLIER == 1.5
+
+
+class TestCheck20dmaHold:
+    """KARAR ADAY #888 - Mark 20-DMA Hold Detector (TTLC s.247)."""
+
+    def test_safe_above_dma(self):
+        # 5 gun, hepsi 20-DMA ustunde
+        closes = [101, 102, 103, 102, 104]
+        smas = [100, 100, 100, 100, 100]
+        result = check_20dma_hold(closes, smas)
+        assert result["status"] == "safe"
+        assert result["consecutive_days_below"] == 0
+        assert result["last_close_below"] is False
+
+    def test_warning_today_below(self):
+        # Son gun altinda kapanis (1 gun)
+        closes = [102, 103, 104, 103, 98]
+        smas = [100, 100, 100, 100, 100]
+        result = check_20dma_hold(closes, smas)
+        assert result["status"] == "warning"
+        assert result["consecutive_days_below"] == 1
+
+    def test_exit_signal_2_consecutive(self):
+        # 2 ardisik gun altinda
+        closes = [102, 103, 104, 98, 97]
+        smas = [100, 100, 100, 100, 100]
+        result = check_20dma_hold(closes, smas)
+        assert result["status"] == "exit_signal"
+        assert result["consecutive_days_below"] >= 2
+
+    def test_exit_signal_3_consecutive(self):
+        closes = [105, 99, 98, 97, 96]
+        smas = [100, 100, 100, 100, 100]
+        result = check_20dma_hold(closes, smas)
+        assert result["status"] == "exit_signal"
+        assert result["consecutive_days_below"] >= 3
+
+    def test_tolerance_buffer(self):
+        # %0.5 tolerans icinde — safe
+        closes = [100, 100, 100, 100, 99.7]
+        smas = [100, 100, 100, 100, 100]
+        result = check_20dma_hold(closes, smas)
+        # %0.5 esigi 99.5 — close 99.7 OK
+        assert result["status"] == "safe"
+
+    def test_invalid_mismatched_length(self):
+        result = check_20dma_hold([100, 101], [100])
+        assert result["status"] == "invalid"
+
+    def test_invalid_empty(self):
+        result = check_20dma_hold([], [])
+        assert result["status"] == "invalid"
+
+    def test_constants(self):
+        assert TWENTY_DMA_BREACH_DAYS_EXIT == 2

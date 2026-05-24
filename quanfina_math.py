@@ -2488,3 +2488,198 @@ def detect_darvas_box(price_volume_history: Optional[list[dict]]) -> dict:
         'tier': tier,
         'mark_says': says,
     }
+
+
+# =============================================================================
+# SPRINT 4-bis.7 — FAZ 2 GENİŞLETME 3 — Mark Pivot Disiplin + 20-DMA Hold
+# Tescil: Vizyon v22.05
+# KARAR ADAY #885 (Wait for Pivot) + #888 (20-DMA Hold)
+# Detay: notebook/Sprint_4_bis_7_Mark_HASSAS_Tarama.md
+# =============================================================================
+
+# Mark KESIN Pivot disiplini sabitler (TTLC s.243)
+PIVOT_TRIGGER_VOLUME_MULTIPLIER: float = 1.5    # Mark KESIN expanded volume
+PIVOT_TRIGGER_PRICE_BUFFER_PCT: float = 0.2     # Pivot fiyatın %0.2 üstünde (gerçek kırılma)
+
+# Mark KESIN 20-DMA Hold sabitler (TTLC s.247)
+TWENTY_DMA_TOLERANCE_PCT: float = 0.5            # %0.5 altı = tolerans (intraday wiggle)
+TWENTY_DMA_BREACH_DAYS_WARNING: int = 1          # 1 gün altı = uyarı
+TWENTY_DMA_BREACH_DAYS_EXIT: int = 2             # 2 ardışık = exit signal
+
+
+def check_pivot_trigger(
+    current_price: float,
+    pivot_price: float,
+    today_volume: int,
+    avg_volume_50d: int,
+    today_high: float,
+    today_low: float,
+    today_close: float,
+) -> dict:
+    """KARAR ADAY #885 — Mark "Wait for Pivot" Discipline (TTLC s.243-244).
+
+    Mark birebir (TTLC s.243):
+        "Assuming that a stock will break out is dangerous. ... Let the stock
+        break above the pivot and prove itself."
+
+    Mark KESIN pivot tetik kriterleri:
+        - Stock pivot_price üstüne çıkmalı (gerçek kırılma)
+        - Volume expanding (50-DMA ortalamasının %150+ üstü)
+        - Close upper half of day range (alım baskısı)
+
+    Args:
+        current_price: Mevcut fiyat (genelde close)
+        pivot_price: Mark pivot point (base high veya cup-handle high)
+        today_volume: Bugünkü hacim
+        avg_volume_50d: 50-gün ortalama hacim
+        today_high: Bugün en yüksek
+        today_low: Bugün en düşük
+        today_close: Bugün kapanış
+
+    Returns:
+        dict:
+        {
+            'should_buy': bool,
+            'tier': 'triggered' | 'almost' | 'wait' | 'invalid',
+            'above_pivot': bool,
+            'volume_expanded': bool,
+            'upper_half_close': bool,
+            'mark_says': str,
+        }
+
+    Kaynak: TTLC s.243 + Sprint_4_bis_7_Mark_HASSAS_Tarama.md KARAR ADAY #885
+    """
+    if pivot_price <= 0 or current_price <= 0 or avg_volume_50d <= 0:
+        return {
+            'should_buy': False,
+            'tier': 'invalid',
+            'above_pivot': False,
+            'volume_expanded': False,
+            'upper_half_close': False,
+            'mark_says': 'Geçersiz veri',
+        }
+
+    # 1) Above pivot (gerçek kırılma — Mark KESIN buffer)
+    buffer_threshold = pivot_price * (1 + PIVOT_TRIGGER_PRICE_BUFFER_PCT / 100)
+    above_pivot = current_price > buffer_threshold
+
+    # 2) Volume expanded (Mark KESIN expanding volume)
+    volume_expanded = today_volume > avg_volume_50d * PIVOT_TRIGGER_VOLUME_MULTIPLIER
+
+    # 3) Upper half close (alım baskısı)
+    if today_high > today_low:
+        midpoint = (today_high + today_low) / 2
+        upper_half_close = today_close > midpoint
+    else:
+        upper_half_close = False
+
+    pass_count = sum([above_pivot, volume_expanded, upper_half_close])
+
+    if pass_count == 3:
+        should_buy = True
+        tier = 'triggered'
+        says = (f"3/3 Mark KESIN tetik — pivot ${pivot_price:.2f} üstünde + "
+                f"hacim {today_volume/avg_volume_50d:.1f}x + upper half close = BUY (TTLC s.243)")
+    elif pass_count == 2 and above_pivot:
+        should_buy = False
+        tier = 'almost'
+        says = (f"2/3 — pivot tetiklendi ama hacim/upper half eksik. "
+                f"Mark 'Wait for Pivot' disipline: 1 gün daha gözle")
+    else:
+        should_buy = False
+        tier = 'wait'
+        says = (f"{pass_count}/3 Mark eşiği eksik — 'Assume breakout YASAK' "
+                f"(TTLC s.243), bekle")
+
+    return {
+        'should_buy': should_buy,
+        'tier': tier,
+        'above_pivot': above_pivot,
+        'volume_expanded': volume_expanded,
+        'upper_half_close': upper_half_close,
+        'mark_says': says,
+    }
+
+
+def check_20dma_hold(
+    closes_last_5d: list[float],
+    sma_20_last_5d: list[float],
+) -> dict:
+    """KARAR ADAY #888 — Mark 20-DMA Hold Detector (TTLC s.247).
+
+    Mark birebir (TTLC s.247):
+        "Once the stock successfully breaks out, the stock price should hold
+        its 20-day moving average and IN MOST CASES SHOULD NOT CLOSE BELOW IT."
+
+    Mark KESIN warning system:
+        - 1 gün 20-DMA altı kapanış = WARNING
+        - 2 ardışık gün altı = EXIT SIGNAL
+        - Heavy volume + altı = "even worse"
+
+    Args:
+        closes_last_5d: Son 5 günün kapanışları [day-4, day-3, day-2, day-1, today]
+        sma_20_last_5d: Son 5 günün 20-DMA değerleri (aynı index)
+
+    Returns:
+        dict:
+        {
+            'status': 'safe' | 'warning' | 'exit_signal' | 'invalid',
+            'days_below_20dma': int,
+            'consecutive_days_below': int,
+            'last_close_below': bool,
+            'mark_says': str,
+        }
+
+    Kaynak: TTLC s.247 + Sprint_4_bis_7_Mark_HASSAS_Tarama.md KARAR ADAY #888
+    """
+    if (not closes_last_5d or not sma_20_last_5d
+            or len(closes_last_5d) != len(sma_20_last_5d)
+            or len(closes_last_5d) < 2):
+        return {
+            'status': 'invalid',
+            'days_below_20dma': 0,
+            'consecutive_days_below': 0,
+            'last_close_below': False,
+            'mark_says': 'Yetersiz veri (en az 2 gün + eşit uzunluk)',
+        }
+
+    # Her gün için 20-DMA altında mı kontrol
+    below_flags = []
+    for close, sma in zip(closes_last_5d, sma_20_last_5d):
+        if sma <= 0:
+            below_flags.append(False)
+            continue
+        # Tolerance buffer (intraday wiggle)
+        threshold = sma * (1 - TWENTY_DMA_TOLERANCE_PCT / 100)
+        below_flags.append(close < threshold)
+
+    days_below = sum(below_flags)
+    last_close_below = below_flags[-1]
+
+    # Ardışık gün hesabı (en yakın geçmişten geriye)
+    consecutive = 0
+    for flag in reversed(below_flags):
+        if flag:
+            consecutive += 1
+        else:
+            break
+
+    if consecutive >= TWENTY_DMA_BREACH_DAYS_EXIT:
+        status = 'exit_signal'
+        says = (f"{consecutive} ardışık gün 20-DMA altı = EXIT SIGNAL "
+                f"(Mark KESIN TTLC s.247 — should NOT close below)")
+    elif last_close_below:
+        status = 'warning'
+        says = (f"Bugün 20-DMA altında kapanış — WARNING "
+                f"(Mark TTLC s.247, 2 ardışık = exit)")
+    else:
+        status = 'safe'
+        says = f"20-DMA üzerinde kapanış — Mark KESIN ideal post-breakout davranış"
+
+    return {
+        'status': status,
+        'days_below_20dma': days_below,
+        'consecutive_days_below': consecutive,
+        'last_close_below': last_close_below,
+        'mark_says': says,
+    }
