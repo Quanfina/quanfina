@@ -17,6 +17,9 @@ import type { TradeCreate, TradeGrade, ExitReason, TradeStatus, SignalSource, Ti
 import { GRADE_OPTIONS, EXIT_REASON_LABELS, SIGNAL_SOURCE_LABELS, SIGNAL_SOURCE_DESCRIPTIONS, TIME_HORIZON_LABELS, TIME_HORIZON_DESCRIPTIONS } from "@/types/trade";
 import { MarkRiskAdvisor } from "./MarkRiskAdvisor";
 import { MarkPyramidCard } from "./MarkPyramidCard";
+import { isReadTodayAny } from "@/lib/mindset-read-state";
+import Link from "next/link";
+import { Quote } from "lucide-react";
 
 const SELECT = "h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring";
 const TEXTAREA = "w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm resize-none focus:outline-none focus:ring-1 focus:ring-ring";
@@ -63,6 +66,11 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
   const [planSizePct, setPlanSizePct]             = useState("");
   const [planExitStrategy, setPlanExitStrategy]   = useState("");
   const [planTimeHorizon, setPlanTimeHorizon]     = useState<TimeHorizon>("swing");
+  // KARAR #720 alt (Paket 30): Mindset disiplin ön-kontrol
+  const [mindsetReadToday, setMindsetReadToday] = useState(false);
+  useEffect(() => {
+    if (open) setMindsetReadToday(isReadTodayAny());
+  }, [open]);
 
   useEffect(() => {
     if (!open || !initialData) return;
@@ -155,6 +163,32 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
         <DialogHeader>
           <DialogTitle>Yeni Trade</DialogTitle>
         </DialogHeader>
+
+        {/* KARAR #720 alt (Paket 30): Mindset disiplin ön-kontrol uyarı banner */}
+        {!mindsetReadToday && (
+          <div
+            className="rounded-md border px-3 py-2 flex items-start gap-2 text-xs"
+            style={{
+              background: "rgba(245, 158, 11, 0.08)",
+              borderColor: "rgba(245, 158, 11, 0.4)",
+              color: "#F59E0B",
+            }}
+          >
+            <Quote size={14} className="mt-0.5 shrink-0" />
+            <div className="flex-1">
+              <span className="font-semibold">Mark hatırlatması bugün okunmamış. </span>
+              <span>Yeni trade öncesi zihinsel disiplin: </span>
+              <Link
+                href="/"
+                onClick={() => onOpenChange(false)}
+                className="underline font-semibold hover:no-underline"
+              >
+                Dashboard&apos;da oku →
+              </Link>
+            </div>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="flex flex-col gap-3 py-2">
           {/* Row 1 — Symbol + Strategy */}
           <div className="grid grid-cols-2 gap-3">
