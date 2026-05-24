@@ -1319,3 +1319,254 @@ class TestComputePowerPlayPass:
         assert VCP_PULLBACK_EXCELLENT == 0.10
         assert VCP_PULLBACK_GOOD == 0.25
         assert VCP_PULLBACK_ACCEPTABLE == 0.40
+
+
+# =============================================================================
+# SPRINT 4-bis.7 — FAZ 1 B PAKET — Mark 4-Kitap Hassas KARAR'ları
+# Tests for: compute_dynamic_stop, mark_position_sizer, mark_six_rule_check
+# Tescil: Vizyon v22.00 (24 May 2026)
+# =============================================================================
+
+from quanfina_math import (
+    compute_dynamic_stop,
+    mark_position_sizer,
+    mark_six_rule_check,
+    MARK_STOP_ABSOLUTE_CAP_PCT,
+    MARK_EQUITY_RISK_MIN_PCT,
+    MARK_EQUITY_RISK_MAX_PCT,
+    MARK_POSITION_MAX_PCT,
+)
+
+
+class TestComputeDynamicStop:
+    """KARAR ADAY #914 - Dynamic Stop = avg_gain / 2 (TTLC s.299)."""
+
+    def _make_rba(self, avg_gain, num_trades=50):
+        return RBAMetrics(
+            num_trades=num_trades,
+            win_rate=0.5,
+            avg_gain_pct=avg_gain,
+            avg_loss_pct=-5.0,
+            largest_gain_pct=avg_gain * 2,
+            largest_loss_pct=-10.0,
+            adjusted_ratio=2.0,
+            expectancy_pct=2.0,
+            is_statistically_significant=num_trades >= 30,
+        )
+
+    def test_rba_based_normal(self):
+        rba = self._make_rba(avg_gain=15.0)
+        result = compute_dynamic_stop(rba)
+        assert result["method"] == "rba_based"
+        assert result["recommended_stop_pct"] == 7.5
+        assert result["absolute_cap_applied"] is False
+
+    def test_rba_based_absolute_cap_kicks_in(self):
+        # avg_gain=30 -> half=15 -> cap %10
+        rba = self._make_rba(avg_gain=30.0)
+        result = compute_dynamic_stop(rba)
+        assert result["method"] == "rba_based"
+        assert result["recommended_stop_pct"] == 10.0
+        assert result["absolute_cap_applied"] is True
+
+    def test_rba_insufficient_trades_fallback(self):
+        rba = self._make_rba(avg_gain=20.0, num_trades=10)
+        result = compute_dynamic_stop(rba, fallback_pct=7.0)
+        assert result["method"] == "fallback"
+        assert result["recommended_stop_pct"] == 7.0
+        assert result["rba_anlamli_mi"] is False
+
+    def test_no_rba_fallback(self):
+        result = compute_dynamic_stop(None, fallback_pct=6.0)
+        assert result["method"] == "fallback"
+        assert result["recommended_stop_pct"] == 6.0
+
+    def test_fallback_cap_applied(self):
+        result = compute_dynamic_stop(None, fallback_pct=15.0)
+        assert result["recommended_stop_pct"] == 10.0
+        assert result["absolute_cap_applied"] is True
+
+
+class TestMarkPositionSizer:
+    """KARAR ADAY #969 - Mark Position Sizing (TTLC s.143)."""
+
+    def test_basic_calculation_default(self):
+        # $100K portfolio, %2 risk, %7 stop
+        result = mark_position_sizer(100000, target_risk_pct=2.0, max_stop_pct=7.0)
+        # risk = $2000, position = $2000/0.07 = $28,571
+        assert result["risk_dollars"] == 2000.0
+        assert abs(result["position_dollars"] - 28571.43) < 1.0
+        assert abs(result["position_pct"] - 28.57) < 0.1
+
+    def test_optimal_tier(self):
+        # $100K, %1.75 risk, %7.5 stop -> ~23.33% position (optimal range)
+        result = mark_position_sizer(100000, target_risk_pct=1.75, max_stop_pct=7.5)
+        assert result["tier"] == "optimal"
+
+    def test_pilot_buy_tier(self):
+        # $100K, %1.25 risk, %10 stop -> 12.5% position
+        result = mark_position_sizer(100000, target_risk_pct=1.25, max_stop_pct=10.0)
+        assert result["tier"] == "pilot_buy"
+        assert abs(result["position_pct"] - 12.5) < 0.01
+
+    def test_aggressive_tier_at_limit(self):
+        # %2.5 risk + %5 stop = %50 position (sınır)
+        result = mark_position_sizer(100000, target_risk_pct=2.5, max_stop_pct=5.0)
+        assert abs(result["position_pct"] - 50.0) < 0.01
+
+    def test_position_exceeds_50_pct_warning(self):
+        # %2.5 risk + %4 stop = %62.5 position -> uyarı
+        result = mark_position_sizer(100000, target_risk_pct=2.5, max_stop_pct=4.0)
+        assert result["position_pct"] > 50.0
+        assert any("MAX %50" in w for w in result["warnings"])
+
+    def test_stop_exceeds_10_pct_warning(self):
+        result = mark_position_sizer(100000, target_risk_pct=2.0, max_stop_pct=12.0)
+        assert any("absolute cap" in w for w in result["warnings"])
+
+    def test_risk_below_mark_min(self):
+        # %1.0 risk < Mark min %1.25
+        result = mark_position_sizer(100000, target_risk_pct=1.0, max_stop_pct=7.0)
+        assert any("Mark min" in w for w in result["warnings"])
+
+    def test_risk_above_mark_max(self):
+        # %3.0 risk > Mark max %2.50
+        result = mark_position_sizer(100000, target_risk_pct=3.0, max_stop_pct=7.0)
+        assert any("MAX" in w for w in result["warnings"])
+
+    def test_invalid_portfolio_value(self):
+        result = mark_position_sizer(0, target_risk_pct=2.0, max_stop_pct=7.0)
+        assert "error" in result
+        assert result["position_dollars"] == 0.0
+
+
+class TestMarkSixRuleCheck:
+    """KARAR ADAY #970 - Mark 6-Rule Position Enforcement (TTLC s.144)."""
+
+    def test_all_six_pass(self):
+        result = mark_six_rule_check(
+            risk_pct=2.0,           # OK 1.25-2.50
+            stop_pct=7.0,           # OK <=10
+            avg_loss_pct=-5.0,      # OK <=6
+            position_pct=22.0,      # OK <=50, best name optimal
+            is_best_name=True,      # OK 20-25
+            total_positions=8,      # OK 4-12 optimal
+        )
+        assert result["all_pass"] is True
+        assert result["pass_count"] == 6
+        assert result["critical_violations"] == []
+
+    def test_rule1_risk_violation_critical(self):
+        result = mark_six_rule_check(
+            risk_pct=3.5,           # FAIL > %2.50
+            stop_pct=7.0,
+            avg_loss_pct=-5.0,
+            position_pct=22.0,
+            is_best_name=True,
+            total_positions=8,
+        )
+        assert result["all_pass"] is False
+        assert 1 in result["critical_violations"]
+
+    def test_rule2_stop_above_10_critical(self):
+        result = mark_six_rule_check(
+            risk_pct=2.0,
+            stop_pct=12.0,          # FAIL > %10
+            avg_loss_pct=-5.0,
+            position_pct=22.0,
+            is_best_name=True,
+            total_positions=8,
+        )
+        assert 2 in result["critical_violations"]
+
+    def test_rule3_avg_loss_high_non_critical(self):
+        result = mark_six_rule_check(
+            risk_pct=2.0,
+            stop_pct=7.0,
+            avg_loss_pct=-9.0,      # WARN > %5-6 advisory
+            position_pct=22.0,
+            is_best_name=True,
+            total_positions=8,
+        )
+        rule3 = next(r for r in result["rules"] if r["rule_no"] == 3)
+        assert rule3["pass"] is False
+        assert 3 not in result["critical_violations"]
+
+    def test_rule3_avg_loss_none_passes(self):
+        result = mark_six_rule_check(
+            risk_pct=2.0,
+            stop_pct=7.0,
+            avg_loss_pct=None,
+            position_pct=22.0,
+            is_best_name=True,
+            total_positions=8,
+        )
+        rule3 = next(r for r in result["rules"] if r["rule_no"] == 3)
+        assert rule3["pass"] is True
+
+    def test_rule4_position_above_50_critical(self):
+        result = mark_six_rule_check(
+            risk_pct=2.0,
+            stop_pct=7.0,
+            avg_loss_pct=-5.0,
+            position_pct=60.0,      # FAIL > %50
+            is_best_name=True,
+            total_positions=8,
+        )
+        assert 4 in result["critical_violations"]
+
+    def test_rule5_best_name_outside_optimal_advisory(self):
+        result = mark_six_rule_check(
+            risk_pct=2.0,
+            stop_pct=7.0,
+            avg_loss_pct=-5.0,
+            position_pct=10.0,
+            is_best_name=True,
+            total_positions=8,
+        )
+        rule5 = next(r for r in result["rules"] if r["rule_no"] == 5)
+        assert rule5["pass"] is False
+        assert 5 not in result["critical_violations"]
+
+    def test_rule5_not_best_name_skipped(self):
+        result = mark_six_rule_check(
+            risk_pct=2.0,
+            stop_pct=7.0,
+            avg_loss_pct=-5.0,
+            position_pct=10.0,
+            is_best_name=False,
+            total_positions=8,
+        )
+        rule5 = next(r for r in result["rules"] if r["rule_no"] == 5)
+        assert rule5["pass"] is True
+
+    def test_rule6_too_many_positions_critical(self):
+        result = mark_six_rule_check(
+            risk_pct=2.0,
+            stop_pct=7.0,
+            avg_loss_pct=-5.0,
+            position_pct=22.0,
+            is_best_name=True,
+            total_positions=25,     # FAIL > 20
+        )
+        assert 6 in result["critical_violations"]
+
+    def test_rule6_large_portfolio_acceptable(self):
+        result = mark_six_rule_check(
+            risk_pct=2.0,
+            stop_pct=7.0,
+            avg_loss_pct=-5.0,
+            position_pct=22.0,
+            is_best_name=True,
+            total_positions=18,
+        )
+        rule6 = next(r for r in result["rules"] if r["rule_no"] == 6)
+        assert rule6["pass"] is True
+        assert 6 not in result["critical_violations"]
+
+    def test_mark_constants_match_canon(self):
+        # Vizyon v22.00 + Sprint_4_bis_7_*.md tutarlilik
+        assert MARK_STOP_ABSOLUTE_CAP_PCT == 10.0
+        assert MARK_EQUITY_RISK_MIN_PCT == 1.25
+        assert MARK_EQUITY_RISK_MAX_PCT == 2.50
+        assert MARK_POSITION_MAX_PCT == 50.0

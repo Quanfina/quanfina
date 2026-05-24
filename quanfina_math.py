@@ -1365,3 +1365,363 @@ def compute_grade_distribution(graded_legs: list[dict]) -> dict:
         "by_group": by_group,
         "total": len(graded_legs),
     }
+
+
+# =============================================================================
+# SPRINT 4-bis.7 — FAZ 1 B PAKET — Mark 4-Kitap Hassas KARAR'ları
+# Tescil: Vizyon v22.00 (24 May 2026)
+# Detay: notebook/Sprint_4_bis_7_Mark_HASSAS_Tarama.md
+# =============================================================================
+
+# Mark KESIN sabitleri (TLSMW Ch 12 + TTLC s.45, 143-144)
+MARK_STOP_ABSOLUTE_CAP_PCT: float = 10.0       # TLSMW Ch 12 s.277 — "no more than 10 percent"
+MARK_STOP_TARGET_PCT_RANGE: tuple = (5.0, 7.0)  # TLSMW Ch 12 — "average maybe 6 or 7 percent"
+MARK_EQUITY_RISK_MIN_PCT: float = 1.25         # TTLC s.143 — conservative
+MARK_EQUITY_RISK_MAX_PCT: float = 2.50         # TTLC s.143 — aggressive
+MARK_PORTFOLIO_MAX_STOCKS: int = 20            # TTLC s.144 — "no more than 20 positions"
+MARK_PORTFOLIO_OPTIMAL_STOCKS: tuple = (4, 12) # TTLC s.144 — "4-12 stocks total"
+MARK_POSITION_OPTIMAL_PCT_RANGE: tuple = (20.0, 25.0)  # TTLC s.144 — "20-25 percent in best names"
+MARK_POSITION_MAX_PCT: float = 50.0            # TTLC s.144 — "Never take position larger than 50%"
+
+
+def compute_dynamic_stop(
+    rba: Optional[RBAMetrics] = None,
+    fallback_pct: float = 7.0
+) -> dict:
+    """KARAR ADAY #914 — Mark Dynamic Stop = avg_gain / 2 (TTLC s.299 "Trader's Cardinal Sin").
+
+    Mark birebir (TTLC s.299):
+        "Allowing your loss on a trade to exceed your average gain is what I call the
+        trader's cardinal sin. ... Stop loss should be no more than HALF the average gain."
+
+    Hesap:
+        stop_pct = min(avg_gain / 2, MARK_STOP_ABSOLUTE_CAP_PCT)
+
+    Eğer RBA istatistiksel olarak anlamlı değilse (<30 trade) → fallback_pct kullanılır
+    (Mark KESIN min trade gözlem kuralı).
+
+    Args:
+        rba: RBAMetrics — kullanıcının gerçek trade istatistikleri (Result-Based)
+        fallback_pct: RBA yokken kullanılacak varsayılan stop (Mark default %6-7 range)
+
+    Returns:
+        dict — Dynamic stop tavsiyesi
+        {
+            'recommended_stop_pct': float,
+            'method': 'rba_based' | 'fallback',
+            'absolute_cap_applied': bool,
+            'mark_says': str (TTLC alıntı),
+            'rba_anlamli_mi': bool
+        }
+
+    Kaynak: TTLC s.299 + Sprint_4_bis_7_Mark_HASSAS_Tarama.md KARAR ADAY #914
+    """
+    if rba is not None and rba.is_statistically_significant and rba.avg_gain_pct > 0:
+        half_gain = rba.avg_gain_pct / 2.0
+        absolute_capped = half_gain > MARK_STOP_ABSOLUTE_CAP_PCT
+        recommended = min(half_gain, MARK_STOP_ABSOLUTE_CAP_PCT)
+        if absolute_capped:
+            says = (f"Avg gain %{rba.avg_gain_pct:.1f} → half = %{half_gain:.1f}, "
+                    f"Mark %10 absolute cap aktif (TTLC s.299)")
+        else:
+            says = (f"Avg gain %{rba.avg_gain_pct:.1f} → half = %{half_gain:.1f} "
+                    f"(Mark KESIN: trader's cardinal sin avoid)")
+        return {
+            'recommended_stop_pct': round(recommended, 2),
+            'method': 'rba_based',
+            'absolute_cap_applied': absolute_capped,
+            'mark_says': says,
+            'rba_anlamli_mi': True,
+        }
+
+    # Fallback: RBA yok veya yetersiz trade
+    capped = min(fallback_pct, MARK_STOP_ABSOLUTE_CAP_PCT)
+    return {
+        'recommended_stop_pct': round(capped, 2),
+        'method': 'fallback',
+        'absolute_cap_applied': fallback_pct > MARK_STOP_ABSOLUTE_CAP_PCT,
+        'mark_says': (f"RBA yok veya <30 trade — fallback %{capped:.1f} "
+                      f"(Mark default %5-7 range, TTLC s.45)"),
+        'rba_anlamli_mi': False,
+    }
+
+
+def mark_position_sizer(
+    portfolio_value: float,
+    target_risk_pct: float = 2.0,
+    max_stop_pct: float = 7.0
+) -> dict:
+    """KARAR ADAY #969 — Mark Position Sizing (TTLC s.143-144).
+
+    Mark birebir (TTLC s.143):
+        "Your maximum risk should be no more than 1.25 to 2.5 percent of your equity
+        on any one trade."
+
+    Mark birebir (TTLC s.143):
+        "Either your stop moves or your position size moves. One or the other must
+        be adjusted to dial in the correct amount of risk."
+
+    Hesap (Mark KESIN formula):
+        risk_dollars   = portfolio_value * (target_risk_pct / 100)
+        position_value = risk_dollars / (max_stop_pct / 100)
+        position_pct   = position_value / portfolio_value * 100
+
+    Validation:
+        - target_risk_pct ∈ [1.25, 2.50] (Mark KESIN range)
+        - max_stop_pct ≤ 10 (Mark absolute cap)
+        - position_pct ≤ 50 (Mark "never take position larger than 50%")
+
+    Args:
+        portfolio_value: Toplam portfolio $ değeri
+        target_risk_pct: Equity risk yüzdesi (%1.25-2.50)
+        max_stop_pct: Stop loss yüzdesi (≤%10)
+
+    Returns:
+        dict — Position size önerisi + warnings
+
+    Kaynak: TTLC s.143-144 + Sprint_4_bis_7_Mark_HASSAS_Tarama.md KARAR ADAY #969
+    """
+    warnings: list[str] = []
+
+    if portfolio_value <= 0:
+        return {
+            'error': 'portfolio_value must be > 0',
+            'position_dollars': 0.0,
+            'position_pct': 0.0,
+            'risk_dollars': 0.0,
+            'risk_pct': 0.0,
+            'warnings': ['Geçersiz portfolio_value'],
+            'mark_says': '',
+        }
+
+    if target_risk_pct < MARK_EQUITY_RISK_MIN_PCT:
+        warnings.append(
+            f"Risk %{target_risk_pct:.2f} < Mark min %{MARK_EQUITY_RISK_MIN_PCT} "
+            f"(TTLC s.143 — conservative range)"
+        )
+    elif target_risk_pct > MARK_EQUITY_RISK_MAX_PCT:
+        warnings.append(
+            f"Risk %{target_risk_pct:.2f} > Mark MAX %{MARK_EQUITY_RISK_MAX_PCT} "
+            f"(TTLC s.143 — never exceed)"
+        )
+
+    if max_stop_pct > MARK_STOP_ABSOLUTE_CAP_PCT:
+        warnings.append(
+            f"Stop %{max_stop_pct:.1f} > Mark absolute cap %{MARK_STOP_ABSOLUTE_CAP_PCT} "
+            f"(TLSMW Ch 12 — '10 percent maximum allowance')"
+        )
+
+    if max_stop_pct <= 0:
+        return {
+            'error': 'max_stop_pct must be > 0',
+            'position_dollars': 0.0,
+            'position_pct': 0.0,
+            'risk_dollars': 0.0,
+            'risk_pct': target_risk_pct,
+            'warnings': warnings + ['Geçersiz max_stop_pct'],
+            'mark_says': '',
+        }
+
+    risk_dollars = portfolio_value * (target_risk_pct / 100.0)
+    position_dollars = risk_dollars / (max_stop_pct / 100.0)
+    position_pct = (position_dollars / portfolio_value) * 100.0
+
+    if position_pct > MARK_POSITION_MAX_PCT:
+        warnings.append(
+            f"Position %{position_pct:.1f} > Mark MAX %{MARK_POSITION_MAX_PCT} "
+            f"(TTLC s.144 — never take position larger than 50%)"
+        )
+
+    # Tier öneri
+    if MARK_POSITION_OPTIMAL_PCT_RANGE[0] <= position_pct <= MARK_POSITION_OPTIMAL_PCT_RANGE[1]:
+        tier = 'optimal'
+        says = (f"Position %{position_pct:.1f} — Mark optimal "
+                f"%{MARK_POSITION_OPTIMAL_PCT_RANGE[0]}-{MARK_POSITION_OPTIMAL_PCT_RANGE[1]} "
+                f"(TTLC s.144 best names)")
+    elif position_pct < MARK_POSITION_OPTIMAL_PCT_RANGE[0]:
+        tier = 'pilot_buy'
+        says = (f"Position %{position_pct:.1f} — Mark pilot buy tier "
+                f"(TTLC s.91 toe-in-the-water)")
+    else:
+        tier = 'aggressive'
+        says = (f"Position %{position_pct:.1f} — agresif tier, dikkat "
+                f"(TTLC s.144 optimal {MARK_POSITION_OPTIMAL_PCT_RANGE[0]}-{MARK_POSITION_OPTIMAL_PCT_RANGE[1]} aralığı)")
+
+    return {
+        'position_dollars': round(position_dollars, 2),
+        'position_pct': round(position_pct, 2),
+        'risk_dollars': round(risk_dollars, 2),
+        'risk_pct': round(target_risk_pct, 2),
+        'tier': tier,
+        'warnings': warnings,
+        'mark_says': says,
+    }
+
+
+def mark_six_rule_check(
+    risk_pct: float,
+    stop_pct: float,
+    avg_loss_pct: Optional[float],
+    position_pct: float,
+    is_best_name: bool,
+    total_positions: int
+) -> dict:
+    """KARAR ADAY #970 — Mark 6-Rule Position Enforcement (TTLC s.144).
+
+    Mark birebir 6 madde (TTLC s.144):
+        1. %1.25-2.50 risk of total equity
+        2. %10 maximum stop
+        3. Losses average no more than %5-6
+        4. Never take position larger than %50
+        5. Shoot for optimal %20-25 positions in best names
+        6. No more than 10-12 stocks total (16-20 large portfolios)
+
+    Args:
+        risk_pct: Toplam equity risk yüzdesi bu pozisyon için
+        stop_pct: Stop loss yüzdesi
+        avg_loss_pct: RBA avg loss yüzdesi (None = bilgi yok)
+        position_pct: Position size yüzdesi (portfolio'nun)
+        is_best_name: Sn. Ferit "best name" işaretlemiş mi?
+        total_positions: Mevcut portfolio'daki toplam stok sayısı
+
+    Returns:
+        dict — 6 kural check sonucu
+        {
+            'all_pass': bool,
+            'rules': [
+                {'rule_no': 1, 'pass': True, 'message': '...', 'mark_says': '...'},
+                ...
+            ],
+            'pass_count': int (0-6),
+            'critical_violations': list[int]
+        }
+
+    Kaynak: TTLC s.144 + Sprint_4_bis_7_Mark_HASSAS_Tarama.md KARAR ADAY #970
+    """
+    rules: list[dict] = []
+
+    # Rule 1: %1.25-2.50 risk of total equity
+    r1_pass = MARK_EQUITY_RISK_MIN_PCT <= risk_pct <= MARK_EQUITY_RISK_MAX_PCT
+    rules.append({
+        'rule_no': 1,
+        'rule': 'Risk %1.25-2.50 of equity',
+        'pass': r1_pass,
+        'value': risk_pct,
+        'message': f"Risk %{risk_pct:.2f}" + (
+            " ✅ Mark range" if r1_pass
+            else f" ⚠️ Mark %{MARK_EQUITY_RISK_MIN_PCT}-{MARK_EQUITY_RISK_MAX_PCT} dışında"
+        ),
+        'mark_says': "TTLC s.143 — no more than 1.25-2.5% equity",
+        'critical': not r1_pass and risk_pct > MARK_EQUITY_RISK_MAX_PCT,
+    })
+
+    # Rule 2: %10 max stop
+    r2_pass = stop_pct <= MARK_STOP_ABSOLUTE_CAP_PCT
+    rules.append({
+        'rule_no': 2,
+        'rule': 'Stop ≤ %10 max',
+        'pass': r2_pass,
+        'value': stop_pct,
+        'message': f"Stop %{stop_pct:.1f}" + (
+            " ✅ Mark cap" if r2_pass
+            else f" 🔴 Mark MAX %{MARK_STOP_ABSOLUTE_CAP_PCT} aşıldı"
+        ),
+        'mark_says': "TLSMW Ch 12 — 10 percent maximum allowance",
+        'critical': not r2_pass,
+    })
+
+    # Rule 3: Losses avg ≤ %5-6
+    if avg_loss_pct is not None:
+        avg_loss_abs = abs(avg_loss_pct)
+        r3_pass = avg_loss_abs <= 6.0
+        rules.append({
+            'rule_no': 3,
+            'rule': 'Avg loss ≤ %5-6',
+            'pass': r3_pass,
+            'value': avg_loss_abs,
+            'message': f"Avg loss %{avg_loss_abs:.1f}" + (
+                " ✅ Mark target" if r3_pass
+                else " ⚠️ Mark %5-6 hedefin üstünde"
+            ),
+            'mark_says': "TTLC s.143 — losses should average no more than 5-6%",
+            'critical': False,
+        })
+    else:
+        rules.append({
+            'rule_no': 3,
+            'rule': 'Avg loss ≤ %5-6',
+            'pass': True,  # Bilgi yokken pass kabul
+            'value': None,
+            'message': "Avg loss bilgisi yok (RBA yetersiz)",
+            'mark_says': "TTLC s.143 — 30+ trade gerekli istatistik için",
+            'critical': False,
+        })
+
+    # Rule 4: Position ≤ %50
+    r4_pass = position_pct <= MARK_POSITION_MAX_PCT
+    rules.append({
+        'rule_no': 4,
+        'rule': 'Position ≤ %50',
+        'pass': r4_pass,
+        'value': position_pct,
+        'message': f"Position %{position_pct:.1f}" + (
+            " ✅" if r4_pass
+            else f" 🔴 Mark MAX %{MARK_POSITION_MAX_PCT} aşıldı"
+        ),
+        'mark_says': "TTLC s.144 — never take position larger than 50%",
+        'critical': not r4_pass,
+    })
+
+    # Rule 5: Best names %20-25 (advisory)
+    if is_best_name:
+        r5_pass = (MARK_POSITION_OPTIMAL_PCT_RANGE[0] <= position_pct
+                   <= MARK_POSITION_OPTIMAL_PCT_RANGE[1])
+        rules.append({
+            'rule_no': 5,
+            'rule': 'Best names %20-25',
+            'pass': r5_pass,
+            'value': position_pct,
+            'message': f"Best name + position %{position_pct:.1f}" + (
+                " ✅ optimal" if r5_pass
+                else f" ℹ️ Mark optimal %{MARK_POSITION_OPTIMAL_PCT_RANGE[0]}-{MARK_POSITION_OPTIMAL_PCT_RANGE[1]}"
+            ),
+            'mark_says': "TTLC s.144 — 20-25% in best names",
+            'critical': False,
+        })
+    else:
+        rules.append({
+            'rule_no': 5,
+            'rule': 'Best names %20-25',
+            'pass': True,  # Best name değilse skip
+            'value': None,
+            'message': "Best name değil — Rule 5 atlandı",
+            'mark_says': "TTLC s.144 — best names only",
+            'critical': False,
+        })
+
+    # Rule 6: Total positions ≤ 10-12 (or 16-20 large)
+    r6_pass = total_positions <= MARK_PORTFOLIO_MAX_STOCKS
+    optimal_match = MARK_PORTFOLIO_OPTIMAL_STOCKS[0] <= total_positions <= MARK_PORTFOLIO_OPTIMAL_STOCKS[1]
+    rules.append({
+        'rule_no': 6,
+        'rule': 'Toplam ≤ 10-12 (or 16-20 large)',
+        'pass': r6_pass,
+        'value': total_positions,
+        'message': f"Toplam {total_positions} stok" + (
+            " ✅ Mark optimal" if optimal_match
+            else " ⚠️ Mark large portfolio (16-20)" if r6_pass
+            else f" 🔴 Mark MAX {MARK_PORTFOLIO_MAX_STOCKS} aşıldı"
+        ),
+        'mark_says': "TTLC s.144 — 10-12 typical, 16-20 large, max 20",
+        'critical': not r6_pass,
+    })
+
+    pass_count = sum(1 for r in rules if r['pass'])
+    critical_violations = [r['rule_no'] for r in rules if r['critical']]
+
+    return {
+        'all_pass': pass_count == 6,
+        'rules': rules,
+        'pass_count': pass_count,
+        'critical_violations': critical_violations,
+    }
