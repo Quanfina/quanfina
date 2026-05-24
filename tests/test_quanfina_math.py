@@ -1719,3 +1719,166 @@ class TestDetectCode33:
         result = detect_code_33([], [], [])
         assert result["pattern"] == "none"
         assert result["pass_count"] == 0
+
+
+# =============================================================================
+# Faz 2 Genisletme — Tennis Ball + Volume Asymmetry + Leader Fingerprint
+# Tests for: detect_tennis_ball, compute_volume_asymmetry, detect_leader_fingerprint
+# Tescil: Vizyon v22.03 (24 May 2026)
+# =============================================================================
+
+from quanfina_math import (
+    detect_tennis_ball,
+    compute_volume_asymmetry,
+    detect_leader_fingerprint,
+    TENNIS_BALL_PULLBACK_MAX_DAYS,
+    TENNIS_BALL_RECOVERY_MAX_DAYS,
+    VOLUME_ASYMMETRY_HEALTHY_RATIO,
+    VOLUME_ASYMMETRY_DISTRIBUTION_RATIO,
+    LEADER_ADVANCE_MIN_PCT,
+    LEADER_ADVANCE_MAX_PCT,
+)
+
+
+def _make_day(close, high=None, low=None, volume=100000):
+    return {
+        "close": close,
+        "high": high if high is not None else close * 1.01,
+        "low": low if low is not None else close * 0.99,
+        "volume": volume,
+    }
+
+
+class TestDetectTennisBall:
+    """KARAR ADAY #893 - Mark Tennis Ball Detector (TLSMW s.253)."""
+
+    def test_classic_tennis_ball(self):
+        # Breakout day 0 -> pullback 3 days -> recovery 5 days
+        history = [
+            _make_day(100, high=100),  # 0 breakout
+            _make_day(99),
+            _make_day(98),
+            _make_day(97),    # 3 pullback low
+            _make_day(98),
+            _make_day(99),
+            _make_day(100),
+            _make_day(101),
+            _make_day(102),   # 8 recovery beyond breakout_high
+        ]
+        result = detect_tennis_ball(0, history)
+        assert result["pattern"] == "TENNIS_BALL"
+        assert result["pullback_days"] == 3
+        # recovery: pullback_low_idx=3 (close=97), close>100 first at idx 7 (close=101)
+        # recovery_days = 7 - 3 = 4
+        assert result["recovery_days"] == 4
+        assert result["recovered"] is True
+
+    def test_egg_long_pullback(self):
+        # 16 gun pullback (>14)
+        history = [_make_day(100, high=100)]
+        for i in range(20):
+            history.append(_make_day(100 - i - 1))
+        result = detect_tennis_ball(0, history)
+        assert result["pattern"] == "EGG"
+        assert result["pullback_days"] >= 15
+
+    def test_still_running(self):
+        history = [_make_day(100, high=100), _make_day(105), _make_day(110)]
+        result = detect_tennis_ball(0, history)
+        assert result["pattern"] == "STILL_RUNNING"
+
+    def test_invalid_index(self):
+        result = detect_tennis_ball(-1, [_make_day(100)])
+        assert result["pattern"] == "INVALID"
+
+    def test_empty_history(self):
+        result = detect_tennis_ball(0, [])
+        assert result["pattern"] == "INVALID"
+
+
+class TestComputeVolumeAsymmetry:
+    """KARAR ADAY #882 - Mark Volume Asymmetry Tracker (TLSMW s.234)."""
+
+    def test_healthy_accumulation(self):
+        # Up days yuksek vol, down days dusuk vol
+        history = [
+            _make_day(100, volume=100000),
+            _make_day(102, volume=200000),  # up high vol
+            _make_day(101, volume=80000),   # down low vol
+            _make_day(103, volume=250000),  # up high vol
+            _make_day(102, volume=70000),   # down low vol
+            _make_day(105, volume=300000),  # up high vol
+        ]
+        result = compute_volume_asymmetry(history)
+        assert result["tier"] == "healthy"
+        assert result["asymmetry_ratio"] >= VOLUME_ASYMMETRY_HEALTHY_RATIO
+
+    def test_distribution_warning(self):
+        # Down days yuksek vol, up days dusuk vol
+        history = [
+            _make_day(100, volume=100000),
+            _make_day(101, volume=50000),    # up low vol
+            _make_day(99, volume=300000),    # down high vol
+            _make_day(100, volume=60000),    # up low vol
+            _make_day(98, volume=350000),    # down high vol
+        ]
+        result = compute_volume_asymmetry(history)
+        assert result["tier"] == "distribution"
+        assert result["asymmetry_ratio"] < VOLUME_ASYMMETRY_DISTRIBUTION_RATIO
+
+    def test_neutral(self):
+        # Up ve down day vol benzer
+        history = [
+            _make_day(100, volume=100000),
+            _make_day(102, volume=110000),
+            _make_day(101, volume=105000),
+            _make_day(103, volume=115000),
+        ]
+        result = compute_volume_asymmetry(history)
+        assert result["tier"] == "neutral"
+
+    def test_insufficient_data(self):
+        result = compute_volume_asymmetry([_make_day(100)])
+        assert result["tier"] == "invalid"
+
+    def test_empty(self):
+        result = compute_volume_asymmetry([])
+        assert result["tier"] == "invalid"
+
+
+class TestDetectLeaderFingerprint:
+    """KARAR ADAY #864 - Mark Leader Behavior Fingerprint (TLSMW s.184)."""
+
+    def test_classic_leader_humana_pattern(self):
+        # Mark Humana paten: advance 15-25%, pullback 5-12%
+        result = detect_leader_fingerprint(
+            advance_segments=[18.0, 22.0, 17.0],
+            pullback_segments=[7.0, 9.0, 6.0],
+        )
+        assert result["pattern"] == "LEADER_FINGERPRINT"
+        assert result["tier"] == "leader_classic"
+
+    def test_partial_leader(self):
+        # 2/3 advance Mark esiginde, 2/3 pullback Mark esiginde
+        result = detect_leader_fingerprint(
+            advance_segments=[18.0, 22.0, 35.0],  # 3rd out of range
+            pullback_segments=[7.0, 9.0, 15.0],   # 3rd out of range
+        )
+        assert result["tier"] == "leader_partial"
+
+    def test_not_leader(self):
+        result = detect_leader_fingerprint(
+            advance_segments=[5.0, 8.0, 3.0],
+            pullback_segments=[15.0, 20.0, 18.0],
+        )
+        assert result["tier"] == "not_leader"
+
+    def test_invalid_empty(self):
+        result = detect_leader_fingerprint([], [])
+        assert result["tier"] == "invalid"
+
+    def test_constants(self):
+        assert TENNIS_BALL_PULLBACK_MAX_DAYS == 7
+        assert TENNIS_BALL_RECOVERY_MAX_DAYS == 14
+        assert LEADER_ADVANCE_MIN_PCT == 15.0
+        assert LEADER_ADVANCE_MAX_PCT == 25.0

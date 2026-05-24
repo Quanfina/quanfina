@@ -1922,3 +1922,358 @@ def detect_code_33(
         'mark_says': says,
         'tier': tier,
     }
+
+
+# =============================================================================
+# SPRINT 4-bis.7 — FAZ 2 GENİŞLETME — Mark Pattern Detectorlar
+# Tescil: Vizyon v22.02 + v22.03
+# KARAR ADAY #893 (Tennis Ball) + #882 (Volume Asymmetry) + #864 (Leader Behavior)
+# Detay: notebook/Sprint_4_bis_7_Mark_HASSAS_Tarama.md
+# =============================================================================
+
+# Mark KESIN Tennis Ball sabitleri (TLSMW Ch 10 s.253-254)
+TENNIS_BALL_PULLBACK_MAX_DAYS: int = 7         # "brief pullbacks 2-5 days even 1-2 weeks"
+TENNIS_BALL_RECOVERY_MAX_DAYS: int = 14        # "recovers within 1-2 weeks"
+EGG_PULLBACK_MIN_DAYS: int = 14                # Egg warning (>14 gün)
+
+# Mark KESIN Volume Asymmetry sabitleri (TTLC Sec 1 + TLSMW s.234)
+VOLUME_ASYMMETRY_HEALTHY_RATIO: float = 1.5    # Up/down vol ratio min healthy
+VOLUME_ASYMMETRY_DISTRIBUTION_RATIO: float = 0.8  # < 0.8 = distribution warning
+
+# Mark KESIN Leader Behavior Fingerprint (TLSMW s.184)
+LEADER_ADVANCE_MIN_PCT: float = 15.0           # +15-20% advance
+LEADER_ADVANCE_MAX_PCT: float = 25.0
+LEADER_PULLBACK_MIN_PCT: float = 5.0           # -5-10% pullback
+LEADER_PULLBACK_MAX_PCT: float = 12.0
+
+
+def detect_tennis_ball(
+    breakout_date_idx: int,
+    daily_history: list[dict]
+) -> dict:
+    """KARAR ADAY #893 — Mark Tennis Ball Detector (TLSMW s.253-254).
+
+    Mark birebir (William M. B. Berger / TLSMW s.253):
+        "I want to own tennis balls, not eggs."
+
+    Mark sağlıklı paten:
+        - Breakout sonrası pullback 2-5 gün (max ~7)
+        - Recovery 1-2 hafta (max ~14 gün)
+        - Volume contraction during pullback, expand back to new highs
+
+    Egg warning:
+        - Pullback > 14 gün veya recovery yok = EGG (SAT)
+
+    Args:
+        breakout_date_idx: Breakout günü daily_history içindeki index
+        daily_history: Liste, her item dict
+            {'date': str, 'close': float, 'high': float, 'low': float, 'volume': int}
+            Index 0 = en eski, index -1 = en yeni
+
+    Returns:
+        dict:
+        {
+            'pattern': 'TENNIS_BALL' | 'EGG' | 'STILL_RUNNING' | 'INVALID',
+            'pullback_days': int | None,
+            'recovery_days': int | None,
+            'recovered': bool,
+            'pullback_depth_pct': float | None,
+            'mark_says': str,
+        }
+
+    Kaynak: TLSMW s.253-254 + Sprint_4_bis_7_Mark_HASSAS_Tarama.md KARAR ADAY #893
+    """
+    if not daily_history or breakout_date_idx < 0 or breakout_date_idx >= len(daily_history) - 1:
+        return {
+            'pattern': 'INVALID',
+            'pullback_days': None,
+            'recovery_days': None,
+            'recovered': False,
+            'pullback_depth_pct': None,
+            'mark_says': 'Geçersiz breakout_date_idx veya boş history',
+        }
+
+    breakout_high = daily_history[breakout_date_idx].get('high', daily_history[breakout_date_idx].get('close', 0))
+    if breakout_high <= 0:
+        return {
+            'pattern': 'INVALID',
+            'pullback_days': None,
+            'recovery_days': None,
+            'recovered': False,
+            'pullback_depth_pct': None,
+            'mark_says': 'Geçersiz breakout_high',
+        }
+
+    # Pullback phase: closing price drop after breakout
+    pullback_low = breakout_high
+    pullback_low_idx = breakout_date_idx
+    for i in range(breakout_date_idx + 1, len(daily_history)):
+        close_i = daily_history[i].get('close', 0)
+        if close_i < pullback_low:
+            pullback_low = close_i
+            pullback_low_idx = i
+
+    pullback_days = pullback_low_idx - breakout_date_idx
+    pullback_depth_pct = ((breakout_high - pullback_low) / breakout_high) * 100 if breakout_high > 0 else 0
+
+    # No real pullback yet (still running up)
+    if pullback_days == 0 or pullback_depth_pct < 1.0:
+        return {
+            'pattern': 'STILL_RUNNING',
+            'pullback_days': 0,
+            'recovery_days': None,
+            'recovered': False,
+            'pullback_depth_pct': 0.0,
+            'mark_says': 'Henüz pullback yok — stock yükselişte',
+        }
+
+    # Recovery phase: close back above breakout_high after pullback_low_idx
+    recovery_days = None
+    recovered = False
+    for j in range(pullback_low_idx + 1, len(daily_history)):
+        close_j = daily_history[j].get('close', 0)
+        if close_j > breakout_high:
+            recovery_days = j - pullback_low_idx
+            recovered = True
+            break
+
+    if not recovered:
+        # Still in pullback or recovering
+        if pullback_days > EGG_PULLBACK_MIN_DAYS:
+            return {
+                'pattern': 'EGG',
+                'pullback_days': pullback_days,
+                'recovery_days': None,
+                'recovered': False,
+                'pullback_depth_pct': round(pullback_depth_pct, 2),
+                'mark_says': (f"Pullback {pullback_days} gün > {EGG_PULLBACK_MIN_DAYS} — "
+                              f"EGG warning (Mark Berger TLSMW s.253: SAT)"),
+            }
+        return {
+            'pattern': 'STILL_RUNNING',
+            'pullback_days': pullback_days,
+            'recovery_days': None,
+            'recovered': False,
+            'pullback_depth_pct': round(pullback_depth_pct, 2),
+            'mark_says': f"Pullback {pullback_days} gün — recovery bekleniyor",
+        }
+
+    # Recovered — check tennis ball criteria
+    total_cycle_days = pullback_days + recovery_days
+    if (pullback_days <= TENNIS_BALL_PULLBACK_MAX_DAYS
+            and recovery_days <= TENNIS_BALL_RECOVERY_MAX_DAYS):
+        pattern = 'TENNIS_BALL'
+        says = (f"Pullback {pullback_days}g + Recovery {recovery_days}g = TENNIS BALL "
+                f"(Mark KESIN TLSMW s.253 healthy bounce)")
+    else:
+        pattern = 'EGG'
+        says = (f"Pullback {pullback_days}g + Recovery {recovery_days}g — "
+                f"Mark eşikleri ({TENNIS_BALL_PULLBACK_MAX_DAYS}/{TENNIS_BALL_RECOVERY_MAX_DAYS}) "
+                f"aşıldı = EGG warning")
+
+    return {
+        'pattern': pattern,
+        'pullback_days': pullback_days,
+        'recovery_days': recovery_days,
+        'recovered': True,
+        'pullback_depth_pct': round(pullback_depth_pct, 2),
+        'mark_says': says,
+    }
+
+
+def compute_volume_asymmetry(daily_history: list[dict], lookback_days: int = 20) -> dict:
+    """KARAR ADAY #882 — Mark Volume Asymmetry Tracker (TLSMW s.234 + TTLC Sec 1).
+
+    Mark birebir (TLSMW s.234):
+        "Look for big up days that are larger and occur more frequently than
+        big down days."
+
+    Mark birebir (TTLC Sec 1):
+        "Stocks under institutional accumulation almost always display this type
+        of price action."
+
+    Hesap:
+        up_volume_avg = up gün hacim ortalaması (lookback içinde)
+        down_volume_avg = down gün hacim ortalaması
+        asymmetry_ratio = up_volume_avg / down_volume_avg
+
+    Tier:
+        >= 1.5: healthy accumulation (Mark KESIN)
+        0.8-1.5: neutral
+        < 0.8: distribution warning
+
+    Args:
+        daily_history: Liste, her item {'close': float, 'volume': int}
+        lookback_days: Geriye bakış (varsayılan 20)
+
+    Returns:
+        dict:
+        {
+            'asymmetry_ratio': float,
+            'up_days_count': int,
+            'down_days_count': int,
+            'up_volume_avg': float,
+            'down_volume_avg': float,
+            'tier': 'healthy' | 'neutral' | 'distribution',
+            'mark_says': str,
+        }
+
+    Kaynak: TLSMW s.234 + TTLC Sec 1 + Sprint_4_bis_7_Mark_HASSAS_Tarama.md
+    """
+    if not daily_history or len(daily_history) < 3:
+        return {
+            'asymmetry_ratio': 0.0,
+            'up_days_count': 0,
+            'down_days_count': 0,
+            'up_volume_avg': 0.0,
+            'down_volume_avg': 0.0,
+            'tier': 'invalid',
+            'mark_says': 'Yetersiz veri (min 3 gün)',
+        }
+
+    # Lookback son N gün
+    history = daily_history[-lookback_days:] if len(daily_history) > lookback_days else daily_history
+    if len(history) < 3:
+        return {
+            'asymmetry_ratio': 0.0,
+            'up_days_count': 0,
+            'down_days_count': 0,
+            'up_volume_avg': 0.0,
+            'down_volume_avg': 0.0,
+            'tier': 'invalid',
+            'mark_says': 'Yetersiz veri',
+        }
+
+    up_volumes = []
+    down_volumes = []
+    prev_close = history[0].get('close', 0)
+    for i in range(1, len(history)):
+        close_i = history[i].get('close', 0)
+        vol_i = history[i].get('volume', 0)
+        if close_i > prev_close:
+            up_volumes.append(vol_i)
+        elif close_i < prev_close:
+            down_volumes.append(vol_i)
+        prev_close = close_i
+
+    up_count = len(up_volumes)
+    down_count = len(down_volumes)
+    up_avg = sum(up_volumes) / up_count if up_count > 0 else 0.0
+    down_avg = sum(down_volumes) / down_count if down_count > 0 else 1.0  # avoid div/0
+
+    if down_avg == 0:
+        ratio = float('inf') if up_avg > 0 else 0.0
+    else:
+        ratio = up_avg / down_avg
+
+    if ratio >= VOLUME_ASYMMETRY_HEALTHY_RATIO:
+        tier = 'healthy'
+        says = (f"Up/Down vol ratio {ratio:.2f} >= {VOLUME_ASYMMETRY_HEALTHY_RATIO} = "
+                f"healthy institutional accumulation (Mark KESIN TLSMW s.234)")
+    elif ratio < VOLUME_ASYMMETRY_DISTRIBUTION_RATIO:
+        tier = 'distribution'
+        says = (f"Up/Down vol ratio {ratio:.2f} < {VOLUME_ASYMMETRY_DISTRIBUTION_RATIO} = "
+                f"DISTRIBUTION warning (institutional selling)")
+    else:
+        tier = 'neutral'
+        says = f"Up/Down vol ratio {ratio:.2f} — neutral, henüz pattern yok"
+
+    return {
+        'asymmetry_ratio': round(ratio, 3),
+        'up_days_count': up_count,
+        'down_days_count': down_count,
+        'up_volume_avg': round(up_avg, 0),
+        'down_volume_avg': round(down_avg, 0),
+        'tier': tier,
+        'mark_says': says,
+    }
+
+
+def detect_leader_fingerprint(
+    advance_segments: list[float],
+    pullback_segments: list[float],
+) -> dict:
+    """KARAR ADAY #864 — Mark Leader Behavior Fingerprint (TLSMW s.184).
+
+    Mark birebir (TLSMW s.184):
+        "Leading stocks will generally advance 15 to 20 percent and then rest,
+        during which time they may pull back 5 to 10 percent."
+
+    Mark Humana 1977-1978 case study referans paten.
+
+    Hesap:
+        - advance_segments: Her rally segment'in yüzde kazancı (örn. [18.5, 22.1, 16.8])
+        - pullback_segments: Her pullback segment'in yüzde kaybı (örn. [7.2, 9.5, 5.8])
+        - Mark eşikleri ile karşılaştırma
+
+    Tier:
+        - 'leader_classic': Tüm advance %15-25, tüm pullback %5-12 (Mark KESIN ideal)
+        - 'leader_partial': Çoğu segment Mark eşiğinde
+        - 'not_leader': Mark eşiklerinin dışında çoğu
+
+    Args:
+        advance_segments: Rally yüzdeleri (pozitif)
+        pullback_segments: Pullback yüzdeleri (pozitif, abs değer)
+
+    Returns:
+        dict
+
+    Kaynak: TLSMW s.184 + Sprint_4_bis_7_Mark_HASSAS_Tarama.md KARAR ADAY #864
+    """
+    if not advance_segments or not pullback_segments:
+        return {
+            'pattern': 'INVALID',
+            'advances_in_range': 0,
+            'pullbacks_in_range': 0,
+            'total_segments': 0,
+            'tier': 'invalid',
+            'mark_says': 'Yetersiz veri (advance + pullback gerekli)',
+        }
+
+    advances_in_range = sum(
+        1 for a in advance_segments
+        if LEADER_ADVANCE_MIN_PCT <= a <= LEADER_ADVANCE_MAX_PCT
+    )
+    pullbacks_in_range = sum(
+        1 for p in pullback_segments
+        if LEADER_PULLBACK_MIN_PCT <= p <= LEADER_PULLBACK_MAX_PCT
+    )
+
+    total_adv = len(advance_segments)
+    total_pb = len(pullback_segments)
+    total_segments = total_adv + total_pb
+
+    adv_pct_in_range = (advances_in_range / total_adv * 100) if total_adv > 0 else 0
+    pb_pct_in_range = (pullbacks_in_range / total_pb * 100) if total_pb > 0 else 0
+
+    # Classic: Tümü Mark eşiğinde
+    if (advances_in_range == total_adv and pullbacks_in_range == total_pb
+            and total_adv >= 2 and total_pb >= 2):
+        tier = 'leader_classic'
+        pattern = 'LEADER_FINGERPRINT'
+        says = (f"Tüm {total_adv} advance + {total_pb} pullback Mark eşiğinde "
+                f"(advance %{LEADER_ADVANCE_MIN_PCT}-{LEADER_ADVANCE_MAX_PCT}, "
+                f"pullback %{LEADER_PULLBACK_MIN_PCT}-{LEADER_PULLBACK_MAX_PCT}) "
+                f"= LEADER (Mark KESIN TLSMW s.184)")
+    elif adv_pct_in_range >= 60 and pb_pct_in_range >= 60:
+        tier = 'leader_partial'
+        pattern = 'LEADER_PARTIAL'
+        says = (f"Advance %{adv_pct_in_range:.0f} + Pullback %{pb_pct_in_range:.0f} "
+                f"Mark eşiğinde — partial leader pattern")
+    else:
+        tier = 'not_leader'
+        pattern = 'NOT_LEADER'
+        says = (f"Advance %{adv_pct_in_range:.0f} + Pullback %{pb_pct_in_range:.0f} "
+                f"Mark eşiklerinin dışında — leader pattern yok")
+
+    return {
+        'pattern': pattern,
+        'advances_in_range': advances_in_range,
+        'pullbacks_in_range': pullbacks_in_range,
+        'total_advances': total_adv,
+        'total_pullbacks': total_pb,
+        'advance_pct_in_range': round(adv_pct_in_range, 1),
+        'pullback_pct_in_range': round(pb_pct_in_range, 1),
+        'tier': tier,
+        'mark_says': says,
+    }
