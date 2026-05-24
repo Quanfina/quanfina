@@ -9,6 +9,7 @@ import { useMarketStatus } from "@/hooks/use-market-status";
 import { useWatchlist } from "@/hooks/use-watchlist";
 import { formatDateTR } from "@/lib/format-date";
 import { getDoneItems, toggleItem } from "@/lib/daily-checklist";
+import { MindsetCardWidget } from "@/components/dashboard/MindsetCard";
 
 // KARAR #474 (20 May 2026 ~08:15): Ana sayfa POC → Gerçek Dashboard.
 // UX Bölüm 3: "Sn. Ferit Quanfina'yı açtığında üstten alta: bakiye + piyasa + sinyaller"
@@ -510,6 +511,9 @@ export default function Home() {
           </div>
         )}
       </div>
+
+      {/* KARAR ADAY #720 (24 May 2026): Daily Mindset Cards — Mark birebir alıntılı zihinsel disiplin */}
+      <MindsetCardWidget />
 
       {/* Hızlı Erişim 4 buton */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 pt-2">
