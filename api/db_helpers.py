@@ -283,6 +283,19 @@ SCREENS_READY_9 = {
         "label": "⚡ Power Play (HTF)",
         "filter": "power_play_pass = TRUE",
     },
+    # KARAR ADAY #486 (23 May 2026) — Temel Eleme: 5 kosul (Mark Fundamental ZORUNLU 3 + Quanfina Ek 2)
+    # Kaynak zinciri (KALICI ILKE #4 — Matematik Uydurmama):
+    #   1-2: Quanfina Ek (Fiyat $10 + Hacim 500K — evren daraltma)
+    #   3: EPS Q/Q >= %25 (TLSMW s.127 birebir)
+    #   4: Sales Q/Q >= %25 (TLSMW s.132 birebir)
+    #   5: ROE >= %15-17 (Momentum Masters s.74 birebir) — 23 May 2026 yeni eklendi
+    # Tablo: minervini_fundamental_only (scanner.py get_finviz_fundamental_only zaten 5 kosulu uyguluyor)
+    # filter "1 = 1" cunku tablo SADECE 5 kosulu gecen hisseleri tutar.
+    "temel_eleme": {
+        "label": "Temel Eleme (Mark Fundamental ZORUNLU)",
+        "filter": "1 = 1",
+        "table": "minervini_fundamental_only",
+    },
 }
 
 # Geriye dönük alias — Sprint 4-bis.1b'de SCREENS_READY_8 ismiyle bilinen
@@ -311,7 +324,14 @@ def screen_get_results(slug: str, limit: int = 500) -> list[dict]:
             f"Gecerli: {list(SCREENS_READY_8.keys())}"
         )
 
-    sql_filter = SCREENS_READY_8[slug]["filter"]
+    meta = SCREENS_READY_8[slug]
+    sql_filter = meta["filter"]
+    # Tablo override: temel_eleme gibi slug'lar farkli tablodan okur (minervini_fundamental_only)
+    # KARAR ADAY #486 (23 May 2026) — Sn. Ferit "5 kosulu yapalim trend template gibi"
+    table_name = meta.get("table", "minervini_scans")
+    # minervini_fundamental_only'da passed kolonu YOK (tablo Fundamental gecenleri tutar)
+    # Trend Template kontrolu olmadigi icin "1 AS passed" hard-coded (gecti varsayilir)
+    passed_expr = "1 AS passed" if table_name == "minervini_fundamental_only" else "passed"
 
     # Idempotent + parametre safety:
     # - filter SCREENS_READY_8 sabit dict'ten (SQL injection riski yok)
@@ -327,9 +347,9 @@ def screen_get_results(slug: str, limit: int = 500) -> list[dict]:
     # Sn. Ferit talimat (22 May 2026): "Adim 1 + Cup-Handle + Pocket Pivot tumu calisir...
     # bunlarida yapicaz ama hemen degil" -> B patch.
     query = f"""
-        SELECT ticker AS symbol, grade, rs_ibd, price, passed, scan_date
-        FROM minervini_scans
-        WHERE scan_date = (SELECT MAX(scan_date) FROM minervini_scans)
+        SELECT ticker AS symbol, grade, rs_ibd, price, {passed_expr}, scan_date
+        FROM {table_name}
+        WHERE scan_date = (SELECT MAX(scan_date) FROM {table_name})
           AND {sql_filter}
         ORDER BY rs_ibd DESC NULLS LAST, ticker ASC
         LIMIT :limit

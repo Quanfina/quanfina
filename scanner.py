@@ -574,17 +574,25 @@ def get_finviz_fundamental():
 
 def get_finviz_fundamental_only():
     """
-    Sadece temel filtreler — teknik kural YOK:
-    - Fiyat > $10
-    - Hacim > 500K
-    - EPS Q/Q > %25
-    - Sales Q/Q > %25
+    Sadece temel filtreler — teknik kural YOK (Mark Fundamental Hard Cut).
+
+    5 koşul (23 May 2026, Sn. Ferit "Temel Eleme" şablonu — KARAR ADAY #484):
+      - Quanfina Ek (evren daraltma):
+        - sh_price_o10  : Fiyat > $10
+        - sh_avgvol_o500: Ortalama hacim > 500K
+      - Mark Fundamental ZORUNLU (kitap birebir):
+        - fa_epsqoq_o25 : EPS Q/Q > %25 (TLSMW s.127)
+        - fa_salesqoq_o25: Sales Q/Q > %25 (TLSMW s.132)
+        - fa_roe_pos15  : ROE > %15 (Momentum Masters s.74) — 23 May 2026 yeni
+
+    KALICI İLKE #4 (Matematik Uydurmama): Tüm eşikler kitap birebir kaynak gösterir.
     """
     filters = ",".join([
         "sh_price_o10",
         "sh_avgvol_o500",
         "fa_epsqoq_o25",
         "fa_salesqoq_o25",
+        "fa_roe_pos15",  # 23 May 2026 — Mark Fundamental ZORUNLU 3. eşik (MM s.74)
         "sec_etf_false",
         "geo_usa",
         "ind_stocksonly",

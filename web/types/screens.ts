@@ -77,6 +77,7 @@ export interface ScreenResultRow {
  */
 export const SCREEN_CATEGORIES: Record<string, string> = {
   stage2_10p: "Trend Template",
+  temel_eleme: "Temel Eleme",
 };
 
 // SCREEN_DESCRIPTIONS kaldirildi (22 May 2026) — Sn. Ferit "bunu sil" talimati.
@@ -129,6 +130,30 @@ export const SCREEN_CONDITIONS: Record<string, ScreenCondition[]> = {
     // Kitap birebir: "RS Rating ≥ 70 (ideali 80-90+)" — Mark daha güçlü adayları
     // 80-90+ RS'de arar. Trend Template'in zorunlu eşiği 70 ama tercih 80-90+.
     { source: "mark_ekstra", text: "RS Rating ideali 80-90+ (Mark kitap tavsiyesi — daha güçlü adaylar)" },
+  ],
+
+  // 23 May 2026 — Temel Eleme şablonu (Mark Minervini Fundamental ZORUNLU)
+  // Sn. Ferit talimat: "bu 5 koşulu yapalım trend template gibi"
+  //
+  // Kaynak zinciri (KALICI İLKE #4 — Matematik Uydurmama):
+  //   1-2: Quanfina Ek (evren daraltma — Mark sapma: kitap $12 yerine $10,
+  //        kitap "sığ kucakla" yerine küçük hesap likidite için 500K)
+  //   3:   EPS Growth Q/Q ≥ %25 — Trade Like a Stock Market Wizard s.127
+  //        Mark birebir: "require a minimum of 20 to 25 percent"
+  //   4:   Sales Growth Q/Q ≥ %25 — TLSMW s.132
+  //        İdeal: triple-digit (%100+)
+  //   5:   ROE ≥ %15-17 — Momentum Masters s.74
+  //        Mark birebir: "have a ROE of 15-17% or higher"
+  //
+  // Backend: scanner.py get_finviz_fundamental_only — minervini_fundamental_only tablosu
+  // Mark Fundamental Hard Cut: 3 ZORUNLU madde (EPS Q/Q + Sales Q/Q + ROE)
+  // Quanfina Ek: 2 evren daraltma (Fiyat + Hacim)
+  temel_eleme: [
+    { source: "quanfina", text: "Fiyat ≥ $10 (mikro-cap eleme — evren daraltma)" },
+    { source: "quanfina", text: "Ortalama hacim ≥ 500.000 (likidite eleme — evren daraltma)" },
+    { source: "mark", text: "EPS Q/Q artışı ≥ %25 (Trade Like a Wizard s.127 — Mark Fundamental ZORUNLU)" },
+    { source: "mark", text: "Sales Q/Q artışı ≥ %25 (TLSMW s.132 — Mark Fundamental ZORUNLU, ideal üç haneli)" },
+    { source: "mark", text: "ROE ≥ %15-17 (Momentum Masters s.74 — Mark Fundamental ZORUNLU)" },
   ],
 };
 

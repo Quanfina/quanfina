@@ -27,7 +27,7 @@ def _read(rel_path: str) -> str:
 
 def _extract_screen_conditions_count(ts_source: str, slug: str) -> int:
     """SCREEN_CONDITIONS[slug] içindeki { source: ... } sayısını döndürür."""
-    pattern = rf'{slug}:\s*\[(.*?)\]\s*,\s*\}};?'
+    pattern = rf'{slug}:\s*\[(.*?)\]\s*,\s*'
     m = re.search(pattern, ts_source, re.DOTALL)
     if not m:
         pytest.fail(f"SCREEN_CONDITIONS['{slug}'] block bulunamadı")
@@ -130,7 +130,7 @@ class TestStage2_10pConsistency:
         Trade Like a Wizard s.79 — RS Rating 8. resmi madde (dahil).
         Kitap 1. maddesi "Fiyat > 150 ve 200 DMA" tek madde (UI ayırma yok).
         """
-        pattern = r'stage2_10p:\s*\[(.*?)\]\s*,\s*\};'
+        pattern = r'stage2_10p:\s*\[(.*?)\]\s*,\s*'
         m = re.search(pattern, ts, re.DOTALL)
         block = m.group(1)
         mark_count = block.count('source: "mark"')
@@ -141,7 +141,7 @@ class TestStage2_10pConsistency:
 
     def test_ui_quanfina_ek_count(self, ts):
         """UI'de tam 2 Quanfina Ek Filtre olmalı (Fiyat + Hacim)."""
-        pattern = r'stage2_10p:\s*\[(.*?)\]\s*,\s*\};'
+        pattern = r'stage2_10p:\s*\[(.*?)\]\s*,\s*'
         m = re.search(pattern, ts, re.DOTALL)
         block = m.group(1)
         quanfina_count = block.count('source: "quanfina"')
@@ -155,11 +155,123 @@ class TestStage2_10pConsistency:
         22 May 2026 Sn. Ferit talimat: 11. madde Mark Ekstra Kural.
         Mark Resmi Kural ZORUNLU değil ama tercih (preferably/ideally şartları).
         """
-        pattern = r'stage2_10p:\s*\[(.*?)\]\s*,\s*\};'
+        pattern = r'stage2_10p:\s*\[(.*?)\]\s*,\s*'
         m = re.search(pattern, ts, re.DOTALL)
         block = m.group(1)
         ekstra_count = block.count('source: "mark_ekstra"')
         assert ekstra_count == 1, (
             f"Mark Ekstra Kural sayısı = {ekstra_count}, beklenen 1 "
             f"(Mark kitap tavsiyesi — RS ideali 80-90+)."
+        )
+
+
+class TestTemelElemeConsistency:
+    """temel_eleme (Mark Fundamental ZORUNLU) — UI ↔ Backend bire-bir uyum.
+
+    23 May 2026 — Sn. Ferit talimat: "bu 5 koşulu yapalım trend template gibi"
+    KARAR ADAY #486: Temel Eleme şablonu 5 koşul (2 Quanfina Ek + 3 Mark Fundamental).
+    """
+
+    @pytest.fixture(scope="class")
+    def ts(self) -> str:
+        return _read("web/types/screens.ts")
+
+    @pytest.fixture(scope="class")
+    def scanner(self) -> str:
+        return _read("scanner.py")
+
+    @pytest.fixture(scope="class")
+    def db_helpers(self) -> str:
+        return _read("api/db_helpers.py")
+
+    def test_ui_condition_count_is_5(self, ts):
+        """temel_eleme UI'de tam 5 koşul gösterilmeli.
+        Sn. Ferit talimat (23 May 2026): "bu 5 koşulu yapalım trend template gibi"
+        Dağılım: 2 Quanfina Ek + 3 Mark Resmi (Fundamental ZORUNLU).
+        """
+        n = _extract_screen_conditions_count(ts, "temel_eleme")
+        assert n == 5, (
+            f"temel_eleme UI condition count = {n}, beklenen 5 "
+            f"(2 Quanfina Ek + 3 Mark Fundamental ZORUNLU)."
+        )
+
+    def test_ui_quanfina_ek_count_is_2(self, ts):
+        """temel_eleme UI'de tam 2 Quanfina Ek olmalı (Fiyat + Hacim — evren daraltma)."""
+        pattern = r'temel_eleme:\s*\[(.*?)\]\s*,\s*'
+        m = re.search(pattern, ts, re.DOTALL)
+        block = m.group(1)
+        quanfina_count = block.count('source: "quanfina"')
+        assert quanfina_count == 2, (
+            f"Quanfina Ek sayısı = {quanfina_count}, beklenen 2 "
+            f"(Fiyat ≥ $10 + Hacim ≥ 500K)."
+        )
+
+    def test_ui_mark_resmi_count_is_3(self, ts):
+        """temel_eleme UI'de tam 3 Mark Resmi olmalı (Fundamental ZORUNLU).
+        Kitap birebir:
+          - EPS Q/Q ≥ %25 (TLSMW s.127)
+          - Sales Q/Q ≥ %25 (TLSMW s.132)
+          - ROE ≥ %15-17 (Momentum Masters s.74)
+        """
+        pattern = r'temel_eleme:\s*\[(.*?)\]\s*,\s*'
+        m = re.search(pattern, ts, re.DOTALL)
+        block = m.group(1)
+        mark_count = block.count('source: "mark"')
+        assert mark_count == 3, (
+            f"Mark Resmi (Fundamental) sayısı = {mark_count}, beklenen 3 "
+            f"(EPS Q/Q + Sales Q/Q + ROE — Mark Fundamental ZORUNLU)."
+        )
+
+    def test_ui_no_mark_ekstra(self, ts):
+        """temel_eleme'de Mark Ekstra OLMAMAlı (Fundamental zorunlu, tavsiye yok).
+        Trend Template'den farklı: Power Play'de var ama Temel Eleme'de yok.
+        """
+        pattern = r'temel_eleme:\s*\[(.*?)\]\s*,\s*'
+        m = re.search(pattern, ts, re.DOTALL)
+        block = m.group(1)
+        ekstra_count = block.count('source: "mark_ekstra"')
+        assert ekstra_count == 0, (
+            f"Mark Ekstra sayısı = {ekstra_count}, beklenen 0 "
+            f"(Temel Eleme'de tavsiye yok, hepsi ZORUNLU)."
+        )
+
+    def test_backend_scanner_has_roe_filter(self, scanner):
+        """Backend get_finviz_fundamental_only fonksiyonunda fa_roe_pos15 olmalı.
+        23 May 2026 yeni ekleme — Mark MM s.74 birebir: "ROE of 15-17% or higher".
+        Önceki sürümde sadece EPS Q/Q + Sales Q/Q vardı, ROE filtresi YOKtu.
+        """
+        assert "fa_roe_pos15" in scanner, (
+            "Backend ROE filtresi (fa_roe_pos15) get_finviz_fundamental_only'da "
+            "bulunamadı. Mark Fundamental ZORUNLU 3. eşik (Momentum Masters s.74)."
+        )
+
+    def test_backend_scanner_has_eps_qoq_filter(self, scanner):
+        """Backend get_finviz_fundamental_only'da fa_epsqoq_o25 olmalı."""
+        assert "fa_epsqoq_o25" in scanner, (
+            "Backend EPS Q/Q filtresi (fa_epsqoq_o25) eksik. "
+            "Mark Fundamental ZORUNLU 1. eşik (TLSMW s.127)."
+        )
+
+    def test_backend_scanner_has_sales_qoq_filter(self, scanner):
+        """Backend get_finviz_fundamental_only'da fa_salesqoq_o25 olmalı."""
+        assert "fa_salesqoq_o25" in scanner, (
+            "Backend Sales Q/Q filtresi (fa_salesqoq_o25) eksik. "
+            "Mark Fundamental ZORUNLU 2. eşik (TLSMW s.132)."
+        )
+
+    def test_db_helpers_has_temel_eleme_slug(self, db_helpers):
+        """api/db_helpers.py SCREENS_READY_9'da temel_eleme slug olmalı."""
+        assert '"temel_eleme":' in db_helpers, (
+            "SCREENS_READY_9 dict'inde temel_eleme slug bulunamadı."
+        )
+
+    def test_db_helpers_temel_eleme_uses_fundamental_table(self, db_helpers):
+        """temel_eleme slug'unun table override'ı minervini_fundamental_only olmalı."""
+        # temel_eleme entry'sini bul
+        pattern = r'"temel_eleme":\s*\{[^}]*"table":\s*"([^"]+)"'
+        m = re.search(pattern, db_helpers)
+        assert m is not None, "temel_eleme entry'de table field bulunamadı"
+        table = m.group(1)
+        assert table == "minervini_fundamental_only", (
+            f"temel_eleme table override = '{table}', beklenen 'minervini_fundamental_only'."
         )

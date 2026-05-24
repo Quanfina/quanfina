@@ -1706,6 +1706,60 @@ isim), Kural #20 (UI/UX Çift Danışma — kitap kitap birebir doğrulama), Kur
 
 ---
 
+### Kural 27 — Tek Prompt Tek Cevap (Çift Danışma Sıralı Tur) (22 May 2026 ~23:00 yeni)
+
+> Sn. Ferit talimatı (Kural #14 doğrudan tescil — 2. ortaya çıkış):
+> *"bundan sonra tek promt tek cevap kuralını sabitleyelim artık
+> kaçırdım hangi promt olduğunu"*
+
+**Tetikleyici (2 ortaya çıkış aynı oturumda):**
+1. H#A7 — Çift Danışma turunda 2 prompt birden verildi, Sn. Ferit 1.'sini
+   yapıştırmadı ama AI yine de eylem aldı (adım adım atlama). Sn. Ferit:
+   "1. promtu unuttun yine adım adım kuralına uymadın".
+2. Power Play çift danışma — Gem + NotebookLM 2 prompt birden, Sn. Ferit
+   ilkini yapıştırdı ama "hangisi 2.?" kaçırdı.
+
+**Disiplin — Çift Danışma / Çoklu Kaynak akışı:**
+
+```
+1. AI TEK prompt verir (KAYNAK ADI + URL + prompt blok net işaretli)
+2. Sn. Ferit kopyalar, ilgili araca yapıştırır, cevabı alır
+3. Sn. Ferit cevabı AI'a yapıştırır
+4. AI cevabı NOT EDER (sentez henüz YASAK)
+5. AI sadece kısa özet teyit + 2. prompt'u verir
+6. Sn. Ferit 2. prompt'u çalıştırır, cevap getirir
+7. AI 2. cevabı not eder
+8. SONRA sentez yapar (tablo / karşılaştırma / karar)
+```
+
+**Yasak pattern:**
+- ❌ Aynı mesajda 2+ prompt vermek (Sn. Ferit hangi cevabın hangi
+  prompt'a ait olduğunu karıştırır)
+- ❌ İlk cevap geldiğinde 2. cevap da gelmeden eylem almak (H#A7-H#A8)
+- ❌ "İki promptu birden hazırladım, sırayla yapıştırırsın" demek
+
+**Doğru pattern:**
+- ✅ "Prompt 1 — [Kaynak]" → cevap bekle → not al → "Prompt 2 — [Kaynak]"
+- ✅ Her prompt'un başında ARAÇ + URL + amaç net
+- ✅ Cevap geldiğinde "✅ [Kaynak] cevabı alındı, önemli bulgular: ..."
+- ✅ Tüm cevaplar geldiğinde sentez bloğu
+
+**İstisna:** Sn. Ferit *"iki promptu birden ver"* derse → talimat
+ile geçici muafiyet. Default davranış TEK prompt tek cevap.
+
+**Kapsam:**
+- Kural #20 Çift Danışma (NotebookLM Quanfina Notebook + Quanfina
+  Minervini, Gem 01_Minervini_Uzmanı)
+- Kural #24 Algoritma Denetimi (NotebookLM çift kanal)
+- Web Claude handoff prompt'ları
+- Manifesto Test prompt'ları
+
+**İlişkili:** Kural #1 (Tek Seferde Tek İş — felsefi ata), Kural #14
+(Pattern Tescil — 2 ortaya çıkış eşiği), Kural #20 (Çift Danışma — ana
+uygulama alanı), `_HATALAR.md` H#A7+H#A8 (ortaya çıkış zinciri).
+
+---
+
 ## 🤝 Çalışma Mantığı + AI Rol Dağılımı
 
 ### Çalışma Mantığı
