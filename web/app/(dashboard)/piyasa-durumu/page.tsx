@@ -55,6 +55,7 @@ export default function PiyasaDurumuPage() {
           spyStage={data.spy_stage}
           qqqStage={data.qqq_stage}
           iwmStage={data.iwm_stage}
+          marketBreadth={data.market_breadth}
         />
       </section>
 

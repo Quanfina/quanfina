@@ -1,8 +1,8 @@
 "use client";
 
-import { CheckCircle2, AlertCircle, XCircle, Shield, Crown } from "lucide-react";
+import { CheckCircle2, AlertCircle, XCircle, Shield, Crown, Activity, TrendingUp, TrendingDown } from "lucide-react";
 import { computeMarketRegime, type MarketRegimeInfo } from "@/lib/market-regime";
-import type { MarkRegimeInfoBackend } from "@/types/market";
+import type { MarkRegimeInfoBackend, MarketBreadthInfo } from "@/types/market";
 
 /**
  * KARAR ADAY #729 (24 May 2026) — Mark Market Regime Kartı.
@@ -26,7 +26,27 @@ interface Props {
   spyStage?: number;
   qqqStage?: number;
   iwmStage?: number;
+  // KARAR #733 alt-paket (Paket 53): Market Breadth A/D Line (P51+P52 backend)
+  marketBreadth?: MarketBreadthInfo | null;
 }
+
+const BREADTH_META: Record<"STRONG" | "NEUTRAL" | "WEAK", { color: string; icon: React.ReactNode; label: string }> = {
+  STRONG: {
+    color: "var(--mtp-excellent)",
+    icon: <TrendingUp size={12} />,
+    label: "Saglikli",
+  },
+  NEUTRAL: {
+    color: "#F59E0B",
+    icon: <Activity size={12} />,
+    label: "Karisik",
+  },
+  WEAK: {
+    color: "var(--mtp-danger)",
+    icon: <TrendingDown size={12} />,
+    label: "Zayif",
+  },
+};
 
 const STAGE_META: Record<number, { emoji: string; label: string; color: string }> = {
   1: { emoji: "⏳", label: "Basing", color: "var(--mtp-good, #4B9CD3)" },
@@ -58,7 +78,14 @@ function backendToInfo(b: MarkRegimeInfoBackend, dd: number): MarketRegimeInfo {
   };
 }
 
-export function MarkRegimeCard({ distributionDays, backendRegime, spyStage, qqqStage, iwmStage }: Props) {
+export function MarkRegimeCard({
+  distributionDays,
+  backendRegime,
+  spyStage,
+  qqqStage,
+  iwmStage,
+  marketBreadth,
+}: Props) {
   // KARAR #731 — Backend tercih + client-side fallback (DRY)
   const info: MarketRegimeInfo = backendRegime
     ? backendToInfo(backendRegime, distributionDays)
@@ -179,10 +206,66 @@ export function MarkRegimeCard({ distributionDays, backendRegime, spyStage, qqqS
         </div>
       </div>
 
+      {/* KARAR #733 alt-paket (Paket 53): Market Breadth A/D Line widget */}
+      {marketBreadth && (
+        <div className="pt-2 border-t border-muted-foreground/15 flex flex-col gap-1.5">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground flex items-center gap-1.5">
+              <Activity size={12} />
+              Market Breadth (A/D)
+            </span>
+            <span
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"
+              style={{
+                background: `${BREADTH_META[marketBreadth.breadth_health].color}22`,
+                color: BREADTH_META[marketBreadth.breadth_health].color,
+                border: `1px solid ${BREADTH_META[marketBreadth.breadth_health].color}55`,
+              }}
+              title={marketBreadth.mark_says}
+            >
+              {BREADTH_META[marketBreadth.breadth_health].icon}
+              {BREADTH_META[marketBreadth.breadth_health].label}
+            </span>
+          </div>
+          <div className="flex items-center gap-4 text-xs tabular-nums">
+            <span className="text-muted-foreground">
+              A/D Ratio:{" "}
+              <span
+                className="font-mono font-semibold"
+                style={{ color: BREADTH_META[marketBreadth.breadth_health].color }}
+              >
+                {marketBreadth.ad_ratio.toFixed(2)}
+              </span>
+            </span>
+            <span className="text-muted-foreground ml-auto">
+              20g Birikim:{" "}
+              <span
+                className="font-mono font-semibold"
+                style={{
+                  color:
+                    marketBreadth.ad_line_cumulative > 0
+                      ? "var(--mtp-excellent)"
+                      : "var(--mtp-danger)",
+                }}
+              >
+                {marketBreadth.ad_line_cumulative > 0 ? "+" : ""}
+                {marketBreadth.ad_line_cumulative.toLocaleString("en-US")}
+              </span>
+            </span>
+          </div>
+          <p className="text-[10px] text-muted-foreground italic leading-snug">
+            {marketBreadth.mark_says}
+          </p>
+        </div>
+      )}
+
       {/* Mark felsefesi atıf */}
       <p className="text-[11px] text-muted-foreground italic pt-1 border-t border-muted-foreground/15">
         KARAR #488 (Vizyon v20.99) — Mark 4-Katman × O&apos;Neil mekanik.
         DD 4+ = O&apos;Neil Hard Filter, Eksen 2 Lider Override felsefesi.
+        {marketBreadth && (
+          <> KARAR #733 (Paket 51-53) — Mark+O&apos;Neil A/D Line breadth.</>
+        )}
       </p>
     </div>
   );
