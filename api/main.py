@@ -40,6 +40,8 @@ from quanfina_math import (  # noqa: E402
     detect_tennis_ball,
     compute_volume_asymmetry,
     detect_leader_fingerprint,
+    compute_rba_metrics,
+    should_drop_setup,
     MARK_STOP_ABSOLUTE_CAP_PCT,
     MARK_EQUITY_RISK_MIN_PCT,
     MARK_EQUITY_RISK_MAX_PCT,
@@ -1574,6 +1576,102 @@ def delete_trade(trade_id: int) -> Response:
     if not trades_delete(trade_id):
         raise HTTPException(status_code=404, detail=f"Trade {trade_id} bulunamadı")
     return Response(status_code=204)
+
+
+# ── RBA Metrics ───────────────────────────────────────────────────────────────
+# KARAR ADAY #722 (24 May 2026) — Mark Result-Based Analysis (RBA) endpoint.
+# Mark TTLC Sec 4 birebir: "Know the truth about your trading."
+# Sn. Ferit'in kapanan trade'lerinden istatistiksel anlamlı metrikler çıkarır,
+# setup'ı bırakma kararı (should_drop_setup) için kullanılabilir.
+
+class RbaMetrics(BaseModel):
+    """Mark RBA metrikleri — Notebook B3 Modül 7.1 + NotebookLM Konu 14."""
+    num_trades: int
+    win_rate: float
+    avg_gain_pct: float
+    avg_loss_pct: float  # negatif
+    largest_gain_pct: float
+    largest_loss_pct: float
+    adjusted_ratio: float       # (Win% × AvgGain) / (Loss% × |AvgLoss|)
+    expectancy_pct: float       # (Win% × AvgGain) - (Loss% × |AvgLoss|)
+    is_statistically_significant: bool  # >= 30 trade
+
+
+class RbaSetupRecommendation(BaseModel):
+    severity: Literal["OK", "INFO", "WARNING", "CRITICAL"]
+    message: str
+
+
+class RbaResponse(BaseModel):
+    """RBA full response — metrikler + setup öneri + filtre meta."""
+    metrics: RbaMetrics
+    recommendation: RbaSetupRecommendation
+    filter_strategy: Optional[str] = None
+    filter_setup_type: Optional[str] = None
+
+
+def _closed_trades_for_rba(
+    strategy: Optional[str] = None,
+    setup_type: Optional[str] = None,
+) -> list[dict]:
+    """Kapanmis trade'leri RBA hesabi icin filtreli getir."""
+    try:
+        all_trades = trades_get_all()
+    except OperationalError:
+        # DB unreachable — boş RBA döner (UI placeholder).
+        return []
+
+    closed = [
+        t for t in all_trades
+        if t.get("status") == "closed" and t.get("pl_pct") is not None
+    ]
+    if strategy:
+        closed = [t for t in closed if t.get("strategy") == strategy]
+    if setup_type:
+        closed = [t for t in closed if t.get("setup_type") == setup_type]
+
+    # compute_rba_metrics 'pnl_pct' anahtarini bekler, DB'den 'pl_pct' geliyor
+    # — basit normalization.
+    return [{"pnl_pct": float(t["pl_pct"])} for t in closed]
+
+
+@app.get("/api/rba/metrics", response_model=RbaResponse)
+def get_rba_metrics(
+    strategy: Optional[str] = None,
+    setup_type: Optional[str] = None,
+) -> RbaResponse:
+    """
+    Mark RBA (Result-Based Analysis) metrikleri.
+
+    Filtre: strategy ve/veya setup_type. Boş ise tüm kapanmış trade'ler.
+
+    Mark TTLC Sec 4: "Know the truth about your trading."
+    - num_trades >= 30 → istatistiksel anlamlı (Mark kuralı)
+    - adjusted_ratio < 1.0 → CRITICAL (setup negatif edge → BIRAK)
+    - abs(avg_loss) > avg_gain → WARNING (setup zayıflıyor)
+    """
+    feed = _closed_trades_for_rba(strategy=strategy, setup_type=setup_type)
+    rba = compute_rba_metrics(feed)
+    rec = should_drop_setup(rba)
+    return RbaResponse(
+        metrics=RbaMetrics(
+            num_trades=rba.num_trades,
+            win_rate=rba.win_rate,
+            avg_gain_pct=rba.avg_gain_pct,
+            avg_loss_pct=rba.avg_loss_pct,
+            largest_gain_pct=rba.largest_gain_pct,
+            largest_loss_pct=rba.largest_loss_pct,
+            adjusted_ratio=rba.adjusted_ratio,
+            expectancy_pct=rba.expectancy_pct,
+            is_statistically_significant=rba.is_statistically_significant,
+        ),
+        recommendation=RbaSetupRecommendation(
+            severity=rec.severity,  # type: ignore[arg-type]
+            message=rec.message,
+        ),
+        filter_strategy=strategy,
+        filter_setup_type=setup_type,
+    )
 
 
 # ── Signals ───────────────────────────────────────────────────────────────────

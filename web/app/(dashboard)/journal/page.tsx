@@ -10,6 +10,7 @@ import { TRADE_COL_DEFS, TRADE_DEFAULT_COL_DEF } from "@/components/journal/colu
 import { TradeRowActions } from "@/components/journal/TradeRowActions";
 import { AddTradeDialog } from "@/components/journal/AddTradeDialog";
 import { CloseTradeDialog } from "@/components/journal/CloseTradeDialog";
+import { RbaSummaryCard } from "@/components/journal/RbaSummaryCard";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -112,6 +113,14 @@ export default function JournalPage() {
           <Plus size={14} className="mr-1.5" />
           Yeni Trade
         </Button>
+      </div>
+
+      {/* KARAR ADAY #722 (24 May 2026): Mark RBA Summary Card (TTLC Sec 4) */}
+      <div className="px-6 py-3 border-b">
+        <RbaSummaryCard
+          strategy={strategyFilter !== "all" ? strategyFilter : undefined}
+          variant="full"
+        />
       </div>
 
       {/* Filters */}
