@@ -1,8 +1,13 @@
 "use client";
 
-import { CheckCircle2, AlertCircle, XCircle, Shield, Crown, Activity, TrendingUp, TrendingDown, AlertTriangle } from "lucide-react";
+import { CheckCircle2, AlertCircle, XCircle, Shield, Crown, Activity, TrendingUp, TrendingDown, AlertTriangle, Sunrise } from "lucide-react";
 import { computeMarketRegime, type MarketRegimeInfo } from "@/lib/market-regime";
-import type { MarkRegimeInfoBackend, MarketBreadthInfo, BreadthDivergenceInfo } from "@/types/market";
+import type {
+  MarkRegimeInfoBackend,
+  MarketBreadthInfo,
+  BreadthDivergenceInfo,
+  FollowThroughDayInfo,
+} from "@/types/market";
 
 /**
  * KARAR ADAY #729 (24 May 2026) — Mark Market Regime Kartı.
@@ -30,6 +35,8 @@ interface Props {
   marketBreadth?: MarketBreadthInfo | null;
   // KARAR #733 alt-paket (Paket 58): Index vs A/D Divergence (P56+P57 backend)
   breadthDivergence?: BreadthDivergenceInfo | null;
+  // KARAR #733 alt-paket (Paket 66): Mark/O'Neil Follow-Through Day (P64+P65 backend)
+  followThrough?: FollowThroughDayInfo | null;
 }
 
 // KARAR #733 alt-paket (Paket 58): Divergence kategori meta — 5 kategori
@@ -130,6 +137,7 @@ export function MarkRegimeCard({
   iwmStage,
   marketBreadth,
   breadthDivergence,
+  followThrough,
 }: Props) {
   // KARAR #731 — Backend tercih + client-side fallback (DRY)
   const info: MarketRegimeInfo = backendRegime
@@ -392,6 +400,93 @@ export function MarkRegimeCard({
         </div>
       )}
 
+      {/* KARAR #733 alt-paket (Paket 66): Follow-Through Day widget —
+          FTD ONAYLI durum yeşil bant (Mark Stage 2 başlangıç sinyali),
+          FTD ZAYIF (hacim eksik) sarı uyarı. ftd_detected=False ise gizli. */}
+      {followThrough && followThrough.ftd_detected && (
+        <div
+          className="pt-2 border-t border-muted-foreground/15 flex flex-col gap-1.5 rounded-md"
+          style={{
+            background: followThrough.volume_confirmed
+              ? "rgba(40,167,69,0.10)"
+              : "rgba(245,158,11,0.10)",
+            padding: "0.5rem",
+            border: followThrough.volume_confirmed
+              ? "1px solid rgba(40,167,69,0.40)"
+              : "1px solid rgba(245,158,11,0.40)",
+          }}
+        >
+          <div className="flex items-center justify-between text-xs">
+            <span
+              className="flex items-center gap-1.5 font-semibold"
+              style={{
+                color: followThrough.volume_confirmed
+                  ? "var(--mtp-excellent)"
+                  : "#F59E0B",
+              }}
+            >
+              <Sunrise size={14} />
+              Follow-Through Day
+            </span>
+            <span
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"
+              style={{
+                background: followThrough.volume_confirmed
+                  ? "var(--mtp-excellent)"
+                  : "#F59E0B",
+                color: "#fff",
+              }}
+              title={followThrough.mark_says}
+            >
+              {followThrough.volume_confirmed ? "✓ ONAYLI" : "⚠️ ZAYIF"}
+            </span>
+          </div>
+          <div className="flex items-center gap-4 text-xs tabular-nums">
+            {followThrough.ftd_gain_pct != null && (
+              <span className="text-muted-foreground">
+                FTD Day:{" "}
+                <span
+                  className="font-mono font-semibold"
+                  style={{
+                    color: followThrough.volume_confirmed
+                      ? "var(--mtp-excellent)"
+                      : "#F59E0B",
+                  }}
+                >
+                  +{followThrough.ftd_gain_pct.toFixed(2)}%
+                </span>
+              </span>
+            )}
+            {followThrough.days_after_low != null && (
+              <span className="text-muted-foreground">
+                Dip&apos;ten:{" "}
+                <span className="font-mono font-semibold tabular-nums">
+                  {followThrough.days_after_low} gün
+                </span>
+              </span>
+            )}
+            {followThrough.previous_low != null && (
+              <span className="text-muted-foreground ml-auto">
+                Dip:{" "}
+                <span className="font-mono font-semibold">
+                  ${followThrough.previous_low.toFixed(2)}
+                </span>
+              </span>
+            )}
+          </div>
+          <p
+            className="text-[10px] italic leading-snug"
+            style={{
+              color: followThrough.volume_confirmed
+                ? "var(--mtp-excellent)"
+                : "#F59E0B",
+            }}
+          >
+            {followThrough.mark_says}
+          </p>
+        </div>
+      )}
+
       {/* Mark felsefesi atıf */}
       <p className="text-[11px] text-muted-foreground italic pt-1 border-t border-muted-foreground/15">
         KARAR #488 (Vizyon v20.99) — Mark 4-Katman × O&apos;Neil mekanik.
@@ -401,6 +496,9 @@ export function MarkRegimeCard({
         )}
         {breadthDivergence && (
           <> KARAR #733 (Paket 56-58) — Index×A/D Divergence (1999/2007 tarihsel paten).</>
+        )}
+        {followThrough?.ftd_detected && (
+          <> KARAR #733 (Paket 64-66) — Mark/O&apos;Neil FTD (2003/2009/2020 dip recovery).</>
         )}
       </p>
     </div>
