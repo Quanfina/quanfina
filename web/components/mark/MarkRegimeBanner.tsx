@@ -86,8 +86,19 @@ export function MarkRegimeBanner({
   const regime = data.mark_regime;
   const meta = REGIME_META[regime.regime];
 
+  // KARAR #733 alt-paket (Paket 61): Kritik Divergence yakalama
+  // BEARISH_DIVERGENCE (severity=critical) durumu — 1999/2007 paten erken uyarı
+  const divergence = data.breadth_divergence;
+  const isCriticalDivergence = divergence?.severity === "critical";
+
   // HEALTHY iken sessiz olabilir (gürültü azaltma) — Sn. Ferit tercih flag
-  if (hideOnHealthy && regime.regime === "HEALTHY" && stage4Count === 0) {
+  // İSTİSNA (Paket 61): Kritik divergence varsa HEALTHY iken bile gösterilir
+  if (
+    hideOnHealthy &&
+    regime.regime === "HEALTHY" &&
+    stage4Count === 0 &&
+    !isCriticalDivergence
+  ) {
     return null;
   }
 
@@ -106,6 +117,15 @@ export function MarkRegimeBanner({
         <span className="font-semibold">{regime.label}</span>
         <span className="opacity-80">·</span>
         <span>{regime.allocation}</span>
+        {isCriticalDivergence && (
+          <span
+            className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider"
+            style={{ background: "var(--mtp-danger)", color: "#fff" }}
+            title={divergence!.mark_says}
+          >
+            BEARISH ⚠️
+          </span>
+        )}
         <span className="opacity-60 ml-auto">DD {dd}/20</span>
       </div>
     );
@@ -155,6 +175,37 @@ export function MarkRegimeBanner({
             </>
           )}
         </p>
+
+        {/* KARAR #733 alt-paket (Paket 61): Kritik divergence uyarısı —
+            BEARISH_DIVERGENCE (severity=critical) durumunda tüm sayfalarda
+            5 sayfa banner DRY uyarı. 1999 dot-com / 2007 housing tarihsel
+            paten Mark+O'Neil erken uyari canon. */}
+        {isCriticalDivergence && divergence && (
+          <div
+            className="mt-2 px-2 py-1.5 rounded text-[11px] flex items-start gap-2"
+            style={{
+              background: "rgba(220,53,69,0.18)",
+              border: "1px solid var(--mtp-danger)",
+              color: "var(--mtp-danger)",
+            }}
+          >
+            <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <span className="font-bold uppercase tracking-wider">
+                  BEARISH DIVERGENCE
+                </span>
+                <span className="opacity-75 font-mono tabular-nums">
+                  · SPY {divergence.index_change_pct >= 0 ? "+" : ""}
+                  {divergence.index_change_pct.toFixed(2)}% / A/D{" "}
+                  {divergence.ad_trend_delta > 0 ? "+" : ""}
+                  {divergence.ad_trend_delta.toLocaleString("en-US")}
+                </span>
+              </div>
+              <p className="opacity-90 leading-snug">{divergence.mark_says}</p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
