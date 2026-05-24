@@ -32,6 +32,8 @@ from db_connection import get_connection
 from quanfina_math import (
     compute_vcp_pass, compute_vcp_quality, compute_vcp_ready_score,
     compute_power_play_pass,
+    # Sprint 4-bis.7 Faz 2 (Vizyon v22.03 + Migration 007)
+    detect_tennis_ball, compute_volume_asymmetry,
 )
 
 load_dotenv()
@@ -142,6 +144,11 @@ def init_db():
         "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS vcp_ready_score INTEGER DEFAULT NULL",
         # Sprint 4-bis.5 KARAR #467 — Power Play (HTF) Mark canon: POLE %100+ FLAG %10-25
         "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS power_play_pass BOOLEAN DEFAULT FALSE",
+        # Sprint 4-bis.7 KARAR ADAY #893 — Tennis Ball Detector (TLSMW s.253)
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS tennis_ball_pattern TEXT DEFAULT NULL",
+        # Sprint 4-bis.7 KARAR ADAY #882 — Volume Asymmetry Tracker (TLSMW s.234)
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS volume_asymmetry_ratio NUMERIC(8,3) DEFAULT NULL",
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS volume_asymmetry_tier TEXT DEFAULT NULL",
     ]:
         c.execute(col_sql)
     c.execute("""
@@ -1161,6 +1168,34 @@ def save_results(df_finviz, slopes, scan_date):
         # Sprint 4-bis.5 KARAR #467 — Power Play (HTF) Mark canon
         power_play_pass = compute_power_play_pass(pvh)
 
+        # Sprint 4-bis.7 KARAR ADAY #893 — Tennis Ball Detector (TLSMW s.253)
+        # Breakout idx = pvh sondan ~5 gün önce (recent breakout var mı kontrolü).
+        # PVH son 80 gün var; index olarak son 70 günü kullan (10 gün gözlem penceresi).
+        tennis_ball_pattern = None
+        if pvh and len(pvh) >= 10:
+            try:
+                # Son 5-10 gün içindeki en yüksek close'u breakout candidate yap
+                recent_window = min(10, len(pvh))
+                breakout_idx = len(pvh) - recent_window + max(
+                    range(recent_window),
+                    key=lambda i: pvh[-recent_window + i].get('close', 0)
+                )
+                tb_result = detect_tennis_ball(breakout_idx, pvh)
+                tennis_ball_pattern = tb_result.get('pattern')
+            except Exception:
+                tennis_ball_pattern = None
+
+        # Sprint 4-bis.7 KARAR ADAY #882 — Volume Asymmetry Tracker (TLSMW s.234)
+        volume_asymmetry_ratio = None
+        volume_asymmetry_tier = None
+        if pvh and len(pvh) >= 5:
+            try:
+                va_result = compute_volume_asymmetry(pvh, lookback_days=20)
+                volume_asymmetry_ratio = va_result.get('asymmetry_ratio')
+                volume_asymmetry_tier = va_result.get('tier')
+            except Exception:
+                pass
+
         # Kural 3: MA200 yükselişte (slope > 0)
         passed = 1 if slope is not None and slope > 0 else 0
 
@@ -1172,9 +1207,10 @@ def save_results(df_finviz, slopes, scan_date):
                  ma200_slope, passed, high52, sma50, atr14,
                  price_volume_history, tight_low_vol_pass, vcp_quality_score,
                  vcp_ready_score, power_play_pass,
+                 tennis_ball_pattern, volume_asymmetry_ratio, volume_asymmetry_tier,
                  confirmations, violations,
                  rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mansfield)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 ON CONFLICT(scan_date, ticker) DO UPDATE SET
                     company               = EXCLUDED.company,
                     sector                = EXCLUDED.sector,
@@ -1194,6 +1230,9 @@ def save_results(df_finviz, slopes, scan_date):
                     vcp_quality_score     = EXCLUDED.vcp_quality_score,
                     vcp_ready_score       = EXCLUDED.vcp_ready_score,
                     power_play_pass       = EXCLUDED.power_play_pass,
+                    tennis_ball_pattern   = EXCLUDED.tennis_ball_pattern,
+                    volume_asymmetry_ratio = EXCLUDED.volume_asymmetry_ratio,
+                    volume_asymmetry_tier  = EXCLUDED.volume_asymmetry_tier,
                     confirmations         = EXCLUDED.confirmations,
                     violations            = EXCLUDED.violations,
                     rs_ibd                = EXCLUDED.rs_ibd,
@@ -1210,6 +1249,7 @@ def save_results(df_finviz, slopes, scan_date):
                 slope, passed, high52, sma50, atr14,
                 pvh_json, tight_low_vol_pass, vcp_quality_score, vcp_ready_score,
                 power_play_pass,
+                tennis_ball_pattern, volume_asymmetry_ratio, volume_asymmetry_tier,
                 confs, viols,
                 rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mf,
             ))
