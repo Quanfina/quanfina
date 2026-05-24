@@ -47,6 +47,7 @@ from quanfina_math import (  # noqa: E402
     compute_carr_stage,
     compute_market_breadth,
     compute_breadth_divergence,
+    compute_follow_through_day,
     MARK_PYRAMID_PILOT_PCT_RANGE,
     MARK_PYRAMID_STANDARD_PCT_RANGE,
     MARK_PYRAMID_FULL_PCT_RANGE,
@@ -962,6 +963,17 @@ class BreadthDivergenceInfo(BaseModel):
     mark_says: str                        # Mark+O'Neil felsefe yorumu
 
 
+class FollowThroughDayInfo(BaseModel):
+    """KARAR #733 alt-paket (Paket 65, 25 May 2026): Mark/O'Neil FTD canon.
+    quanfina_math.compute_follow_through_day backend pre-compute (P64 helper)."""
+    ftd_detected: bool
+    ftd_gain_pct: Optional[float] = None      # FTD günü % degisim (1.7+)
+    days_after_low: Optional[int] = None      # Dip'ten kaç gün sonra
+    volume_confirmed: bool = False             # Hacim teyit (onceki >=1x)
+    previous_low: Optional[float] = None       # Bulunan dip fiyatı
+    mark_says: str                             # Mark/O'Neil felsefe yorumu
+
+
 class MarketStatus(BaseModel):
     spy_stage: int
     qqq_stage: int
@@ -982,6 +994,9 @@ class MarketStatus(BaseModel):
     # KARAR #733 alt-paket (Paket 57, 25 May 2026): Index vs A/D divergence
     # backend pre-compute (P56 compute_breadth_divergence helper wire)
     breadth_divergence: Optional[BreadthDivergenceInfo] = None
+    # KARAR #733 alt-paket (Paket 65, 25 May 2026): Follow-Through Day backend
+    # pre-compute (P64 compute_follow_through_day helper wire — Mark/O'Neil)
+    follow_through: Optional[FollowThroughDayInfo] = None
 
 
 MOCK_MARKET_STATUS = MarketStatus(
@@ -1122,7 +1137,7 @@ def get_market_status() -> MarketStatus:
     # KARAR #733 alt (Paket 57): Index vs A/D Divergence backend pre-compute
     # (Mark+O'Neil canon — P56 compute_breadth_divergence helper wire)
     # SPY closes 25-gun MOCK + advances/declines aynı 25-gun feed
-    spy_closes, _ = _mock_index_history("SPY", 400.0, days=25)
+    spy_closes, spy_volumes = _mock_index_history("SPY", 400.0, days=25)
     divergence_result = compute_breadth_divergence(
         spy_closes, advances, declines, lookback_days=10,
     )
@@ -1136,6 +1151,21 @@ def get_market_status() -> MarketStatus:
             mark_says=divergence_result["mark_says"],
         )
 
+    # KARAR #733 alt (Paket 65): Follow-Through Day backend pre-compute
+    # (Mark/O'Neil canon — P64 compute_follow_through_day helper wire)
+    # Aynı SPY closes + volumes 25-gun feed (deterministik)
+    ftd_result = compute_follow_through_day(
+        spy_closes, spy_volumes, lookback_days=15,
+    )
+    follow_through = FollowThroughDayInfo(
+        ftd_detected=bool(ftd_result.get("ftd_detected", False)),
+        ftd_gain_pct=ftd_result.get("ftd_gain_pct"),
+        days_after_low=ftd_result.get("days_after_low"),
+        volume_confirmed=bool(ftd_result.get("volume_confirmed", False)),
+        previous_low=ftd_result.get("previous_low"),
+        mark_says=ftd_result.get("mark_says", ""),
+    )
+
     status = MOCK_MARKET_STATUS.model_copy(
         update={
             "distribution_days": dd_count,
@@ -1145,6 +1175,7 @@ def get_market_status() -> MarketStatus:
             "mark_regime": _compute_mark_regime(dd_count),
             "market_breadth": market_breadth,
             "breadth_divergence": breadth_divergence,
+            "follow_through": follow_through,
         }
     )
     return status

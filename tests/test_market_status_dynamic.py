@@ -287,3 +287,52 @@ class TestBreadthDivergenceWire:
         bd = status["breadth_divergence"]
         if bd["divergence"] == "CONFIRMED_UP":
             assert bd["severity"] == "ok"
+
+
+# =====================================================================
+# Test: Follow-Through Day backend wire (Paket 65)
+# =====================================================================
+
+class TestFollowThroughWire:
+    """KARAR #733 alt-paket (Paket 65): follow_through backend pre-compute
+    (P64 compute_follow_through_day helper wire)."""
+
+    def test_follow_through_field_present(self, status):
+        """follow_through Pydantic alani response'da bulunmali."""
+        assert "follow_through" in status
+
+    def test_follow_through_shape(self, status):
+        """Tum alanlar mevcut (Optional alanlar None olabilir)."""
+        ft = status["follow_through"]
+        assert ft is not None
+        for field in ("ftd_detected", "volume_confirmed", "mark_says"):
+            assert field in ft
+        # Optional alanlar
+        for field in ("ftd_gain_pct", "days_after_low", "previous_low"):
+            assert field in ft  # null veya değer
+
+    def test_ftd_detected_is_bool(self, status):
+        """ftd_detected boolean tip."""
+        assert isinstance(status["follow_through"]["ftd_detected"], bool)
+
+    def test_volume_confirmed_is_bool(self, status):
+        """volume_confirmed boolean tip."""
+        assert isinstance(status["follow_through"]["volume_confirmed"], bool)
+
+    def test_mark_says_non_empty(self, status):
+        """KALICI İLKE #4 Mark felsefe yorumu non-empty."""
+        assert len(status["follow_through"]["mark_says"]) > 5
+
+    def test_ftd_gain_consistency(self, status):
+        """ftd_detected=True ise ftd_gain_pct >= 1.7 (Mark canon esigi)."""
+        ft = status["follow_through"]
+        if ft["ftd_detected"]:
+            assert ft["ftd_gain_pct"] is not None
+            assert ft["ftd_gain_pct"] >= 1.7
+
+    def test_ftd_no_detected_consistency(self, status):
+        """ftd_detected=False ise ftd_gain_pct None olabilir."""
+        ft = status["follow_through"]
+        if not ft["ftd_detected"]:
+            # ftd_gain_pct None ya da düşük olabilir (sicrama yok)
+            assert ft["volume_confirmed"] is False

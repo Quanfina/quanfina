@@ -44,6 +44,17 @@ export interface BreadthDivergenceInfo {
   mark_says: string;
 }
 
+// KARAR #733 alt-paket (Paket 65, 25 May 2026): Mark/O'Neil FTD canon
+// (P64 compute_follow_through_day helper + P65 backend wire)
+export interface FollowThroughDayInfo {
+  ftd_detected: boolean;
+  ftd_gain_pct?: number | null;       // FTD günü % değişim
+  days_after_low?: number | null;     // Dip'ten kaç gün sonra
+  volume_confirmed: boolean;           // Hacim teyit
+  previous_low?: number | null;        // Bulunan dip fiyatı
+  mark_says: string;
+}
+
 export interface MarketStatus {
   spy_stage: number;
   qqq_stage: number;
@@ -61,4 +72,6 @@ export interface MarketStatus {
   market_breadth?: MarketBreadthInfo | null;
   // KARAR #733 alt-paket (Paket 57): Index vs A/D Divergence backend pre-compute
   breadth_divergence?: BreadthDivergenceInfo | null;
+  // KARAR #733 alt-paket (Paket 65): Mark/O'Neil Follow-Through Day backend
+  follow_through?: FollowThroughDayInfo | null;
 }
