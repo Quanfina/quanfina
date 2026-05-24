@@ -2135,3 +2135,86 @@ class TestCheck20dmaHold:
 
     def test_constants(self):
         assert TWENTY_DMA_BREACH_DAYS_EXIT == 2
+
+
+# =============================================================================
+# Faz 2 Son — Earnings Gap Breakout
+# Tests for: detect_earnings_gap_breakout
+# Tescil: Vizyon v22.05 (24 May 2026)
+# =============================================================================
+
+from quanfina_math import (
+    detect_earnings_gap_breakout,
+    EARNINGS_GAP_MIN_PCT,
+    EARNINGS_GAP_BIG_PCT,
+)
+
+
+class TestDetectEarningsGapBreakout:
+    """KARAR ADAY #890 - Mark Earnings Gap Breakout (TLSMW s.250, Foster Wheeler)."""
+
+    def test_institutional_foster_wheeler_pattern(self):
+        # Mark FWLT paten: gap %8, volume 5x, close at high
+        result = detect_earnings_gap_breakout(
+            pre_earnings_close=100,
+            earnings_day_open=108,    # %8 gap
+            earnings_day_high=112,
+            earnings_day_low=107,
+            earnings_day_close=111.5,  # %90 of day range
+            earnings_day_volume=500000,
+            avg_volume_50d=100000,    # 5x volume
+        )
+        assert result["pattern"] == "EARNINGS_GAP_BREAKOUT"
+        assert result["tier"] == "institutional"
+        assert result["gap_pct"] >= 7.0
+        assert result["volume_multiplier"] >= 2.0
+
+    def test_mild_gap_low_close_position(self):
+        # Gap %5 + 3x vol ama close lower half
+        result = detect_earnings_gap_breakout(
+            pre_earnings_close=100,
+            earnings_day_open=105,
+            earnings_day_high=108,
+            earnings_day_low=103,
+            earnings_day_close=104,  # %20 of range
+            earnings_day_volume=300000,
+            avg_volume_50d=100000,
+        )
+        assert result["pattern"] == "EARNINGS_GAP_MILD"
+        assert result["tier"] == "mild"
+
+    def test_no_gap(self):
+        # %1 gap — Mark esigin altinda
+        result = detect_earnings_gap_breakout(
+            pre_earnings_close=100,
+            earnings_day_open=101,
+            earnings_day_high=102,
+            earnings_day_low=100,
+            earnings_day_close=101.5,
+            earnings_day_volume=110000,
+            avg_volume_50d=100000,
+        )
+        assert result["pattern"] == "NO_GAP"
+        assert result["tier"] == "weak"
+
+    def test_weak_volume(self):
+        # Gap %5 ama dusuk hacim
+        result = detect_earnings_gap_breakout(
+            pre_earnings_close=100,
+            earnings_day_open=105,
+            earnings_day_high=106,
+            earnings_day_low=104,
+            earnings_day_close=105.5,
+            earnings_day_volume=150000,  # 1.5x — Mark min 2x altinda
+            avg_volume_50d=100000,
+        )
+        assert result["tier"] == "weak"
+
+    def test_invalid_zero_data(self):
+        result = detect_earnings_gap_breakout(0, 0, 0, 0, 0, 0, 0)
+        assert result["pattern"] == "INVALID"
+        assert result["tier"] == "invalid"
+
+    def test_constants(self):
+        assert EARNINGS_GAP_MIN_PCT == 3.0
+        assert EARNINGS_GAP_BIG_PCT == 7.0

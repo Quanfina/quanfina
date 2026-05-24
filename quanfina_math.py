@@ -2683,3 +2683,125 @@ def check_20dma_hold(
         'last_close_below': last_close_below,
         'mark_says': says,
     }
+
+
+# =============================================================================
+# SPRINT 4-bis.7 — FAZ 2 SON — Earnings Gap Breakout (KARAR ADAY #890)
+# Tescil: Vizyon v22.05
+# Detay: notebook/Sprint_4_bis_7_Mark_HASSAS_Tarama.md
+# =============================================================================
+
+# Mark KESIN Earnings Gap sabitler (TLSMW s.250 — Foster Wheeler örneği)
+EARNINGS_GAP_MIN_PCT: float = 3.0                # %3+ gap (Mark KESIN anlamlı)
+EARNINGS_GAP_BIG_PCT: float = 7.0                # %7+ büyük gap
+EARNINGS_VOLUME_MIN_MULTIPLIER: float = 2.0      # 2x avg vol (Mark KESIN 2-10x range)
+EARNINGS_CLOSE_HIGH_THRESHOLD_PCT: float = 80.0  # Close gün yüksekinin %80+ (alım baskısı)
+
+
+def detect_earnings_gap_breakout(
+    pre_earnings_close: float,
+    earnings_day_open: float,
+    earnings_day_high: float,
+    earnings_day_low: float,
+    earnings_day_close: float,
+    earnings_day_volume: int,
+    avg_volume_50d: int,
+) -> dict:
+    """KARAR ADAY #890 — Mark Earnings Gap Breakout Detector (TLSMW s.250).
+
+    Mark birebir (TLSMW s.250):
+        "In April 2007, I purchased Foster Wheeler on a gap fueled by a great
+        earnings report announced in the morning. Note the **huge breakout
+        volume** and the **close right at the high of the day**. It then rose
+        180 percent in nine months from this point."
+
+    Mark KESIN earnings gap kriterleri:
+        1. Gap up: open > previous close (%3+ minimum, %7+ büyük)
+        2. Huge breakout volume (2-10x avg 50-DMA)
+        3. Close at upper portion of day range (alım baskısı, %80+ ideal)
+
+    Mark + Dick's Sporting Goods 2003 patterns aynı (s.222):
+        "Gapped up big after positive forward guidance. Overwhelming volume."
+
+    Args:
+        pre_earnings_close: Earnings'ten önceki kapanış
+        earnings_day_open: Earnings günü açılış
+        earnings_day_high: Earnings günü en yüksek
+        earnings_day_low: Earnings günü en düşük
+        earnings_day_close: Earnings günü kapanış
+        earnings_day_volume: Earnings günü hacim
+        avg_volume_50d: 50-gün ortalama hacim
+
+    Returns:
+        dict:
+        {
+            'pattern': 'EARNINGS_GAP_BREAKOUT' | 'EARNINGS_GAP_MILD' | 'NO_GAP' | 'INVALID',
+            'gap_pct': float,         # Open vs previous close
+            'volume_multiplier': float,
+            'close_position_pct': float,  # Close gün range içinde nerede (0-100)
+            'tier': 'institutional' | 'mild' | 'weak' | 'invalid',
+            'mark_says': str,
+        }
+
+    Kaynak: TLSMW s.250 + Sprint_4_bis_7_Mark_HASSAS_Tarama.md KARAR ADAY #890
+    """
+    if (pre_earnings_close <= 0 or earnings_day_open <= 0
+            or earnings_day_high <= 0 or earnings_day_close <= 0
+            or earnings_day_volume <= 0 or avg_volume_50d <= 0):
+        return {
+            'pattern': 'INVALID',
+            'gap_pct': 0.0,
+            'volume_multiplier': 0.0,
+            'close_position_pct': 0.0,
+            'tier': 'invalid',
+            'mark_says': 'Geçersiz veri (sıfır veya negatif)',
+        }
+
+    # 1) Gap percentage
+    gap_pct = ((earnings_day_open - pre_earnings_close) / pre_earnings_close) * 100
+
+    # 2) Volume multiplier
+    volume_multiplier = earnings_day_volume / avg_volume_50d
+
+    # 3) Close position within day range (Mark "close at high")
+    if earnings_day_high > earnings_day_low:
+        close_position_pct = ((earnings_day_close - earnings_day_low) /
+                              (earnings_day_high - earnings_day_low)) * 100
+    else:
+        close_position_pct = 50.0  # neutral
+
+    # Tier classification
+    if gap_pct < EARNINGS_GAP_MIN_PCT:
+        pattern = 'NO_GAP'
+        tier = 'weak'
+        says = (f"Gap %{gap_pct:.1f} < Mark min %{EARNINGS_GAP_MIN_PCT} — "
+                f"earnings reaction zayıf, paten yok")
+    elif (gap_pct >= EARNINGS_GAP_BIG_PCT
+            and volume_multiplier >= EARNINGS_VOLUME_MIN_MULTIPLIER
+            and close_position_pct >= EARNINGS_CLOSE_HIGH_THRESHOLD_PCT):
+        # Full Mark KESIN (Foster Wheeler paten)
+        pattern = 'EARNINGS_GAP_BREAKOUT'
+        tier = 'institutional'
+        says = (f"Gap %{gap_pct:.1f} + Volume {volume_multiplier:.1f}x + "
+                f"Close %{close_position_pct:.0f} day high = INSTITUTIONAL EARNINGS GAP "
+                f"(Mark KESIN Foster Wheeler paten, TLSMW s.250)")
+    elif (gap_pct >= EARNINGS_GAP_MIN_PCT
+            and volume_multiplier >= EARNINGS_VOLUME_MIN_MULTIPLIER):
+        pattern = 'EARNINGS_GAP_MILD'
+        tier = 'mild'
+        says = (f"Gap %{gap_pct:.1f} + Volume {volume_multiplier:.1f}x — "
+                f"earnings gap var ama close pozisyonu zayıf (Mark KESIN için %80+ gerekli)")
+    else:
+        pattern = 'EARNINGS_GAP_MILD'
+        tier = 'weak'
+        says = (f"Gap %{gap_pct:.1f} ama volume {volume_multiplier:.1f}x < "
+                f"Mark min {EARNINGS_VOLUME_MIN_MULTIPLIER}x — institutional değil")
+
+    return {
+        'pattern': pattern,
+        'gap_pct': round(gap_pct, 2),
+        'volume_multiplier': round(volume_multiplier, 2),
+        'close_position_pct': round(close_position_pct, 1),
+        'tier': tier,
+        'mark_says': says,
+    }
