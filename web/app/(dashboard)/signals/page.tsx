@@ -20,6 +20,7 @@ import { getPassedSignals, setPassedSignals, signalKey } from "@/lib/passed-sign
 import { toast } from "sonner";
 import type { Signal } from "@/types/signal";
 import { MarkBadgeStrip } from "@/components/mark/MarkBadgeStrip";
+import { MarkRegimeBanner } from "@/components/mark/MarkRegimeBanner";
 
 const SELECT =
   "h-8 rounded-md border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring";
@@ -309,6 +310,8 @@ export default function SignalsPage() {
   const newTodayCount = data?.filter((s) => s.is_new_today).length ?? 0;
   const passedCount = passedKeys.size;
   const strongest = data?.[0];
+  // KARAR #733 alt-paket (Paket 36): Stage 4 sayisi banner icin
+  const stage4Count = data?.filter((s) => s.mark_signals?.carr_stage === 4).length ?? 0;
 
   const tradeInitial = tradeSignal
     ? {
@@ -335,6 +338,9 @@ export default function SignalsPage() {
           Manuel Sinyal
         </Button>
       </div>
+
+      {/* KARAR #733 alt-paket (Paket 36): Mark Regime üst-uyarı banner */}
+      <MarkRegimeBanner stage4Count={stage4Count} totalCount={totalSignals} />
 
       {/* Stats */}
       {!isLoading && !isError && (

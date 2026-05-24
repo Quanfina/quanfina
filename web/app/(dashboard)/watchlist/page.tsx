@@ -30,6 +30,7 @@ import {
 import type { WatchlistRow } from "@/types/watchlist";
 import { demoteStatus } from "@/lib/watchlist-status";
 import { GridLoadingOverlay } from "@/components/ag-grid/LoadingOverlay";
+import { MarkRegimeBanner } from "@/components/mark/MarkRegimeBanner";
 
 export default function WatchlistPage() {
   const { gridClass } = useGridTheme();
@@ -119,6 +120,8 @@ export default function WatchlistPage() {
   }, [data, strategy, status, search]);
 
   // KARAR #476: gridClass useGridTheme'den (SSR uyumu)
+  // KARAR #733 alt-paket (Paket 36): Mark Regime banner Stage 4 sayim
+  const stage4Count = data?.filter((r) => r.mark_signals?.carr_stage === 4).length ?? 0;
 
   return (
     <div className="flex flex-col h-full">
@@ -134,6 +137,9 @@ export default function WatchlistPage() {
           Hisse Ekle
         </Button>
       </div>
+
+      {/* KARAR #733 alt-paket (Paket 36): Mark Regime üst-uyarı banner */}
+      <MarkRegimeBanner stage4Count={stage4Count} totalCount={data?.length ?? 0} />
 
       <div className="px-6 py-3 border-b">
         <WatchlistFilters
