@@ -1,7 +1,8 @@
 "use client";
 
 import { CheckCircle2, AlertCircle, XCircle, Shield, Crown } from "lucide-react";
-import { computeMarketRegime } from "@/lib/market-regime";
+import { computeMarketRegime, type MarketRegimeInfo } from "@/lib/market-regime";
+import type { MarkRegimeInfoBackend } from "@/types/market";
 
 /**
  * KARAR ADAY #729 (24 May 2026) — Mark Market Regime Kartı.
@@ -11,10 +12,14 @@ import { computeMarketRegime } from "@/lib/market-regime";
  *
  * 4 Katman: HEALTHY / CAUTION / UNDER_PRESSURE / BEAR_PRESSURE
  * Eksen 2 Override: Lider hisse %1-2 pilot delebilir
+ *
+ * KARAR #731 (24 May 2026): Backend mark_regime tercih + client-side fallback (DRY).
  */
 
 interface Props {
   distributionDays: number;
+  /** Backend pre-compute (KARAR #731) — varsa client-side hesap yerine kullanılır */
+  backendRegime?: MarkRegimeInfoBackend | null;
   /** Spot SPY model placeholder — gelecek genişleme */
   spySpotAllocationPct?: number;
 }
@@ -26,8 +31,27 @@ const REGIME_ICON = {
   BEAR_PRESSURE: <XCircle size={20} />,
 };
 
-export function MarkRegimeCard({ distributionDays }: Props) {
-  const info = computeMarketRegime(distributionDays);
+// Backend MarkRegimeInfoBackend -> client MarketRegimeInfo eşleştirme (DRY)
+function backendToInfo(b: MarkRegimeInfoBackend, dd: number): MarketRegimeInfo {
+  // Helper'in REGIME_MAP'inden görsel meta'lar (color, bgColor, emoji, markSays)
+  // alınır; backend sadece felsefi alanları (allocation, new_buy_allowed,
+  // pilot_override, label) override eder.
+  const fallback = computeMarketRegime(dd);
+  return {
+    ...fallback,
+    regime: b.regime,
+    label: b.label,
+    allocation: b.allocation,
+    newBuyAllowed: b.new_buy_allowed,
+    pilotOverride: b.pilot_override,
+  };
+}
+
+export function MarkRegimeCard({ distributionDays, backendRegime }: Props) {
+  // KARAR #731 — Backend tercih + client-side fallback (DRY)
+  const info: MarketRegimeInfo = backendRegime
+    ? backendToInfo(backendRegime, distributionDays)
+    : computeMarketRegime(distributionDays);
 
   return (
     <div

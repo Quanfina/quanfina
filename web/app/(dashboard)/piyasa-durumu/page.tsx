@@ -43,12 +43,16 @@ export default function PiyasaDurumuPage() {
         <MarketStatusBadge />
       </div>
 
-      {/* KARAR ADAY #729 (24 May 2026): Mark Market Regime kartı (KARAR #488 4-Katman) */}
+      {/* KARAR ADAY #729 (24 May 2026): Mark Market Regime kartı (KARAR #488 4-Katman)
+          KARAR #731 (24 May 2026): backend mark_regime tercih + client fallback */}
       <section className="flex flex-col gap-2">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           Mark Market Regime (4-Katman × 2-Eksen)
         </h2>
-        <MarkRegimeCard distributionDays={data.distribution_days} />
+        <MarkRegimeCard
+          distributionDays={data.distribution_days}
+          backendRegime={data.mark_regime}
+        />
       </section>
 
       {/* Stage kartları */}
