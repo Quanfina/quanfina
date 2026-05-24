@@ -369,6 +369,39 @@ export default function Home() {
                   {market.data.distribution_days ?? "—"}
                 </span>
               </div>
+              {/* KARAR #733 alt-paket (Paket 55): Market Breadth A/D Line özet */}
+              {market.data.market_breadth && (
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span title={market.data.market_breadth.mark_says}>A/D Line</span>
+                  <span className="flex items-center gap-1.5 tabular-nums">
+                    <span
+                      className="font-semibold"
+                      style={{ fontFamily: "var(--font-jetbrains-mono, monospace)" }}
+                    >
+                      {market.data.market_breadth.ad_ratio.toFixed(2)}
+                    </span>
+                    <span
+                      className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider"
+                      style={{
+                        background:
+                          market.data.market_breadth.breadth_health === "STRONG"
+                            ? "rgba(40,167,69,0.15)"
+                            : market.data.market_breadth.breadth_health === "NEUTRAL"
+                            ? "rgba(245,158,11,0.15)"
+                            : "rgba(220,53,69,0.15)",
+                        color:
+                          market.data.market_breadth.breadth_health === "STRONG"
+                            ? "var(--mtp-excellent)"
+                            : market.data.market_breadth.breadth_health === "NEUTRAL"
+                            ? "#F59E0B"
+                            : "var(--mtp-danger)",
+                      }}
+                    >
+                      {market.data.market_breadth.breadth_health}
+                    </span>
+                  </span>
+                </div>
+              )}
               <div className="pt-2 border-t flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">Önerilen Mod</span>
                 <span
