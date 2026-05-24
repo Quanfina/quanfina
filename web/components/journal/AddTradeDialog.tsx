@@ -19,7 +19,8 @@ import { MarkRiskAdvisor } from "./MarkRiskAdvisor";
 import { MarkPyramidCard } from "./MarkPyramidCard";
 import { isReadTodayAny } from "@/lib/mindset-read-state";
 import Link from "next/link";
-import { Quote } from "lucide-react";
+import { Quote, AlertTriangle } from "lucide-react";
+import { useCarrStage } from "@/hooks/use-carr-stage";
 
 const SELECT = "h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring";
 const TEXTAREA = "w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm resize-none focus:outline-none focus:ring-1 focus:ring-ring";
@@ -71,6 +72,13 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
   useEffect(() => {
     if (open) setMindsetReadToday(isReadTodayAny());
   }, [open]);
+
+  // KARAR #733 alt (Paket 33): Symbol Carr Stage pre-check (Stage 4 → uzak dur uyarısı)
+  // Symbol ≥3 karakter olduğunda hook etkinleşir (gereksiz API gürültüsü engellenir)
+  const trimmedSymbol = symbol.trim().toUpperCase();
+  const { data: carrStage } = useCarrStage(
+    open && trimmedSymbol.length >= 2 ? trimmedSymbol : undefined,
+  );
 
   useEffect(() => {
     if (!open || !initialData) return;
@@ -163,6 +171,29 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
         <DialogHeader>
           <DialogTitle>Yeni Trade</DialogTitle>
         </DialogHeader>
+
+        {/* KARAR #733 alt (Paket 33): Stage 4 'UZAK DUR' Mark uyarısı */}
+        {carrStage && carrStage.stage === 4 && (
+          <div
+            className="rounded-md border px-3 py-2 flex items-start gap-2 text-xs"
+            style={{
+              background: "rgba(220, 53, 69, 0.08)",
+              borderColor: "rgba(220, 53, 69, 0.4)",
+              color: "var(--mtp-danger)",
+            }}
+          >
+            <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+            <div className="flex-1">
+              <span className="font-semibold">
+                ⛔ {trimmedSymbol} Carr Stage 4 (Declining)
+              </span>
+              <span className="block mt-1 italic">
+                Mark felsefesi: <b>UZAK DUR</b>. 30W MA altı + slope negatif.
+                Stage 2'ye dönene kadar yeni alım önerilmez (KARAR #733).
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* KARAR #720 alt (Paket 30): Mindset disiplin ön-kontrol uyarı banner */}
         {!mindsetReadToday && (
