@@ -11,6 +11,7 @@ import { TradeRowActions } from "@/components/journal/TradeRowActions";
 import { AddTradeDialog } from "@/components/journal/AddTradeDialog";
 import { CloseTradeDialog } from "@/components/journal/CloseTradeDialog";
 import { RbaSummaryCard } from "@/components/journal/RbaSummaryCard";
+import { MarkRegimeBanner } from "@/components/mark/MarkRegimeBanner";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -114,6 +115,11 @@ export default function JournalPage() {
           Yeni Trade
         </Button>
       </div>
+
+      {/* KARAR #733 alt-paket (Paket 39): Mark Regime banner — trade aç/kapa
+          yaparken piyasa rejimi sürekli görünür. Stage 4 sayım Trade tipinde
+          mark_signals yok, default 0 — banner sadece piyasa rejimini uyarır. */}
+      <MarkRegimeBanner />
 
       {/* KARAR ADAY #722 (24 May 2026): Mark RBA Summary Card (TTLC Sec 4) */}
       <div className="px-6 py-3 border-b">

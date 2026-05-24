@@ -8,6 +8,8 @@ import dynamic from "next/dynamic";
 import { StockHeader } from "@/components/stock/StockHeader";
 import { ActiveStrategies } from "@/components/stock/ActiveStrategies";
 import { CarrStageCard } from "@/components/stock/CarrStageCard";
+import { MarkRegimeBanner } from "@/components/mark/MarkRegimeBanner";
+import { useCarrStage } from "@/hooks/use-carr-stage";
 
 const PriceChart = dynamic(
   () => import("@/components/stock/PriceChart").then((m) => ({ default: m.PriceChart })),
@@ -35,6 +37,9 @@ export default function HissePage({
 
   const { data: info, isLoading: infoLoading, isError: infoError } = useStockInfo(sym);
   const { data: ohlcv, isLoading: ohlcvLoading } = useOhlcv(sym);
+  // KARAR #733 alt-paket (Paket 39): hisse Stage 4 ise banner'da somut uyarı
+  const { data: carrStage } = useCarrStage(sym);
+  const isStage4 = carrStage?.stage === 4;
 
   const isLoading = infoLoading || ohlcvLoading;
 
@@ -75,6 +80,11 @@ export default function HissePage({
           İzleme Listesi
         </Link>
       </div>
+
+      {/* KARAR #733 alt-paket (Paket 39): Mark Regime banner + bu hissenin
+          Stage 4 olup olmadığı sayım payı (isStage4 ? 1 : 0). hideOnHealthy
+          default — HEALTHY iken sadece bu hisse Stage 4 olursa banner kalır. */}
+      <MarkRegimeBanner stage4Count={isStage4 ? 1 : 0} totalCount={1} />
 
       {/* Stock header */}
       <div className="px-6 py-4 border-b">
