@@ -3022,3 +3022,141 @@ def count_distribution_days(
         'regime_hint': regime,
         'mark_says': says,
     }
+
+
+# =============================================================================
+# Carr Stage Analysis Detector (Stan Weinstein 4-Stage, Notebook kitaplar/Carr.md)
+# =============================================================================
+
+# Stan Weinstein 4-stage (Carr Stage Analizi):
+# Stage 1: Basing (30W MA flat, price near MA)         - hazırlık
+# Stage 2: Advancing (price > 30W MA + slope positive) - alım fazı
+# Stage 3: Topping (slope flattening + volume div)     - çıkış hazırlık
+# Stage 4: Declining (price < 30W MA + slope negative) - uzak dur
+
+CARR_STAGE_MA_WINDOW: int = 150  # 30 hafta × 5 gün
+CARR_STAGE_SLOPE_FLAT_PCT: float = 1.0  # 30W MA yıllık eğim mutlak < %1 = flat
+CARR_STAGE_PROXIMITY_PCT: float = 5.0   # ±%5 = "near MA" (Stage 1/3 testi)
+
+
+def compute_carr_stage(
+    closes: list[float],
+    volumes: list[int],
+    ma_window: int = CARR_STAGE_MA_WINDOW,
+) -> dict:
+    """Carr Stage Analizi — Stan Weinstein 4-Stage Detector.
+
+    Notebook kaynak: notebook/kitaplar/Carr.md (Carr stratejisi tescili).
+    Quanfina Carr Stage Analizi NotebookLM (Aşama 4.1).
+
+    Stage tanımları:
+    - 1 (Basing):    30W MA flat (slope ≈ 0), price ±%5 MA yakını
+    - 2 (Advancing): price > 30W MA + slope > 0 (Mark + Carr kabul fazı)
+    - 3 (Topping):   slope flattening (positive ama düşüyor), hacim diverjans
+    - 4 (Declining): price < 30W MA + slope < 0 (Mark "Stage 4 = uzak dur")
+
+    Args:
+        closes: Tarihsel close fiyatları (eskiden yeniye, son eleman bugün)
+        volumes: Tarihsel hacim (closes ile eşit uzunluk)
+        ma_window: 30W MA pencere (default 150 gün)
+
+    Returns:
+        dict:
+        {
+            'stage': 1 | 2 | 3 | 4 | None,
+            'stage_label': str,
+            'ma_value': float | None,
+            'price_vs_ma_pct': float | None,
+            'slope_pct_per_year': float | None,
+            'mark_says': str,
+        }
+
+    Kaynak: notebook/kitaplar/Carr.md + Mark TTLC Stage 2 felsefesi
+    """
+    n = len(closes)
+    if n < ma_window or len(volumes) != n:
+        return {
+            'stage': None,
+            'stage_label': 'Belirsiz',
+            'ma_value': None,
+            'price_vs_ma_pct': None,
+            'slope_pct_per_year': None,
+            'mark_says': f'Yetersiz veri — min {ma_window} gun close gerek.',
+        }
+
+    # 30W SMA hesap (son ma_window kapanış ortalama)
+    ma_value = sum(closes[-ma_window:]) / ma_window
+    current_price = closes[-1]
+    price_vs_ma_pct = ((current_price - ma_value) / ma_value) * 100.0
+
+    # Slope: son 50 gunluk MA degisim orani (yıllık % normalize)
+    # Slope = (MA_today - MA_50_days_ago) / MA_50_days_ago * 100 * (252/50)
+    slope_window = min(50, n - ma_window)
+    if slope_window > 5:
+        ma_past = sum(closes[-(ma_window + slope_window):-slope_window]) / ma_window
+        slope_raw_pct = ((ma_value - ma_past) / ma_past) * 100.0
+        slope_pct_per_year = slope_raw_pct * (252.0 / slope_window)
+    else:
+        slope_pct_per_year = 0.0
+
+    # Stage tespit (Carr/Weinstein mekanik)
+    is_above_ma = price_vs_ma_pct > 0
+    is_below_ma = price_vs_ma_pct < 0
+    is_near_ma = abs(price_vs_ma_pct) <= CARR_STAGE_PROXIMITY_PCT
+    is_slope_positive = slope_pct_per_year > CARR_STAGE_SLOPE_FLAT_PCT
+    is_slope_negative = slope_pct_per_year < -CARR_STAGE_SLOPE_FLAT_PCT
+    is_slope_flat = not is_slope_positive and not is_slope_negative
+
+    # Stage 4: price < MA + slope negative (en kritik, Mark "uzak dur")
+    if is_below_ma and is_slope_negative:
+        stage = 4
+        label = 'Stage 4 (Declining)'
+        says = ('Stage 4 Declining — price 30W MA alti + slope negatif. '
+                'Mark felsefesi: bu hisseden UZAK DUR. Carr stratejisi de aynı.')
+    # Stage 2: price > MA + slope positive (Mark/Carr alim fazi)
+    elif is_above_ma and is_slope_positive:
+        stage = 2
+        label = 'Stage 2 (Advancing)'
+        says = ('Stage 2 Advancing — price 30W MA ustu + slope pozitif. '
+                'Mark + Carr kabul fazi: superperformance hisseleri burada.')
+    # Stage 3: above MA ama slope flattening (volume diverjansi kontrolu basitleştirilmiş)
+    elif is_above_ma and is_slope_flat:
+        stage = 3
+        label = 'Stage 3 (Topping)'
+        says = ('Stage 3 Topping — price MA ustu ama slope dusuyor. '
+                'Carr: cikis hazirlik, kar kilitleme. Mark: trail stop sıkı.')
+    # Stage 1: near MA + slope flat (basing/consolidation)
+    elif is_near_ma and is_slope_flat:
+        stage = 1
+        label = 'Stage 1 (Basing)'
+        says = ('Stage 1 Basing — 30W MA flat + price MA yakini. '
+                'Carr: hazirlik fazi, breakout izle. Mark: pivot tetiklemesi bekle.')
+    # Slope negatif ama near/above MA (bozulan trend)
+    elif is_slope_negative:
+        stage = 3 if is_above_ma else 4
+        if stage == 3:
+            label = 'Stage 3 (Erken Topping)'
+            says = ('Stage 3 erken topping — slope negative, price hala MA ustu. '
+                    'Yakinda Stage 4 riskli, Carr: cikis simdi.')
+        else:
+            label = 'Stage 4 (Erken Declining)'
+            says = ('Stage 4 yaklasti — slope negatif, price MA yaklasiyor. Mark: uzak dur.')
+    # Belirsiz - slope pozitif ama MA altı (toparlanma başlangıcı?)
+    elif is_below_ma and is_slope_positive:
+        stage = 1
+        label = 'Stage 1 (Toparlanma)'
+        says = ('Stage 1 toparlanma — price MA alti ama slope pozitif. '
+                'Carr: hala basing, henuz Stage 2 onayi yok.')
+    else:
+        stage = None
+        label = 'Belirsiz'
+        says = f'Carr stage net degil — price MA {price_vs_ma_pct:+.1f}%, slope {slope_pct_per_year:+.1f}%/yr.'
+
+    return {
+        'stage': stage,
+        'stage_label': label,
+        'ma_value': round(ma_value, 2),
+        'price_vs_ma_pct': round(price_vs_ma_pct, 2),
+        'slope_pct_per_year': round(slope_pct_per_year, 2),
+        'mark_says': says,
+    }
