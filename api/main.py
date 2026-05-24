@@ -30,12 +30,16 @@ from db_helpers import (  # noqa: E402
 
 # Sprint 4-bis.7 Faz 1 B paket: Mark KARAR #914 + #969 + #970
 # Sprint 4-bis.7 Faz 2 başlangıç: Mark KARAR #834 + #855
+# Sprint 4-bis.7 Faz 2 genişletme: Mark KARAR #893 + #882 + #864
 from quanfina_math import (  # noqa: E402
     compute_dynamic_stop,
     mark_position_sizer,
     mark_six_rule_check,
     detect_eps_acceleration,
     detect_code_33,
+    detect_tennis_ball,
+    compute_volume_asymmetry,
+    detect_leader_fingerprint,
     MARK_STOP_ABSOLUTE_CAP_PCT,
     MARK_EQUITY_RISK_MIN_PCT,
     MARK_EQUITY_RISK_MAX_PCT,
@@ -48,6 +52,13 @@ from quanfina_math import (  # noqa: E402
     MARK_EPS_BULL_MARKET_PCT,
     MARK_EPS_TURNAROUND_PCT,
     MARK_EPS_90PCT_RULE_THRESHOLD,
+    TENNIS_BALL_PULLBACK_MAX_DAYS,
+    TENNIS_BALL_RECOVERY_MAX_DAYS,
+    VOLUME_ASYMMETRY_HEALTHY_RATIO,
+    LEADER_ADVANCE_MIN_PCT,
+    LEADER_ADVANCE_MAX_PCT,
+    LEADER_PULLBACK_MIN_PCT,
+    LEADER_PULLBACK_MAX_PCT,
 )
 
 from typing import Literal, Optional
@@ -1869,6 +1880,120 @@ def risk_code_33(req: Code33Request) -> Code33Response:
         sales_accel=result['sales_accel'],
         margin_expanding=result['margin_expanding'],
         pass_count=result['pass_count'],
+        tier=result['tier'],
+        mark_says=result['mark_says'],
+    )
+
+
+# =============================================================================
+# Sprint 4-bis.7 — Faz 2 genişletme endpoint'leri (KARAR #893 + #882 + #864)
+# Vizyon v22.03 tescili
+# =============================================================================
+
+class DailyBar(BaseModel):
+    close: float
+    high: Optional[float] = None
+    low: Optional[float] = None
+    volume: int = 0
+
+
+class TennisBallRequest(BaseModel):
+    breakout_date_idx: int
+    daily_history: list[DailyBar]
+
+
+class TennisBallResponse(BaseModel):
+    pattern: str  # TENNIS_BALL / EGG / STILL_RUNNING / INVALID
+    pullback_days: Optional[int] = None
+    recovery_days: Optional[int] = None
+    recovered: bool
+    pullback_depth_pct: Optional[float] = None
+    mark_says: str
+
+
+@app.post("/api/risk/tennis-ball", response_model=TennisBallResponse)
+def risk_tennis_ball(req: TennisBallRequest) -> TennisBallResponse:
+    """KARAR ADAY #893 — Mark Tennis Ball Detector endpoint (TLSMW s.253)."""
+    history_dicts = [
+        {
+            'close': b.close,
+            'high': b.high if b.high is not None else b.close * 1.01,
+            'low': b.low if b.low is not None else b.close * 0.99,
+            'volume': b.volume,
+        }
+        for b in req.daily_history
+    ]
+    result = detect_tennis_ball(req.breakout_date_idx, history_dicts)
+    return TennisBallResponse(
+        pattern=result['pattern'],
+        pullback_days=result['pullback_days'],
+        recovery_days=result['recovery_days'],
+        recovered=result['recovered'],
+        pullback_depth_pct=result['pullback_depth_pct'],
+        mark_says=result['mark_says'],
+    )
+
+
+class VolumeAsymmetryRequest(BaseModel):
+    daily_history: list[DailyBar]
+    lookback_days: int = 20
+
+
+class VolumeAsymmetryResponse(BaseModel):
+    asymmetry_ratio: float
+    up_days_count: int
+    down_days_count: int
+    up_volume_avg: float
+    down_volume_avg: float
+    tier: str
+    mark_says: str
+
+
+@app.post("/api/risk/volume-asymmetry", response_model=VolumeAsymmetryResponse)
+def risk_volume_asymmetry(req: VolumeAsymmetryRequest) -> VolumeAsymmetryResponse:
+    """KARAR ADAY #882 — Mark Volume Asymmetry endpoint (TLSMW s.234)."""
+    history_dicts = [{'close': b.close, 'volume': b.volume} for b in req.daily_history]
+    result = compute_volume_asymmetry(history_dicts, lookback_days=req.lookback_days)
+    return VolumeAsymmetryResponse(
+        asymmetry_ratio=result['asymmetry_ratio'],
+        up_days_count=result['up_days_count'],
+        down_days_count=result['down_days_count'],
+        up_volume_avg=result['up_volume_avg'],
+        down_volume_avg=result['down_volume_avg'],
+        tier=result['tier'],
+        mark_says=result['mark_says'],
+    )
+
+
+class LeaderFingerprintRequest(BaseModel):
+    advance_segments: list[float]   # pozitif %
+    pullback_segments: list[float]  # pozitif %
+
+
+class LeaderFingerprintResponse(BaseModel):
+    pattern: str  # LEADER_FINGERPRINT / LEADER_PARTIAL / NOT_LEADER / INVALID
+    advances_in_range: int
+    pullbacks_in_range: int
+    total_advances: int
+    total_pullbacks: int
+    advance_pct_in_range: float
+    pullback_pct_in_range: float
+    tier: str
+    mark_says: str
+
+
+@app.post("/api/risk/leader-fingerprint", response_model=LeaderFingerprintResponse)
+def risk_leader_fingerprint(req: LeaderFingerprintRequest) -> LeaderFingerprintResponse:
+    """KARAR ADAY #864 — Mark Leader Behavior Fingerprint endpoint (TLSMW s.184)."""
+    result = detect_leader_fingerprint(req.advance_segments, req.pullback_segments)
+    return LeaderFingerprintResponse(
+        pattern=result['pattern'],
+        advances_in_range=result['advances_in_range'],
+        pullbacks_in_range=result['pullbacks_in_range'],
+        total_advances=result['total_advances'],
+        total_pullbacks=result['total_pullbacks'],
+        advance_pct_in_range=result['advance_pct_in_range'],
+        pullback_pct_in_range=result['pullback_pct_in_range'],
         tier=result['tier'],
         mark_says=result['mark_says'],
     )
