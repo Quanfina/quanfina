@@ -29,10 +29,13 @@ from db_helpers import (  # noqa: E402
 )
 
 # Sprint 4-bis.7 Faz 1 B paket: Mark KARAR #914 + #969 + #970
+# Sprint 4-bis.7 Faz 2 başlangıç: Mark KARAR #834 + #855
 from quanfina_math import (  # noqa: E402
     compute_dynamic_stop,
     mark_position_sizer,
     mark_six_rule_check,
+    detect_eps_acceleration,
+    detect_code_33,
     MARK_STOP_ABSOLUTE_CAP_PCT,
     MARK_EQUITY_RISK_MIN_PCT,
     MARK_EQUITY_RISK_MAX_PCT,
@@ -40,6 +43,11 @@ from quanfina_math import (  # noqa: E402
     MARK_POSITION_OPTIMAL_PCT_RANGE,
     MARK_PORTFOLIO_OPTIMAL_STOCKS,
     MARK_PORTFOLIO_MAX_STOCKS,
+    MARK_EPS_MIN_GROWTH_PCT,
+    MARK_EPS_SUPERPERFORMANCE_PCT,
+    MARK_EPS_BULL_MARKET_PCT,
+    MARK_EPS_TURNAROUND_PCT,
+    MARK_EPS_90PCT_RULE_THRESHOLD,
 )
 
 from typing import Literal, Optional
@@ -1762,4 +1770,105 @@ def risk_advisor(req: RiskAdvisorRequest) -> RiskAdvisorResponse:
             'portfolio_optimal_stocks': list(MARK_PORTFOLIO_OPTIMAL_STOCKS),
             'portfolio_max_stocks': MARK_PORTFOLIO_MAX_STOCKS,
         },
+    )
+
+
+# =============================================================================
+# Sprint 4-bis.7 — Faz 2 backend: EPS Acceleration + Code 33 endpoint'leri
+# Vizyon v22.00 tescili (KARAR ADAY #834 + #855)
+# Detay: notebook/Sprint_4_bis_7_Mark_HASSAS_Tarama.md
+# =============================================================================
+
+class EpsAccelerationRequest(BaseModel):
+    """Mark EPS Acceleration Detector input.
+
+    eps_growth_yoy_last_4q: Son 4 çeyrek YoY EPS büyüme oranı %
+        [q-3, q-2, q-1, current] sırasıyla (en eski → en yeni)
+        Mark TLSMW s.131 örnek: [-5.0, 10.0, 28.0, 56.0]
+    """
+    eps_growth_yoy_last_4q: list[float]
+
+
+class EpsAccelerationResponse(BaseModel):
+    accelerating: bool
+    magnitude_pct_pts: float
+    mark_90pct_rule: bool
+    phase: str  # 'accelerating' | 'decelerating' | 'flat' | 'invalid'
+    tier: str   # 'below_minimum' | 'minimum' | 'superperformance' | 'bull_market' | 'turnaround'
+    mark_says: str
+    quarters_count: int
+    mark_constants: dict
+
+
+@app.post("/api/risk/eps-acceleration", response_model=EpsAccelerationResponse)
+def risk_eps_acceleration(req: EpsAccelerationRequest) -> EpsAccelerationResponse:
+    """KARAR ADAY #834 — Mark EPS Acceleration Detector endpoint.
+
+    Mark TLSMW s.131:
+        "More than 90 percent of the biggest stock market winners showed
+        some form of earnings acceleration before or during their huge price moves."
+    """
+    result = detect_eps_acceleration(req.eps_growth_yoy_last_4q)
+    return EpsAccelerationResponse(
+        accelerating=result['accelerating'],
+        magnitude_pct_pts=result['magnitude_pct_pts'],
+        mark_90pct_rule=result['mark_90pct_rule'],
+        phase=result['phase'],
+        tier=result['tier'],
+        mark_says=result['mark_says'],
+        quarters_count=result['quarters_count'],
+        mark_constants={
+            'eps_min_growth_pct': MARK_EPS_MIN_GROWTH_PCT,
+            'eps_superperformance_pct': MARK_EPS_SUPERPERFORMANCE_PCT,
+            'eps_bull_market_pct': MARK_EPS_BULL_MARKET_PCT,
+            'eps_turnaround_pct': MARK_EPS_TURNAROUND_PCT,
+            'eps_90pct_rule_threshold': MARK_EPS_90PCT_RULE_THRESHOLD,
+        },
+    )
+
+
+class Code33Request(BaseModel):
+    """Mark Code 33 Detector input.
+
+    3 ardışık array, her biri 4-çeyrek YoY büyüme oranı %.
+    Mark TLSMW s.173 — superperformance condition.
+    """
+    eps_growth_yoy_last_4q: list[float]
+    sales_growth_yoy_last_4q: list[float]
+    net_margin_last_4q: list[float]
+
+
+class Code33Response(BaseModel):
+    pattern: str  # 'CODE_33' | 'partial' | 'none'
+    eps_accel: bool
+    sales_accel: bool
+    margin_expanding: bool
+    pass_count: int  # 0-3
+    tier: str  # 'elite' | 'partial_2' | 'partial_1' | 'none'
+    mark_says: str
+
+
+@app.post("/api/risk/code-33", response_model=Code33Response)
+def risk_code_33(req: Code33Request) -> Code33Response:
+    """KARAR ADAY #855 — Mark Code 33 Detector endpoint.
+
+    Mark TLSMW s.173:
+        "Code 33 situation: three quarters of acceleration in earnings, sales,
+        AND profit margins. That's a potent recipe."
+
+    Mark Monster Beverage (MNST) 2003-2005 classic Code 33 reference.
+    """
+    result = detect_code_33(
+        eps_growth_yoy_last_4q=req.eps_growth_yoy_last_4q,
+        sales_growth_yoy_last_4q=req.sales_growth_yoy_last_4q,
+        net_margin_last_4q=req.net_margin_last_4q,
+    )
+    return Code33Response(
+        pattern=result['pattern'],
+        eps_accel=result['eps_accel'],
+        sales_accel=result['sales_accel'],
+        margin_expanding=result['margin_expanding'],
+        pass_count=result['pass_count'],
+        tier=result['tier'],
+        mark_says=result['mark_says'],
     )
