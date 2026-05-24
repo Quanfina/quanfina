@@ -1926,6 +1926,46 @@ def evaluate_pyramid_tier(body: PyramidTierRequest) -> PyramidTierResponse:
     return PyramidTierResponse(**result)
 
 
+# ── Carr Stage (KARAR #733) ───────────────────────────────────────────────────
+# Tek hisse icin Carr Stage Analizi (Stan Weinstein 4-Stage) detay endpoint'i.
+
+class CarrStageResponse(BaseModel):
+    symbol: str
+    stage: Optional[Literal[1, 2, 3, 4]] = None
+    stage_label: str
+    ma_value: Optional[float] = None
+    price_vs_ma_pct: Optional[float] = None
+    slope_pct_per_year: Optional[float] = None
+    mark_says: str
+    ma_window: int = 150
+
+
+@app.get("/api/carr/stage/{symbol}", response_model=CarrStageResponse)
+def get_carr_stage(symbol: str) -> CarrStageResponse:
+    """KARAR #733 — Tek hisse Carr Stage Analizi detay.
+
+    Sn. Ferit hisse ticker'i verir, 180 gun MOCK SPY-tipi history uretilir
+    + compute_carr_stage cagrisi + Stan Weinstein 4-Stage detay yanit.
+
+    Production'da yfinance/SQL real veri (ACIK KONU #75 yfinance pipeline).
+    """
+    sym = symbol.upper()
+    # MOCK SPY pattern (ticker hash seed deterministik)
+    start_price = 100.0 + (sum(ord(c) for c in sym) % 400)
+    closes, volumes = _mock_index_history(sym, start_price, days=180)
+    result = compute_carr_stage(closes, volumes, ma_window=150)
+    return CarrStageResponse(
+        symbol=sym,
+        stage=result.get("stage"),
+        stage_label=result.get("stage_label", "Belirsiz"),
+        ma_value=result.get("ma_value"),
+        price_vs_ma_pct=result.get("price_vs_ma_pct"),
+        slope_pct_per_year=result.get("slope_pct_per_year"),
+        mark_says=result.get("mark_says", ""),
+        ma_window=150,
+    )
+
+
 # ── Signals ───────────────────────────────────────────────────────────────────
 
 _STATUS_RANK: dict[str, int] = {s: i for i, s in enumerate(_STATUS_HIERARCHY)}
