@@ -162,7 +162,9 @@ def trades_get_all() -> list[dict]:
             SELECT id, symbol, strategy, setup_type,
                    entry_date, entry_price, exit_date, exit_price,
                    shares, status, pl_dollar, pl_pct,
-                   grade, exit_reason, lessons
+                   grade, exit_reason, lessons,
+                   plan_entry_trigger, plan_stop, plan_target,
+                   plan_size_pct, plan_exit_strategy, plan_time_horizon
             FROM web_trades
             ORDER BY id DESC
         """))
@@ -172,29 +174,48 @@ def trades_get_all() -> list[dict]:
             for df in ("entry_date", "exit_date"):
                 if d[df] is not None:
                     d[df] = d[df].isoformat()
-            for nf in ("entry_price", "exit_price", "pl_dollar", "pl_pct"):
-                if d[nf] is not None:
+            for nf in (
+                "entry_price", "exit_price", "pl_dollar", "pl_pct",
+                "plan_stop", "plan_target", "plan_size_pct",
+            ):
+                if d.get(nf) is not None:
                     d[nf] = float(d[nf])
             rows.append(d)
         return rows
 
 
 def trades_insert(trade: dict) -> int:
+    # KARAR ADAY #717 — Mark TTLC Sec 1 6 zorunlu plan alani
+    # API katmaninda Pydantic Field required; eski testler icin geriye uyum
+    # plan_* anahtarlari yoksa None default'la doldur
+    trade_with_plan = {
+        "plan_entry_trigger": None,
+        "plan_stop": None,
+        "plan_target": None,
+        "plan_size_pct": None,
+        "plan_exit_strategy": None,
+        "plan_time_horizon": None,
+        **trade,
+    }
     with engine.begin() as conn:
         result = conn.execute(text("""
             INSERT INTO web_trades (
                 symbol, strategy, setup_type,
                 entry_date, entry_price, exit_date, exit_price,
                 shares, status, pl_dollar, pl_pct,
-                grade, exit_reason, lessons
+                grade, exit_reason, lessons,
+                plan_entry_trigger, plan_stop, plan_target,
+                plan_size_pct, plan_exit_strategy, plan_time_horizon
             ) VALUES (
                 :symbol, :strategy, :setup_type,
                 :entry_date, :entry_price, :exit_date, :exit_price,
                 :shares, :status, :pl_dollar, :pl_pct,
-                :grade, :exit_reason, :lessons
+                :grade, :exit_reason, :lessons,
+                :plan_entry_trigger, :plan_stop, :plan_target,
+                :plan_size_pct, :plan_exit_strategy, :plan_time_horizon
             )
             RETURNING id
-        """), trade)
+        """), trade_with_plan)
         return result.scalar()
 
 
@@ -224,7 +245,9 @@ def trades_get_by_id(trade_id: int) -> Optional[dict]:
                 SELECT id, symbol, strategy, setup_type,
                        entry_date, entry_price, exit_date, exit_price,
                        shares, status, pl_dollar, pl_pct,
-                       grade, exit_reason, lessons
+                       grade, exit_reason, lessons,
+                       plan_entry_trigger, plan_stop, plan_target,
+                       plan_size_pct, plan_exit_strategy, plan_time_horizon
                 FROM web_trades WHERE id = :id
             """),
             {"id": trade_id},
@@ -236,7 +259,10 @@ def trades_get_by_id(trade_id: int) -> Optional[dict]:
         for df in ("entry_date", "exit_date"):
             if d[df] is not None:
                 d[df] = d[df].isoformat()
-        for nf in ("entry_price", "exit_price", "pl_dollar", "pl_pct"):
+        for nf in (
+            "entry_price", "exit_price", "pl_dollar", "pl_pct",
+            "plan_stop", "plan_target", "plan_size_pct",
+        ):
             if d[nf] is not None:
                 d[nf] = float(d[nf])
         return d

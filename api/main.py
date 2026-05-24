@@ -1399,6 +1399,9 @@ def _calc_pl(entry_price: float, exit_price: float, shares: int) -> tuple[float,
     return pl_dollar, pl_pct
 
 
+TimeHorizon = Literal["swing", "position", "core"]
+
+
 class Trade(BaseModel):
     id: int
     symbol: str
@@ -1418,6 +1421,15 @@ class Trade(BaseModel):
     grade: Optional[str] = None
     exit_reason: Optional[str] = None
     lessons: Optional[str] = None
+    # KARAR ADAY #717 (24 May 2026) — Mark TTLC Sec 1 birebir 6 zorunlu plan alanı.
+    # Eski trade'ler için NULL (geriye uyum), yeni kayıtlarda zorunlu (TradeCreate).
+    # Mark birebir: "Without a written plan, you have only hope"
+    plan_entry_trigger: Optional[str] = None
+    plan_stop: Optional[float] = None
+    plan_target: Optional[float] = None
+    plan_size_pct: Optional[float] = None
+    plan_exit_strategy: Optional[str] = None
+    plan_time_horizon: Optional[TimeHorizon] = None
 
 
 class TradeCreate(BaseModel):
@@ -1436,6 +1448,14 @@ class TradeCreate(BaseModel):
     grade: Optional[str] = None
     exit_reason: Optional[str] = None
     lessons: Optional[str] = None
+    # KARAR ADAY #717 — Mark TTLC Sec 1 disiplini: yeni trade plan'sız girilemez.
+    # 6 alan ZORUNLU (default yok), Mark felsefesi: "Always go in with a plan".
+    plan_entry_trigger: str
+    plan_stop: float
+    plan_target: float
+    plan_size_pct: float
+    plan_exit_strategy: str
+    plan_time_horizon: TimeHorizon
 
 
 class TradeUpdate(BaseModel):
@@ -1446,6 +1466,13 @@ class TradeUpdate(BaseModel):
     exit_reason: Optional[str] = None
     lessons: Optional[str] = None
     setup_type: Optional[str] = None
+    # KARAR ADAY #717 — Plan alanlari yazıldıktan sonra düzeltilebilir (Optional).
+    plan_entry_trigger: Optional[str] = None
+    plan_stop: Optional[float] = None
+    plan_target: Optional[float] = None
+    plan_size_pct: Optional[float] = None
+    plan_exit_strategy: Optional[str] = None
+    plan_time_horizon: Optional[TimeHorizon] = None
 
 
 def _make_closed(
@@ -1511,6 +1538,13 @@ def add_trade(body: TradeCreate) -> Trade:
         "grade": body.grade,
         "exit_reason": body.exit_reason,
         "lessons": body.lessons,
+        # KARAR ADAY #717 — Mark TTLC Sec 1 6 zorunlu plan alani
+        "plan_entry_trigger": body.plan_entry_trigger,
+        "plan_stop": body.plan_stop,
+        "plan_target": body.plan_target,
+        "plan_size_pct": body.plan_size_pct,
+        "plan_exit_strategy": body.plan_exit_strategy,
+        "plan_time_horizon": body.plan_time_horizon,
     }
     new_id = trades_insert(trade_data)
     return Trade(**trades_get_by_id(new_id))

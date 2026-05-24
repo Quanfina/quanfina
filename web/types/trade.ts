@@ -24,6 +24,23 @@ export const SIGNAL_SOURCE_DESCRIPTIONS: Record<SignalSource, string> = {
   manual_external: 'Başkasından (sosyal medya, forum, tavsiye) gelen fikir',
 };
 
+// KARAR ADAY #717 (24 May 2026): Mark TTLC Sec 1 6 zorunlu plan alanı.
+// Mark birebir: "Without a written plan, you have only hope" / "Always go in with a plan"
+// Time Horizon — Mark'ın 3 trade tipi: swing (1-2 hafta), position (1-6 ay), core (6+ ay)
+export type TimeHorizon = 'swing' | 'position' | 'core';
+
+export const TIME_HORIZON_LABELS: Record<TimeHorizon, string> = {
+  swing:    'Swing (1-2 hafta)',
+  position: 'Pozisyon (1-6 ay)',
+  core:     'Core (6+ ay)',
+};
+
+export const TIME_HORIZON_DESCRIPTIONS: Record<TimeHorizon, string> = {
+  swing:    'Kısa vadeli — daralma → kırılım → 2R/3R hedef',
+  position: 'Orta vadeli — trend takibi 50MA üzerinde, sektör lideri',
+  core:     'Uzun vadeli — sermayenin %25-50 büyük posisyon, 200MA disiplin',
+};
+
 export interface Trade {
   id: number;
   symbol: string;
@@ -41,6 +58,14 @@ export interface Trade {
   grade: TradeGrade | null;
   exit_reason: ExitReason | null;
   lessons: string | null;
+  // KARAR ADAY #717 — Mark TTLC Sec 1 6 zorunlu plan alanı.
+  // Eski trade'ler için null (geriye uyum), yeni kayıtlarda zorunlu.
+  plan_entry_trigger?: string | null;
+  plan_stop?: number | null;
+  plan_target?: number | null;
+  plan_size_pct?: number | null;
+  plan_exit_strategy?: string | null;
+  plan_time_horizon?: TimeHorizon | null;
 }
 
 export interface TradeCreate {
@@ -57,6 +82,13 @@ export interface TradeCreate {
   grade?: TradeGrade | null;
   exit_reason?: ExitReason | null;
   lessons?: string | null;
+  // KARAR ADAY #717 — Mark felsefesi: plan'sız trade YASAK. 6 alan ZORUNLU.
+  plan_entry_trigger: string;
+  plan_stop: number;
+  plan_target: number;
+  plan_size_pct: number;
+  plan_exit_strategy: string;
+  plan_time_horizon: TimeHorizon;
 }
 
 export interface TradeUpdate {
@@ -67,6 +99,13 @@ export interface TradeUpdate {
   exit_reason?: ExitReason | null;
   lessons?: string | null;
   setup_type?: string;
+  // KARAR ADAY #717 — Plan alanları sonradan revize edilebilir (Optional).
+  plan_entry_trigger?: string | null;
+  plan_stop?: number | null;
+  plan_target?: number | null;
+  plan_size_pct?: number | null;
+  plan_exit_strategy?: string | null;
+  plan_time_horizon?: TimeHorizon | null;
 }
 
 export interface SetupType {

@@ -13,8 +13,8 @@ import {
 } from "@/components/ui/dialog";
 import { useAddTrade, useSetupTypes } from "@/hooks/use-trades";
 import { calcPL, fmtPLDollar, fmtPLPct } from "@/lib/math";
-import type { TradeCreate, TradeGrade, ExitReason, TradeStatus, SignalSource } from "@/types/trade";
-import { GRADE_OPTIONS, EXIT_REASON_LABELS, SIGNAL_SOURCE_LABELS, SIGNAL_SOURCE_DESCRIPTIONS } from "@/types/trade";
+import type { TradeCreate, TradeGrade, ExitReason, TradeStatus, SignalSource, TimeHorizon } from "@/types/trade";
+import { GRADE_OPTIONS, EXIT_REASON_LABELS, SIGNAL_SOURCE_LABELS, SIGNAL_SOURCE_DESCRIPTIONS, TIME_HORIZON_LABELS, TIME_HORIZON_DESCRIPTIONS } from "@/types/trade";
 import { MarkRiskAdvisor } from "./MarkRiskAdvisor";
 
 const SELECT = "h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring";
@@ -55,6 +55,13 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
   const [exitReason, setExitReason] = useState<ExitReason>("stop_loss");
   const [lessons, setLessons]       = useState("");
   const [error, setError]           = useState<string | null>(null);
+  // KARAR ADAY #717 — Mark TTLC Sec 1 6 zorunlu plan alani (Mark birebir disiplin)
+  const [planEntryTrigger, setPlanEntryTrigger]   = useState("");
+  const [planStop, setPlanStop]                   = useState("");
+  const [planTarget, setPlanTarget]               = useState("");
+  const [planSizePct, setPlanSizePct]             = useState("");
+  const [planExitStrategy, setPlanExitStrategy]   = useState("");
+  const [planTimeHorizon, setPlanTimeHorizon]     = useState<TimeHorizon>("swing");
 
   useEffect(() => {
     if (!open || !initialData) return;
@@ -84,6 +91,9 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
     setEntryDate(""); setEntryPrice(""); setShares("");
     setStatus("open"); setExitDate(""); setExitPrice("");
     setGrade("B"); setExitReason("stop_loss"); setLessons(""); setError(null);
+    // KARAR ADAY #717 plan alanlari reset
+    setPlanEntryTrigger(""); setPlanStop(""); setPlanTarget("");
+    setPlanSizePct(""); setPlanExitStrategy(""); setPlanTimeHorizon("swing");
   }
 
   function handleOpenChange(v: boolean) {
@@ -101,10 +111,27 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
     if (isNaN(ep) || ep <= 0) { setError("Geçerli giriş fiyatı gerekli"); return; }
     if (isNaN(sh) || sh <= 0) { setError("Geçerli adet gerekli"); return; }
 
+    // KARAR ADAY #717 — Mark TTLC Sec 1 disiplini: 6 plan alani ZORUNLU
+    const pStop   = parseFloat(planStop);
+    const pTarget = parseFloat(planTarget);
+    const pSize   = parseFloat(planSizePct);
+    if (!planEntryTrigger.trim()) { setError("Plan: Giriş tetikleyicisi gerekli (Mark TTLC Sec 1)"); return; }
+    if (isNaN(pStop)   || pStop   <= 0) { setError("Plan: Geçerli stop $ gerekli (Mark)"); return; }
+    if (isNaN(pTarget) || pTarget <= 0) { setError("Plan: Geçerli hedef $ gerekli (Mark)"); return; }
+    if (isNaN(pSize)   || pSize   <= 0 || pSize > 100) { setError("Plan: Pozisyon % (0-100 arası) gerekli"); return; }
+    if (!planExitStrategy.trim()) { setError("Plan: Çıkış stratejisi gerekli (Mark)"); return; }
+
     const body: TradeCreate = {
       symbol: sym, strategy, setup_type: setupType,
       signal_source: signalSource,  // KARAR #477 zorunlu (UX Bölüm 7)
       entry_date: entryDate, entry_price: ep, shares: sh, status,
+      // KARAR ADAY #717 — Mark TTLC Sec 1 6 alan
+      plan_entry_trigger: planEntryTrigger.trim(),
+      plan_stop: pStop,
+      plan_target: pTarget,
+      plan_size_pct: pSize,
+      plan_exit_strategy: planExitStrategy.trim(),
+      plan_time_horizon: planTimeHorizon,
     };
     if (isClosed) {
       if (!exitDate || !exitPrice) { setError("Kapalı trade için çıkış tarihi ve fiyatı gerekli"); return; }
@@ -201,6 +228,111 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
 
           {/* Mark Risk Advisor — Sprint 4-bis.7 Faz 1 B paket (KARAR #914+#969+#970) */}
           <MarkRiskAdvisor entryPrice={entryPrice} shares={shares} />
+
+          {/* KARAR ADAY #717 — Mark Trade Plan (TTLC Sec 1, 6 zorunlu alan) */}
+          <div className="border rounded-md p-3 bg-muted/30 flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <span>📋 Mark Trade Plan</span>
+                <span className="text-xs font-normal text-muted-foreground">
+                  (TTLC Sec 1 — "Without a written plan, you have only hope")
+                </span>
+              </h3>
+              <span className="text-xs px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-900 dark:text-amber-200 font-medium">
+                6 alan ZORUNLU
+              </span>
+            </div>
+
+            {/* Plan Row A — Time Horizon + Size % */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="at-plan-horizon">Süre Ufku *</Label>
+                <select
+                  id="at-plan-horizon"
+                  value={planTimeHorizon}
+                  onChange={(e) => setPlanTimeHorizon(e.target.value as TimeHorizon)}
+                  className={SELECT}
+                >
+                  <option value="swing">{TIME_HORIZON_LABELS.swing}</option>
+                  <option value="position">{TIME_HORIZON_LABELS.position}</option>
+                  <option value="core">{TIME_HORIZON_LABELS.core}</option>
+                </select>
+                <span className="text-xs text-muted-foreground">
+                  {TIME_HORIZON_DESCRIPTIONS[planTimeHorizon]}
+                </span>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="at-plan-size">Pozisyon % *</Label>
+                <Input
+                  id="at-plan-size"
+                  type="number"
+                  value={planSizePct}
+                  onChange={(e) => setPlanSizePct(e.target.value)}
+                  placeholder="6.25"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                />
+                <span className="text-xs text-muted-foreground">
+                  Mark: Pilot %1-3 / Standart %6.25-12.5 / Full %15-25
+                </span>
+              </div>
+            </div>
+
+            {/* Plan Row B — Stop + Target */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="at-plan-stop">Stop $ *</Label>
+                <Input
+                  id="at-plan-stop"
+                  type="number"
+                  value={planStop}
+                  onChange={(e) => setPlanStop(e.target.value)}
+                  placeholder="entry'den önce yazılır"
+                  step="0.01"
+                  min="0"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="at-plan-target">Hedef $ *</Label>
+                <Input
+                  id="at-plan-target"
+                  type="number"
+                  value={planTarget}
+                  onChange={(e) => setPlanTarget(e.target.value)}
+                  placeholder="2R-3R minimum"
+                  step="0.01"
+                  min="0"
+                />
+              </div>
+            </div>
+
+            {/* Plan Row C — Entry Trigger (textarea) */}
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="at-plan-trigger">Giriş Tetikleyicisi *</Label>
+              <textarea
+                id="at-plan-trigger"
+                value={planEntryTrigger}
+                onChange={(e) => setPlanEntryTrigger(e.target.value)}
+                rows={2}
+                placeholder="Mark: Neden bu trade? Örn. 'VCP 3 daralma + hacim teyitli pivot kırılımı 50DMA üstünde'"
+                className={TEXTAREA}
+              />
+            </div>
+
+            {/* Plan Row D — Exit Strategy (textarea) */}
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="at-plan-exit">Çıkış Stratejisi *</Label>
+              <textarea
+                id="at-plan-exit"
+                value={planExitStrategy}
+                onChange={(e) => setPlanExitStrategy(e.target.value)}
+                rows={2}
+                placeholder="Mark: Çıkış planı net. Örn. '2R'de yarı sat, kalanı 50MA trail. Outside Day → tam çıkış.'"
+                className={TEXTAREA}
+              />
+            </div>
+          </div>
 
           {/* Row 4 — Status */}
           <div className="flex flex-col gap-1.5">
