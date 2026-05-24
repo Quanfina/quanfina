@@ -28,6 +28,20 @@ from db_helpers import (  # noqa: E402
     trades_insert, trades_update, trades_delete,
 )
 
+# Sprint 4-bis.7 Faz 1 B paket: Mark KARAR #914 + #969 + #970
+from quanfina_math import (  # noqa: E402
+    compute_dynamic_stop,
+    mark_position_sizer,
+    mark_six_rule_check,
+    MARK_STOP_ABSOLUTE_CAP_PCT,
+    MARK_EQUITY_RISK_MIN_PCT,
+    MARK_EQUITY_RISK_MAX_PCT,
+    MARK_POSITION_MAX_PCT,
+    MARK_POSITION_OPTIMAL_PCT_RANGE,
+    MARK_PORTFOLIO_OPTIMAL_STOCKS,
+    MARK_PORTFOLIO_MAX_STOCKS,
+)
+
 from typing import Literal, Optional
 
 from fastapi import FastAPI, HTTPException, Response
@@ -1611,3 +1625,141 @@ def get_signals() -> list[Signal]:
     # Sıralama: RS rating descending (UX Bölüm 4 madde 6 ile uyumlu — sonra R/R sırası)
     signals.sort(key=lambda s: -s.rs_rating)
     return signals
+
+
+# =============================================================================
+# Sprint 4-bis.7 — Faz 1 B paket: Mark Risk Advisor Endpoint
+# Vizyon v22.00 tescili (24 May 2026)
+# KARAR ADAY #914 + #969 + #970 — backend exposure
+# =============================================================================
+
+class RiskAdvisorRequest(BaseModel):
+    """Mark Risk Advisor input — Trade form'dan gelir."""
+    portfolio_value: float
+    target_risk_pct: float = 2.0    # Mark default %2 (TTLC s.143 ortalama)
+    max_stop_pct: float = 7.0       # Mark default %7 (TLSMW Ch 12)
+    total_positions: int = 0        # Portfolio'da mevcut açık trade sayısı
+    is_best_name: bool = False      # Sn. Ferit "best name" işareti
+    # RBA optional — kullanıcı geçmiş trade istatistik bilgisi
+    avg_gain_pct: Optional[float] = None
+    avg_loss_pct: Optional[float] = None
+    num_trades: Optional[int] = None
+
+
+class RiskAdvisorRule(BaseModel):
+    rule_no: int
+    rule: str
+    passed: bool
+    value: Optional[float] = None
+    message: str
+    mark_says: str
+    critical: bool
+
+
+class RiskAdvisorResponse(BaseModel):
+    # Position sizing (KARAR #969)
+    position_dollars: float
+    position_pct: float
+    risk_dollars: float
+    risk_pct: float
+    tier: str  # 'pilot_buy' | 'optimal' | 'aggressive'
+    sizing_warnings: list[str]
+    sizing_says: str
+    # Dynamic stop (KARAR #914)
+    recommended_stop_pct: float
+    stop_method: str  # 'rba_based' | 'fallback'
+    stop_absolute_cap_applied: bool
+    stop_says: str
+    # 6-Rule check (KARAR #970)
+    six_rule_all_pass: bool
+    six_rule_pass_count: int
+    six_rule_critical_violations: list[int]
+    six_rules: list[RiskAdvisorRule]
+    # Mark KESIN sabitler — UI'da göstermek için
+    mark_constants: dict
+
+
+@app.post("/api/risk/advisor", response_model=RiskAdvisorResponse)
+def risk_advisor(req: RiskAdvisorRequest) -> RiskAdvisorResponse:
+    """Mark Risk Advisor — Trade form için canlı pozisyon size + 6-rule danışmanlık.
+
+    Faz 1 B paket UI tamamlayıcı endpoint.
+    Detay: notebook/Sprint_4_bis_7_Mark_HASSAS_Tarama.md
+    """
+    # 1) Position sizing (KARAR #969)
+    sizing = mark_position_sizer(
+        portfolio_value=req.portfolio_value,
+        target_risk_pct=req.target_risk_pct,
+        max_stop_pct=req.max_stop_pct,
+    )
+
+    # 2) Dynamic stop (KARAR #914) — RBA varsa kullan
+    rba_obj = None
+    if (req.avg_gain_pct is not None
+            and req.avg_loss_pct is not None
+            and req.num_trades is not None
+            and req.num_trades >= 1):
+        from quanfina_math import RBAMetrics
+        rba_obj = RBAMetrics(
+            num_trades=req.num_trades,
+            win_rate=0.5,  # placeholder; advisor stop için sadece avg_gain kullanılır
+            avg_gain_pct=req.avg_gain_pct,
+            avg_loss_pct=req.avg_loss_pct,
+            largest_gain_pct=req.avg_gain_pct * 2,
+            largest_loss_pct=req.avg_loss_pct * 2,
+            adjusted_ratio=0.0,
+            expectancy_pct=0.0,
+            is_statistically_significant=req.num_trades >= 30,
+        )
+
+    stop_advice = compute_dynamic_stop(rba_obj, fallback_pct=req.max_stop_pct)
+
+    # 3) 6-Rule check (KARAR #970)
+    six_rule = mark_six_rule_check(
+        risk_pct=req.target_risk_pct,
+        stop_pct=req.max_stop_pct,
+        avg_loss_pct=req.avg_loss_pct,
+        position_pct=sizing.get('position_pct', 0.0),
+        is_best_name=req.is_best_name,
+        total_positions=req.total_positions,
+    )
+
+    rule_list = [
+        RiskAdvisorRule(
+            rule_no=r['rule_no'],
+            rule=r['rule'],
+            passed=r['pass'],
+            value=r['value'] if isinstance(r['value'], (int, float)) else None,
+            message=r['message'],
+            mark_says=r['mark_says'],
+            critical=r['critical'],
+        )
+        for r in six_rule['rules']
+    ]
+
+    return RiskAdvisorResponse(
+        position_dollars=sizing.get('position_dollars', 0.0),
+        position_pct=sizing.get('position_pct', 0.0),
+        risk_dollars=sizing.get('risk_dollars', 0.0),
+        risk_pct=sizing.get('risk_pct', req.target_risk_pct),
+        tier=sizing.get('tier', 'pilot_buy'),
+        sizing_warnings=sizing.get('warnings', []),
+        sizing_says=sizing.get('mark_says', ''),
+        recommended_stop_pct=stop_advice['recommended_stop_pct'],
+        stop_method=stop_advice['method'],
+        stop_absolute_cap_applied=stop_advice['absolute_cap_applied'],
+        stop_says=stop_advice['mark_says'],
+        six_rule_all_pass=six_rule['all_pass'],
+        six_rule_pass_count=six_rule['pass_count'],
+        six_rule_critical_violations=six_rule['critical_violations'],
+        six_rules=rule_list,
+        mark_constants={
+            'stop_absolute_cap_pct': MARK_STOP_ABSOLUTE_CAP_PCT,
+            'equity_risk_min_pct': MARK_EQUITY_RISK_MIN_PCT,
+            'equity_risk_max_pct': MARK_EQUITY_RISK_MAX_PCT,
+            'position_max_pct': MARK_POSITION_MAX_PCT,
+            'position_optimal_range': list(MARK_POSITION_OPTIMAL_PCT_RANGE),
+            'portfolio_optimal_stocks': list(MARK_PORTFOLIO_OPTIMAL_STOCKS),
+            'portfolio_max_stocks': MARK_PORTFOLIO_MAX_STOCKS,
+        },
+    )

@@ -15,6 +15,7 @@ import { useAddTrade, useSetupTypes } from "@/hooks/use-trades";
 import { calcPL, fmtPLDollar, fmtPLPct } from "@/lib/math";
 import type { TradeCreate, TradeGrade, ExitReason, TradeStatus, SignalSource } from "@/types/trade";
 import { GRADE_OPTIONS, EXIT_REASON_LABELS, SIGNAL_SOURCE_LABELS, SIGNAL_SOURCE_DESCRIPTIONS } from "@/types/trade";
+import { MarkRiskAdvisor } from "./MarkRiskAdvisor";
 
 const SELECT = "h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring";
 const TEXTAREA = "w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm resize-none focus:outline-none focus:ring-1 focus:ring-ring";
@@ -197,6 +198,9 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
               <Input id="at-shares" type="number" value={shares} onChange={(e) => setShares(e.target.value)} placeholder="50" min="1" />
             </div>
           </div>
+
+          {/* Mark Risk Advisor — Sprint 4-bis.7 Faz 1 B paket (KARAR #914+#969+#970) */}
+          <MarkRiskAdvisor entryPrice={entryPrice} shares={shares} />
 
           {/* Row 4 — Status */}
           <div className="flex flex-col gap-1.5">
