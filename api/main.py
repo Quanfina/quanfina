@@ -42,6 +42,10 @@ from quanfina_math import (  # noqa: E402
     detect_leader_fingerprint,
     compute_rba_metrics,
     should_drop_setup,
+    compute_pyramid_tier,
+    MARK_PYRAMID_PILOT_PCT_RANGE,
+    MARK_PYRAMID_STANDARD_PCT_RANGE,
+    MARK_PYRAMID_FULL_PCT_RANGE,
     MARK_STOP_ABSOLUTE_CAP_PCT,
     MARK_EQUITY_RISK_MIN_PCT,
     MARK_EQUITY_RISK_MAX_PCT,
@@ -1799,6 +1803,45 @@ def get_rba_metrics(
         filter_strategy=strategy,
         filter_setup_type=setup_type,
     )
+
+
+# ── Pyramid Tier (KARAR #732) ─────────────────────────────────────────────────
+# Mark KARAR #487 v20.98 3-Tier (Pilot/Standart/Full) + Mark X "Trades Working"
+# guvenlik kilidi. Backend hesap, frontend (web/lib/pyramid-calculator.ts)
+# fallback + UI gosterim (MarkPyramidCard).
+
+class PyramidTierRequest(BaseModel):
+    position_value: float
+    portfolio_value: float
+    prev_tier_profitable: bool = False
+
+
+class PyramidTierResponse(BaseModel):
+    tier: Literal["BELOW_PILOT", "PILOT", "STANDARD", "FULL", "OVER_MAX"]
+    position_pct: float
+    severity: Literal["ok", "info", "warn", "violation"]
+    next_tier: Optional[Literal["PILOT", "STANDARD", "FULL"]] = None
+    mark_says: str
+    # Mark KARAR #487 sabit referanslari (KALICI ILKE #4)
+    pilot_range_pct: tuple[float, float] = MARK_PYRAMID_PILOT_PCT_RANGE
+    standard_range_pct: tuple[float, float] = MARK_PYRAMID_STANDARD_PCT_RANGE
+    full_range_pct: tuple[float, float] = MARK_PYRAMID_FULL_PCT_RANGE
+
+
+@app.post("/api/pyramid/tier", response_model=PyramidTierResponse)
+def evaluate_pyramid_tier(body: PyramidTierRequest) -> PyramidTierResponse:
+    """KARAR #732 — Mark Pyramid Tier hesabi.
+
+    Mark KARAR #487 v20.98 birebir 3-Tier + Mark X "Trades not working = no
+    size increase" guvenlik kilidi. quanfina_math.compute_pyramid_tier
+    fonksiyonu direkt cagrilir (DRY: TypeScript ve Python ayni mantik).
+    """
+    result = compute_pyramid_tier(
+        position_value=body.position_value,
+        portfolio_value=body.portfolio_value,
+        prev_tier_profitable=body.prev_tier_profitable,
+    )
+    return PyramidTierResponse(**result)
 
 
 # ── Signals ───────────────────────────────────────────────────────────────────
