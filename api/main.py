@@ -894,6 +894,44 @@ class SectorChange(BaseModel):
     change_pct: float
 
 
+class MarkRegimeInfo(BaseModel):
+    """KARAR #488 (Vizyon v20.99) — Mark Market Regime 4-Katman x 2-Eksen.
+    Backend pre-compute: distribution_days -> regime + Mark felsefe etiketi."""
+    regime: Literal["HEALTHY", "CAUTION", "UNDER_PRESSURE", "BEAR_PRESSURE"]
+    label: str            # TR etiket
+    allocation: str       # Mark allocation oneri
+    new_buy_allowed: bool # Yeni alim izinli mi
+    pilot_override: bool  # Lider hisse %1-2 pilot Override
+
+
+def _compute_mark_regime(distribution_days: int) -> MarkRegimeInfo:
+    """KARAR #488 4-katman + O'Neil mekanik (Mark birebir, web/lib paten)."""
+    dd = max(0, int(distribution_days))
+    if dd <= 2:
+        return MarkRegimeInfo(
+            regime="HEALTHY", label="Sağlıklı",
+            allocation="Tam pozisyon (100%)",
+            new_buy_allowed=True, pilot_override=True,
+        )
+    if dd == 3:
+        return MarkRegimeInfo(
+            regime="CAUTION", label="Dikkat",
+            allocation="Mevcut korunur, yeni alım sıkı kriter",
+            new_buy_allowed=True, pilot_override=True,
+        )
+    if dd == 4:
+        return MarkRegimeInfo(
+            regime="UNDER_PRESSURE", label="Baskı Altında",
+            allocation="%50 pozisyon, yeni alım YASAK",
+            new_buy_allowed=False, pilot_override=True,
+        )
+    return MarkRegimeInfo(
+        regime="BEAR_PRESSURE", label="Ayı Baskısı",
+        allocation="%25 max veya nakit",
+        new_buy_allowed=False, pilot_override=True,
+    )
+
+
 class MarketStatus(BaseModel):
     spy_stage: int
     qqq_stage: int
@@ -905,6 +943,9 @@ class MarketStatus(BaseModel):
     suggested_mode: str
     top_sectors: list[SectorChange]
     bottom_sectors: list[SectorChange]
+    # KARAR ADAY #731 (24 May 2026): Mark Regime backend pre-compute
+    # (KARAR #488 4-Katman x 2-Eksen, frontend DRY)
+    mark_regime: Optional[MarkRegimeInfo] = None
 
 
 MOCK_MARKET_STATUS = MarketStatus(
@@ -925,12 +966,19 @@ MOCK_MARKET_STATUS = MarketStatus(
         SectorChange(name="Utilities", change_pct=-1.2),
         SectorChange(name="Health Care", change_pct=-0.4),
     ],
+    # KARAR ADAY #731: Mark Regime backend pre-compute
+    mark_regime=_compute_mark_regime(3),
 )
 
 
 @app.get("/api/market/status", response_model=MarketStatus)
 def get_market_status() -> MarketStatus:
-    return MOCK_MARKET_STATUS
+    # KARAR #731: mark_regime distribution_days'tan canli hesaplanir
+    # (MOCK 3 DD -> CAUTION; production'da real DD tracking)
+    status = MOCK_MARKET_STATUS.model_copy(
+        update={"mark_regime": _compute_mark_regime(MOCK_MARKET_STATUS.distribution_days)}
+    )
+    return status
 
 
 # ─── ABD Borsa Takvim Status (Sprint 4-bis.7, 22 May 2026) ───────────────────
