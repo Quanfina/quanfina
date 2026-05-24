@@ -62,6 +62,12 @@ export interface ScreenResultRow {
   vcp_ready_score?: number | null;
   // KARAR #467 — Power Play (HTF) Mark resmi kuralı
   power_play_pass?: boolean | null;
+  // KARAR ADAY #893 — Mark Tennis Ball Detector (TLSMW s.253) — backend Migration 007 sonrasi
+  tennis_ball_pattern?: "TENNIS_BALL" | "partial" | "none" | null;
+  // KARAR ADAY #882 — Mark Volume Asymmetry (TLSMW s.234) — backend Migration 007 sonrasi
+  volume_asymmetry_tier?: "healthy" | "neutral" | "distribution" | null;
+  // KARAR ADAY #713 — Mark Code 33 (TLSMW s.173 EPS+Sales+Margin triple) — yfinance pipeline (AÇIK KONU #75) sonrasi
+  code_33_pattern?: "CODE_33" | "partial" | "none" | null;
 }
 
 /**

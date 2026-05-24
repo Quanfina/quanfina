@@ -27,6 +27,7 @@ import { AgGridReact } from "ag-grid-react";
 import type { ColDef, CellClassParams } from "ag-grid-community";
 import { useScreenResults } from "@/hooks/use-screen-results";
 import type { ScreenSlug, ScreenResultRow } from "@/types/screens";
+import { MarkBadgeStrip } from "@/components/mark/MarkBadgeStrip";
 import { SCREEN_CATEGORIES, SCREEN_CONDITIONS, CONDITION_SOURCE_LABEL } from "@/types/screens";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { GridLoadingOverlay } from "@/components/ag-grid/LoadingOverlay";
@@ -139,6 +140,33 @@ export default function ScreensPage() {
         cellStyle: MONO,
         // KARAR #471 paten: ISO YYYY-MM-DD → DD.MM.YYYY (Sinyaller + Journal ile tutarlı)
         valueFormatter: (p) => formatDateTR(p.value as string | null | undefined),
+      },
+      // KARAR ADAY #721 (24 May 2026): Mark Profile Badge Strip kolonu (DRY component).
+      // Backend Cloud SQL Migration 004-007 uygulandıkça otomatik canlanır (AÇIK KONU #70).
+      // Mevcut field undefined ise rozet gösterilmez (cell boş kalır).
+      {
+        headerName: "MARK PROFİLİ",
+        minWidth: 260,
+        flex: 1,
+        sortable: false,
+        filter: false,
+        cellRenderer: (p: { data?: ScreenResultRow }) => {
+          if (!p.data) return null;
+          return (
+            <MarkBadgeStrip
+              signals={{
+                vcp_quality_score: p.data.vcp_quality_score,
+                vcp_ready_score: p.data.vcp_ready_score,
+                power_play_pass: p.data.power_play_pass,
+                tennis_ball_pattern: p.data.tennis_ball_pattern,
+                volume_asymmetry_tier: p.data.volume_asymmetry_tier,
+                code_33_pattern: p.data.code_33_pattern,
+              }}
+              density="compact"
+              showEmpty={true}
+            />
+          );
+        },
       },
     ],
     []
