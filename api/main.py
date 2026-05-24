@@ -1332,29 +1332,35 @@ _STOCK_MARK_SIGNALS: dict[str, dict] = {
         "power_play_pass": True,
         "tennis_ball_pattern": "TENNIS_BALL",
         "volume_asymmetry_tier": "healthy",
+        "carr_stage": 2,  # Advancing - Mark+Carr alim fazi
     },
     "MSFT": {
         "vcp_quality_score": "PASS",
         "vcp_ready_score": 72,
         "power_play_pass": False,
         "volume_asymmetry_tier": "healthy",
+        "carr_stage": 2,
     },
     "AVGO": {
         "vcp_quality_score": "EXCELLENT",
         "power_play_pass": True,
         "tennis_ball_pattern": "TENNIS_BALL",
+        "carr_stage": 2,
     },
     "AMD": {
         "vcp_ready_score": 78,
         "tennis_ball_pattern": "TENNIS_BALL",
         "volume_asymmetry_tier": "healthy",
+        "carr_stage": 2,
     },
     "META": {
         "vcp_quality_score": "PASS",
         "volume_asymmetry_tier": "neutral",
+        "carr_stage": 3,  # Topping - cikis hazirlik
     },
     "TSLA": {
         "volume_asymmetry_tier": "distribution",  # uyari rozet
+        "carr_stage": 4,  # Declining - uzak dur
     },
 }
 
@@ -1369,6 +1375,8 @@ class MarkSignalsBlock(BaseModel):
     tennis_ball_pattern: Optional[Literal["TENNIS_BALL", "partial", "none"]] = None
     volume_asymmetry_tier: Optional[Literal["healthy", "neutral", "distribution"]] = None
     code_33_pattern: Optional[Literal["CODE_33", "partial", "none"]] = None
+    # KARAR ADAY #735 (24 May 2026): Carr Stage rozet (Mark+Carr birleşik DRY)
+    carr_stage: Optional[Literal[1, 2, 3, 4]] = None
 
 
 class StockInfo(BaseModel):

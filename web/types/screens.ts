@@ -68,6 +68,8 @@ export interface ScreenResultRow {
   volume_asymmetry_tier?: "healthy" | "neutral" | "distribution" | null;
   // KARAR ADAY #713 — Mark Code 33 (TLSMW s.173 EPS+Sales+Margin triple) — yfinance pipeline (AÇIK KONU #75) sonrasi
   code_33_pattern?: "CODE_33" | "partial" | "none" | null;
+  // KARAR ADAY #735 — Carr Stage rozet (Mark+Carr birleşik)
+  carr_stage?: 1 | 2 | 3 | 4 | null;
 }
 
 /**

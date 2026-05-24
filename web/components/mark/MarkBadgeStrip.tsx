@@ -29,6 +29,8 @@ export interface MarkSignals {
   tennis_ball_pattern?: "TENNIS_BALL" | "partial" | "none" | null;
   volume_asymmetry_tier?: "healthy" | "neutral" | "distribution" | null;
   code_33_pattern?: "CODE_33" | "partial" | "none" | null;
+  // KARAR ADAY #735 (24 May 2026): Carr Stage rozet (Mark+Carr birleşik)
+  carr_stage?: 1 | 2 | 3 | 4 | null;
 }
 
 interface BadgeProps {
@@ -156,6 +158,54 @@ export function MarkBadgeStrip({ signals, density = "compact", showEmpty = false
         color="rgba(220,53,69,0.10)"
         textColor="var(--mtp-danger)"
         tooltip="Volume Distribution — institutional satış sinyali (Mark TLSMW s.234)"
+      />
+    );
+  }
+
+  // KARAR ADAY #735 (24 May 2026): Carr Stage rozet (Stan Weinstein 4-Stage)
+  // Stage 2 Advancing = Mark superperformance, Stage 4 Declining = uzak dur
+  if (signals.carr_stage === 2) {
+    badges.push(
+      <Badge
+        key="cs2"
+        emoji="📈"
+        label="Stage 2"
+        color="rgba(40,167,69,0.10)"
+        textColor="var(--mtp-excellent)"
+        tooltip="Carr Stage 2 (Advancing) — Mark+Carr alım fazı, superperformance hisseleri burada (KARAR #733)"
+      />
+    );
+  } else if (signals.carr_stage === 4) {
+    badges.push(
+      <Badge
+        key="cs4"
+        emoji="⛔"
+        label="Stage 4"
+        color="rgba(220,53,69,0.10)"
+        textColor="var(--mtp-danger)"
+        tooltip="Carr Stage 4 (Declining) — Mark felsefesi: UZAK DUR. 30W MA altı + slope negatif (KARAR #733)"
+      />
+    );
+  } else if (signals.carr_stage === 1 && density === "full") {
+    badges.push(
+      <Badge
+        key="cs1"
+        emoji="⏳"
+        label="Stage 1"
+        color="rgba(75,156,211,0.08)"
+        textColor="var(--mtp-good, #4B9CD3)"
+        tooltip="Carr Stage 1 (Basing) — 30W MA flat, breakout izle (KARAR #733)"
+      />
+    );
+  } else if (signals.carr_stage === 3 && density === "full") {
+    badges.push(
+      <Badge
+        key="cs3"
+        emoji="⚠️"
+        label="Stage 3"
+        color="rgba(245,158,11,0.10)"
+        textColor="#F59E0B"
+        tooltip="Carr Stage 3 (Topping) — Slope flattening, çıkış hazırlık, trail stop sıkı (KARAR #733)"
       />
     );
   }
