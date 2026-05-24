@@ -16,6 +16,7 @@ import { calcPL, fmtPLDollar, fmtPLPct } from "@/lib/math";
 import type { TradeCreate, TradeGrade, ExitReason, TradeStatus, SignalSource, TimeHorizon } from "@/types/trade";
 import { GRADE_OPTIONS, EXIT_REASON_LABELS, SIGNAL_SOURCE_LABELS, SIGNAL_SOURCE_DESCRIPTIONS, TIME_HORIZON_LABELS, TIME_HORIZON_DESCRIPTIONS } from "@/types/trade";
 import { MarkRiskAdvisor } from "./MarkRiskAdvisor";
+import { MarkPyramidCard } from "./MarkPyramidCard";
 
 const SELECT = "h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring";
 const TEXTAREA = "w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm resize-none focus:outline-none focus:ring-1 focus:ring-ring";
@@ -229,6 +230,9 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
           {/* Mark Risk Advisor — Sprint 4-bis.7 Faz 1 B paket (KARAR #914+#969+#970)
               KARAR #727 (24 May 2026): RBA gerçek veri bağı — strategy prop ile filtre */}
           <MarkRiskAdvisor entryPrice={entryPrice} shares={shares} strategy={strategy} />
+
+          {/* KARAR ADAY #732 (24 May 2026): Mark Pyramid Calculator (KARAR #487 3-Tier) */}
+          <MarkPyramidCard entryPrice={entryPrice} shares={shares} />
 
           {/* KARAR ADAY #717 — Mark Trade Plan (TTLC Sec 1, 6 zorunlu alan) */}
           <div className="border rounded-md p-3 bg-muted/30 flex flex-col gap-3">
