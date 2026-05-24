@@ -19,6 +19,7 @@ import { formatDateTR } from "@/lib/format-date";
 import { getPassedSignals, setPassedSignals, signalKey } from "@/lib/passed-signals";
 import { toast } from "sonner";
 import type { Signal } from "@/types/signal";
+import { MarkBadgeStrip } from "@/components/mark/MarkBadgeStrip";
 
 const SELECT =
   "h-8 rounded-md border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring";
@@ -232,6 +233,19 @@ export default function SignalsPage() {
       // (web/lib/format-date.ts — DRY, Bilgi Mimarisi İlke #4 Tekrarsızlık).
       valueFormatter: (p) => formatDateTR(p.value as string | null),
       cellStyle: MONO,
+    },
+    // KARAR #726 (24 May 2026): Mark Profili kolonu (DRY MarkBadgeStrip 4. sayfa)
+    {
+      headerName: "Mark Profili",
+      minWidth: 220,
+      flex: 1,
+      sortable: false,
+      filter: false,
+      cellRenderer: (p: ICellRendererParams<Signal>) => {
+        const sig = p.data;
+        if (!sig?.mark_signals) return <span className="text-xs text-muted-foreground">—</span>;
+        return <MarkBadgeStrip signals={sig.mark_signals} density="compact" showEmpty={false} />;
+      },
     },
     {
       headerName: "",

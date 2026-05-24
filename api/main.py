@@ -1764,6 +1764,7 @@ class Signal(BaseModel):
     # UX Bölüm 4 madde 5 ("Her satır ayrı trade: kendi stop, kendi hedef, kendi R/R") ile uyumlu.
     # KARAR #473 (20 May 2026 ~07:30): stop_loss + target_price + risk_reward eklendi
     # (UX Bölüm 4 madde 6: "R/R'a göre sıralı"). Backend hesaplar, frontend gösterir.
+    # KARAR #726 (24 May 2026): Mark Profili rozetleri (DRY MarkBadgeStrip 4. sayfa).
     symbol: str
     strategy: str
     status: str
@@ -1775,6 +1776,8 @@ class Signal(BaseModel):
     risk_reward: Optional[float] = None  # (target - price) / (price - stop)
     added_date: str
     is_new_today: bool
+    # KARAR ADAY #726 — Sinyaller Mark Profili (MOCK feed + Migration 004-007 sonra canli)
+    mark_signals: Optional[dict] = None
 
 
 def _calc_rr(price: float, stop: Optional[float], target: Optional[float]) -> Optional[float]:
@@ -1798,12 +1801,14 @@ def get_signals() -> list[Signal]:
     # Her watchlist satırı 1 sinyal felsefesi korundu — çoklu strateji × çoklu hisse
     if not db_health_check():
         # KARAR #473: stop_loss + target_price + risk_reward (R/R 2:1 ile 3.5:1 arasında gerçekçi dağılım)
+        # KARAR #726: mark_signals MOCK lookup (_STOCK_MARK_SIGNALS dict)
         def s(symbol, strategy, status, setup, rs, price, stop, target, added, new=False):
             return Signal(
                 symbol=symbol, strategy=strategy, status=status, setup_type=setup,
                 rs_rating=rs, price=price, stop_loss=stop, target_price=target,
                 risk_reward=_calc_rr(price, stop, target),
                 added_date=added, is_new_today=new,
+                mark_signals=_STOCK_MARK_SIGNALS.get(symbol),
             )
         mock_signals = [
             s("NVDA",  "minervini", "buy",     "VCP",                 99.0, 145.20,  141.50,  157.00,  f"{today} 09:32",     True),
@@ -1850,6 +1855,7 @@ def get_signals() -> list[Signal]:
             risk_reward=None,
             added_date=row.added_date,
             is_new_today=(added_prefix == today),
+            mark_signals=_STOCK_MARK_SIGNALS.get(row.symbol),  # KARAR #726
         ))
 
     # Sıralama: RS rating descending (UX Bölüm 4 madde 6 ile uyumlu — sonra R/R sırası)
