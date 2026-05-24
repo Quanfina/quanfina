@@ -15,6 +15,7 @@ import { useUpdateTrade } from "@/hooks/use-trades";
 import { calcPL, fmtPLDollar, fmtPLPct } from "@/lib/math";
 import type { Trade, TradeGrade, ExitReason, TradeUpdate } from "@/types/trade";
 import { GRADE_OPTIONS, EXIT_REASON_LABELS } from "@/types/trade";
+import { PlanVsRealityCard } from "./PlanVsRealityCard";
 
 const SELECT = "h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring";
 const TEXTAREA = "w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm resize-none focus:outline-none focus:ring-1 focus:ring-ring";
@@ -115,6 +116,9 @@ export function CloseTradeDialog({ trade, open, onOpenChange }: Props) {
               </span>
             </div>
           )}
+
+          {/* KARAR ADAY #725 (24 May 2026): Plan vs Reality karti (Mark TTLC Sec 4) */}
+          {trade && <PlanVsRealityCard trade={trade} exitPrice={exitPrice} />}
 
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
