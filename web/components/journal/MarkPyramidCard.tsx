@@ -7,7 +7,9 @@ import {
   suggestPositionDollars,
   TIER_LIMITS,
   TIER_ORDER,
+  type TierEvaluation,
 } from "@/lib/pyramid-calculator";
+import { usePyramidTier } from "@/hooks/use-pyramid-tier";
 
 /**
  * KARAR ADAY #732 (24 May 2026) — Mark Pyramid Calculator Karti.
@@ -46,12 +48,45 @@ export function MarkPyramidCard({
 }: Props) {
   const [prevTierProfitable, setPrevTierProfitable] = useState(initialPrevTierProfitable);
 
-  const evalResult = useMemo(() => {
+  // Pozisyon değeri (entry × shares)
+  const positionValue = useMemo(() => {
     const ep = parseFloat(entryPrice);
     const sh = parseInt(shares);
-    const positionValue = !isNaN(ep) && !isNaN(sh) && ep > 0 && sh > 0 ? ep * sh : 0;
-    return evaluatePyramidTier(positionValue, portfolioValue, prevTierProfitable);
-  }, [entryPrice, shares, portfolioValue, prevTierProfitable]);
+    return !isNaN(ep) && !isNaN(sh) && ep > 0 && sh > 0 ? ep * sh : 0;
+  }, [entryPrice, shares]);
+
+  // KARAR #732 alt-paket (Paket 19): backend /api/pyramid/tier tercih + client fallback
+  const { data: backendResult } = usePyramidTier({
+    positionValue,
+    portfolioValue,
+    prevTierProfitable,
+  });
+
+  // Backend cevap geldiyse onu kullan, gelmezse client-side hesap (DRY fallback)
+  const evalResult: TierEvaluation = useMemo(() => {
+    const clientFallback = evaluatePyramidTier(positionValue, portfolioValue, prevTierProfitable);
+    if (!backendResult) {
+      return clientFallback;
+    }
+    // Backend cevabını client TierEvaluation shape'ine çevir
+    // (görsel meta — color/emoji/markSays vs. — client fallback'tan, severity/tier backend'den)
+    const limits =
+      backendResult.tier === "PILOT" ? TIER_LIMITS.PILOT :
+      backendResult.tier === "STANDARD" ? TIER_LIMITS.STANDARD :
+      backendResult.tier === "FULL" ? TIER_LIMITS.FULL : null;
+    return {
+      ...clientFallback,
+      positionPct: backendResult.position_pct,
+      currentTier:
+        backendResult.tier === "BELOW_PILOT" ? "BELOW_PILOT" :
+        backendResult.tier === "OVER_MAX" ? "OVER_MAX" :
+        backendResult.tier,
+      tierLabel: limits ? limits.label : clientFallback.tierLabel,
+      severity: backendResult.severity,
+      markSays: backendResult.mark_says,
+      nextTier: backendResult.next_tier,
+    };
+  }, [backendResult, positionValue, portfolioValue, prevTierProfitable]);
 
   if (evalResult.positionValue <= 0) {
     return (
