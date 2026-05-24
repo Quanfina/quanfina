@@ -10,6 +10,7 @@ import { useWatchlist } from "@/hooks/use-watchlist";
 import { formatDateTR } from "@/lib/format-date";
 import { getDoneItems, toggleItem } from "@/lib/daily-checklist";
 import { MindsetCardWidget } from "@/components/dashboard/MindsetCard";
+import { MarkRegimeBanner } from "@/components/mark/MarkRegimeBanner";
 
 // KARAR #474 (20 May 2026 ~08:15): Ana sayfa POC → Gerçek Dashboard.
 // UX Bölüm 3: "Sn. Ferit Quanfina'yı açtığında üstten alta: bakiye + piyasa + sinyaller"
@@ -100,6 +101,11 @@ export default function Home() {
   const signalCount = signals.data?.length ?? 0;
   const newTodayCount = signals.data?.filter((s) => s.is_new_today).length ?? 0;
   const watchlistCount = watchlist.data?.length ?? 0;
+  // KARAR #733 alt-paket (Paket 37): Stage 4 sayim — sinyaller + watchlist toplam
+  const stage4Signals = (signals.data ?? []).filter((s) => s.mark_signals?.carr_stage === 4).length;
+  const stage4Watchlist = (watchlist.data ?? []).filter((r) => r.mark_signals?.carr_stage === 4).length;
+  const stage4Total = stage4Signals + stage4Watchlist;
+  const stage4ListTotal = signalCount + watchlistCount;
 
   // En iyi 5 sinyal (R/R desc, sonra RS)
   const topSignals = (signals.data ?? []).slice(0, 5);
@@ -166,6 +172,17 @@ export default function Home() {
 
   return (
     <div className="p-6 flex flex-col gap-6">
+      {/* KARAR #733 alt-paket (Paket 37): Mark Regime üst-uyarı — sn. Ferit
+          Quanfina'yi açtığında piyasa rejimini ilk gören öğe (hideOnHealthy=false:
+          Dashboard sabit göstersin, HEALTHY iken bile yeşil rozet pekiştirsin). */}
+      <div className="-mx-6 -mt-6">
+        <MarkRegimeBanner
+          stage4Count={stage4Total}
+          totalCount={stage4ListTotal}
+          hideOnHealthy={false}
+        />
+      </div>
+
       {/* Header */}
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold tracking-tight">Bugün Ne Var?</h1>
