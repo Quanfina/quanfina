@@ -10,6 +10,7 @@ import {
   type PyramidTier,
 } from "@/lib/pyramid-calculator";
 import { usePyramidTier } from "@/hooks/use-pyramid-tier";
+import { useMarketStatus } from "@/hooks/use-market-status";
 import { fmtUsd } from "@/lib/format-currency";
 
 /**
@@ -49,6 +50,21 @@ export default function RiskYonetimiPage() {
 
   const portfolioValue = parseFloat(portfolioStr) || 0;
   const positionValue = parseFloat(positionStr) || 0;
+
+  // KARAR #733 alt-paket (Paket 47, 25 May 2026): Piyasa-aware tier öneri.
+  // KARAR #488 4-Katman x 2-Eksen Mark Regime'e göre Standart/Full tier
+  // ihtiyat seviyesi. Pilot her zaman acik (pilot_override=true canon).
+  const { data: marketStatus } = useMarketStatus();
+  const regime = marketStatus?.mark_regime?.regime ?? null;
+  const newBuyAllowed = marketStatus?.mark_regime?.new_buy_allowed ?? true;
+
+  // Tier kilit mantık: UNDER_PRESSURE/BEAR_PRESSURE iken Standart/Full
+  // "rejim kilitli" rozeti, sadece Pilot önerilir (Mark canon)
+  const tierLockedByRegime: Record<PyramidTier, boolean> = {
+    PILOT: false, // pilot her zaman acik (pilot_override=true)
+    STANDARD: !newBuyAllowed,
+    FULL: !newBuyAllowed,
+  };
 
   // Backend hook (DRY) + client fallback
   const backend = usePyramidTier({
@@ -262,34 +278,100 @@ export default function RiskYonetimiPage() {
       {/* 3 Tier $ aralık tablosu */}
       {tierDollarRanges && (
         <div className="rounded-lg border bg-card p-4 flex flex-col gap-3">
-          <h2 className="text-sm font-semibold">
-            3 Tier Pozisyon $ Aralıkları (Portföy {fmtUsd(portfolioValue)})
-          </h2>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <h2 className="text-sm font-semibold">
+              3 Tier Pozisyon $ Aralıkları (Portföy {fmtUsd(portfolioValue)})
+            </h2>
+            {/* KARAR #733 alt-paket (Paket 47): Piyasa rejimi göstergesi */}
+            {regime && (
+              <span
+                className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider"
+                style={{
+                  background:
+                    regime === "HEALTHY"
+                      ? "rgba(40,167,69,0.15)"
+                      : regime === "CAUTION"
+                      ? "rgba(245,158,11,0.15)"
+                      : "rgba(220,53,69,0.15)",
+                  color:
+                    regime === "HEALTHY"
+                      ? "var(--mtp-excellent)"
+                      : regime === "CAUTION"
+                      ? "#F59E0B"
+                      : "var(--mtp-danger)",
+                  border: "1px solid currentColor",
+                }}
+                title={marketStatus?.mark_regime?.allocation}
+              >
+                Piyasa: {marketStatus?.mark_regime?.label}
+              </span>
+            )}
+          </div>
+
+          {/* Piyasa-aware uyarı bandı — UNDER_PRESSURE/BEAR_PRESSURE iken */}
+          {!newBuyAllowed && regime && (
+            <div
+              className="text-xs p-2 rounded border-l-2 flex items-center gap-2"
+              style={{
+                background: "rgba(220,53,69,0.08)",
+                borderLeftColor: "var(--mtp-danger)",
+                color: "var(--mtp-danger)",
+              }}
+            >
+              <ShieldAlert size={14} />
+              <span>
+                <strong>Piyasa {marketStatus?.mark_regime?.label}</strong> —
+                Mark canon: Yeni alım YASAK. Sadece <strong>Pilot tier (%1-3)</strong> Lider
+                hisse pilot Override ile mümkün. Standart + Full kilitli.
+              </span>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {tierDollarRanges.map(({ tier: t, min, max }) => {
               const meta = TIER_LIMITS[t];
               const isCurrent = tier === t;
+              const isLocked = tierLockedByRegime[t];
               return (
                 <div
                   key={t}
                   className="rounded-md border p-3 flex flex-col gap-2"
                   style={{
-                    borderColor: isCurrent ? "var(--mtp-excellent)" : undefined,
+                    borderColor: isCurrent
+                      ? "var(--mtp-excellent)"
+                      : isLocked
+                      ? "rgba(220,53,69,0.40)"
+                      : undefined,
                     borderWidth: isCurrent ? 2 : 1,
-                    background: isCurrent ? "rgba(40,167,69,0.05)" : undefined,
+                    background: isCurrent
+                      ? "rgba(40,167,69,0.05)"
+                      : isLocked
+                      ? "rgba(220,53,69,0.03)"
+                      : undefined,
+                    opacity: isLocked && !isCurrent ? 0.7 : 1,
                   }}
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-xl" aria-hidden="true">{meta.emoji}</span>
-                    {isCurrent && (
-                      <span
-                        className="text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase"
-                        style={{ background: "var(--mtp-excellent)", color: "#fff" }}
-                      >
-                        Mevcut
-                      </span>
-                    )}
+                    <div className="flex items-center gap-1">
+                      {isLocked && (
+                        <span
+                          className="text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase"
+                          style={{ background: "var(--mtp-danger)", color: "#fff" }}
+                          title={`Piyasa ${marketStatus?.mark_regime?.label} — bu tier kilitli`}
+                        >
+                          Rejim Kilitli
+                        </span>
+                      )}
+                      {isCurrent && (
+                        <span
+                          className="text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase"
+                          style={{ background: "var(--mtp-excellent)", color: "#fff" }}
+                        >
+                          Mevcut
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="text-sm font-semibold">{meta.label}</div>
                   <div className="text-xs text-muted-foreground">
