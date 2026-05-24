@@ -445,6 +445,49 @@ export default function Home() {
                   </span>
                 </div>
               )}
+              {/* KARAR #733 alt-paket (Paket 67): FTD satırı — ftd_detected
+                  iken görünür. ONAYLI yeşil (Mark Stage 2 başlangıç sinyali),
+                  ZAYIF sarı (hacim eksik). DRY tüketim 2. nokta (MarkRegimeCard
+                  P66 widget pateni — compact varyant). */}
+              {market.data.follow_through?.ftd_detected && (
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span title={market.data.follow_through.mark_says}>
+                    Follow-Through
+                  </span>
+                  <span className="flex items-center gap-1.5 tabular-nums">
+                    {market.data.follow_through.ftd_gain_pct != null && (
+                      <span
+                        className="font-mono font-semibold"
+                        style={{
+                          color: market.data.follow_through.volume_confirmed
+                            ? "var(--mtp-excellent)"
+                            : "#F59E0B",
+                        }}
+                      >
+                        +{market.data.follow_through.ftd_gain_pct.toFixed(2)}%
+                      </span>
+                    )}
+                    <span
+                      className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider"
+                      style={{
+                        background: market.data.follow_through.volume_confirmed
+                          ? "rgba(40,167,69,0.15)"
+                          : "rgba(245,158,11,0.15)",
+                        color: market.data.follow_through.volume_confirmed
+                          ? "var(--mtp-excellent)"
+                          : "#F59E0B",
+                        border: market.data.follow_through.volume_confirmed
+                          ? "1px solid var(--mtp-excellent)"
+                          : "1px solid #F59E0B",
+                      }}
+                    >
+                      {market.data.follow_through.volume_confirmed
+                        ? "FTD ✓ ONAYLI"
+                        : "FTD ⚠️ ZAYIF"}
+                    </span>
+                  </span>
+                </div>
+              )}
               <div className="pt-2 border-t flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">Önerilen Mod</span>
                 <span
