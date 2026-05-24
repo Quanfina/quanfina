@@ -22,7 +22,18 @@ interface Props {
   backendRegime?: MarkRegimeInfoBackend | null;
   /** Spot SPY model placeholder — gelecek genişleme */
   spySpotAllocationPct?: number;
+  // KARAR ADAY #735 alt-paket (Paket 27): SPY/QQQ/IWM Stage özet (Mark+Carr)
+  spyStage?: number;
+  qqqStage?: number;
+  iwmStage?: number;
 }
+
+const STAGE_META: Record<number, { emoji: string; label: string; color: string }> = {
+  1: { emoji: "⏳", label: "Basing", color: "var(--mtp-good, #4B9CD3)" },
+  2: { emoji: "📈", label: "Advancing", color: "var(--mtp-excellent)" },
+  3: { emoji: "⚠️", label: "Topping", color: "#F59E0B" },
+  4: { emoji: "⛔", label: "Declining", color: "var(--mtp-danger)" },
+};
 
 const REGIME_ICON = {
   HEALTHY: <CheckCircle2 size={20} />,
@@ -47,7 +58,7 @@ function backendToInfo(b: MarkRegimeInfoBackend, dd: number): MarketRegimeInfo {
   };
 }
 
-export function MarkRegimeCard({ distributionDays, backendRegime }: Props) {
+export function MarkRegimeCard({ distributionDays, backendRegime, spyStage, qqqStage, iwmStage }: Props) {
   // KARAR #731 — Backend tercih + client-side fallback (DRY)
   const info: MarketRegimeInfo = backendRegime
     ? backendToInfo(backendRegime, distributionDays)
@@ -103,6 +114,45 @@ export function MarkRegimeCard({ distributionDays, backendRegime }: Props) {
           {info.allocation}
         </span>
       </div>
+
+      {/* KARAR #735 alt (Paket 27): SPY/QQQ/IWM Stage özet (Mark+Carr) */}
+      {(spyStage || qqqStage || iwmStage) && (
+        <div className="flex items-center gap-2 text-xs pt-2 border-t border-muted-foreground/15">
+          <span className="text-muted-foreground">Endeks Stage:</span>
+          <div className="flex items-center gap-3 ml-auto">
+            {spyStage && STAGE_META[spyStage] && (
+              <span
+                className="inline-flex items-center gap-1 tabular-nums"
+                title={`SPY Carr Stage ${spyStage} - ${STAGE_META[spyStage].label}`}
+                style={{ color: STAGE_META[spyStage].color }}
+              >
+                <span aria-hidden="true">{STAGE_META[spyStage].emoji}</span>
+                <span className="font-semibold">SPY {spyStage}</span>
+              </span>
+            )}
+            {qqqStage && STAGE_META[qqqStage] && (
+              <span
+                className="inline-flex items-center gap-1 tabular-nums"
+                title={`QQQ Carr Stage ${qqqStage} - ${STAGE_META[qqqStage].label}`}
+                style={{ color: STAGE_META[qqqStage].color }}
+              >
+                <span aria-hidden="true">{STAGE_META[qqqStage].emoji}</span>
+                <span className="font-semibold">QQQ {qqqStage}</span>
+              </span>
+            )}
+            {iwmStage && STAGE_META[iwmStage] && (
+              <span
+                className="inline-flex items-center gap-1 tabular-nums"
+                title={`IWM Carr Stage ${iwmStage} - ${STAGE_META[iwmStage].label}`}
+                style={{ color: STAGE_META[iwmStage].color }}
+              >
+                <span aria-hidden="true">{STAGE_META[iwmStage].emoji}</span>
+                <span className="font-semibold">IWM {iwmStage}</span>
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Disiplin matrisi */}
       <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-muted-foreground/15">

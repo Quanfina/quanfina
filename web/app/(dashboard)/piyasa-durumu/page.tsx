@@ -52,6 +52,9 @@ export default function PiyasaDurumuPage() {
         <MarkRegimeCard
           distributionDays={data.distribution_days}
           backendRegime={data.mark_regime}
+          spyStage={data.spy_stage}
+          qqqStage={data.qqq_stage}
+          iwmStage={data.iwm_stage}
         />
       </section>
 
