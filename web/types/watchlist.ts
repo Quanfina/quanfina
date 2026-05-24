@@ -1,3 +1,5 @@
+import type { MarkSignals } from "@/components/mark/MarkBadgeStrip";
+
 export type WatchlistStatus = 'watch' | 'on_deck' | 'focus' | 'buy';
 export type WatchlistStrategy = 'minervini' | 'carr';
 
@@ -13,6 +15,9 @@ export interface WatchlistRow {
   rs_rating: number;
   consensus_count: number;
   consensus_strategies: string[];
+  // KARAR ADAY #724 (24 May 2026) — Mark Profili rozetleri (DRY MarkBadgeStrip)
+  // Backend /api/watchlist Mark sinyallerini join eder; eski response'lar bozulmaz
+  mark_signals?: MarkSignals;
 }
 
 export interface WatchlistRowCreate {

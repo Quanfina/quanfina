@@ -1006,6 +1006,23 @@ class WatchlistRow(BaseModel):
     rs_rating: int                     # 0–99
     consensus_count: int
     consensus_strategies: list[str]
+    # KARAR ADAY #724 (24 May 2026) — Mark Profili rozetleri (Optional)
+    # MarkSignalsBlock asagida tanimli (forward ref) — dict olarak tutuluyor
+    # JSON serialization sorunsuz, frontend MarkSignals interface ile parse.
+    mark_signals: Optional[dict] = None
+
+
+def _enrich_with_mark_signals(row: WatchlistRow) -> WatchlistRow:
+    """KARAR ADAY #724 — Watchlist satirina Mark Profili rozetlerini ekler.
+
+    Production'da minervini_scans tablo join'i ile gelir; simdilik
+    _STOCK_MARK_SIGNALS MOCK lookup (Migration 004-007 sonrasi degisecek).
+    """
+    signals = _STOCK_MARK_SIGNALS.get(row.symbol)
+    if signals:
+        # Pydantic immutability — model_copy ile yeni instance
+        return row.model_copy(update={"mark_signals": signals})
+    return row
 
 
 @app.get("/api/watchlist", response_model=list[WatchlistRow])
@@ -1013,7 +1030,7 @@ def get_watchlist() -> list[WatchlistRow]:
     # DB unreachable -> MOCK fallback (Sinyaller pateni — Kural #20 UX)
     # Sn. Ferit: DB down ortamda UI demo dolu görünsün, banner sadece API'da
     if not db_health_check():
-        return [
+        rows = [
             WatchlistRow(symbol="NVDA",  strategy="minervini", status="buy",     price=145.20,  added_date=f"{date.today().isoformat()} 09:32", setup_type="VCP",                pivot_price=148.00,  rs_rating=99, consensus_count=2, consensus_strategies=["minervini","carr"]),
             WatchlistRow(symbol="NVDA",  strategy="carr",      status="focus",   price=145.20,  added_date="2026-05-19 14:15", setup_type="Pullback",           pivot_price=147.50,  rs_rating=99, consensus_count=2, consensus_strategies=["minervini","carr"]),
             WatchlistRow(symbol="MSFT",  strategy="minervini", status="buy",     price=425.30,  added_date="2026-05-19 11:23", setup_type="Tight Low Vol",      pivot_price=430.00,  rs_rating=91, consensus_count=2, consensus_strategies=["minervini","carr"]),
@@ -1025,9 +1042,11 @@ def get_watchlist() -> list[WatchlistRow]:
             WatchlistRow(symbol="META",  strategy="carr",      status="watch",   price=512.80,  added_date="2026-05-16 12:18", setup_type="Pullback",           pivot_price=518.00,  rs_rating=80, consensus_count=1, consensus_strategies=["carr"]),
             WatchlistRow(symbol="AVGO",  strategy="minervini", status="buy",     price=1450.30, added_date="2026-05-19 10:09", setup_type="VCP",                pivot_price=1460.00, rs_rating=78, consensus_count=1, consensus_strategies=["minervini"]),
         ]
+        return [_enrich_with_mark_signals(r) for r in rows]
 
     try:
-        return [WatchlistRow(**r) for r in watchlist_get_all()]
+        rows = [WatchlistRow(**r) for r in watchlist_get_all()]
+        return [_enrich_with_mark_signals(r) for r in rows]
     except OperationalError as e:
         # Cloud SQL paused / IP whitelist eski / network problemi
         raise HTTPException(

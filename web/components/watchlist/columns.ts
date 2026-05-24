@@ -7,6 +7,7 @@ import { StatusBadge } from "./StatusBadge";
 import { StrategyCellRenderer } from "./StrategyCellRenderer";
 import { SetupCellRenderer } from "./SetupCellRenderer";
 import { SymbolCellRenderer } from "./SymbolCellRenderer";
+import { MarkBadgeCell } from "./MarkBadgeCell";
 import { TermHeaderComponent } from "@/components/terminology/TermHeaderComponent";
 // KARAR #492 (20 May 2026 ~16:45): DRY hijyen - yerel MONO -> @/lib/grid-styles
 // Sinyaller + Hisse Tarama paterniyle eşitleme. Davranış: fontSize 13px global ->
@@ -93,6 +94,16 @@ export const COL_DEFS: ColDef<WatchlistRow>[] = [
     minWidth: 100,
     valueFormatter: (p) => p.value ? relativeDate(p.value as string) : "—",
     cellStyle: { fontSize: 12, color: "var(--muted-foreground)" },
+  },
+  // KARAR ADAY #724 (24 May 2026): Mark Profili rozetleri (DRY MarkBadgeStrip)
+  // Backend Migration 004-007 sonrasi otomatik canli. MOCK feed (_STOCK_MARK_SIGNALS).
+  {
+    headerName: "MARK PROFİLİ",
+    minWidth: 240,
+    flex: 1,
+    sortable: false,
+    filter: false,
+    cellRenderer: MarkBadgeCell,
   },
   {
     field: "note",
