@@ -10,6 +10,7 @@ import {
   type PyramidTier,
 } from "@/lib/pyramid-calculator";
 import { usePyramidTier } from "@/hooks/use-pyramid-tier";
+import { fmtUsd } from "@/lib/format-currency";
 
 /**
  * KARAR #733 alt-paket (Paket 38): Risk Yönetimi Pyramid Calculator sayfası.
@@ -39,10 +40,6 @@ const SEVERITY_LABEL: Record<string, string> = {
   warn: "DİKKAT",
   violation: "İHLAL",
 };
-
-function fmtUsd(v: number): string {
-  return `$${v.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
-}
 
 export default function RiskYonetimiPage() {
   // Form state
