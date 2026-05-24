@@ -3408,3 +3408,175 @@ def compute_breadth_divergence(
         'severity': severity,
         'mark_says': says,
     }
+
+
+# ======================================================================
+# KARAR #733 alt-paket (Paket 64, 25 May 2026) — Follow-Through Day
+#
+# Mark/O'Neil canon "FTD" mekanigi: Bear correction/pressure içinde
+# major index (SPY/QQQ) dip yapip 4-10 gun sonra +1.5-2% sıçrama
+# (yuksek hacimle teyit). Bu "Follow-Through Day" — Stage 1 -> Stage 2
+# gecişin onayı. Mark birebir: "FTD before FTD is no signal."
+#
+# Tarihsel paten:
+# - 2003 Mart 17: SPY +3.5% FTD -> bull market basladi
+# - 2009 Mart 12: SPY +4.1% FTD -> finansal kriz dip onayı
+# - 2020 Nisan 6: SPY +7% FTD -> COVID dip recovery
+#
+# Algoritma:
+# 1. Lookback 4-10 gun arası bir gun +THRESHOLD %  + hacim onceki >1.0x
+# 2. Önceki dip (lowest close) tespit
+# 3. FTD gun sayisi (dip'ten sonraki gun sayisi)
+# 4. Hacim teyidi (volume_today > volume_yesterday)
+#
+# Mark birebir kaynak:
+# - O'Neil HowToMakeMoney: "%1.7-2% FTD gerek, hacim onceki >1x"
+# - TLSMW Ch 4: "FTD 4. gunden onceki FTD yanıltıcıdır"
+# - Mark+CANSLIM 4-7 gun ideal pencere (Best stocks make lows first)
+# ======================================================================
+
+# FTD esikleri (Mark/O'Neil canon)
+FTD_MIN_GAIN_PCT: float = 1.7        # Major index gun icinde >+1.7%
+FTD_VOLUME_MULTIPLIER: float = 1.0   # Hacim onceki >=1.0x (Mark: yuksek hacim)
+FTD_WINDOW_MIN_DAYS: int = 4         # Dip'ten sonra 4. gun veya sonrasi
+FTD_WINDOW_MAX_DAYS: int = 10        # 10. gunu gecince FTD gecerligi azalir
+
+
+def compute_follow_through_day(
+    closes: list[float],
+    volumes: list[int],
+    lookback_days: int = 15,
+) -> dict:
+    """Mark/O'Neil Follow-Through Day tespiti — bear dip'ten sonraki rally onayı.
+
+    Args:
+        closes: Major index (SPY/QQQ) günlük kapanış fiyatları (kronolojik)
+        volumes: Aynı gün hacim
+        lookback_days: Önceki dip arama penceresi (default 15)
+
+    Returns:
+        dict {
+            'ftd_detected': bool,
+            'ftd_day_index': int | None,    # closes listesinde FTD günü
+            'ftd_gain_pct': float | None,    # FTD günü % değişim
+            'days_after_low': int | None,    # Dip'ten kaç gün sonra
+            'volume_confirmed': bool,         # FTD günü hacim > önceki
+            'previous_low': float | None,     # Bulunan dip fiyatı
+            'mark_says': str,
+        }
+
+    Mark birebir kaynak:
+    - O'Neil: "FTD %1.7-2% gun + hacim onceki >1x"
+    - TLSMW Ch 4: "FTD 4-7 gun ideal, <4 yanıltıcı, >10 zayıf"
+    """
+    if not closes or not volumes:
+        return {
+            'ftd_detected': False,
+            'ftd_day_index': None,
+            'ftd_gain_pct': None,
+            'days_after_low': None,
+            'volume_confirmed': False,
+            'previous_low': None,
+            'mark_says': 'Yetersiz veri — FTD tespiti yapılamıyor.',
+        }
+    if len(closes) != len(volumes):
+        return {
+            'ftd_detected': False,
+            'ftd_day_index': None,
+            'ftd_gain_pct': None,
+            'days_after_low': None,
+            'volume_confirmed': False,
+            'previous_low': None,
+            'mark_says': 'FTD: closes/volumes listesi uzunluğu farklı.',
+        }
+    if len(closes) < FTD_WINDOW_MIN_DAYS + 2:
+        return {
+            'ftd_detected': False,
+            'ftd_day_index': None,
+            'ftd_gain_pct': None,
+            'days_after_low': None,
+            'volume_confirmed': False,
+            'previous_low': None,
+            'mark_says': f'Yetersiz veri — en az {FTD_WINDOW_MIN_DAYS + 2} gün gerek.',
+        }
+
+    # Son lookback gün içinde dip arama
+    window_size = min(lookback_days, len(closes))
+    recent_closes = closes[-window_size:]
+    recent_volumes = volumes[-window_size:]
+    low_index_in_window = recent_closes.index(min(recent_closes))
+    previous_low = recent_closes[low_index_in_window]
+    # Pencere içindeki dip günü → tam listede index
+    low_index = len(closes) - window_size + low_index_in_window
+
+    # Dip günü pencerenin sonuna çok yakınsa (henuz dip yapıldı), FTD aramaya
+    # uygun değil — en az FTD_WINDOW_MIN_DAYS sonrası gelecek günler lazım
+    days_since_low = (len(closes) - 1) - low_index
+    if days_since_low < FTD_WINDOW_MIN_DAYS:
+        return {
+            'ftd_detected': False,
+            'ftd_day_index': None,
+            'ftd_gain_pct': None,
+            'days_after_low': days_since_low,
+            'volume_confirmed': False,
+            'previous_low': round(previous_low, 2),
+            'mark_says': (f'Dip {days_since_low} gün önce, FTD penceresi '
+                          f'({FTD_WINDOW_MIN_DAYS}-{FTD_WINDOW_MAX_DAYS} gün) henüz başlamadı.'),
+        }
+
+    # FTD penceresi (dip + 4 ile dip + 10 gün arası)
+    ftd_window_start = low_index + FTD_WINDOW_MIN_DAYS
+    ftd_window_end = min(low_index + FTD_WINDOW_MAX_DAYS, len(closes) - 1)
+
+    # En son güçlü gün ara (en yüksek % değişim FTD penceresinde)
+    best_ftd_index = None
+    best_ftd_gain = 0.0
+    for i in range(ftd_window_start, ftd_window_end + 1):
+        if i == 0:
+            continue
+        prev_close = closes[i - 1]
+        if prev_close <= 0:
+            continue
+        gain_pct = (closes[i] - prev_close) / prev_close * 100
+        if gain_pct >= FTD_MIN_GAIN_PCT and gain_pct > best_ftd_gain:
+            best_ftd_gain = gain_pct
+            best_ftd_index = i
+
+    if best_ftd_index is None:
+        return {
+            'ftd_detected': False,
+            'ftd_day_index': None,
+            'ftd_gain_pct': None,
+            'days_after_low': days_since_low,
+            'volume_confirmed': False,
+            'previous_low': round(previous_low, 2),
+            'mark_says': (f'Dip\'ten {days_since_low} gün geçti, pencere '
+                          f'içinde +{FTD_MIN_GAIN_PCT}% sıçrama YOK. Bekle.'),
+        }
+
+    # FTD detected — hacim teyit
+    prev_vol = volumes[best_ftd_index - 1]
+    today_vol = volumes[best_ftd_index]
+    volume_confirmed = (
+        prev_vol > 0 and today_vol >= prev_vol * FTD_VOLUME_MULTIPLIER
+    )
+    days_after = best_ftd_index - low_index
+
+    if volume_confirmed:
+        says = (f'✓ FTD ONAYI — Day {days_after}: +{best_ftd_gain:.2f}% '
+                f'sıçrama + hacim teyidi. Mark/O\'Neil: Stage 1 -> Stage 2 '
+                f'geçiş, lider hisseler izle. Tarihsel: 2003/2009/2020.')
+    else:
+        says = (f'⚠️ FTD ZAYIF — Day {days_after}: +{best_ftd_gain:.2f}% '
+                f'sıçrama AMA hacim teyit yok ({today_vol} < {prev_vol}). '
+                f'Mark: gerçek FTD hacim onceki >1x ister.')
+
+    return {
+        'ftd_detected': True,
+        'ftd_day_index': best_ftd_index,
+        'ftd_gain_pct': round(best_ftd_gain, 2),
+        'days_after_low': days_after,
+        'volume_confirmed': volume_confirmed,
+        'previous_low': round(previous_low, 2),
+        'mark_says': says,
+    }
