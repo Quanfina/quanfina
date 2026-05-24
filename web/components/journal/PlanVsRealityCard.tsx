@@ -1,7 +1,8 @@
 "use client";
 
-import { CheckCircle2, AlertCircle, XCircle, Target } from "lucide-react";
+import { CheckCircle2, AlertCircle, XCircle, Target, TrendingUp } from "lucide-react";
 import type { Trade } from "@/types/trade";
+import { computeRMultiple, formatR } from "@/lib/r-multiple";
 
 /**
  * KARAR ADAY #725 (24 May 2026) — Plan vs Reality Karti.
@@ -170,6 +171,40 @@ export function PlanVsRealityCard({ trade, exitPrice }: Props) {
           );
         })}
       </div>
+
+      {/* KARAR #734 sinerji (Paket 25): R-Multiple satırı — Mark RBA tek-trade ölçümü */}
+      {trade.plan_stop != null && (() => {
+        const rResult = computeRMultiple(trade.entry_price, trade.plan_stop, exitPriceNum, trade.shares);
+        if (!rResult) return null;
+        return (
+          <div
+            className="flex items-center gap-3 px-2 py-2 rounded border bg-background/40"
+            style={{ borderColor: `${rResult.color}44` }}
+          >
+            <TrendingUp size={16} style={{ color: rResult.color }} />
+            <div className="flex flex-col flex-1 min-w-0">
+              <div className="flex items-center gap-2 text-xs">
+                <span className="font-semibold">R-Multiple:</span>
+                <span
+                  className="font-mono font-bold tabular-nums"
+                  style={{ color: rResult.color, fontSize: 14 }}
+                >
+                  {formatR(rResult.r)}
+                </span>
+                <span
+                  className="text-[10px] px-1.5 py-0.5 rounded font-medium"
+                  style={{ background: `${rResult.color}22`, color: rResult.color }}
+                >
+                  {rResult.label}
+                </span>
+              </div>
+              <span className="text-[11px] mt-0.5" style={{ color: rResult.color }}>
+                {rResult.markSays}
+              </span>
+            </div>
+          </div>
+        );
+      })()}
 
       {trade.plan_exit_strategy && (
         <div className="text-xs pt-2 border-t border-muted-foreground/20">
