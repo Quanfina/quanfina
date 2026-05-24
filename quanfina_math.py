@@ -3262,3 +3262,149 @@ def compute_market_breadth(
         'breadth_health': breadth_health,
         'mark_says': says,
     }
+
+
+# ======================================================================
+# KARAR #733 alt-paket (Paket 56, 25 May 2026) — Breadth Divergence
+#
+# Mark+O'Neil canon "erken uyari" mekanigi: Index (SPY/QQQ) yukseliyor
+# ama A/D Line zayifliyorsa BEARISH DIVERGENCE — gercek piyasa lideri
+# darling birkac mega-cap, geniş tabanli rally olmuyor. Tarihsel:
+# 1999 dot-com, 2007 housing — index pozitif iken A/D Line aylar
+# oncesi tepe yapip dustu.
+#
+# 4 kategori:
+# - CONFIRMED_UP: Index up + A/D up → saglikli rally (Mark Stage 2 onay)
+# - BEARISH_DIVERGENCE: Index up + A/D down → KRITIK uyari (O'Neil)
+# - BULLISH_DIVERGENCE: Index down + A/D up → toparlanma adayi
+# - CONFIRMED_DOWN: Index down + A/D down → bear pressure dogrulandi
+# - NEUTRAL: Index/AD trend belirsiz (esik altinda) → bekle
+#
+# Mark birebir kaynak:
+# - O'Neil HowToMakeMoney: "Best stocks make lows first" + A/D erken uyari
+# - TLSMW Ch 5: "Healthy markets show broad participation"
+# ======================================================================
+
+# Divergence trend esik (% degisim)
+DIVERGENCE_INDEX_TREND_THRESHOLD_PCT: float = 1.0   # Index >+1% up, <-1% down
+DIVERGENCE_AD_TREND_THRESHOLD: int = 500            # A/D cumulative >+500 up, <-500 down
+
+
+def compute_breadth_divergence(
+    index_closes: list[float],
+    advances_daily: list[int],
+    declines_daily: list[int],
+    lookback_days: int = 10,
+) -> dict:
+    """Index trend vs A/D Line trend ayrismasi tespiti — Mark+O'Neil erken uyari.
+
+    Args:
+        index_closes: SPY/QQQ gunluk kapanis fiyatlari (kronolojik)
+        advances_daily: Gunluk yukselen hisse sayisi
+        declines_daily: Gunluk dusen hisse sayisi
+        lookback_days: Trend hesap penceresi (default 10 gun)
+
+    Returns:
+        dict {
+            'divergence': str | None,        # CONFIRMED_UP/BEARISH_DIVERGENCE/...
+            'index_change_pct': float | None, # lookback boyunca % degisim
+            'ad_trend_delta': int | None,     # lookback boyunca A/D cumulative delta
+            'severity': str,                  # ok / info / warn / critical
+            'mark_says': str,
+        }
+
+    Mark birebir kaynak:
+    - O'Neil HowToMakeMoney: "Best stocks make lows first" (A/D index oncesi)
+    - TLSMW Ch 5: "Healthy markets show broad participation"
+    """
+    # Edge: bos veya yetersiz veri
+    if not index_closes or not advances_daily or not declines_daily:
+        return {
+            'divergence': None,
+            'index_change_pct': None,
+            'ad_trend_delta': None,
+            'severity': 'info',
+            'mark_says': 'Yetersiz veri — index/A/D trend hesaplanamiyor.',
+        }
+    if len(advances_daily) != len(declines_daily):
+        return {
+            'divergence': None,
+            'index_change_pct': None,
+            'ad_trend_delta': None,
+            'severity': 'info',
+            'mark_says': 'Divergence: advances/declines listesi uzunlugu farkli.',
+        }
+
+    # Lookback window
+    n_index = min(lookback_days, len(index_closes) - 1)
+    n_breadth = min(lookback_days, len(advances_daily))
+    if n_index < 2 or n_breadth < 2:
+        return {
+            'divergence': None,
+            'index_change_pct': None,
+            'ad_trend_delta': None,
+            'severity': 'info',
+            'mark_says': 'Yetersiz veri penceresi (en az 2 gun gerekli).',
+        }
+
+    # Index % degisim (lookback once -> bugun)
+    index_start = index_closes[-n_index - 1] if len(index_closes) > n_index else index_closes[0]
+    index_now = index_closes[-1]
+    index_change_pct = round((index_now - index_start) / index_start * 100, 2) if index_start > 0 else 0.0
+
+    # A/D Line trend delta: ilk yari ortalama vs son yari ortalama
+    # Trendin yonunu ve buyuklugunu ayrim eder (sadece cumulative degil)
+    recent_adv = advances_daily[-n_breadth:]
+    recent_dec = declines_daily[-n_breadth:]
+    half = n_breadth // 2
+    if half == 0:
+        first_half_net = recent_adv[0] - recent_dec[0]
+        second_half_net = recent_adv[-1] - recent_dec[-1]
+    else:
+        first_half_net = sum(a - d for a, d in zip(recent_adv[:half], recent_dec[:half]))
+        second_half_net = sum(a - d for a, d in zip(recent_adv[half:], recent_dec[half:]))
+    ad_trend_delta = second_half_net - first_half_net
+
+    # Trend yonu
+    is_index_up = index_change_pct > DIVERGENCE_INDEX_TREND_THRESHOLD_PCT
+    is_index_down = index_change_pct < -DIVERGENCE_INDEX_TREND_THRESHOLD_PCT
+    is_ad_up = ad_trend_delta > DIVERGENCE_AD_TREND_THRESHOLD
+    is_ad_down = ad_trend_delta < -DIVERGENCE_AD_TREND_THRESHOLD
+
+    # 4 kategori + neutral
+    if is_index_up and is_ad_up:
+        divergence = 'CONFIRMED_UP'
+        severity = 'ok'
+        says = (f'Index {index_change_pct:+.2f}% + A/D trend {ad_trend_delta:+d} — '
+                f'Mark Stage 2 onayli rally. Geniş katilim, lider hisseler yukseliyor.')
+    elif is_index_up and is_ad_down:
+        divergence = 'BEARISH_DIVERGENCE'
+        severity = 'critical'
+        says = (f'⚠️ BEARISH DIVERGENCE — Index {index_change_pct:+.2f}% ama '
+                f'A/D trend {ad_trend_delta:+d} (zayif). O\'Neil: A/D index '
+                f'oncesi zayifliyorsa erken uyari. Tarihsel: 1999 / 2007 paten.')
+    elif is_index_down and is_ad_up:
+        divergence = 'BULLISH_DIVERGENCE'
+        severity = 'info'
+        says = (f'Bullish divergence — Index {index_change_pct:+.2f}% dustu ama '
+                f'A/D trend {ad_trend_delta:+d} (saglikli). Toparlanma adayi, '
+                f'Mark Stage 1 -> 2 gecisi izle.')
+    elif is_index_down and is_ad_down:
+        divergence = 'CONFIRMED_DOWN'
+        severity = 'warn'
+        says = (f'Confirmed weakness — Index {index_change_pct:+.2f}% + A/D '
+                f'{ad_trend_delta:+d}. Bear pressure dogrulandi, Mark Stage 4 '
+                f'uzak dur.')
+    else:
+        divergence = 'NEUTRAL'
+        severity = 'info'
+        says = (f'Trend belirsiz — Index {index_change_pct:+.2f}%, A/D '
+                f'{ad_trend_delta:+d}. Esik altinda, sinyalsiz bekle.')
+
+    return {
+        'divergence': divergence,
+        'index_change_pct': index_change_pct,
+        'ad_trend_delta': ad_trend_delta,
+        'severity': severity,
+        'mark_says': says,
+    }
