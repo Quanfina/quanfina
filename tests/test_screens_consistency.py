@@ -107,6 +107,25 @@ class TestStage2_10pConsistency:
         for f in required:
             assert f in filters, f"Mark Resmi Kural filter eksik: {f}"
 
+    def test_ui_madde_8_52w_low_is_30_percent(self, ts):
+        """UI'de "52 haftalık dipten en az %30 yukarıda" olmalı (Mark birebir).
+        24 May 2026 — KALICI İLKE #4 ihlali düzeltildi: %25 → %30.
+        Mark Kitap birebir: TLSMW s.79 "at least 30 percent above its 52-week low".
+        """
+        pattern = r'stage2_10p:\s*\[(.*?)\]\s*,\s*'
+        m = re.search(pattern, ts, re.DOTALL)
+        block = m.group(1)
+        # %30 doğru, %25 hatalı (eski metin)
+        assert "dipten en az %30" in block, (
+            "UI Madde 8 '52 haftalık dipten en az %30 yukarıda' beklenirken farklı. "
+            "Mark TLSMW s.79 birebir: '30 percent above 52-week low'."
+        )
+        # %25 dipten yanlışlıkla geri eklenmemeli
+        assert "dipten en az %25" not in block, (
+            "UI Madde 8 eski %25 değeri tespit edildi. Mark birebir %30 olmalı "
+            "(TLSMW s.79). KALICI İLKE #4 ihlali — uydurma değer YASAK."
+        )
+
     def test_sql_filter_has_rs_threshold(self, db_helpers):
         """SQL filter rs_ibd >= 70 (KARAR #484) içermeli."""
         sql = _extract_sql_filter(db_helpers, "stage2_10p")
@@ -206,43 +225,63 @@ class TestTemelElemeConsistency:
             f"(Fiyat ≥ $10 + Hacim ≥ 500K)."
         )
 
-    def test_ui_mark_resmi_count_is_3(self, ts):
-        """temel_eleme UI'de tam 3 Mark Resmi olmalı (Fundamental ZORUNLU).
-        Kitap birebir:
-          - EPS Q/Q ≥ %25 (TLSMW s.127)
-          - Sales Q/Q ≥ %25 (TLSMW s.132)
-          - ROE ≥ %15-17 (Momentum Masters s.74)
-        """
-        pattern = r'temel_eleme:\s*\[(.*?)\]\s*,\s*'
-        m = re.search(pattern, ts, re.DOTALL)
-        block = m.group(1)
-        mark_count = block.count('source: "mark"')
-        assert mark_count == 3, (
-            f"Mark Resmi (Fundamental) sayısı = {mark_count}, beklenen 3 "
-            f"(EPS Q/Q + Sales Q/Q + ROE — Mark Fundamental ZORUNLU)."
-        )
-
-    def test_ui_no_mark_ekstra(self, ts):
-        """temel_eleme'de Mark Ekstra OLMAMAlı (Fundamental zorunlu, tavsiye yok).
-        Trend Template'den farklı: Power Play'de var ama Temel Eleme'de yok.
+    def test_ui_mark_ekstra_count_is_3(self, ts):
+        """temel_eleme UI'de tam 3 Mark Ekstra olmalı (Fundamental Soft Score).
+        24 May 2026 revize — Çift Danışma (Gem + Quanfina Notebook):
+          Mark felsefesi gereği Fundamental "Hard Filter" DEĞİL, "Soft Score".
+          Yeni IPO + biotech + Story Stocks Hard Filter'a takılırsa Quanfina
+          patlayıcı fırsatları eler.
+          - EPS Q/Q ≥ %25 (TLSMW s.127) — mark_ekstra (turuncu)
+          - Sales Q/Q ≥ %25 (TLSMW s.132) — mark_ekstra (turuncu)
+          - ROE ≥ %15-17 (Momentum Masters s.74) — mark_ekstra (turuncu)
         """
         pattern = r'temel_eleme:\s*\[(.*?)\]\s*,\s*'
         m = re.search(pattern, ts, re.DOTALL)
         block = m.group(1)
         ekstra_count = block.count('source: "mark_ekstra"')
-        assert ekstra_count == 0, (
-            f"Mark Ekstra sayısı = {ekstra_count}, beklenen 0 "
-            f"(Temel Eleme'de tavsiye yok, hepsi ZORUNLU)."
+        assert ekstra_count == 3, (
+            f"Mark Ekstra (Fundamental Soft Score) sayısı = {ekstra_count}, beklenen 3 "
+            f"(EPS Q/Q + Sales Q/Q + ROE — Mark felsefesi gereği turuncu)."
         )
 
-    def test_backend_scanner_has_roe_filter(self, scanner):
-        """Backend get_finviz_fundamental_only fonksiyonunda fa_roe_pos15 olmalı.
-        23 May 2026 yeni ekleme — Mark MM s.74 birebir: "ROE of 15-17% or higher".
-        Önceki sürümde sadece EPS Q/Q + Sales Q/Q vardı, ROE filtresi YOKtu.
+    def test_ui_no_mark_resmi(self, ts):
+        """temel_eleme'de Mark Resmi (yeşil) OLMAMAlı.
+        24 May 2026 revize: Mark felsefesi gereği Fundamental Hard Filter değil,
+        hepsi Soft Score (turuncu).
         """
-        assert "fa_roe_pos15" in scanner, (
-            "Backend ROE filtresi (fa_roe_pos15) get_finviz_fundamental_only'da "
-            "bulunamadı. Mark Fundamental ZORUNLU 3. eşik (Momentum Masters s.74)."
+        pattern = r'temel_eleme:\s*\[(.*?)\]\s*,\s*'
+        m = re.search(pattern, ts, re.DOTALL)
+        block = m.group(1)
+        mark_count = block.count('source: "mark"')
+        assert mark_count == 0, (
+            f"Mark Resmi sayısı = {mark_count}, beklenen 0 "
+            f"(Temel Eleme'de Fundamental Hard Filter yok, hepsi Soft Score)."
+        )
+
+    def test_backend_scanner_no_roe_hard_filter(self, scanner):
+        """Backend get_finviz_fundamental_only'da fa_roe_pos15 OLMAMAlı.
+        24 May 2026 — Çift Danışma sonucu (Gem + Quanfina Notebook):
+          Mark felsefesi gereği ROE "Hard Filter" DEĞİL, "Soft Score" (Recipe).
+          ROE Hard Filter olarak uygulanırsa yeni IPO + biotech + Story Stocks
+          Açıklanamayan Güç hisseleri elenir.
+          ROE Finviz extras (c=33) ile DB'ye kolon olarak çekilir, UI Soft Score.
+        """
+        # fa_roe_pos15 kaldırıldı — Mark felsefesi gereği Soft Score
+        # NOT: scanner.py'de yorumda "fa_roe_pos15 KALDIRILDI" geçebilir, sadece
+        # filters listesindeki AKTİF kullanımı kontrol edilir.
+        # get_finviz_fundamental_only fonksiyon içindeki filters = ",".join([...])
+        # bloğuna fa_roe_pos15 string'i girmemeli.
+        m = re.search(
+            r'def get_finviz_fundamental_only.*?filters\s*=\s*",".join\(\[(.*?)\]\)',
+            scanner, re.DOTALL,
+        )
+        assert m is not None, "get_finviz_fundamental_only filters list bulunamadı"
+        filters_block = m.group(1)
+        active_filters = re.findall(r'"([^"]+)"', filters_block)
+        assert "fa_roe_pos15" not in active_filters, (
+            "Backend ROE filtresi (fa_roe_pos15) get_finviz_fundamental_only filters "
+            "listesinden KALDIRILMALI — Mark felsefesi gereği Soft Score, Hard Filter değil. "
+            "ROE c=33 ile DB'ye kolon olarak çekilir, UI'da Mark Ekstra (turuncu)."
         )
 
     def test_backend_scanner_has_eps_qoq_filter(self, scanner):
@@ -274,4 +313,138 @@ class TestTemelElemeConsistency:
         table = m.group(1)
         assert table == "minervini_fundamental_only", (
             f"temel_eleme table override = '{table}', beklenen 'minervini_fundamental_only'."
+        )
+
+
+class TestTamMinerviniConsistency:
+    """tam_minervini (Trend Template + Fundamentals birleşik) — Hibrit Pipeline.
+
+    24 May 2026 — Sn. Ferit talimat: "tam minervini tarama listesini yapıcaz
+    hem teknik hem temel kaynaklara danışarak".
+
+    KARAR ADAY #495: Tam Minervini Tarama (Hibrit 15 koşul):
+      AŞAMA 1 SCREEN (Hard Filter, 10): 2 Quanfina Ek + 8 Mark Resmi Teknik
+      AŞAMA 2 RECIPE (Soft Score, 5):   EPS Q/Q + Sales Q/Q + ROE + Yıllık EPS + Margin
+
+    Çift Danışma sonucu: Gem 01_Minervini_Uzmanı (kitap birebir) + Quanfina
+    Notebook NotebookLM (sistem perspektifi) — Mark felsefesi tam uyum.
+    """
+
+    @pytest.fixture(scope="class")
+    def ts(self) -> str:
+        return _read("web/types/screens.ts")
+
+    @pytest.fixture(scope="class")
+    def db_helpers(self) -> str:
+        return _read("api/db_helpers.py")
+
+    def test_ui_condition_count_is_15(self, ts):
+        """tam_minervini UI'de tam 15 koşul gösterilmeli (Hibrit Pipeline).
+        Dağılım: 2 Quanfina Ek + 8 Mark Resmi Teknik + 5 Mark Ekstra Soft Score.
+        """
+        n = _extract_screen_conditions_count(ts, "tam_minervini")
+        assert n == 15, (
+            f"tam_minervini UI condition count = {n}, beklenen 15 "
+            f"(2 Quanfina + 8 Mark Resmi Teknik + 5 Mark Ekstra Soft Score)."
+        )
+
+    def test_ui_quanfina_ek_count_is_2(self, ts):
+        """tam_minervini'de tam 2 Quanfina Ek olmalı (Fiyat + Hacim — evren daraltma)."""
+        pattern = r'tam_minervini:\s*\[(.*?)\]\s*,?\s*\};'
+        m = re.search(pattern, ts, re.DOTALL)
+        assert m is not None, "tam_minervini block not found"
+        block = m.group(1)
+        n = block.count('source: "quanfina"')
+        assert n == 2, (
+            f"tam_minervini Quanfina Ek sayısı = {n}, beklenen 2 (Fiyat + Hacim)."
+        )
+
+    def test_ui_mark_resmi_count_is_8(self, ts):
+        """tam_minervini'de tam 8 Mark Resmi Teknik olmalı (Trend Template).
+        TLSMW s.79 birebir 8 madde — Hard Filter (Screen aşaması).
+        """
+        pattern = r'tam_minervini:\s*\[(.*?)\]\s*,?\s*\};'
+        m = re.search(pattern, ts, re.DOTALL)
+        assert m is not None, "tam_minervini block not found"
+        block = m.group(1)
+        n = block.count('source: "mark"')
+        assert n == 8, (
+            f"tam_minervini Mark Resmi (Trend Template) sayısı = {n}, beklenen 8 "
+            f"(TLSMW s.79 birebir 8 madde)."
+        )
+
+    def test_ui_mark_ekstra_count_is_5(self, ts):
+        """tam_minervini'de tam 5 Mark Ekstra olmalı (Soft Score — Recipe aşaması).
+        EPS Q/Q + Sales Q/Q + ROE + Yıllık EPS + Operating Margin.
+        """
+        pattern = r'tam_minervini:\s*\[(.*?)\]\s*,?\s*\};'
+        m = re.search(pattern, ts, re.DOTALL)
+        assert m is not None, "tam_minervini block not found"
+        block = m.group(1)
+        n = block.count('source: "mark_ekstra"')
+        assert n == 5, (
+            f"tam_minervini Mark Ekstra (Soft Score) sayısı = {n}, beklenen 5 "
+            f"(EPS Q/Q + Sales Q/Q + ROE + Yıllık EPS + Margin)."
+        )
+
+    def test_ui_madde_8_52w_low_is_30(self, ts):
+        """tam_minervini Madde 8: 52W dipten ≥ %30 (Mark birebir, TLSMW s.79).
+        KALICI İLKE #4: Önceki Trend Template UI %25 hatalıydı, %30 birebir.
+        """
+        pattern = r'tam_minervini:\s*\[(.*?)\]\s*,?\s*\};'
+        m = re.search(pattern, ts, re.DOTALL)
+        block = m.group(1)
+        assert "dipten en az %30" in block, (
+            "tam_minervini Madde 8 '52 haftalık dipten en az %30 yukarıda' eksik. "
+            "Mark TLSMW s.79 birebir: '30 percent above 52-week low'."
+        )
+
+    def test_ui_has_yillik_eps(self, ts):
+        """tam_minervini'de Yıllık EPS Soft Score olmalı (Gem önerisi yeni ekleme).
+        TLSMW s.134-136 birebir: 'current annual growth positive, preferably breakout'.
+        """
+        pattern = r'tam_minervini:\s*\[(.*?)\]\s*,?\s*\};'
+        m = re.search(pattern, ts, re.DOTALL)
+        block = m.group(1)
+        assert "Yıllık EPS" in block, (
+            "tam_minervini'de Yıllık EPS maddesi eksik. TLSMW s.134-136 Soft Score."
+        )
+
+    def test_ui_has_operating_margin(self, ts):
+        """tam_minervini'de Operating Margin expanding Soft Score olmalı.
+        TLSMW s.145-147: 'expanding margins', sabit eşik yok (trend kontrolü).
+        """
+        pattern = r'tam_minervini:\s*\[(.*?)\]\s*,?\s*\};'
+        m = re.search(pattern, ts, re.DOTALL)
+        block = m.group(1)
+        assert "Operating Margin" in block, (
+            "tam_minervini'de Operating Margin maddesi eksik. TLSMW s.145 Soft Score."
+        )
+
+    def test_db_helpers_has_tam_minervini_slug(self, db_helpers):
+        """api/db_helpers.py SCREENS_READY_9'da tam_minervini slug olmalı."""
+        assert '"tam_minervini":' in db_helpers, (
+            "SCREENS_READY_9 dict'inde tam_minervini slug bulunamadı."
+        )
+
+    def test_db_helpers_tam_minervini_uses_fundamental_scans_table(self, db_helpers):
+        """tam_minervini slug'unun table override'ı minervini_fundamental_scans olmalı.
+        Trend Template + EPS + Sales Hard Cut'tan geçmiş hisseler bu tabloda.
+        """
+        pattern = r'"tam_minervini":\s*\{[^}]*"table":\s*"([^"]+)"'
+        m = re.search(pattern, db_helpers)
+        assert m is not None, "tam_minervini entry'de table field bulunamadı"
+        table = m.group(1)
+        assert table == "minervini_fundamental_scans", (
+            f"tam_minervini table override = '{table}', "
+            f"beklenen 'minervini_fundamental_scans'."
+        )
+
+    def test_screen_categories_has_tam_minervini(self, ts):
+        """SCREEN_CATEGORIES'de tam_minervini label 'Tam Minervini Tarama' olmalı."""
+        pattern = r'tam_minervini:\s*"([^"]+)"'
+        m = re.search(pattern, ts)
+        assert m is not None, "SCREEN_CATEGORIES'de tam_minervini bulunamadı"
+        assert "Tam Minervini" in m.group(1), (
+            f"tam_minervini label = '{m.group(1)}', 'Tam Minervini' içermeli."
         )

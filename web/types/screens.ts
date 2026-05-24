@@ -78,6 +78,7 @@ export interface ScreenResultRow {
 export const SCREEN_CATEGORIES: Record<string, string> = {
   stage2_10p: "Trend Template",
   temel_eleme: "Temel Eleme",
+  tam_minervini: "Tam Minervini Tarama",
 };
 
 // SCREEN_DESCRIPTIONS kaldirildi (22 May 2026) — Sn. Ferit "bunu sil" talimati.
@@ -123,7 +124,7 @@ export const SCREEN_CONDITIONS: Record<string, ScreenCondition[]> = {
     { source: "mark", text: "200DMA en az 1 aydır yukarı yönlü (trending up)" },
     { source: "mark", text: "50DMA > 150DMA > 200DMA (sıralı piramit dizilimi)" },
     { source: "mark", text: "Fiyat > 50 günlük hareketli ortalama (50DMA)" },
-    { source: "mark", text: "Fiyat 52 haftalık dipten en az %25 yukarıda" },
+    { source: "mark", text: "Fiyat 52 haftalık dipten en az %30 yukarıda" },
     { source: "mark", text: "Fiyat 52 haftalık zirveye en fazla %25 mesafede" },
     { source: "mark", text: "Relative Strength (RS) sıralaması ≥ 70 (IBD)" }, // Mark'ın 8. resmi maddesi
     // 11. Mark Ekstra Kural — Mark kitap tavsiyesi (kitap birebir ZORUNLU değil ama tercih)
@@ -132,28 +133,64 @@ export const SCREEN_CONDITIONS: Record<string, ScreenCondition[]> = {
     { source: "mark_ekstra", text: "RS Rating ideali 80-90+ (Mark kitap tavsiyesi — daha güçlü adaylar)" },
   ],
 
-  // 23 May 2026 — Temel Eleme şablonu (Mark Minervini Fundamental ZORUNLU)
-  // Sn. Ferit talimat: "bu 5 koşulu yapalım trend template gibi"
+  // 23 May 2026 — Temel Eleme şablonu (Mark Minervini Fundamental — Soft Score)
+  // Sn. Ferit talimat (23 May): "bu 5 koşulu yapalım trend template gibi"
+  // 24 May 2026 revize — Gem + Quanfina Notebook Çift Danışma:
+  //   Mark felsefesi gereği Fundamental kuralları "Hard Filter" DEĞİL,
+  //   "Soft Score / Relative Prioritizing" katmanına aittir.
+  //   Yeni IPO + biotech + Story Stocks "Açıklanamayan Güç" hisseleri
+  //   Hard Filter'a takılırsa Quanfina patlayıcı fırsatları eler.
   //
-  // Kaynak zinciri (KALICI İLKE #4 — Matematik Uydurmama):
-  //   1-2: Quanfina Ek (evren daraltma — Mark sapma: kitap $12 yerine $10,
-  //        kitap "sığ kucakla" yerine küçük hesap likidite için 500K)
-  //   3:   EPS Growth Q/Q ≥ %25 — Trade Like a Stock Market Wizard s.127
-  //        Mark birebir: "require a minimum of 20 to 25 percent"
-  //   4:   Sales Growth Q/Q ≥ %25 — TLSMW s.132
-  //        İdeal: triple-digit (%100+)
+  // Kaynak zinciri (KALICI İLKE #4):
+  //   1-2: Quanfina Ek (evren daraltma — Mark sapma)
+  //   3:   EPS Growth Q/Q ≥ %25 — TLSMW s.127
+  //   4:   Sales Growth Q/Q ≥ %25 — TLSMW s.132 (ideal üç haneli)
   //   5:   ROE ≥ %15-17 — Momentum Masters s.74
-  //        Mark birebir: "have a ROE of 15-17% or higher"
   //
-  // Backend: scanner.py get_finviz_fundamental_only — minervini_fundamental_only tablosu
-  // Mark Fundamental Hard Cut: 3 ZORUNLU madde (EPS Q/Q + Sales Q/Q + ROE)
-  // Quanfina Ek: 2 evren daraltma (Fiyat + Hacim)
+  // Hepsi Mark Ekstra (turuncu) — Soft Score katmanı (Mark "Recipe")
+  // Backend scanner.py get_finviz_fundamental_only Quanfina pratik gereği
+  // Hard Cut uyguluyor (sapma kaydı), UI'da Mark felsefesine sadık turuncu.
   temel_eleme: [
     { source: "quanfina", text: "Fiyat ≥ $10 (mikro-cap eleme — evren daraltma)" },
     { source: "quanfina", text: "Ortalama hacim ≥ 500.000 (likidite eleme — evren daraltma)" },
-    { source: "mark", text: "EPS Q/Q artışı ≥ %25 (Trade Like a Wizard s.127 — Mark Fundamental ZORUNLU)" },
-    { source: "mark", text: "Sales Q/Q artışı ≥ %25 (TLSMW s.132 — Mark Fundamental ZORUNLU, ideal üç haneli)" },
-    { source: "mark", text: "ROE ≥ %15-17 (Momentum Masters s.74 — Mark Fundamental ZORUNLU)" },
+    { source: "mark_ekstra", text: "EPS Q/Q artışı ≥ %25 (TLSMW s.127 — Mark Soft Score, Recipe)" },
+    { source: "mark_ekstra", text: "Sales Q/Q artışı ≥ %25 (TLSMW s.132 — Soft Score, ideal üç haneli)" },
+    { source: "mark_ekstra", text: "ROE ≥ %15-17 (Momentum Masters s.74 — Soft Score, yeni IPO için esnetilir)" },
+  ],
+
+  // 24 May 2026 — Tam Minervini Tarama (Hibrit Pipeline: 10 Hard + 5 Soft)
+  // Sn. Ferit talimat: "tam minervini tarama listesi yapıcaz hem teknik
+  //                     hem temel kaynaklara danışarak"
+  // Çift Danışma sonucu (Gem 01_Minervini_Uzmanı + Quanfina Notebook):
+  //   AŞAMA 1 — SCREEN (Hard Filter, 10 madde): 2 Quanfina + 8 Mark Resmi Teknik
+  //   AŞAMA 2 — RECIPE (Soft Score, 5 madde):   EPS Q/Q + Sales Q/Q + ROE +
+  //                                             Yıllık EPS + Operating Margin
+  //
+  // Mark Pipeline (TLSMW Bölüm 5 + 7 + Momentum Masters):
+  //   10.000 Universe → Trend Template (Hard) → ~1.000 → Fundamentals (Soft) → 40-100
+  //
+  // Backend: minervini_fundamental_scans tablosu (scanner.py get_finviz_fundamental)
+  // Yıllık EPS + Operating Margin GELİŞTİRİLMESİ LAZIM — Migration sonra,
+  // şu an UI'da gösterilir, backend ileride filter olarak uygulanır.
+  // RS Multi-Month gereksiz (sistem 6 RS varyantı zaten hesaplıyor).
+  tam_minervini: [
+    // AŞAMA 1 — SCREEN (Hard Filter) — 10 madde
+    { source: "quanfina", text: "Fiyat ≥ $10 (mikro-cap eleme — evren daraltma)" },
+    { source: "quanfina", text: "Ortalama hacim ≥ 500.000 (likidite eleme — evren daraltma)" },
+    { source: "mark", text: "Fiyat > 150 ve 200 günlük hareketli ortalama (TLSMW s.79)" },
+    { source: "mark", text: "150DMA > 200DMA (uzun vadeli yükseliş yapısı)" },
+    { source: "mark", text: "200DMA en az 1 aydır yukarı yönlü (tercihen 4-5 ay)" },
+    { source: "mark", text: "50DMA > 150DMA > 200DMA (sıralı piramit dizilimi)" },
+    { source: "mark", text: "Fiyat > 50 günlük hareketli ortalama (50DMA)" },
+    { source: "mark", text: "Fiyat 52 haftalık dipten en az %30 yukarıda (TLSMW s.79 birebir)" },
+    { source: "mark", text: "Fiyat 52 haftalık zirveye en fazla %25 mesafede" },
+    { source: "mark", text: "Relative Strength (RS) sıralaması ≥ 70 (IBD)" },
+    // AŞAMA 2 — RECIPE (Soft Score) — 5 madde (Mark Ekstra turuncu)
+    { source: "mark_ekstra", text: "EPS Q/Q artışı ≥ %25 (TLSMW s.127 — Soft Score)" },
+    { source: "mark_ekstra", text: "Sales Q/Q artışı ≥ %25 veya 3 çeyrek ivmelenme (TLSMW s.132)" },
+    { source: "mark_ekstra", text: "ROE ≥ %15-17 (Momentum Masters s.74 — yeni IPO esnetilir)" },
+    { source: "mark_ekstra", text: "Yıllık EPS pozitif / Breakout Year (TLSMW s.134-136)" },
+    { source: "mark_ekstra", text: "Operating Margin expanding (TLSMW s.145-147 — sabit eşik yok, trend)" },
   ],
 };
 

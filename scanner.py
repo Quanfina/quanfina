@@ -574,25 +574,35 @@ def get_finviz_fundamental():
 
 def get_finviz_fundamental_only():
     """
-    Sadece temel filtreler — teknik kural YOK (Mark Fundamental Hard Cut).
+    Sadece temel filtreler — teknik kural YOK.
 
-    5 koşul (23 May 2026, Sn. Ferit "Temel Eleme" şablonu — KARAR ADAY #484):
+    24 May 2026 revize (Gem + Quanfina Notebook Çift Danışma):
+      Mark felsefesi gereği Fundamental kuralları "Hard Filter" DEĞİL,
+      "Soft Score / Relative Prioritizing" katmanına aittir (Mark Recipe).
+      Yeni IPO + biotech + Story Stocks "Açıklanamayan Güç" hisseleri
+      Hard Filter'a takılırsa Quanfina patlayıcı fırsatları eler.
+
+    ROE filtresi (fa_roe_pos15) 24 May 2026'da KALDIRILDI — Hard Filter
+    değil. ROE Finviz extras (c=33) ile DB'ye kolon olarak çekilir,
+    UI tarafında Soft Score puanlama olarak uygulanır.
+
+    4 koşul:
       - Quanfina Ek (evren daraltma):
-        - sh_price_o10  : Fiyat > $10
-        - sh_avgvol_o500: Ortalama hacim > 500K
-      - Mark Fundamental ZORUNLU (kitap birebir):
-        - fa_epsqoq_o25 : EPS Q/Q > %25 (TLSMW s.127)
-        - fa_salesqoq_o25: Sales Q/Q > %25 (TLSMW s.132)
-        - fa_roe_pos15  : ROE > %15 (Momentum Masters s.74) — 23 May 2026 yeni
+        - sh_price_o10   : Fiyat > $10
+        - sh_avgvol_o500 : Ortalama hacim > 500K
+      - Mark Soft Score (UI turuncu Mark Ekstra):
+        - fa_epsqoq_o25  : EPS Q/Q > %25 (TLSMW s.127, Quanfina pratik Hard Cut)
+        - fa_salesqoq_o25: Sales Q/Q > %25 (TLSMW s.132, Quanfina pratik Hard Cut)
 
-    KALICI İLKE #4 (Matematik Uydurmama): Tüm eşikler kitap birebir kaynak gösterir.
+    KALICI İLKE #4: Eşikler kitap birebir kaynak gösterir.
     """
     filters = ",".join([
         "sh_price_o10",
         "sh_avgvol_o500",
         "fa_epsqoq_o25",
         "fa_salesqoq_o25",
-        "fa_roe_pos15",  # 23 May 2026 — Mark Fundamental ZORUNLU 3. eşik (MM s.74)
+        # fa_roe_pos15 KALDIRILDI 24 May 2026 — Mark felsefesi gereği Soft Score
+        # (Gem + Quanfina Notebook Çift Danışma onayı, ROE Hard Filter değil)
         "sec_etf_false",
         "geo_usa",
         "ind_stocksonly",

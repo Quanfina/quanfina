@@ -283,18 +283,27 @@ SCREENS_READY_9 = {
         "label": "⚡ Power Play (HTF)",
         "filter": "power_play_pass = TRUE",
     },
-    # KARAR ADAY #486 (23 May 2026) — Temel Eleme: 5 kosul (Mark Fundamental ZORUNLU 3 + Quanfina Ek 2)
-    # Kaynak zinciri (KALICI ILKE #4 — Matematik Uydurmama):
-    #   1-2: Quanfina Ek (Fiyat $10 + Hacim 500K — evren daraltma)
-    #   3: EPS Q/Q >= %25 (TLSMW s.127 birebir)
-    #   4: Sales Q/Q >= %25 (TLSMW s.132 birebir)
-    #   5: ROE >= %15-17 (Momentum Masters s.74 birebir) — 23 May 2026 yeni eklendi
-    # Tablo: minervini_fundamental_only (scanner.py get_finviz_fundamental_only zaten 5 kosulu uyguluyor)
-    # filter "1 = 1" cunku tablo SADECE 5 kosulu gecen hisseleri tutar.
+    # KARAR ADAY #486 (23 May 2026) — Temel Eleme: 4 kosul (24 May revize)
+    # 24 May 2026 — Gem + Quanfina Notebook Çift Danışma sonucu:
+    #   Mark felsefesi gereği Fundamental "Hard Filter" DEĞİL, "Soft Score"
+    #   ROE filtresi (fa_roe_pos15) scanner'dan kaldırıldı (Mark Ekstra olarak UI'da)
+    # Tablo: minervini_fundamental_only (Quanfina pratik Hard Cut 4 kosul)
     "temel_eleme": {
-        "label": "Temel Eleme (Mark Fundamental ZORUNLU)",
+        "label": "Temel Eleme (Mark Fundamental Soft Score)",
         "filter": "1 = 1",
         "table": "minervini_fundamental_only",
+    },
+    # KARAR ADAY #495 (24 May 2026) — Tam Minervini Tarama (Hibrit 15 koşul)
+    # Sn. Ferit talimat: "tam minervini tarama listesi hem teknik hem temel"
+    # Çift Danışma (Gem + Quanfina Notebook):
+    #   AŞAMA 1 SCREEN (Hard Filter, 10): 2 Quanfina + 8 Mark Resmi Teknik (Trend Template)
+    #   AŞAMA 2 RECIPE (Soft Score, 5):   EPS Q/Q + Sales Q/Q + ROE + Yıllık EPS + Margin
+    # Tablo: minervini_fundamental_scans (Trend Template + EPS + Sales filtreli mevcut)
+    # filter "1 = 1" — tablo Trend Template + Fundamental Hard Cut geçmişleri tutar
+    "tam_minervini": {
+        "label": "Tam Minervini Tarama (Trend Template + Fundamentals)",
+        "filter": "1 = 1",
+        "table": "minervini_fundamental_scans",
     },
 }
 
@@ -330,8 +339,11 @@ def screen_get_results(slug: str, limit: int = 500) -> list[dict]:
     # KARAR ADAY #486 (23 May 2026) — Sn. Ferit "5 kosulu yapalim trend template gibi"
     table_name = meta.get("table", "minervini_scans")
     # minervini_fundamental_only'da passed kolonu YOK (tablo Fundamental gecenleri tutar)
-    # Trend Template kontrolu olmadigi icin "1 AS passed" hard-coded (gecti varsayilir)
-    passed_expr = "1 AS passed" if table_name == "minervini_fundamental_only" else "passed"
+    # minervini_fundamental_scans Trend Template + Fundamental Hard Cut gecmis hisseleri tutar
+    # Her ikisi de "geçti" varsayilir — Trend Template kontrolu olmadigi icin
+    # "1 AS passed" hard-coded (gecti varsayilir)
+    fundamental_tables = ("minervini_fundamental_only", "minervini_fundamental_scans")
+    passed_expr = "1 AS passed" if table_name in fundamental_tables else "passed"
 
     # Idempotent + parametre safety:
     # - filter SCREENS_READY_8 sabit dict'ten (SQL injection riski yok)
