@@ -2,6 +2,7 @@
 
 import { TrendingUp, AlertCircle, XCircle, Clock } from "lucide-react";
 import { useCarrStage, type CarrStage } from "@/hooks/use-carr-stage";
+import { fmtUsd } from "@/lib/format-currency";
 
 /**
  * KARAR #733 alt-paket (Paket 32): Carr Stage detay paneli (/hisse/[symbol]).
@@ -55,10 +56,6 @@ const STAGE_META: Record<1 | 2 | 3 | 4, StageMeta> = {
 function fmtPct(v: number | null, decimals: number = 2): string {
   if (v == null) return "—";
   return `${v > 0 ? "+" : ""}${v.toFixed(decimals)}%`;
-}
-
-function fmtPrice(v: number | null): string {
-  return v == null ? "—" : `$${v.toFixed(2)}`;
 }
 
 export function CarrStageCard({ symbol }: { symbol: string }) {
@@ -123,7 +120,7 @@ export function CarrStageCard({ symbol }: { symbol: string }) {
             30W MA
           </span>
           <span className="font-mono font-semibold tabular-nums">
-            {fmtPrice(data.ma_value)}
+            {fmtUsd(data.ma_value)}
           </span>
         </div>
         <div className="flex flex-col">

@@ -11,6 +11,7 @@ import { formatDateTR } from "@/lib/format-date";
 import { getDoneItems, toggleItem } from "@/lib/daily-checklist";
 import { MindsetCardWidget } from "@/components/dashboard/MindsetCard";
 import { MarkRegimeBanner } from "@/components/mark/MarkRegimeBanner";
+import { fmtUsd, fmtPctSigned } from "@/lib/format-currency";
 
 // KARAR #474 (20 May 2026 ~08:15): Ana sayfa POC → Gerçek Dashboard.
 // UX Bölüm 3: "Sn. Ferit Quanfina'yı açtığında üstten alta: bakiye + piyasa + sinyaller"
@@ -217,12 +218,12 @@ export default function Home() {
           label="Toplam P/L"
           value={
             closedTrades.length > 0
-              ? `${totalPL >= 0 ? "+" : ""}$${totalPL.toFixed(2)}`
+              ? `${totalPL >= 0 ? "+" : ""}${fmtUsd(totalPL)}`
               : "—"
           }
           subValue={
             closedTrades.length > 0
-              ? `ort. ${totalPLPct >= 0 ? "+" : ""}${totalPLPct.toFixed(2)}%`
+              ? `ort. ${fmtPctSigned(totalPLPct)}`
               : "ilk trade bekleniyor"
           }
           href="/journal"
@@ -308,7 +309,7 @@ export default function Home() {
                       className="font-semibold"
                       style={{ fontFamily: "var(--font-jetbrains-mono, monospace)" }}
                     >
-                      ${s.price.toFixed(2)}
+                      {fmtUsd(s.price)}
                     </span>
                   </div>
                 </div>
@@ -430,7 +431,7 @@ export default function Home() {
                     className="font-semibold"
                     style={{ fontFamily: "var(--font-jetbrains-mono, monospace)" }}
                   >
-                    ${t.entry_price.toFixed(2)}
+                    {fmtUsd(t.entry_price)}
                   </span>
                 </div>
               </div>

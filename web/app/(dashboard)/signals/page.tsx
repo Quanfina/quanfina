@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import type { Signal } from "@/types/signal";
 import { MarkBadgeStrip } from "@/components/mark/MarkBadgeStrip";
 import { MarkRegimeBanner } from "@/components/mark/MarkRegimeBanner";
+import { fmtUsd } from "@/lib/format-currency";
 
 const SELECT =
   "h-8 rounded-md border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring";
@@ -177,8 +178,7 @@ export default function SignalsPage() {
       headerName: "Fiyat",
       width: 100,
       type: "rightAligned",
-      valueFormatter: (p) =>
-        `$${(p.value as number).toFixed(2)}`,
+      valueFormatter: (p) => fmtUsd(p.value as number),
       cellStyle: MONO_RIGHT,
     },
     {
@@ -186,8 +186,7 @@ export default function SignalsPage() {
       headerName: "Stop",
       width: 90,
       type: "rightAligned",
-      valueFormatter: (p) =>
-        p.value != null ? `$${(p.value as number).toFixed(2)}` : "—",
+      valueFormatter: (p) => fmtUsd(p.value as number | null),
       cellStyle: { ...MONO_RIGHT, color: "var(--mtp-danger)" },
     },
     {
@@ -195,8 +194,7 @@ export default function SignalsPage() {
       headerName: "Hedef",
       width: 90,
       type: "rightAligned",
-      valueFormatter: (p) =>
-        p.value != null ? `$${(p.value as number).toFixed(2)}` : "—",
+      valueFormatter: (p) => fmtUsd(p.value as number | null),
       cellStyle: { ...MONO_RIGHT, color: "var(--mtp-excellent)" },
     },
     {

@@ -34,6 +34,7 @@ import { GridLoadingOverlay } from "@/components/ag-grid/LoadingOverlay";
 import { SymbolCellRenderer } from "@/components/watchlist/SymbolCellRenderer";
 import { MONO, MONO_RIGHT } from "@/lib/grid-styles";
 import { formatDateTR } from "@/lib/format-date";
+import { fmtUsd } from "@/lib/format-currency";
 
 // Grade chip renkleri (Sprint 4-bis.1b paten — KARAR ADAY #453)
 const GRADE_STYLE: Record<string, { bg: string; color: string }> = {
@@ -129,8 +130,7 @@ export default function ScreensPage() {
         width: 100,
         minWidth: 90,
         cellStyle: MONO_RIGHT,
-        valueFormatter: (p) =>
-          p.value != null ? `$${(p.value as number).toFixed(2)}` : "—",
+        valueFormatter: (p) => fmtUsd(p.value as number | null),
       },
       {
         field: "scan_date",
