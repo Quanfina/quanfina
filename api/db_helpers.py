@@ -283,6 +283,19 @@ SCREENS_READY_9 = {
         "label": "⚡ Power Play (HTF)",
         "filter": "power_play_pass = TRUE",
     },
+    # KARAR ADAY #893 (24 May 2026) — Mark Tennis Ball Detector (TLSMW s.253)
+    # Mark William M. B. Berger: "I want to own tennis balls, not eggs."
+    # Saglikli pullback + recovery = breakout sonrasi institutional kabul
+    "tennis_ball_active": {
+        "label": "🎾 Tennis Ball Aktif",
+        "filter": "tennis_ball_pattern = 'TENNIS_BALL'",
+    },
+    # KARAR ADAY #882 (24 May 2026) — Mark Volume Asymmetry (TLSMW s.234)
+    # Up volume >> Down volume = institutional accumulation
+    "healthy_accumulation": {
+        "label": "📈 Healthy Accumulation",
+        "filter": "volume_asymmetry_tier = 'healthy'",
+    },
     # KARAR ADAY #486 (23 May 2026) — Temel Eleme: 4 kosul (24 May revize)
     # 24 May 2026 — Gem + Quanfina Notebook Çift Danışma sonucu:
     #   Mark felsefesi gereği Fundamental "Hard Filter" DEĞİL, "Soft Score"
