@@ -9,15 +9,17 @@ const OUT_DIR = "test-screenshots/_full_site";
 mkdirSync(OUT_DIR, { recursive: true });
 
 const PAGES = [
-  { name: "01_dashboard",      path: "/",             desc: "Ana Sayfa Dashboard (KARAR #474+#480)" },
-  { name: "02_signals",        path: "/signals",      desc: "Sinyaller AG Grid (KARAR #469-#479)" },
+  { name: "01_dashboard",      path: "/",             desc: "Ana Sayfa Dashboard + MarkRegimeBanner (P37)" },
+  { name: "02_signals",        path: "/signals",      desc: "Sinyaller AG Grid + MarkRegimeBanner (P36)" },
   { name: "03_screens",        path: "/screens",      desc: "Hisse Tarama (FF paket theme fix)" },
-  { name: "04_watchlist",      path: "/watchlist",    desc: "Watchlist (Y paket MOCK)" },
-  { name: "05_journal",        path: "/journal",      desc: "Trade Journal (II paket Sinyal Kaynagi)" },
-  { name: "06_piyasa_durumu",  path: "/piyasa-durumu",desc: "Piyasa Durumu (4 kart)" },
+  { name: "04_watchlist",      path: "/watchlist",    desc: "Watchlist + MarkRegimeBanner (P36)" },
+  { name: "05_journal",        path: "/journal",      desc: "Trade Journal + MarkRegimeBanner (P39)" },
+  { name: "06_piyasa_durumu",  path: "/piyasa-durumu",desc: "Piyasa Durumu (4 kart + MarkRegimeCard)" },
   { name: "07_minervini",      path: "/minervini",    desc: "Minervini MOCK 30+ hisse" },
   { name: "08_carr",           path: "/carr",         desc: "Carr referans kartlari" },
-  { name: "09_hisse_NVDA",     path: "/hisse/NVDA",   desc: "Hisse Detay TradingView" },
+  { name: "09_hisse_NVDA",     path: "/hisse/NVDA",   desc: "Hisse Detay + MarkRegimeBanner (P39)" },
+  { name: "10_zihinsel_disiplin", path: "/zihinsel-disiplin", desc: "Mark Disiplin 15 kart (KARAR #730)" },
+  { name: "11_risk_yonetimi",  path: "/risk-yonetimi", desc: "Risk Yonetimi Pyramid Calculator (P38)" },
 ];
 
 async function main() {
