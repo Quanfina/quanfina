@@ -1645,6 +1645,11 @@ class Trade(BaseModel):
     plan_size_pct: Optional[float] = None
     plan_exit_strategy: Optional[str] = None
     plan_time_horizon: Optional[TimeHorizon] = None
+    # KARAR #733 alt-paket (Paket 41, 24 May 2026): Trade satirina Mark Profili
+    # rozetlerini ekler (Watchlist + Signals + Screens + Hisse pateni).
+    # Journal sayfasinda stage4Count gerçek hesaplama icin. Production'da
+    # minervini_scans tablo join'i ile gelir; simdilik _STOCK_MARK_SIGNALS MOCK.
+    mark_signals: Optional[dict] = None
 
 
 class TradeCreate(BaseModel):
@@ -1707,12 +1712,25 @@ def _make_closed(
     )
 
 
+def _enrich_trade_with_mark_signals(trade: Trade) -> Trade:
+    """KARAR #733 alt-paket (Paket 41, 24 May 2026) — Trade satirina Mark
+    Profili rozetlerini ekler. Watchlist + Signals enrich pateni birebir.
+
+    Production'da minervini_scans tablo join'i ile gelir; simdilik
+    _STOCK_MARK_SIGNALS MOCK lookup (Migration 004-007 sonrasi degisecek).
+    """
+    signals = _STOCK_MARK_SIGNALS.get(trade.symbol)
+    if signals:
+        return trade.model_copy(update={"mark_signals": signals})
+    return trade
+
+
 @app.get("/api/trades", response_model=list[Trade])
 def get_trades() -> list[Trade]:
     # DB unreachable -> MOCK fallback (Sinyaller + Watchlist pateni — Kural #20 UX)
     # 8 trade: 4 açık + 4 kapalı, çeşitli grade/strateji/setup
     if not db_health_check():
-        return [
+        rows = [
             Trade(id=1, symbol="NVDA",  strategy="minervini", setup_type="VCP",                signal_source="strategy",        entry_date="2026-04-22 09:35", entry_price=132.50,  shares=100, status="closed", exit_date="2026-05-15 15:42", exit_price=145.80, pl_dollar=1330.00,  pl_pct=10.04, grade="A",  exit_reason="target",         lessons="VCP pivot kırılımı 3+ daralma sonrası temiz"),
             Trade(id=2, symbol="MSFT",  strategy="minervini", setup_type="Power Play",         signal_source="strategy",        entry_date="2026-05-02 10:12", entry_price=412.00,  shares=50,  status="open",   exit_date=None,                exit_price=None,    pl_dollar=None,     pl_pct=None,  grade=None, exit_reason=None,              lessons=None),
             Trade(id=3, symbol="AAPL",  strategy="carr",      setup_type="Pullback",           signal_source="manual_self",     entry_date="2026-04-10 14:28", entry_price=198.50,  shares=80,  status="closed", exit_date="2026-04-25 11:05", exit_price=189.20, pl_dollar=-744.00,  pl_pct=-4.69, grade="C",  exit_reason="stop_loss",      lessons="Pullback dip teyit eksikti, erken giriş"),
@@ -1722,9 +1740,12 @@ def get_trades() -> list[Trade]:
             Trade(id=7, symbol="META",  strategy="carr",      setup_type="Pullback",           signal_source="manual_self",     entry_date="2026-04-05 11:20", entry_price=485.30,  shares=30,  status="closed", exit_date="2026-04-30 09:47", exit_price=510.20, pl_dollar=747.00,   pl_pct=5.13,  grade="B",  exit_reason="trailing_stop",  lessons="Trailing stop biraz sıkı kalmış, sabırlı kalsaydım daha iyi"),
             Trade(id=8, symbol="AVGO",  strategy="minervini", setup_type="VCP",                signal_source="strategy",        entry_date="2026-05-08 09:42", entry_price=1392.00, shares=10,  status="open",   exit_date=None,                exit_price=None,    pl_dollar=None,     pl_pct=None,  grade=None, exit_reason=None,              lessons=None),
         ]
+        # KARAR #733 alt-paket (Paket 41): Mark Profili enrichment (DRY watchlist pateni)
+        return [_enrich_trade_with_mark_signals(t) for t in rows]
 
     try:
-        return [Trade(**t) for t in trades_get_all()]
+        rows = [Trade(**t) for t in trades_get_all()]
+        return [_enrich_trade_with_mark_signals(t) for t in rows]
     except OperationalError as e:
         raise HTTPException(
             status_code=503,

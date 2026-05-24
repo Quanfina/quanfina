@@ -41,6 +41,8 @@ export const TIME_HORIZON_DESCRIPTIONS: Record<TimeHorizon, string> = {
   core:     'Uzun vadeli — sermayenin %25-50 büyük posisyon, 200MA disiplin',
 };
 
+import type { MarkSignals } from "@/components/mark/MarkBadgeStrip";
+
 export interface Trade {
   id: number;
   symbol: string;
@@ -66,6 +68,9 @@ export interface Trade {
   plan_size_pct?: number | null;
   plan_exit_strategy?: string | null;
   plan_time_horizon?: TimeHorizon | null;
+  // KARAR #733 alt-paket (Paket 41): Mark Profili enrichment (Watchlist + Signals pateni)
+  // Journal sayfasinda stage4Count gerçek hesaplama + gelecek MarkBadgeStrip kolonu.
+  mark_signals?: MarkSignals;
 }
 
 export interface TradeCreate {
