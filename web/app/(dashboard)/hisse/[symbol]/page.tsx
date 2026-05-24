@@ -1,8 +1,8 @@
 "use client";
 
-import { use } from "react";
+import { use, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Plus } from "lucide-react";
 import { useStockInfo, useOhlcv } from "@/hooks/use-stock";
 import dynamic from "next/dynamic";
 import { StockHeader } from "@/components/stock/StockHeader";
@@ -10,6 +10,9 @@ import { ActiveStrategies } from "@/components/stock/ActiveStrategies";
 import { CarrStageCard } from "@/components/stock/CarrStageCard";
 import { MarkRegimeBanner } from "@/components/mark/MarkRegimeBanner";
 import { useCarrStage } from "@/hooks/use-carr-stage";
+import { AddTradeDialog } from "@/components/journal/AddTradeDialog";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 const PriceChart = dynamic(
   () => import("@/components/stock/PriceChart").then((m) => ({ default: m.PriceChart })),
@@ -40,6 +43,23 @@ export default function HissePage({
   // KARAR #733 alt-paket (Paket 39): hisse Stage 4 ise banner'da somut uyarı
   const { data: carrStage } = useCarrStage(sym);
   const isStage4 = carrStage?.stage === 4;
+
+  // KARAR #733 alt-paket (Paket 46): Hisse detay sayfasından doğrudan trade aç.
+  // Sn. Ferit Watchlist/Hisse Tarama'dan hisseye girdiğinde direkt buradan
+  // trade açabilsin. Sinyaller AL butonu pateni — pre-fill ile.
+  const [tradeOpen, setTradeOpen] = useState(false);
+
+  function handleTradeClick() {
+    // Stage 4 ise warning toast — KALICI İLKE #4 Mark "UZAK DUR" canon.
+    // Dialog yine açılır, Sn. Ferit'in kararı (mekanik karar Kural #23 saklı).
+    if (isStage4) {
+      toast.warning(
+        `${sym} Carr Stage 4 (Declining) — Mark felsefe: UZAK DUR. Yine de trade açacak mısın?`,
+        { duration: 6000 }
+      );
+    }
+    setTradeOpen(true);
+  }
 
   const isLoading = infoLoading || ohlcvLoading;
 
@@ -86,9 +106,25 @@ export default function HissePage({
           default — HEALTHY iken sadece bu hisse Stage 4 olursa banner kalır. */}
       <MarkRegimeBanner stage4Count={isStage4 ? 1 : 0} totalCount={1} />
 
-      {/* Stock header */}
-      <div className="px-6 py-4 border-b">
-        <StockHeader info={info} />
+      {/* Stock header + Trade Aç buton (KARAR #733 alt-paket Paket 46) */}
+      <div className="px-6 py-4 border-b flex items-start justify-between gap-3 flex-wrap">
+        <div className="flex-1 min-w-0">
+          <StockHeader info={info} />
+        </div>
+        <Button
+          size="sm"
+          onClick={handleTradeClick}
+          className="shrink-0"
+          style={{ background: isStage4 ? "var(--mtp-danger)" : "#28A745", color: "#fff" }}
+          title={
+            isStage4
+              ? "Carr Stage 4 — Mark UZAK DUR uyarisi (yine de devam edebilirsin)"
+              : "Bu hisseye trade aç (form pre-fill ile)"
+          }
+        >
+          <Plus size={14} className="mr-1.5" />
+          Trade Aç
+        </Button>
       </div>
 
       {/* Main content */}
@@ -115,6 +151,20 @@ export default function HissePage({
         {/* Setup notes (only when notes exist) */}
         <SetupNotes strategies={info.active_strategies} />
       </div>
+
+      {/* KARAR #733 alt-paket (Paket 46): AddTradeDialog — sembol + fiyat pre-fill.
+          Mevcut aktif stratejilerin ilkini default seçer (Mark+Carr çift strateji
+          aktivse "minervini" tercih). Plan/Stop/Hedef Sn. Ferit elle doldurur. */}
+      <AddTradeDialog
+        open={tradeOpen}
+        onOpenChange={setTradeOpen}
+        initialData={{
+          symbol: sym,
+          strategy: info.active_strategies?.[0]?.strategy ?? "minervini",
+          entry_date: new Date().toISOString().split("T")[0],
+          entry_price: info.price,
+        }}
+      />
     </div>
   );
 }
