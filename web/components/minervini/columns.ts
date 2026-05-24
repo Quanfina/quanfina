@@ -4,6 +4,7 @@ import { LIST_LABELS } from "@/types/minervini";
 import { GradeBadge } from "./GradeBadge";
 import { ListTypeEditor } from "./ListTypeEditor";
 import { TermHeaderComponent } from "@/components/terminology/TermHeaderComponent";
+import { fmtUsd, fmtPctSigned } from "@/lib/format-currency";
 
 const NUM: CellStyle = {
   fontFamily: "var(--font-jetbrains-mono, monospace)",
@@ -12,11 +13,12 @@ const NUM: CellStyle = {
 };
 
 function fmtPrice(p: ValueFormatterParams<MinerviniStock>) {
-  return p.value != null ? `$${(p.value as number).toFixed(2)}` : "-";
+  const v = p.value as number | null;
+  return v != null ? fmtUsd(v) : "-";
 }
 function fmtPct(p: ValueFormatterParams<MinerviniStock>) {
-  const v = p.value as number;
-  return v != null ? `${v >= 0 ? "+" : ""}${v.toFixed(2)}%` : "-";
+  const v = p.value as number | null;
+  return v != null ? fmtPctSigned(v) : "-";
 }
 function fmtPct1(p: ValueFormatterParams<MinerviniStock>) {
   const v = p.value as number;

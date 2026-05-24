@@ -13,9 +13,10 @@ import { TermHeaderComponent } from "@/components/terminology/TermHeaderComponen
 // Sinyaller + Hisse Tarama paterniyle eşitleme. Davranış: fontSize 13px global ->
 // 12px MONO_RIGHT (Sinyaller exact). Tüm tablolarda fiyat 12px tutarlı.
 import { MONO_RIGHT as MONO } from "@/lib/grid-styles";
+import { fmtUsd } from "@/lib/format-currency";
 
 function fmtPrice(p: ValueFormatterParams<WatchlistRow>) {
-  return p.value != null ? `$${(p.value as number).toFixed(2)}` : "—";
+  return fmtUsd(p.value as number | null);
 }
 
 function relativeDate(iso: string): string {

@@ -5,6 +5,7 @@ import { GradeBadge } from "./GradeBadge";
 import { TradeStatusBadge } from "./TradeStatusBadge";
 import { SymbolCellRenderer } from "@/components/watchlist/SymbolCellRenderer";
 import { formatDateTR } from "@/lib/format-date";
+import { fmtUsd, fmtPctSigned } from "@/lib/format-currency";
 import { RMultipleCell } from "./RMultipleCell";
 // KARAR #492 (20 May 2026 ~16:45): DRY hijyen - yerel MONO -> @/lib/grid-styles
 // 4 sayfa tek noktada toplandi (signals/screens/watchlist/journal). fontSize 12px
@@ -18,7 +19,7 @@ function fmtDate(p: ValueFormatterParams<Trade>): string {
 }
 
 function fmtPrice(p: ValueFormatterParams<Trade>): string {
-  return p.value != null ? `$${(p.value as number).toFixed(2)}` : "—";
+  return fmtUsd(p.value as number | null);
 }
 
 function plStyle(p: CellClassParams<Trade, number>): CellStyle {
@@ -30,17 +31,16 @@ function plStyle(p: CellClassParams<Trade, number>): CellStyle {
   };
 }
 
+// KARAR #733 alt-paket (Paket 45): fmtUsd default sign yok, P/L icin
+// pozitif "+" prefix gerek -> sign manuel ekleniyor + fmtUsd kalan format.
 function fmtPLDollar(p: ValueFormatterParams<Trade>): string {
   const v = p.value as number | null;
   if (v == null) return "—";
-  const abs = Math.abs(v).toFixed(2);
-  return v >= 0 ? `+$${abs}` : `-$${abs}`;
+  return (v >= 0 ? "+" : "-") + fmtUsd(Math.abs(v));
 }
 
 function fmtPLPct(p: ValueFormatterParams<Trade>): string {
-  const v = p.value as number | null;
-  if (v == null) return "—";
-  return (v >= 0 ? "+" : "") + v.toFixed(2) + "%";
+  return fmtPctSigned(p.value as number | null);
 }
 
 
