@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Quote, RefreshCw } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Quote, RefreshCw, CheckCircle2 } from "lucide-react";
 import {
   MINDSET_CARDS,
   CATEGORY_LABELS,
@@ -9,6 +9,7 @@ import {
   getTodayMindsetCard,
   type MindsetCard as MindsetCardType,
 } from "@/data/mindset-cards";
+import { isCardReadToday, markCardReadToday } from "@/lib/mindset-read-state";
 
 /**
  * KARAR ADAY #720 — Daily Mindset Cards (Dashboard üst bölüm)
@@ -23,6 +24,13 @@ export function MindsetCardWidget() {
   const todayCard = useMemo(() => getTodayMindsetCard(), []);
   const [card, setCard] = useState<MindsetCardType>(todayCard);
   const [isManualPick, setIsManualPick] = useState(false);
+  // KARAR #720 alt (Paket 28): "okundu" persistence — günlük disiplin
+  const [isReadToday, setIsReadToday] = useState(false);
+
+  // Mount + bugünün kartı değişince "okundu mu" yeniden kontrol et
+  useEffect(() => {
+    setIsReadToday(isCardReadToday(todayCard.id));
+  }, [todayCard.id]);
 
   function pickRandom() {
     const others = MINDSET_CARDS.filter((c) => c.id !== card.id);
@@ -35,6 +43,11 @@ export function MindsetCardWidget() {
   function resetToToday() {
     setCard(todayCard);
     setIsManualPick(false);
+  }
+
+  function handleMarkRead() {
+    markCardReadToday(todayCard.id);
+    setIsReadToday(true);
   }
 
   const accentColor = CATEGORY_COLORS[card.category];
@@ -114,6 +127,32 @@ export function MindsetCardWidget() {
         <span className="font-semibold text-muted-foreground">Quanfina&apos;da: </span>
         <span>{card.quanfinaNote}</span>
       </div>
+
+      {/* KARAR #720 alt (Paket 28): "Okudum" buton + günlük disiplin pekiştirme */}
+      {!isManualPick && (
+        <div className="flex items-center justify-between gap-2 pt-1">
+          {isReadToday ? (
+            <span
+              className="inline-flex items-center gap-1.5 text-xs font-medium"
+              style={{ color: "var(--mtp-excellent)" }}
+            >
+              <CheckCircle2 size={14} />
+              Bugün için okundu — disiplin pekiştirildi
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={handleMarkRead}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border transition-colors hover:bg-accent/40"
+              style={{ borderColor: `${accentColor}55`, color: accentColor }}
+              title="Bugün için Mark hatırlatmasını okuduğunu işaretle"
+            >
+              <CheckCircle2 size={14} />
+              Okudum, anladım
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
