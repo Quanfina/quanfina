@@ -7,6 +7,7 @@ import { useStockInfo, useOhlcv } from "@/hooks/use-stock";
 import dynamic from "next/dynamic";
 import { StockHeader } from "@/components/stock/StockHeader";
 import { ActiveStrategies } from "@/components/stock/ActiveStrategies";
+import { CarrStageCard } from "@/components/stock/CarrStageCard";
 
 const PriceChart = dynamic(
   () => import("@/components/stock/PriceChart").then((m) => ({ default: m.PriceChart })),
@@ -94,9 +95,10 @@ export default function HissePage({
             )}
           </div>
 
-          {/* Active strategies sidebar */}
-          <div className="w-64 shrink-0">
+          {/* Active strategies sidebar + Carr Stage (KARAR #733 P32) */}
+          <div className="w-64 shrink-0 flex flex-col gap-3">
             <ActiveStrategies strategies={info.active_strategies} symbol={sym} />
+            <CarrStageCard symbol={sym} />
           </div>
         </div>
 
