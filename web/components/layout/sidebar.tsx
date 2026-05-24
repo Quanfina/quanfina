@@ -6,6 +6,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Menu, Home, Activity, Globe,
   ListChecks, NotebookText, ScanLine, ChevronDown,
+  Quote,
 } from "lucide-react";
 // KARAR ADAY (22 May 2026): BarChart2, TrendingUp, Layers ikonlari kaldirildi -
 // Stratejiler grup sidebar'dan cikti (Secenek E). NavGroup tip ve rendering KORUNDU
@@ -35,6 +36,8 @@ const NAV_ITEMS: NavItem[] = [
   { kind: "leaf", href: "/watchlist",      label: "İzleme Listesi", icon: ListChecks  },
   { kind: "leaf", href: "/screens",        label: "Tarama",         icon: ScanLine    },
   { kind: "leaf", href: "/journal",        label: "İşlem Günlüğü", icon: NotebookText },
+  // KARAR ADAY #730 (24 May 2026) — Mark Zihinsel Disiplin Kütüphanesi
+  { kind: "leaf", href: "/zihinsel-disiplin", label: "Mark Disiplin", icon: Quote },
 ];
 // KARAR ADAY (22 May 2026): Stratejiler grup (Minervini + Carr) kaldirildi (Secenek E).
 // Sebep: Minervini akisi mevcut sayfalarda zaten coziluyor (Tarama -> Izleme Listesi
