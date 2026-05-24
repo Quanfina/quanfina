@@ -1725,3 +1725,200 @@ def mark_six_rule_check(
         'pass_count': pass_count,
         'critical_violations': critical_violations,
     }
+
+
+# =============================================================================
+# SPRINT 4-bis.7 — FAZ 2 BAŞLANGIÇ — Mark EPS Acceleration (KARAR ADAY #834)
+# Tescil: Vizyon v22.00 + v22.01
+# Detay: notebook/Sprint_4_bis_7_Mark_HASSAS_Tarama.md
+# =============================================================================
+
+# Mark KESIN EPS sabitler (TLSMW Ch 7 + Ch 8 hassas)
+MARK_EPS_MIN_GROWTH_PCT: float = 20.0          # TLSMW s.127 minimum
+MARK_EPS_SUPERPERFORMANCE_PCT: float = 30.0    # TLSMW s.127 superperformance
+MARK_EPS_BULL_MARKET_PCT: float = 40.0         # TLSMW s.127 bull market
+MARK_EPS_TURNAROUND_PCT: float = 100.0         # TLSMW s.137 turnaround
+MARK_EPS_ACCEL_MIN_QUARTERS: int = 3           # TLSMW s.131 3-quarter accel
+MARK_EPS_90PCT_RULE_THRESHOLD: float = 25.0    # TLSMW s.131 "%90 winners"
+
+
+def detect_eps_acceleration(eps_growth_yoy_last_4q: list[float]) -> dict:
+    """KARAR ADAY #834 — Mark EPS Acceleration Detector (TLSMW s.131).
+
+    Mark birebir (TLSMW s.131):
+        "More than 90 percent of the biggest stock market winners showed some
+        form of earnings acceleration before or during their huge price moves."
+
+    Mark KESIN örnek (s.131):
+        q-4: -%5, q-3: +%10, q-2: +%28, q-1: +%56 = 3 quarter acceleration
+
+    Hesap:
+        - is_accelerating: q[i] < q[i+1] for i in range(len-1) — STRICT artış
+        - magnitude_pct_pts: q[-1] - q[0] (toplam acceleration büyüklüğü)
+        - mark_90pct_rule: STRICT acceleration + current quarter > %25
+        - phase: 'accelerating' | 'decelerating' | 'flat'
+
+    Args:
+        eps_growth_yoy_last_4q: Son 4 çeyrek YoY EPS büyüme oranı [q-3, q-2, q-1, current]
+            En eski quarter ilk, current quarter son sırada.
+            Örnek: [-5.0, 10.0, 28.0, 56.0]
+
+    Returns:
+        dict:
+        {
+            'accelerating': bool,        # 3-quarter strict acceleration
+            'magnitude_pct_pts': float,  # current - oldest
+            'mark_90pct_rule': bool,     # Mark KESIN 90% winners pattern
+            'phase': 'accelerating' | 'decelerating' | 'flat' | 'invalid',
+            'tier': 'minimum' | 'superperformance' | 'bull_market' | 'turnaround' | 'below_minimum',
+            'mark_says': str,
+            'quarters_count': int,
+        }
+
+    Kaynak: TLSMW s.131 + Sprint_4_bis_7_Mark_HASSAS_Tarama.md KARAR ADAY #834
+    """
+    if not eps_growth_yoy_last_4q or len(eps_growth_yoy_last_4q) < 2:
+        return {
+            'accelerating': False,
+            'magnitude_pct_pts': 0.0,
+            'mark_90pct_rule': False,
+            'phase': 'invalid',
+            'tier': 'below_minimum',
+            'mark_says': 'En az 2 çeyrek EPS gerekli',
+            'quarters_count': 0,
+        }
+
+    q = eps_growth_yoy_last_4q
+    n = len(q)
+    current = q[-1]
+
+    # Strict acceleration check (Mark KESIN — 3+ quarter monotonic)
+    is_strict_accel = all(q[i] < q[i + 1] for i in range(n - 1))
+    is_strict_decel = all(q[i] > q[i + 1] for i in range(n - 1))
+
+    magnitude = current - q[0]
+
+    # Phase classification
+    if is_strict_accel:
+        phase = 'accelerating'
+    elif is_strict_decel:
+        phase = 'decelerating'
+    else:
+        phase = 'flat'
+
+    # Mark 90% Rule: STRICT acceleration + current quarter > %25 threshold
+    mark_90pct = is_strict_accel and current > MARK_EPS_90PCT_RULE_THRESHOLD
+
+    # Tier classification (Mark KESIN tier'lar)
+    if current >= MARK_EPS_TURNAROUND_PCT:
+        tier = 'turnaround'
+    elif current >= MARK_EPS_BULL_MARKET_PCT:
+        tier = 'bull_market'
+    elif current >= MARK_EPS_SUPERPERFORMANCE_PCT:
+        tier = 'superperformance'
+    elif current >= MARK_EPS_MIN_GROWTH_PCT:
+        tier = 'minimum'
+    else:
+        tier = 'below_minimum'
+
+    # Mark says
+    if mark_90pct:
+        says = (f"3-quarter strict acceleration + current %{current:.1f} > %{MARK_EPS_90PCT_RULE_THRESHOLD} "
+                f"= Mark 90% Rule MATCH (TLSMW s.131)")
+    elif is_strict_accel:
+        says = (f"Strict acceleration ama current %{current:.1f} < %{MARK_EPS_90PCT_RULE_THRESHOLD} "
+                f"(Mark 90% Rule için threshold gerekli)")
+    elif is_strict_decel:
+        says = f"Strict DECELERATION — Mark uyarı (Dell paten, TLSMW s.138)"
+    else:
+        says = "Düzensiz EPS — Mark 90% Rule için pattern yok"
+
+    return {
+        'accelerating': is_strict_accel,
+        'magnitude_pct_pts': round(magnitude, 2),
+        'mark_90pct_rule': mark_90pct,
+        'phase': phase,
+        'tier': tier,
+        'mark_says': says,
+        'quarters_count': n,
+    }
+
+
+def detect_code_33(
+    eps_growth_yoy_last_4q: list[float],
+    sales_growth_yoy_last_4q: list[float],
+    net_margin_last_4q: list[float],
+) -> dict:
+    """KARAR ADAY #855 — Mark Code 33 Detector (TLSMW s.173).
+
+    Mark birebir (TLSMW s.173):
+        "Code 33 situation: three quarters of acceleration in earnings, sales,
+        AND profit margins. That's a potent recipe."
+
+    Mark Monster Beverage (MNST) 2003-2005:
+        "Classic Code 33 annual acceleration ... superperformance condition"
+
+    Hesap (Mark KESIN ÜÇLÜ accel):
+        - eps_accel: 3-quarter EPS YoY strict artış
+        - sales_accel: 3-quarter satış YoY strict artış
+        - margin_expanding: 3-quarter net margin strict artış
+        - Tüm 3'ü PASS → CODE_33 elite tier
+
+    Args:
+        eps_growth_yoy_last_4q: Son 4 çeyrek EPS YoY büyüme
+        sales_growth_yoy_last_4q: Son 4 çeyrek satış YoY büyüme
+        net_margin_last_4q: Son 4 çeyrek net margin yüzdesi
+
+    Returns:
+        dict:
+        {
+            'pattern': 'CODE_33' | 'partial' | 'none',
+            'eps_accel': bool,
+            'sales_accel': bool,
+            'margin_expanding': bool,
+            'pass_count': int (0-3),
+            'mark_says': str,
+            'tier': 'elite' | 'partial_2' | 'partial_1' | 'none',
+        }
+
+    Kaynak: TLSMW s.173 + Sprint_4_bis_7_Mark_HASSAS_Tarama.md KARAR ADAY #855
+    """
+    def _strict_accel(arr: list[float]) -> bool:
+        if not arr or len(arr) < MARK_EPS_ACCEL_MIN_QUARTERS + 1:
+            return False
+        return all(arr[i] < arr[i + 1] for i in range(len(arr) - 1))
+
+    eps_accel = _strict_accel(eps_growth_yoy_last_4q)
+    sales_accel = _strict_accel(sales_growth_yoy_last_4q)
+    margin_expanding = _strict_accel(net_margin_last_4q)
+
+    pass_count = sum([eps_accel, sales_accel, margin_expanding])
+
+    if pass_count == 3:
+        pattern = 'CODE_33'
+        tier = 'elite'
+        says = ("CODE 33 elite — EPS + Sales + Margin 3-quarter triple accel "
+                "(Mark KESIN superperformance condition, TLSMW s.173)")
+    elif pass_count == 2:
+        pattern = 'partial'
+        tier = 'partial_2'
+        says = ("Partial Code 33 — 2/3 accel (eksik faktör Mark için kritik, "
+                "TLSMW s.173 'potent recipe' için 3/3 ZORUNLU)")
+    elif pass_count == 1:
+        pattern = 'partial'
+        tier = 'partial_1'
+        says = "Sadece 1/3 accel — Mark Code 33 imzası YOK"
+    else:
+        pattern = 'none'
+        tier = 'none'
+        says = "Code 33 pattern yok — Mark superperformance condition eksik"
+
+    return {
+        'pattern': pattern,
+        'eps_accel': eps_accel,
+        'sales_accel': sales_accel,
+        'margin_expanding': margin_expanding,
+        'pass_count': pass_count,
+        'mark_says': says,
+        'tier': tier,
+    }

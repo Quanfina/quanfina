@@ -1570,3 +1570,152 @@ class TestMarkSixRuleCheck:
         assert MARK_EQUITY_RISK_MIN_PCT == 1.25
         assert MARK_EQUITY_RISK_MAX_PCT == 2.50
         assert MARK_POSITION_MAX_PCT == 50.0
+
+
+# =============================================================================
+# SPRINT 4-bis.7 — FAZ 2 — Mark EPS Acceleration + Code 33
+# Tests for: detect_eps_acceleration, detect_code_33
+# Tescil: Vizyon v22.00 + v22.01 (24 May 2026)
+# =============================================================================
+
+from quanfina_math import (
+    detect_eps_acceleration,
+    detect_code_33,
+    MARK_EPS_MIN_GROWTH_PCT,
+    MARK_EPS_SUPERPERFORMANCE_PCT,
+    MARK_EPS_BULL_MARKET_PCT,
+    MARK_EPS_TURNAROUND_PCT,
+    MARK_EPS_90PCT_RULE_THRESHOLD,
+)
+
+
+class TestDetectEpsAcceleration:
+    """KARAR ADAY #834 - Mark EPS Acceleration Detector (TLSMW s.131)."""
+
+    def test_mark_textbook_example(self):
+        # Mark TLSMW s.131 birebir: -5, 10, 28, 56
+        result = detect_eps_acceleration([-5.0, 10.0, 28.0, 56.0])
+        assert result["accelerating"] is True
+        assert result["mark_90pct_rule"] is True  # current 56 > 25
+        assert result["phase"] == "accelerating"
+        assert result["tier"] == "bull_market"  # 56 > 40
+        assert abs(result["magnitude_pct_pts"] - 61.0) < 0.01
+
+    def test_strict_accel_below_25_threshold(self):
+        # Accel var ama current < 25 → 90% Rule MATCH değil
+        result = detect_eps_acceleration([5.0, 10.0, 15.0, 20.0])
+        assert result["accelerating"] is True
+        assert result["mark_90pct_rule"] is False  # current 20 < 25
+        assert result["tier"] == "minimum"  # 20 == 20
+
+    def test_strict_deceleration_dell_pattern(self):
+        # Mark Dell pattern (TLSMW s.138): %80 → %65 → %28 → declining
+        result = detect_eps_acceleration([80.0, 65.0, 28.0, 11.0])
+        assert result["accelerating"] is False
+        assert result["phase"] == "decelerating"
+        assert "DECELERATION" in result["mark_says"]
+
+    def test_flat_irregular_pattern(self):
+        result = detect_eps_acceleration([10.0, 25.0, 15.0, 30.0])
+        assert result["accelerating"] is False
+        assert result["phase"] == "flat"
+
+    def test_turnaround_tier(self):
+        # Mark Turnaround (TLSMW s.137): current %100+
+        result = detect_eps_acceleration([10.0, 50.0, 80.0, 150.0])
+        assert result["accelerating"] is True
+        assert result["tier"] == "turnaround"
+        assert result["mark_90pct_rule"] is True
+
+    def test_superperformance_tier(self):
+        # current %30-40 range
+        result = detect_eps_acceleration([5.0, 15.0, 25.0, 35.0])
+        assert result["tier"] == "superperformance"
+
+    def test_below_minimum_tier(self):
+        result = detect_eps_acceleration([1.0, 3.0, 5.0, 10.0])
+        assert result["tier"] == "below_minimum"  # current < 20
+
+    def test_empty_input_invalid(self):
+        result = detect_eps_acceleration([])
+        assert result["phase"] == "invalid"
+        assert result["accelerating"] is False
+
+    def test_single_quarter_invalid(self):
+        result = detect_eps_acceleration([20.0])
+        assert result["phase"] == "invalid"
+
+    def test_two_quarters_minimal_check(self):
+        result = detect_eps_acceleration([10.0, 30.0])
+        assert result["accelerating"] is True
+        assert result["quarters_count"] == 2
+
+    def test_mark_constants(self):
+        assert MARK_EPS_MIN_GROWTH_PCT == 20.0
+        assert MARK_EPS_SUPERPERFORMANCE_PCT == 30.0
+        assert MARK_EPS_BULL_MARKET_PCT == 40.0
+        assert MARK_EPS_TURNAROUND_PCT == 100.0
+        assert MARK_EPS_90PCT_RULE_THRESHOLD == 25.0
+
+
+class TestDetectCode33:
+    """KARAR ADAY #855 - Mark Code 33 Detector (TLSMW s.173)."""
+
+    def test_full_code_33_monster_pattern(self):
+        # Mark MNST 2003-2005 classic Code 33
+        result = detect_code_33(
+            eps_growth_yoy_last_4q=[20.0, 35.0, 50.0, 75.0],
+            sales_growth_yoy_last_4q=[15.0, 25.0, 40.0, 60.0],
+            net_margin_last_4q=[5.0, 7.0, 9.0, 12.0],
+        )
+        assert result["pattern"] == "CODE_33"
+        assert result["tier"] == "elite"
+        assert result["eps_accel"] is True
+        assert result["sales_accel"] is True
+        assert result["margin_expanding"] is True
+        assert result["pass_count"] == 3
+        assert "CODE 33 elite" in result["mark_says"]
+
+    def test_partial_2_of_3(self):
+        result = detect_code_33(
+            eps_growth_yoy_last_4q=[20.0, 35.0, 50.0, 75.0],
+            sales_growth_yoy_last_4q=[15.0, 25.0, 40.0, 60.0],
+            net_margin_last_4q=[10.0, 8.0, 6.0, 4.0],  # decreasing margin
+        )
+        assert result["pattern"] == "partial"
+        assert result["tier"] == "partial_2"
+        assert result["pass_count"] == 2
+
+    def test_partial_1_of_3(self):
+        result = detect_code_33(
+            eps_growth_yoy_last_4q=[20.0, 35.0, 50.0, 75.0],  # only EPS accel
+            sales_growth_yoy_last_4q=[15.0, 12.0, 10.0, 8.0],
+            net_margin_last_4q=[10.0, 9.0, 8.0, 7.0],
+        )
+        assert result["pattern"] == "partial"
+        assert result["tier"] == "partial_1"
+        assert result["pass_count"] == 1
+
+    def test_none(self):
+        result = detect_code_33(
+            eps_growth_yoy_last_4q=[20.0, 15.0, 10.0, 5.0],
+            sales_growth_yoy_last_4q=[20.0, 15.0, 10.0, 5.0],
+            net_margin_last_4q=[10.0, 9.0, 8.0, 7.0],
+        )
+        assert result["pattern"] == "none"
+        assert result["pass_count"] == 0
+
+    def test_insufficient_quarters(self):
+        # Mark KESIN minimum 3-quarter accel — 4 data point gerekli
+        result = detect_code_33(
+            eps_growth_yoy_last_4q=[10.0, 20.0],
+            sales_growth_yoy_last_4q=[10.0, 20.0],
+            net_margin_last_4q=[5.0, 6.0],
+        )
+        assert result["pattern"] == "none"
+        assert result["eps_accel"] is False  # <4 quarter
+
+    def test_empty_inputs(self):
+        result = detect_code_33([], [], [])
+        assert result["pattern"] == "none"
+        assert result["pass_count"] == 0
