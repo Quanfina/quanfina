@@ -402,6 +402,49 @@ export default function Home() {
                   </span>
                 </div>
               )}
+              {/* KARAR #733 alt-paket (Paket 60): Divergence kategori shortLabel
+                  — BEARISH_DIVERGENCE kritik kırmızı vurgu, P58 widget pateni
+                  compact varyant. */}
+              {market.data.breadth_divergence &&
+                market.data.breadth_divergence.divergence !== "NEUTRAL" && (
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span title={market.data.breadth_divergence.mark_says}>
+                    Index × A/D
+                  </span>
+                  <span
+                    className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider"
+                    style={{
+                      background:
+                        market.data.breadth_divergence.severity === "critical"
+                          ? "rgba(220,53,69,0.18)"
+                          : market.data.breadth_divergence.severity === "warn"
+                          ? "rgba(220,53,69,0.12)"
+                          : market.data.breadth_divergence.severity === "ok"
+                          ? "rgba(40,167,69,0.15)"
+                          : "rgba(75,156,211,0.12)",
+                      color:
+                        market.data.breadth_divergence.severity === "critical" ||
+                        market.data.breadth_divergence.severity === "warn"
+                          ? "var(--mtp-danger)"
+                          : market.data.breadth_divergence.severity === "ok"
+                          ? "var(--mtp-excellent)"
+                          : "var(--mtp-good, #4B9CD3)",
+                      border:
+                        market.data.breadth_divergence.severity === "critical"
+                          ? "1px solid var(--mtp-danger)"
+                          : undefined,
+                    }}
+                  >
+                    {market.data.breadth_divergence.divergence === "CONFIRMED_UP"
+                      ? "ONAYLI ↑"
+                      : market.data.breadth_divergence.divergence === "BEARISH_DIVERGENCE"
+                      ? "BEARISH ⚠️"
+                      : market.data.breadth_divergence.divergence === "BULLISH_DIVERGENCE"
+                      ? "BULLISH ↗"
+                      : "ONAYLI ↓"}
+                  </span>
+                </div>
+              )}
               <div className="pt-2 border-t flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">Önerilen Mod</span>
                 <span
