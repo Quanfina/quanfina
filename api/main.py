@@ -45,6 +45,7 @@ from quanfina_math import (  # noqa: E402
     compute_pyramid_tier,
     count_distribution_days,
     compute_carr_stage,
+    compute_market_breadth,
     MARK_PYRAMID_PILOT_PCT_RANGE,
     MARK_PYRAMID_STANDARD_PCT_RANGE,
     MARK_PYRAMID_FULL_PCT_RANGE,
@@ -938,6 +939,15 @@ def _compute_mark_regime(distribution_days: int) -> MarkRegimeInfo:
     )
 
 
+class MarketBreadthInfo(BaseModel):
+    """KARAR #733 alt-paket (Paket 52, 25 May 2026): Mark+O'Neil A/D Line canon.
+    quanfina_math.compute_market_breadth backend pre-compute (P51 helper)."""
+    ad_ratio: float                       # Bugun advance/decline orani
+    ad_line_cumulative: int               # 20-gun birikimli (advance - decline)
+    breadth_health: Literal["STRONG", "NEUTRAL", "WEAK"]
+    mark_says: str                        # Mark felsefe yorumu
+
+
 class MarketStatus(BaseModel):
     spy_stage: int
     qqq_stage: int
@@ -952,6 +962,9 @@ class MarketStatus(BaseModel):
     # KARAR ADAY #731 (24 May 2026): Mark Regime backend pre-compute
     # (KARAR #488 4-Katman x 2-Eksen, frontend DRY)
     mark_regime: Optional[MarkRegimeInfo] = None
+    # KARAR #733 alt-paket (Paket 52, 25 May 2026): Market Breadth A/D Line
+    # backend pre-compute (P51 compute_market_breadth helper wire)
+    market_breadth: Optional[MarketBreadthInfo] = None
 
 
 MOCK_MARKET_STATUS = MarketStatus(
@@ -1022,6 +1035,35 @@ def _mock_spy_closes_volumes(days: int = 25) -> tuple[list[float], list[int]]:
     return _mock_index_history("SPY", 400.0, days)
 
 
+def _mock_breadth_history(days: int = 25) -> tuple[list[int], list[int]]:
+    """KARAR #733 alt-paket (Paket 52, 25 May 2026): MOCK A/D advance/decline.
+
+    Deterministik tarih seed — ayni gun ayni veri. Production'da
+    minervini_scans + sector_rotation tablosundan gunluk sayim
+    (AÇIK KONU #75 yfinance pipeline + Cloud SQL JOIN).
+
+    Algoritma: NYSE+NASDAQ ~3500 hisse varsayim. Hafif bias daily.
+    Tarih seed dagilimi ile market regime'e gore ortalama A/D ratio
+    degisir (carr-stage paten).
+    """
+    seed = int(date.today().toordinal()) + 17  # SPY/QQQ/IWM seedler 0-200 arasi
+    rng = random.Random(seed)
+    advances: list[int] = []
+    declines: list[int] = []
+    total_stocks = 3500
+    for _ in range(days):
+        # Bias degisken (regime hafif drift)
+        bias = rng.uniform(0.40, 0.60)  # 0.4 = zayif, 0.6 = saglikli
+        adv = int(total_stocks * bias)
+        dec = total_stocks - adv
+        # Hafif gurultu
+        adv += rng.randint(-100, 100)
+        dec += rng.randint(-100, 100)
+        advances.append(max(0, adv))
+        declines.append(max(0, dec))
+    return advances, declines
+
+
 def _index_stage(ticker: str, start_price: float) -> int:
     """KARAR #733 alt-paket (Paket 24): SPY/QQQ/IWM stage dinamik hesap.
 
@@ -1047,6 +1089,19 @@ def get_market_status() -> MarketStatus:
     qqq_stage = _index_stage("QQQ", 380.0)
     iwm_stage = _index_stage("IWM", 200.0)
 
+    # KARAR #733 alt (Paket 52): Market Breadth A/D Line backend pre-compute
+    # (Mark+O'Neil canon — P51 compute_market_breadth helper wire)
+    advances, declines = _mock_breadth_history(days=25)
+    breadth = compute_market_breadth(advances, declines, lookback_days=20)
+    market_breadth = None
+    if breadth.get("breadth_health"):  # None ise skip (edge)
+        market_breadth = MarketBreadthInfo(
+            ad_ratio=breadth["ad_ratio"],
+            ad_line_cumulative=breadth["ad_line_cumulative"],
+            breadth_health=breadth["breadth_health"],
+            mark_says=breadth["mark_says"],
+        )
+
     status = MOCK_MARKET_STATUS.model_copy(
         update={
             "distribution_days": dd_count,
@@ -1054,6 +1109,7 @@ def get_market_status() -> MarketStatus:
             "qqq_stage": qqq_stage,
             "iwm_stage": iwm_stage,
             "mark_regime": _compute_mark_regime(dd_count),
+            "market_breadth": market_breadth,
         }
     )
     return status

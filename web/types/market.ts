@@ -14,6 +14,17 @@ export interface MarkRegimeInfoBackend {
   pilot_override: boolean;
 }
 
+// KARAR #733 alt-paket (Paket 52, 25 May 2026): Mark+O'Neil A/D Line canon
+// (P51 compute_market_breadth helper + P52 backend wire)
+export type MarketBreadthHealth = "STRONG" | "NEUTRAL" | "WEAK";
+
+export interface MarketBreadthInfo {
+  ad_ratio: number;                 // Bugun advance/decline orani
+  ad_line_cumulative: number;       // 20-gun birikimli (advance - decline)
+  breadth_health: MarketBreadthHealth;
+  mark_says: string;
+}
+
 export interface MarketStatus {
   spy_stage: number;
   qqq_stage: number;
@@ -27,4 +38,6 @@ export interface MarketStatus {
   bottom_sectors: SectorChange[];
   // KARAR ADAY #731: Mark Regime backend (frontend DRY computeMarketRegime fallback)
   mark_regime?: MarkRegimeInfoBackend | null;
+  // KARAR #733 alt-paket (Paket 52): Market Breadth A/D Line backend pre-compute
+  market_breadth?: MarketBreadthInfo | null;
 }

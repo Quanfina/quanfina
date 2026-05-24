@@ -192,3 +192,40 @@ class TestDeterminism:
         assert s1["iwm_stage"] == s2["iwm_stage"]
         assert s1["distribution_days"] == s2["distribution_days"]
         assert s1["mark_regime"]["regime"] == s2["mark_regime"]["regime"]
+
+
+# =====================================================================
+# Test: Market Breadth backend wire (Paket 52)
+# =====================================================================
+
+class TestMarketBreadthWire:
+    """KARAR #733 alt-paket (Paket 52): market_breadth backend pre-compute
+    (P51 compute_market_breadth helper wire)."""
+
+    def test_market_breadth_field_present(self, status):
+        """market_breadth Pydantic alani response'da bulunmali."""
+        assert "market_breadth" in status
+
+    def test_market_breadth_shape(self, status):
+        """Tum alanlar mevcut + tip uyumu."""
+        mb = status["market_breadth"]
+        assert mb is not None
+        for field in ("ad_ratio", "ad_line_cumulative", "breadth_health", "mark_says"):
+            assert field in mb
+
+    def test_breadth_health_valid(self, status):
+        """STRONG/NEUTRAL/WEAK literal'larindan biri."""
+        valid = {"STRONG", "NEUTRAL", "WEAK"}
+        assert status["market_breadth"]["breadth_health"] in valid
+
+    def test_ad_ratio_positive(self, status):
+        """A/D ratio her zaman pozitif (decline > 0 MOCK)."""
+        assert status["market_breadth"]["ad_ratio"] > 0
+
+    def test_ad_line_int(self, status):
+        """ad_line_cumulative int tip."""
+        assert isinstance(status["market_breadth"]["ad_line_cumulative"], int)
+
+    def test_mark_says_non_empty(self, status):
+        """KALICI İLKE #4 Mark felsefe yorumu non-empty."""
+        assert len(status["market_breadth"]["mark_says"]) > 10
