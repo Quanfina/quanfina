@@ -44,6 +44,7 @@ from quanfina_math import (  # noqa: E402
     should_drop_setup,
     compute_pyramid_tier,
     count_distribution_days,
+    compute_carr_stage,
     MARK_PYRAMID_PILOT_PCT_RANGE,
     MARK_PYRAMID_STANDARD_PCT_RANGE,
     MARK_PYRAMID_FULL_PCT_RANGE,
@@ -976,48 +977,82 @@ MOCK_MARKET_STATUS = MarketStatus(
 )
 
 
-def _mock_spy_closes_volumes(days: int = 25) -> tuple[list[float], list[int]]:
-    """MOCK SPY closes + volumes - deterministik (tarih hash seed) MOCK uretim.
+def _mock_index_history(
+    ticker: str = "SPY",
+    start_price: float = 400.0,
+    days: int = 25,
+    drift_mean: float = 0.05,
+    drift_std: float = 0.7,
+) -> tuple[list[float], list[int]]:
+    """MOCK SPY/QQQ/IWM closes + volumes - deterministik (tarih + ticker hash seed).
 
-    KARAR #488 alt-paket (Paket 22): count_distribution_days helper'i icin
-    gercek bir veri akisi gerektigi icin MOCK uretim. Production'da
-    yfinance/Cloud SQL SPY tarihsel verisi ile degisecek (AÇIK KONU #75).
+    KARAR #488 + #733 alt-paket (Paket 22 + 24): count_distribution_days +
+    compute_carr_stage helper'lari icin gercek bir veri akisi MOCK uretim.
+    Production'da yfinance/Cloud SQL real tarihsel veri (ACIK KONU #75).
 
-    Algoritma: bugune kadar son N gün, hafif uptrend + arada DD'ler
-    (tarihsel pattern simulasyon). Deterministik (tarih seed) ki UI
-    aynı günün çağrılarında aynı veri görsün.
+    Algoritma: hafif drift + arada negatif gunler (DD adaylari).
+    Deterministik (tarih + ticker seed) ki ayni gun ayni veri.
+
+    Args:
+        ticker: 'SPY' / 'QQQ' / 'IWM' (seed icin)
+        start_price: Baslangic fiyati
+        days: Pencere uzunlugu (25 = DD; 180 = Carr Stage 30W)
+        drift_mean: Gunluk ortalama % degisim
+        drift_std: Gunluk std
     """
-    seed = int(date.today().toordinal())
+    seed = int(date.today().toordinal()) + sum(ord(c) for c in ticker)
     rng = random.Random(seed)
-    closes: list[float] = [400.0]
+    closes: list[float] = [start_price]
     volumes: list[int] = []
     for i in range(days):
-        # Hafif yukari drift + arada negatif gunler (DD adaylari)
-        pct = rng.gauss(0.05, 0.7)  # ortalama +%0.05, std %0.7
+        pct = rng.gauss(drift_mean, drift_std)
         closes.append(closes[-1] * (1 + pct / 100.0))
-        # Volume: down gunlerde %20 daha yuksek (DD kriteri)
         base_vol = 80_000_000
         if pct < 0:
             vol = int(base_vol * rng.uniform(1.0, 1.4))
         else:
             vol = int(base_vol * rng.uniform(0.8, 1.1))
         volumes.append(vol)
-    # closes[0] başlangıç; volumes[i] -> closes[i+1] eşleşmesi
-    closes = closes[1:]  # closes ve volumes esit uzunluk (days)
+    closes = closes[1:]
     return closes, volumes
+
+
+# Geriye uyum alias (Paket 22 ismi)
+def _mock_spy_closes_volumes(days: int = 25) -> tuple[list[float], list[int]]:
+    return _mock_index_history("SPY", 400.0, days)
+
+
+def _index_stage(ticker: str, start_price: float) -> int:
+    """KARAR #733 alt-paket (Paket 24): SPY/QQQ/IWM stage dinamik hesap.
+
+    180 gun MOCK history + compute_carr_stage helper.
+    Stan Weinstein 4-Stage (1=Basing, 2=Advancing, 3=Topping, 4=Declining).
+    Helper None donerse fallback Stage 2 (default).
+    """
+    closes, volumes = _mock_index_history(ticker, start_price, days=180)
+    result = compute_carr_stage(closes, volumes, ma_window=150)
+    return result.get("stage") or 2
 
 
 @app.get("/api/market/status", response_model=MarketStatus)
 def get_market_status() -> MarketStatus:
-    # KARAR #731 + #488 alt-paket (Paket 22): distribution_days deterministik
-    # MOCK SPY akisindan hesaplanir (count_distribution_days helper).
-    # Production'da yfinance/SQL real veri (AÇIK KONU #75).
+    # KARAR #731 + #488 alt (Paket 22): distribution_days MOCK SPY -> DD count
     closes, volumes = _mock_spy_closes_volumes(days=25)
     dd_result = count_distribution_days(closes, volumes, lookback_days=20)
     dd_count = dd_result["count"]
+
+    # KARAR #733 alt (Paket 24): SPY/QQQ/IWM stage dinamik compute_carr_stage
+    # Production'da yfinance/SQL real veri (AÇIK KONU #75).
+    spy_stage = _index_stage("SPY", 400.0)
+    qqq_stage = _index_stage("QQQ", 380.0)
+    iwm_stage = _index_stage("IWM", 200.0)
+
     status = MOCK_MARKET_STATUS.model_copy(
         update={
             "distribution_days": dd_count,
+            "spy_stage": spy_stage,
+            "qqq_stage": qqq_stage,
+            "iwm_stage": iwm_stage,
             "mark_regime": _compute_mark_regime(dd_count),
         }
     )
