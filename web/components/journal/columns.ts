@@ -5,6 +5,7 @@ import { GradeBadge } from "./GradeBadge";
 import { TradeStatusBadge } from "./TradeStatusBadge";
 import { SymbolCellRenderer } from "@/components/watchlist/SymbolCellRenderer";
 import { formatDateTR } from "@/lib/format-date";
+import { RMultipleCell } from "./RMultipleCell";
 // KARAR #492 (20 May 2026 ~16:45): DRY hijyen - yerel MONO -> @/lib/grid-styles
 // 4 sayfa tek noktada toplandi (signals/screens/watchlist/journal). fontSize 12px
 // MONO_RIGHT global tutarlilik (Sinyaller pateniyle exact match).
@@ -116,6 +117,18 @@ export const TRADE_COL_DEFS: ColDef<Trade>[] = [
     minWidth: 70,
     valueFormatter: fmtPLPct,
     cellStyle: plStyle as (p: CellClassParams) => CellStyle,
+  },
+  // KARAR ADAY #734 (24 May 2026): R-Multiple sutunu — Mark RBA disiplinini guclendir.
+  // Plan_stop + entry + exit + shares ile hesaplanir; plan_stop yoksa "—".
+  // NOT: sortable false (hesaplanan field, AG Grid sort fonksiyonu kullanmiyoruz).
+  {
+    headerName: "R",
+    width: 80,
+    minWidth: 70,
+    sortable: false,
+    filter: false,
+    cellRenderer: RMultipleCell,
+    cellStyle: { display: "flex", alignItems: "center", justifyContent: "flex-end" },
   },
   {
     field: "grade",
