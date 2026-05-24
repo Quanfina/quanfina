@@ -57,6 +57,9 @@ export default function RiskYonetimiPage() {
   const { data: marketStatus } = useMarketStatus();
   const regime = marketStatus?.mark_regime?.regime ?? null;
   const newBuyAllowed = marketStatus?.mark_regime?.new_buy_allowed ?? true;
+  // KARAR #733 alt-paket (Paket 62, 25 May 2026): Divergence rozet — piyasa
+  // rejimi yanında ek uyarı (DRY 5-katman tüketim 4. nokta)
+  const divergence = marketStatus?.breadth_divergence;
 
   // Tier kilit mantık: UNDER_PRESSURE/BEAR_PRESSURE iken Standart/Full
   // "rejim kilitli" rozeti, sadece Pilot önerilir (Mark canon)
@@ -282,30 +285,69 @@ export default function RiskYonetimiPage() {
             <h2 className="text-sm font-semibold">
               3 Tier Pozisyon $ Aralıkları (Portföy {fmtUsd(portfolioValue)})
             </h2>
-            {/* KARAR #733 alt-paket (Paket 47): Piyasa rejimi göstergesi */}
-            {regime && (
-              <span
-                className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider"
-                style={{
-                  background:
-                    regime === "HEALTHY"
-                      ? "rgba(40,167,69,0.15)"
-                      : regime === "CAUTION"
-                      ? "rgba(245,158,11,0.15)"
-                      : "rgba(220,53,69,0.15)",
-                  color:
-                    regime === "HEALTHY"
-                      ? "var(--mtp-excellent)"
-                      : regime === "CAUTION"
-                      ? "#F59E0B"
-                      : "var(--mtp-danger)",
-                  border: "1px solid currentColor",
-                }}
-                title={marketStatus?.mark_regime?.allocation}
-              >
-                Piyasa: {marketStatus?.mark_regime?.label}
-              </span>
-            )}
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* KARAR #733 alt-paket (Paket 47): Piyasa rejimi göstergesi */}
+              {regime && (
+                <span
+                  className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider"
+                  style={{
+                    background:
+                      regime === "HEALTHY"
+                        ? "rgba(40,167,69,0.15)"
+                        : regime === "CAUTION"
+                        ? "rgba(245,158,11,0.15)"
+                        : "rgba(220,53,69,0.15)",
+                    color:
+                      regime === "HEALTHY"
+                        ? "var(--mtp-excellent)"
+                        : regime === "CAUTION"
+                        ? "#F59E0B"
+                        : "var(--mtp-danger)",
+                    border: "1px solid currentColor",
+                  }}
+                  title={marketStatus?.mark_regime?.allocation}
+                >
+                  Piyasa: {marketStatus?.mark_regime?.label}
+                </span>
+              )}
+              {/* KARAR #733 alt-paket (Paket 62): Divergence rozet — DRY tüketim
+                  4. nokta (MarkRegimeCard P58 + Dashboard P60 + Banner P61 + Risk P62) */}
+              {divergence && divergence.divergence !== "NEUTRAL" && (
+                <span
+                  className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider"
+                  style={{
+                    background:
+                      divergence.severity === "critical"
+                        ? "rgba(220,53,69,0.18)"
+                        : divergence.severity === "warn"
+                        ? "rgba(220,53,69,0.12)"
+                        : divergence.severity === "ok"
+                        ? "rgba(40,167,69,0.15)"
+                        : "rgba(75,156,211,0.12)",
+                    color:
+                      divergence.severity === "critical" ||
+                      divergence.severity === "warn"
+                        ? "var(--mtp-danger)"
+                        : divergence.severity === "ok"
+                        ? "var(--mtp-excellent)"
+                        : "var(--mtp-good, #4B9CD3)",
+                    border:
+                      divergence.severity === "critical"
+                        ? "1px solid var(--mtp-danger)"
+                        : "1px solid currentColor",
+                  }}
+                  title={divergence.mark_says}
+                >
+                  {divergence.divergence === "CONFIRMED_UP"
+                    ? "A/D ↑ ONAYLI"
+                    : divergence.divergence === "BEARISH_DIVERGENCE"
+                    ? "A/D BEARISH ⚠️"
+                    : divergence.divergence === "BULLISH_DIVERGENCE"
+                    ? "A/D BULLISH ↗"
+                    : "A/D ↓ ONAYLI"}
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Piyasa-aware uyarı bandı — UNDER_PRESSURE/BEAR_PRESSURE iken */}
