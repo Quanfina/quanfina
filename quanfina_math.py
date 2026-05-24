@@ -2927,3 +2927,98 @@ def compute_pyramid_tier(
             'tier ustu asiri risk.'
         ),
     }
+
+
+# =============================================================================
+# KARAR #488 — Distribution Day Detector (O'Neil/Mark mekanik)
+# =============================================================================
+
+# O'Neil orijinal eşik (KALICI İLKE #4 birebir):
+DISTRIBUTION_DAY_CLOSE_THRESHOLD_PCT: float = -0.2  # close <= -0.2% (O'Neil)
+DISTRIBUTION_DAY_LOOKBACK_DAYS: int = 20             # 4-5 hafta penceresi
+
+
+def count_distribution_days(
+    closes: list[float],
+    volumes: list[int],
+    lookback_days: int = DISTRIBUTION_DAY_LOOKBACK_DAYS,
+) -> dict:
+    """Mark KARAR #488 — Distribution Day sayimi (O'Neil mekanik).
+
+    O'Neil birebir kriter (TLSMW + Mark Regime referansi):
+    - Close <= -0.2% (gun bazli yuzde dusus)
+    - Volume bir onceki gunden YUKSEK (institutional satis kaniti)
+    - Lookback 4-5 hafta (~20 trade gunu)
+
+    Mark KARAR #488 4-Katman threshold:
+    - 0-2 DD -> HEALTHY
+    - 3 DD   -> CAUTION
+    - 4 DD   -> UNDER_PRESSURE (Hard Filter)
+    - 5+ DD  -> BEAR_PRESSURE
+
+    Args:
+        closes:  Tarihsel close fiyatlari (eskiden yeniye, son eleman bugun)
+        volumes: Tarihsel hacim (closes ile esit uzunluk)
+        lookback_days: Pencere (default 20)
+
+    Returns:
+        dict:
+        {
+            'count': int (DD sayimi son pencere),
+            'lookback': int,
+            'regime_hint': 'HEALTHY' | 'CAUTION' | 'UNDER_PRESSURE' | 'BEAR_PRESSURE',
+            'mark_says': str,
+        }
+
+    Kaynak: Vizyon v20.99 KARAR #488 O'Neil + Mark
+    """
+    if not closes or len(closes) != len(volumes):
+        return {
+            'count': 0, 'lookback': lookback_days,
+            'regime_hint': 'HEALTHY',
+            'mark_says': 'Yetersiz veri - DD sayimi yapilmadi (closes/volumes esit uzunluk gerek).',
+        }
+
+    n = len(closes)
+    if n < 2:
+        return {
+            'count': 0, 'lookback': lookback_days,
+            'regime_hint': 'HEALTHY',
+            'mark_says': 'En az 2 gun veri gerek (DD karsilastirma icin).',
+        }
+
+    # Son lookback_days pencere (1+ gunluk veri gerekli)
+    start_idx = max(1, n - lookback_days)
+    dd_count = 0
+    for i in range(start_idx, n):
+        prev_close = closes[i - 1]
+        curr_close = closes[i]
+        prev_vol = volumes[i - 1]
+        curr_vol = volumes[i]
+        if prev_close <= 0:
+            continue
+        pct_change = ((curr_close - prev_close) / prev_close) * 100.0
+        # O'Neil DD: close <= -0.2% + volume > onceki gun
+        if pct_change <= DISTRIBUTION_DAY_CLOSE_THRESHOLD_PCT and curr_vol > prev_vol:
+            dd_count += 1
+
+    # Mark KARAR #488 4-katman mapping
+    if dd_count <= 2:
+        regime = 'HEALTHY'
+        says = f'{dd_count} DD - Mark Regime HEALTHY (0-2 DD). Yeni alim izinli.'
+    elif dd_count == 3:
+        regime = 'CAUTION'
+        says = f'{dd_count} DD - Mark Regime CAUTION. Yeni alim siki kriter.'
+    elif dd_count == 4:
+        regime = 'UNDER_PRESSURE'
+        says = f'{dd_count} DD - Mark Regime UNDER_PRESSURE (O\'Neil Hard Filter). Yeni alim YASAK.'
+    else:
+        regime = 'BEAR_PRESSURE'
+        says = f'{dd_count} DD - Mark Regime BEAR_PRESSURE (5+ DD). %25 max veya nakit.'
+
+    return {
+        'count': dd_count,
+        'lookback': lookback_days,
+        'regime_hint': regime,
+        'mark_says': says,
+    }
