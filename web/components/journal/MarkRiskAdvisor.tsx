@@ -2,17 +2,25 @@
 
 import { useEffect, useState } from "react";
 import { useRiskAdvisor, type RiskAdvisorResponse } from "@/hooks/use-risk-advisor";
+import { useRbaMetrics } from "@/hooks/use-rba-metrics";
 
 /**
  * Sprint 4-bis.7 Faz 1 B paket — Mark Risk Advisor UI komponenti
  * KARAR ADAY #914 + #969 + #970 (Vizyon v22.00 tescili)
  * Trade form'a entegre: entry_price + shares değişince Mark'a danışır.
+ *
+ * KARAR ADAY #727 (24 May 2026): RBA gerçek veri bağlantısı.
+ * Önceki placeholder (avg_gain=undefined) yerine, Mark Dynamic Stop hesabı
+ * (avg_gain/2) için kullanıcının kapanmış trade'lerinden istatistik gelir.
+ *
  * Detay: notebook/Sprint_4_bis_7_Mark_HASSAS_Tarama.md
  */
 
 interface Props {
   entryPrice: string;
   shares: string;
+  // KARAR #727: RBA filtre için strategy (Minervini/Carr istatistikleri ayrı analiz)
+  strategy?: string;
   // Opsiyonel — gelecek extension
   portfolioValue?: number;        // varsayılan $100K (placeholder Sn. Ferit ayarı gelene kadar)
   totalPositions?: number;        // mevcut açık trade sayısı
@@ -24,17 +32,30 @@ const DEFAULT_PORTFOLIO_VALUE = 100000;
 export function MarkRiskAdvisor({
   entryPrice,
   shares,
+  strategy,
   portfolioValue = DEFAULT_PORTFOLIO_VALUE,
   totalPositions = 0,
   isBestName = false,
 }: Props) {
   const [data, setData] = useState<RiskAdvisorResponse | null>(null);
   const { mutate, isPending, error } = useRiskAdvisor();
+  // KARAR #727 — RBA gerçek veri (compute_dynamic_stop için)
+  const { data: rbaData } = useRbaMetrics({ strategy });
 
   const ep = parseFloat(entryPrice);
   const sh = parseInt(shares);
   const positionValue = !isNaN(ep) && !isNaN(sh) && ep > 0 && sh > 0 ? ep * sh : 0;
   const positionPctActual = portfolioValue > 0 ? (positionValue / portfolioValue) * 100 : 0;
+
+  // RBA istatistik anlamlı ise (>= 1 kapanmış trade) Mark Dynamic Stop'a beslenir
+  const rbaPayload =
+    rbaData && rbaData.metrics.num_trades >= 1
+      ? {
+          avg_gain_pct: rbaData.metrics.avg_gain_pct,
+          avg_loss_pct: rbaData.metrics.avg_loss_pct,
+          num_trades: rbaData.metrics.num_trades,
+        }
+      : {};
 
   // Auto-fetch on input change (debounced via mutation)
   useEffect(() => {
@@ -43,6 +64,7 @@ export function MarkRiskAdvisor({
     // risk_dollars = portfolio * (target_risk_pct/100)
     // position_dollars = risk_dollars / (max_stop_pct/100)
     // For advisory display: use Mark default %2 risk + %7 stop, then show 6-rule check
+    // KARAR #727: RBA varsa Mark Dynamic Stop avg_gain/2 hesabı kullanır
     mutate(
       {
         portfolio_value: portfolioValue,
@@ -50,12 +72,14 @@ export function MarkRiskAdvisor({
         max_stop_pct: 7.0,
         total_positions: totalPositions,
         is_best_name: isBestName,
+        ...rbaPayload,
       },
       {
         onSuccess: (resp) => setData(resp),
       }
     );
-  }, [entryPrice, shares, portfolioValue, totalPositions, isBestName, mutate, positionValue]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entryPrice, shares, portfolioValue, totalPositions, isBestName, mutate, positionValue, rbaData?.metrics.num_trades]);
 
   if (positionValue <= 0) {
     return (

@@ -226,8 +226,9 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
             </div>
           </div>
 
-          {/* Mark Risk Advisor — Sprint 4-bis.7 Faz 1 B paket (KARAR #914+#969+#970) */}
-          <MarkRiskAdvisor entryPrice={entryPrice} shares={shares} />
+          {/* Mark Risk Advisor — Sprint 4-bis.7 Faz 1 B paket (KARAR #914+#969+#970)
+              KARAR #727 (24 May 2026): RBA gerçek veri bağı — strategy prop ile filtre */}
+          <MarkRiskAdvisor entryPrice={entryPrice} shares={shares} strategy={strategy} />
 
           {/* KARAR ADAY #717 — Mark Trade Plan (TTLC Sec 1, 6 zorunlu alan) */}
           <div className="border rounded-md p-3 bg-muted/30 flex flex-col gap-3">
