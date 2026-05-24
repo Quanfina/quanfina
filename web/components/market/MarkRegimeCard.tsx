@@ -1,8 +1,8 @@
 "use client";
 
-import { CheckCircle2, AlertCircle, XCircle, Shield, Crown, Activity, TrendingUp, TrendingDown } from "lucide-react";
+import { CheckCircle2, AlertCircle, XCircle, Shield, Crown, Activity, TrendingUp, TrendingDown, AlertTriangle } from "lucide-react";
 import { computeMarketRegime, type MarketRegimeInfo } from "@/lib/market-regime";
-import type { MarkRegimeInfoBackend, MarketBreadthInfo } from "@/types/market";
+import type { MarkRegimeInfoBackend, MarketBreadthInfo, BreadthDivergenceInfo } from "@/types/market";
 
 /**
  * KARAR ADAY #729 (24 May 2026) — Mark Market Regime Kartı.
@@ -28,7 +28,51 @@ interface Props {
   iwmStage?: number;
   // KARAR #733 alt-paket (Paket 53): Market Breadth A/D Line (P51+P52 backend)
   marketBreadth?: MarketBreadthInfo | null;
+  // KARAR #733 alt-paket (Paket 58): Index vs A/D Divergence (P56+P57 backend)
+  breadthDivergence?: BreadthDivergenceInfo | null;
 }
+
+// KARAR #733 alt-paket (Paket 58): Divergence kategori meta — 5 kategori
+const DIVERGENCE_META: Record<
+  "CONFIRMED_UP" | "BEARISH_DIVERGENCE" | "BULLISH_DIVERGENCE" | "CONFIRMED_DOWN" | "NEUTRAL",
+  { color: string; bg: string; icon: React.ReactNode; label: string; shortLabel: string }
+> = {
+  CONFIRMED_UP: {
+    color: "var(--mtp-excellent)",
+    bg: "rgba(40,167,69,0.10)",
+    icon: <CheckCircle2 size={14} />,
+    label: "Onaylı Rally",
+    shortLabel: "ONAYLI ↑",
+  },
+  BEARISH_DIVERGENCE: {
+    color: "var(--mtp-danger)",
+    bg: "rgba(220,53,69,0.12)",
+    icon: <AlertTriangle size={14} />,
+    label: "Bearish Divergence (KRİTİK)",
+    shortLabel: "BEARISH ⚠️",
+  },
+  BULLISH_DIVERGENCE: {
+    color: "var(--mtp-good, #4B9CD3)",
+    bg: "rgba(75,156,211,0.10)",
+    icon: <TrendingUp size={14} />,
+    label: "Bullish Divergence",
+    shortLabel: "BULLISH ↗",
+  },
+  CONFIRMED_DOWN: {
+    color: "var(--mtp-danger)",
+    bg: "rgba(220,53,69,0.08)",
+    icon: <TrendingDown size={14} />,
+    label: "Onaylı Düşüş",
+    shortLabel: "ONAYLI ↓",
+  },
+  NEUTRAL: {
+    color: "var(--muted-foreground)",
+    bg: "rgba(127,127,127,0.06)",
+    icon: <Activity size={14} />,
+    label: "Belirsiz",
+    shortLabel: "NEUTRAL",
+  },
+};
 
 const BREADTH_META: Record<"STRONG" | "NEUTRAL" | "WEAK", { color: string; icon: React.ReactNode; label: string }> = {
   STRONG: {
@@ -85,6 +129,7 @@ export function MarkRegimeCard({
   qqqStage,
   iwmStage,
   marketBreadth,
+  breadthDivergence,
 }: Props) {
   // KARAR #731 — Backend tercih + client-side fallback (DRY)
   const info: MarketRegimeInfo = backendRegime
@@ -259,12 +304,103 @@ export function MarkRegimeCard({
         </div>
       )}
 
+      {/* KARAR #733 alt-paket (Paket 58): Index vs A/D Divergence widget */}
+      {breadthDivergence && (
+        <div
+          className="pt-2 border-t border-muted-foreground/15 flex flex-col gap-1.5 rounded-md"
+          style={{
+            // KRİTİK durum (BEARISH_DIVERGENCE) için ekstra vurgu
+            background:
+              breadthDivergence.divergence === "BEARISH_DIVERGENCE"
+                ? DIVERGENCE_META.BEARISH_DIVERGENCE.bg
+                : undefined,
+            padding:
+              breadthDivergence.divergence === "BEARISH_DIVERGENCE"
+                ? "0.5rem"
+                : undefined,
+            border:
+              breadthDivergence.divergence === "BEARISH_DIVERGENCE"
+                ? `1px solid ${DIVERGENCE_META.BEARISH_DIVERGENCE.color}55`
+                : undefined,
+          }}
+        >
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground flex items-center gap-1.5">
+              {DIVERGENCE_META[breadthDivergence.divergence].icon}
+              Index × A/D Divergence
+            </span>
+            <span
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"
+              style={{
+                background: `${DIVERGENCE_META[breadthDivergence.divergence].color}22`,
+                color: DIVERGENCE_META[breadthDivergence.divergence].color,
+                border: `1px solid ${DIVERGENCE_META[breadthDivergence.divergence].color}55`,
+              }}
+              title={DIVERGENCE_META[breadthDivergence.divergence].label}
+            >
+              {DIVERGENCE_META[breadthDivergence.divergence].shortLabel}
+            </span>
+          </div>
+          <div className="flex items-center gap-4 text-xs tabular-nums">
+            <span className="text-muted-foreground">
+              SPY {breadthDivergence.index_change_pct >= 0 ? "+" : ""}
+              <span
+                className="font-mono font-semibold"
+                style={{
+                  color:
+                    breadthDivergence.index_change_pct > 0
+                      ? "var(--mtp-excellent)"
+                      : breadthDivergence.index_change_pct < 0
+                      ? "var(--mtp-danger)"
+                      : "var(--muted-foreground)",
+                }}
+              >
+                {breadthDivergence.index_change_pct.toFixed(2)}%
+              </span>
+            </span>
+            <span className="text-muted-foreground ml-auto">
+              A/D Trend:{" "}
+              <span
+                className="font-mono font-semibold"
+                style={{
+                  color:
+                    breadthDivergence.ad_trend_delta > 0
+                      ? "var(--mtp-excellent)"
+                      : breadthDivergence.ad_trend_delta < 0
+                      ? "var(--mtp-danger)"
+                      : "var(--muted-foreground)",
+                }}
+              >
+                {breadthDivergence.ad_trend_delta > 0 ? "+" : ""}
+                {breadthDivergence.ad_trend_delta.toLocaleString("en-US")}
+              </span>
+            </span>
+          </div>
+          <p
+            className="text-[10px] italic leading-snug"
+            style={{
+              color:
+                breadthDivergence.severity === "critical"
+                  ? "var(--mtp-danger)"
+                  : "var(--muted-foreground)",
+              fontWeight:
+                breadthDivergence.severity === "critical" ? 600 : "normal",
+            }}
+          >
+            {breadthDivergence.mark_says}
+          </p>
+        </div>
+      )}
+
       {/* Mark felsefesi atıf */}
       <p className="text-[11px] text-muted-foreground italic pt-1 border-t border-muted-foreground/15">
         KARAR #488 (Vizyon v20.99) — Mark 4-Katman × O&apos;Neil mekanik.
         DD 4+ = O&apos;Neil Hard Filter, Eksen 2 Lider Override felsefesi.
         {marketBreadth && (
           <> KARAR #733 (Paket 51-53) — Mark+O&apos;Neil A/D Line breadth.</>
+        )}
+        {breadthDivergence && (
+          <> KARAR #733 (Paket 56-58) — Index×A/D Divergence (1999/2007 tarihsel paten).</>
         )}
       </p>
     </div>

@@ -56,6 +56,7 @@ export default function PiyasaDurumuPage() {
           qqqStage={data.qqq_stage}
           iwmStage={data.iwm_stage}
           marketBreadth={data.market_breadth}
+          breadthDivergence={data.breadth_divergence}
         />
       </section>
 
