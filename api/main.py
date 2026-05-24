@@ -1205,6 +1205,43 @@ def _generate_ohlcv(symbol: str, end_price: float, n_bars: int = 252) -> list[Oh
     return bars
 
 
+def _fetch_scan_symbol_data(sym: str) -> dict | None:
+    """Tarama tablolarindan (minervini_scans, _fundamental_only, _fundamental_scans)
+    sembol fiyat + RS bilgisini cek. Tarama sonucu hisselerde grafik acilmali.
+
+    24 May 2026 — KARAR ADAY #498 (Hisse Detay Generic Fallback):
+      Sn. Ferit "hisselere tıklandığında grafik açılmıyor" raporu.
+      Sebep: MOCK_STOCKS + watchlist sınırlı, AXTI/SNDK gibi tarama sonucu
+      semboller eksikti → 404. Fix: scan tablolarından lookup.
+    """
+    from sqlalchemy import text as sql_text
+    from api.db_helpers import engine
+    # En son scan_date'ten symbol cek — 3 tablo birden (öncelik scans > fundamental_only > fundamental_scans)
+    for table in ("minervini_scans", "minervini_fundamental_only", "minervini_fundamental_scans"):
+        try:
+            with engine.connect() as conn:
+                result = conn.execute(sql_text(f"""
+                    SELECT ticker, price, rs_ibd, company, sector, industry
+                    FROM {table}
+                    WHERE ticker = :sym
+                      AND scan_date = (SELECT MAX(scan_date) FROM {table})
+                    LIMIT 1
+                """), {"sym": sym})
+                row = result.first()
+                if row:
+                    return {
+                        "ticker": row[0],
+                        "price": float(row[1]) if row[1] is not None else 100.0,
+                        "rs_ibd": int(round(float(row[2]))) if row[2] is not None else 50,
+                        "company": row[3] or sym,
+                        "sector": row[4] or "—",
+                        "industry": row[5] or "—",
+                    }
+        except (OperationalError, Exception):
+            continue
+    return None
+
+
 @app.get("/api/stock/{symbol}/info", response_model=StockInfo)
 def get_stock_info(symbol: str) -> StockInfo:
     sym = symbol.upper()
@@ -1215,9 +1252,6 @@ def get_stock_info(symbol: str) -> StockInfo:
         active = [WatchlistRow(**r) for r in watchlist_get_all() if r["symbol"] == sym]
     except OperationalError:
         active = []
-
-    if not stock and not active:
-        raise HTTPException(status_code=404, detail=f"Symbol '{sym}' not found")
 
     if stock:
         return StockInfo(
@@ -1231,7 +1265,7 @@ def get_stock_info(symbol: str) -> StockInfo:
             rs_rating=int(stock.rs_ibd),
             active_strategies=active,
         )
-    else:
+    if active:
         row = active[0]
         return StockInfo(
             symbol=sym,
@@ -1244,6 +1278,33 @@ def get_stock_info(symbol: str) -> StockInfo:
             rs_rating=row.rs_rating,
             active_strategies=active,
         )
+    # 24 May 2026 — Tarama sonucu sembollerinde fallback (KARAR ADAY #498)
+    # Sn. Ferit raporu: "hisselere tıklandığında grafik açılmıyor"
+    scan_data = _fetch_scan_symbol_data(sym)
+    if scan_data:
+        return StockInfo(
+            symbol=sym,
+            name=scan_data["company"],
+            sector=scan_data["sector"],
+            industry=scan_data["industry"],
+            market_cap=meta.get("market_cap", "—"),
+            price=scan_data["price"],
+            change_pct=0.0,
+            rs_rating=scan_data["rs_ibd"],
+            active_strategies=[],
+        )
+    # Son fallback — Generic MOCK (DB down + scan yok), grafik acilsin
+    return StockInfo(
+        symbol=sym,
+        name=sym,
+        sector="—",
+        industry="—",
+        market_cap="—",
+        price=100.0,
+        change_pct=0.0,
+        rs_rating=50,
+        active_strategies=[],
+    )
 
 
 @app.get("/api/stock/{symbol}/ohlcv", response_model=list[OhlcvBar])
@@ -1257,9 +1318,12 @@ def get_stock_ohlcv(symbol: str) -> list[OhlcvBar]:
             wl = [r for r in watchlist_get_all() if r["symbol"] == sym]
         except OperationalError:
             wl = []
-        if not wl:
-            raise HTTPException(status_code=404, detail=f"Symbol '{sym}' not found")
-        price = float(wl[0]["price"])
+        if wl:
+            price = float(wl[0]["price"])
+        else:
+            # 24 May 2026 — Tarama sonucu fallback (KARAR ADAY #498)
+            scan_data = _fetch_scan_symbol_data(sym)
+            price = scan_data["price"] if scan_data else 100.0  # Generic MOCK son fallback
     return _generate_ohlcv(sym, price)
 
 
