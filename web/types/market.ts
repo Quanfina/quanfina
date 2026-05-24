@@ -25,6 +25,25 @@ export interface MarketBreadthInfo {
   mark_says: string;
 }
 
+// KARAR #733 alt-paket (Paket 57, 25 May 2026): Mark+O'Neil divergence canon
+// (P56 compute_breadth_divergence helper + P57 backend wire)
+export type BreadthDivergenceType =
+  | "CONFIRMED_UP"
+  | "BEARISH_DIVERGENCE"
+  | "BULLISH_DIVERGENCE"
+  | "CONFIRMED_DOWN"
+  | "NEUTRAL";
+
+export type BreadthDivergenceSeverity = "ok" | "info" | "warn" | "critical";
+
+export interface BreadthDivergenceInfo {
+  divergence: BreadthDivergenceType;
+  index_change_pct: number;
+  ad_trend_delta: number;
+  severity: BreadthDivergenceSeverity;
+  mark_says: string;
+}
+
 export interface MarketStatus {
   spy_stage: number;
   qqq_stage: number;
@@ -40,4 +59,6 @@ export interface MarketStatus {
   mark_regime?: MarkRegimeInfoBackend | null;
   // KARAR #733 alt-paket (Paket 52): Market Breadth A/D Line backend pre-compute
   market_breadth?: MarketBreadthInfo | null;
+  // KARAR #733 alt-paket (Paket 57): Index vs A/D Divergence backend pre-compute
+  breadth_divergence?: BreadthDivergenceInfo | null;
 }

@@ -229,3 +229,61 @@ class TestMarketBreadthWire:
     def test_mark_says_non_empty(self, status):
         """KALICI İLKE #4 Mark felsefe yorumu non-empty."""
         assert len(status["market_breadth"]["mark_says"]) > 10
+
+
+# =====================================================================
+# Test: Breadth Divergence backend wire (Paket 57)
+# =====================================================================
+
+class TestBreadthDivergenceWire:
+    """KARAR #733 alt-paket (Paket 57): breadth_divergence backend pre-compute
+    (P56 compute_breadth_divergence helper wire)."""
+
+    def test_breadth_divergence_field_present(self, status):
+        """breadth_divergence Pydantic alani response'da bulunmali."""
+        assert "breadth_divergence" in status
+
+    def test_breadth_divergence_shape(self, status):
+        """Tum alanlar mevcut + tip uyumu."""
+        bd = status["breadth_divergence"]
+        assert bd is not None
+        for field in ("divergence", "index_change_pct", "ad_trend_delta",
+                      "severity", "mark_says"):
+            assert field in bd
+
+    def test_divergence_value_valid(self, status):
+        """5 kategori literal'larından biri."""
+        valid = {
+            "CONFIRMED_UP", "BEARISH_DIVERGENCE", "BULLISH_DIVERGENCE",
+            "CONFIRMED_DOWN", "NEUTRAL",
+        }
+        assert status["breadth_divergence"]["divergence"] in valid
+
+    def test_severity_value_valid(self, status):
+        """ok/info/warn/critical literal'larından biri."""
+        valid = {"ok", "info", "warn", "critical"}
+        assert status["breadth_divergence"]["severity"] in valid
+
+    def test_index_change_pct_is_float(self, status):
+        """index_change_pct float tip."""
+        assert isinstance(status["breadth_divergence"]["index_change_pct"], (int, float))
+
+    def test_ad_trend_delta_is_int(self, status):
+        """ad_trend_delta integer tip."""
+        assert isinstance(status["breadth_divergence"]["ad_trend_delta"], int)
+
+    def test_mark_says_non_empty(self, status):
+        """KALICI İLKE #4 Mark felsefe yorumu non-empty."""
+        assert len(status["breadth_divergence"]["mark_says"]) > 10
+
+    def test_bearish_divergence_severity_critical(self, status):
+        """BEARISH_DIVERGENCE ise severity=critical olmali."""
+        bd = status["breadth_divergence"]
+        if bd["divergence"] == "BEARISH_DIVERGENCE":
+            assert bd["severity"] == "critical"
+
+    def test_confirmed_up_severity_ok(self, status):
+        """CONFIRMED_UP ise severity=ok olmali."""
+        bd = status["breadth_divergence"]
+        if bd["divergence"] == "CONFIRMED_UP":
+            assert bd["severity"] == "ok"

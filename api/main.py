@@ -46,6 +46,7 @@ from quanfina_math import (  # noqa: E402
     count_distribution_days,
     compute_carr_stage,
     compute_market_breadth,
+    compute_breadth_divergence,
     MARK_PYRAMID_PILOT_PCT_RANGE,
     MARK_PYRAMID_STANDARD_PCT_RANGE,
     MARK_PYRAMID_FULL_PCT_RANGE,
@@ -948,6 +949,19 @@ class MarketBreadthInfo(BaseModel):
     mark_says: str                        # Mark felsefe yorumu
 
 
+class BreadthDivergenceInfo(BaseModel):
+    """KARAR #733 alt-paket (Paket 57, 25 May 2026): Mark+O'Neil divergence canon.
+    quanfina_math.compute_breadth_divergence backend pre-compute (P56 helper)."""
+    divergence: Literal[
+        "CONFIRMED_UP", "BEARISH_DIVERGENCE", "BULLISH_DIVERGENCE",
+        "CONFIRMED_DOWN", "NEUTRAL",
+    ]
+    index_change_pct: float               # lookback boyunca % degisim (SPY)
+    ad_trend_delta: int                   # lookback A/D cumulative delta
+    severity: Literal["ok", "info", "warn", "critical"]
+    mark_says: str                        # Mark+O'Neil felsefe yorumu
+
+
 class MarketStatus(BaseModel):
     spy_stage: int
     qqq_stage: int
@@ -965,6 +979,9 @@ class MarketStatus(BaseModel):
     # KARAR #733 alt-paket (Paket 52, 25 May 2026): Market Breadth A/D Line
     # backend pre-compute (P51 compute_market_breadth helper wire)
     market_breadth: Optional[MarketBreadthInfo] = None
+    # KARAR #733 alt-paket (Paket 57, 25 May 2026): Index vs A/D divergence
+    # backend pre-compute (P56 compute_breadth_divergence helper wire)
+    breadth_divergence: Optional[BreadthDivergenceInfo] = None
 
 
 MOCK_MARKET_STATUS = MarketStatus(
@@ -1102,6 +1119,23 @@ def get_market_status() -> MarketStatus:
             mark_says=breadth["mark_says"],
         )
 
+    # KARAR #733 alt (Paket 57): Index vs A/D Divergence backend pre-compute
+    # (Mark+O'Neil canon — P56 compute_breadth_divergence helper wire)
+    # SPY closes 25-gun MOCK + advances/declines aynı 25-gun feed
+    spy_closes, _ = _mock_index_history("SPY", 400.0, days=25)
+    divergence_result = compute_breadth_divergence(
+        spy_closes, advances, declines, lookback_days=10,
+    )
+    breadth_divergence = None
+    if divergence_result.get("divergence"):
+        breadth_divergence = BreadthDivergenceInfo(
+            divergence=divergence_result["divergence"],
+            index_change_pct=divergence_result["index_change_pct"],
+            ad_trend_delta=divergence_result["ad_trend_delta"],
+            severity=divergence_result["severity"],
+            mark_says=divergence_result["mark_says"],
+        )
+
     status = MOCK_MARKET_STATUS.model_copy(
         update={
             "distribution_days": dd_count,
@@ -1110,6 +1144,7 @@ def get_market_status() -> MarketStatus:
             "iwm_stage": iwm_stage,
             "mark_regime": _compute_mark_regime(dd_count),
             "market_breadth": market_breadth,
+            "breadth_divergence": breadth_divergence,
         }
     )
     return status
