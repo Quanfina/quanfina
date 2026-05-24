@@ -1383,6 +1383,13 @@ MARK_PORTFOLIO_OPTIMAL_STOCKS: tuple = (4, 12) # TTLC s.144 — "4-12 stocks tot
 MARK_POSITION_OPTIMAL_PCT_RANGE: tuple = (20.0, 25.0)  # TTLC s.144 — "20-25 percent in best names"
 MARK_POSITION_MAX_PCT: float = 50.0            # TTLC s.144 — "Never take position larger than 50%"
 
+# KARAR ADAY #732 (24 May 2026) — Mark Pyramid 3-Tier sabit (KARAR #487 Mark birebir).
+# Kaynak zinciri: TraderLion Lesson 7 (Pilot) + Brandon Video (Standart) +
+# Mark Video Kelly 2:1 (Full) + Mark X "Trades not working = no size increase" (Kilit).
+MARK_PYRAMID_PILOT_PCT_RANGE: tuple = (1.0, 3.0)        # Zayıf piyasa / nakitten giriş
+MARK_PYRAMID_STANDARD_PCT_RANGE: tuple = (6.25, 12.5)   # Normal piyasa + trades working
+MARK_PYRAMID_FULL_PCT_RANGE: tuple = (15.0, 25.0)       # Peak market + Kelly 2:1
+
 
 def compute_dynamic_stop(
     rba: Optional[RBAMetrics] = None,
@@ -2804,4 +2811,119 @@ def detect_earnings_gap_breakout(
         'close_position_pct': round(close_position_pct, 1),
         'tier': tier,
         'mark_says': says,
+    }
+
+
+# =============================================================================
+# KARAR #732 — Mark Pyramid Tier Calculator (KARAR #487 v20.98 Mark birebir)
+# =============================================================================
+
+def compute_pyramid_tier(
+    position_value: float,
+    portfolio_value: float,
+    prev_tier_profitable: bool = False,
+) -> dict:
+    """Mark Pyramid 3-Tier tier tespit + Mark X "Trades Working" güvenlik kilidi.
+
+    KARAR #487 (Vizyon v20.98) Mark birebir kaynak zinciri:
+    - PILOT     %1-3 (TraderLion Lesson 7) - zayıf piyasa / nakitten giriş
+    - STANDARD  %6.25-12.5 (Brandon Video) - normal piyasa + trades working
+    - FULL      %15-25 (Mark Video Kelly 2:1) - peak market + 60% win rate
+    - Mark X kilit: önceki tier kâra geçmeden bir üst tier'a YASAK
+
+    Args:
+        position_value: Pozisyon $ (entry_price * shares)
+        portfolio_value: Toplam portföy $
+        prev_tier_profitable: Pilot/Standart kâra geçti mi (Mark X kilit)
+
+    Returns:
+        dict:
+        {
+            'tier': 'BELOW_PILOT' | 'PILOT' | 'STANDARD' | 'FULL' | 'OVER_MAX',
+            'position_pct': float (0-100),
+            'severity': 'ok' | 'info' | 'warn' | 'violation',
+            'next_tier': 'PILOT' | 'STANDARD' | 'FULL' | None,
+            'mark_says': str (felsefe yorumu),
+        }
+
+    Kaynak: notebook Vizyon v20.98 KARAR #487 + scripts/Sprint_4_bis_7
+    """
+    if portfolio_value <= 0 or position_value <= 0:
+        return {
+            'tier': 'BELOW_PILOT',
+            'position_pct': 0.0,
+            'severity': 'info',
+            'next_tier': 'PILOT',
+            'mark_says': 'Pozisyon değeri sıfır — Pilot tier (%1-3) ile başla.',
+        }
+
+    pct = (position_value / portfolio_value) * 100.0
+    pilot_min, pilot_max = MARK_PYRAMID_PILOT_PCT_RANGE
+    std_min, std_max = MARK_PYRAMID_STANDARD_PCT_RANGE
+    full_min, full_max = MARK_PYRAMID_FULL_PCT_RANGE
+
+    if pct < pilot_min:
+        return {
+            'tier': 'BELOW_PILOT', 'position_pct': round(pct, 2),
+            'severity': 'info', 'next_tier': 'PILOT',
+            'mark_says': 'Pilot tier altinda. Mark felsefesi: %1-3 pilot ile basla.',
+        }
+    if pct <= pilot_max:
+        return {
+            'tier': 'PILOT', 'position_pct': round(pct, 2),
+            'severity': 'ok', 'next_tier': 'STANDARD',
+            'mark_says': 'Pilot tier (%1-3). Mark TraderLion: nakitten ilk giris icin ideal.',
+        }
+    if pct < std_min:
+        # Pilot/Standart arasi - Mark X kilit denetle
+        return {
+            'tier': 'PILOT', 'position_pct': round(pct, 2),
+            'severity': 'info' if prev_tier_profitable else 'warn',
+            'next_tier': 'STANDARD',
+            'mark_says': (
+                'Pilot ustu, Standart alti - pilot kara gecti, Standart hazir.'
+                if prev_tier_profitable
+                else "Pilot ustu, Standart alti - Mark X: pilot kara gecmeden Standart YASAK."
+            ),
+        }
+    if pct <= std_max:
+        return {
+            'tier': 'STANDARD', 'position_pct': round(pct, 2),
+            'severity': 'ok' if prev_tier_profitable else 'warn',
+            'next_tier': 'FULL',
+            'mark_says': (
+                'Standart tier (%6.25-12.5). Mark Brandon: normal piyasa + trades working.'
+                if prev_tier_profitable
+                else "Standart tier - Mark X kilit: pilot kara gecmedi, risk arttirma riskli."
+            ),
+        }
+    if pct < full_min:
+        return {
+            'tier': 'STANDARD', 'position_pct': round(pct, 2),
+            'severity': 'info' if prev_tier_profitable else 'warn',
+            'next_tier': 'FULL',
+            'mark_says': (
+                'Standart ustu, Full alti - Standart kara gecti, Full hazir.'
+                if prev_tier_profitable
+                else "Standart ustu, Full alti - Mark X: standart kara gecmemis."
+            ),
+        }
+    if pct <= full_max:
+        return {
+            'tier': 'FULL', 'position_pct': round(pct, 2),
+            'severity': 'ok' if prev_tier_profitable else 'warn',
+            'next_tier': None,
+            'mark_says': (
+                'Full tier (%15-25). Mark Kelly 2:1: peak market + 60% win rate.'
+                if prev_tier_profitable
+                else "Full tier - Mark X: onceki tier kara gecmedi, asiri risk."
+            ),
+        }
+    return {
+        'tier': 'OVER_MAX', 'position_pct': round(pct, 2),
+        'severity': 'violation', 'next_tier': None,
+        'mark_says': (
+            f'%{pct:.1f} - Mark MAX. MARK_POSITION_MAX_PCT={MARK_POSITION_MAX_PCT}% sert tavan, '
+            'tier ustu asiri risk.'
+        ),
     }
