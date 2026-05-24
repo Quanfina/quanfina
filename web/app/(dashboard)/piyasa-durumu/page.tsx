@@ -6,6 +6,7 @@ import { HealthScoreCard } from "@/components/market/HealthScoreCard";
 import { ModeSuggestionCard } from "@/components/market/ModeSuggestionCard";
 import { SectorSummaryCard } from "@/components/market/SectorSummaryCard";
 import { MarketStatusBadge } from "@/components/market/MarketStatusBadge";
+import { MarkRegimeCard } from "@/components/market/MarkRegimeCard";
 
 export default function PiyasaDurumuPage() {
   const { data, isLoading, isError, error } = useMarketStatus();
@@ -41,6 +42,14 @@ export default function PiyasaDurumuPage() {
         {/* ABD borsa açık/kapalı + TR/ET saat + sonraki açılış (Sprint 4-bis.7) */}
         <MarketStatusBadge />
       </div>
+
+      {/* KARAR ADAY #729 (24 May 2026): Mark Market Regime kartı (KARAR #488 4-Katman) */}
+      <section className="flex flex-col gap-2">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Mark Market Regime (4-Katman × 2-Eksen)
+        </h2>
+        <MarkRegimeCard distributionDays={data.distribution_days} />
+      </section>
 
       {/* Stage kartları */}
       <section className="flex flex-col gap-2">
