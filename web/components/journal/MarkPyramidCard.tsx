@@ -1,15 +1,17 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Layers, Lock, Unlock, CheckCircle2, AlertCircle, XCircle } from "lucide-react";
+import { Layers, Lock, Unlock, CheckCircle2, AlertCircle, XCircle, ShieldAlert } from "lucide-react";
 import {
   evaluatePyramidTier,
   suggestPositionDollars,
   TIER_LIMITS,
   TIER_ORDER,
+  type PyramidTier,
   type TierEvaluation,
 } from "@/lib/pyramid-calculator";
 import { usePyramidTier } from "@/hooks/use-pyramid-tier";
+import { useMarketStatus } from "@/hooks/use-market-status";
 
 /**
  * KARAR ADAY #732 (24 May 2026) — Mark Pyramid Calculator Karti.
@@ -47,6 +49,19 @@ export function MarkPyramidCard({
   initialPrevTierProfitable = false,
 }: Props) {
   const [prevTierProfitable, setPrevTierProfitable] = useState(initialPrevTierProfitable);
+
+  // KARAR #733 alt-paket (Paket 49, 25 May 2026): Piyasa-aware tier kilit
+  // (P47 Risk Yönetimi sayfa pateni). KARAR #488 4-Katman Mark Regime'e göre
+  // UNDER_PRESSURE/BEAR_PRESSURE iken Standart/Full kilitli, Pilot her zaman
+  // açık (pilot_override=true canon).
+  const { data: marketStatus } = useMarketStatus();
+  const newBuyAllowed = marketStatus?.mark_regime?.new_buy_allowed ?? true;
+  const regimeLabel = marketStatus?.mark_regime?.label ?? null;
+  const tierLockedByRegime: Record<PyramidTier, boolean> = {
+    PILOT: false,
+    STANDARD: !newBuyAllowed,
+    FULL: !newBuyAllowed,
+  };
 
   // Pozisyon değeri (entry × shares)
   const positionValue = useMemo(() => {
@@ -132,6 +147,24 @@ export function MarkPyramidCard({
         {evalResult.markSays}
       </p>
 
+      {/* KARAR #733 alt-paket (Paket 49): Piyasa-aware uyarı bandı */}
+      {!newBuyAllowed && regimeLabel && (
+        <div
+          className="text-[11px] px-2 py-1.5 rounded border-l-2 flex items-center gap-1.5"
+          style={{
+            background: "rgba(220,53,69,0.08)",
+            borderLeftColor: "var(--mtp-danger)",
+            color: "var(--mtp-danger)",
+          }}
+        >
+          <ShieldAlert size={12} />
+          <span>
+            Piyasa <strong>{regimeLabel}</strong> — Mark canon: Yeni alım YASAK.
+            Standart + Full tier kilitli, sadece Pilot Override.
+          </span>
+        </div>
+      )}
+
       {/* 3 Tier görsel ölçek */}
       <div className="flex flex-col gap-1.5">
         {TIER_ORDER.map((tier) => {
@@ -139,14 +172,23 @@ export function MarkPyramidCard({
           const active = evalResult.currentTier === tier;
           const reached = evalResult.positionPct >= limits.minPct;
           const range = suggestPositionDollars(portfolioValue, tier);
+          const isLocked = tierLockedByRegime[tier];
           return (
             <div
               key={tier}
               className="flex items-center gap-3 px-2 py-1.5 rounded border text-xs"
               style={{
-                background: active ? `${evalResult.tierColor}11` : "transparent",
-                borderColor: active ? `${evalResult.tierColor}55` : "var(--border)",
-                opacity: reached ? 1 : 0.6,
+                background: active
+                  ? `${evalResult.tierColor}11`
+                  : isLocked
+                  ? "rgba(220,53,69,0.03)"
+                  : "transparent",
+                borderColor: active
+                  ? `${evalResult.tierColor}55`
+                  : isLocked
+                  ? "rgba(220,53,69,0.35)"
+                  : "var(--border)",
+                opacity: isLocked && !active ? 0.55 : reached ? 1 : 0.6,
               }}
             >
               <span aria-hidden="true" className="text-lg leading-none">
@@ -158,6 +200,15 @@ export function MarkPyramidCard({
                   <span className="text-muted-foreground tabular-nums">
                     %{limits.minPct}-{limits.maxPct}
                   </span>
+                  {isLocked && (
+                    <span
+                      className="text-[9px] font-bold px-1 py-0.5 rounded uppercase"
+                      style={{ background: "var(--mtp-danger)", color: "#fff" }}
+                      title={`Piyasa ${regimeLabel} — tier kilitli`}
+                    >
+                      Kilit
+                    </span>
+                  )}
                   <span className="text-muted-foreground tabular-nums ml-auto">
                     ${range.min.toFixed(0)} - ${range.max.toFixed(0)}
                   </span>
