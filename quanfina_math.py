@@ -3160,3 +3160,105 @@ def compute_carr_stage(
         'slope_pct_per_year': round(slope_pct_per_year, 2),
         'mark_says': says,
     }
+
+
+# ======================================================================
+# KARAR #733 alt-paket (Paket 51, 25 May 2026) — Market Breadth
+#
+# Mark+O'Neil canon: market breadth = listedeki hisselerin yukselen/dusen
+# orani. A/D Line (Advance/Decline) ile birikimli sayim. KARAR #488 4-Katman
+# Mark Regime'i destekleyen ek metrik — Distribution Days + Market Breadth
+# birlikte daha guvenilir regime tespiti.
+#
+# Mark birebir kaynak (TLSMW Ch 5 + O'Neil HowToMakeMoney):
+# - "When the A/D line breaks down before the index, that's a warning"
+# - "Healthy markets show advances exceeding declines on volume"
+#
+# 3 metrik:
+# - ad_ratio: bugun advance / decline orani (>1 saglikli)
+# - ad_line_cumulative: 20-gun ardisik birikimli A/D
+# - breadth_health: 'STRONG' (>1.5) / 'NEUTRAL' (0.8-1.5) / 'WEAK' (<0.8)
+# ======================================================================
+
+# A/D ratio esikleri (KARAR #488 paralel)
+BREADTH_STRONG_THRESHOLD: float = 1.5   # advance/decline > 1.5 = saglikli
+BREADTH_WEAK_THRESHOLD: float = 0.8     # advance/decline < 0.8 = zayif
+BREADTH_LOOKBACK_DAYS: int = 20         # A/D Line pencere
+
+
+def compute_market_breadth(
+    advances_daily: list[int],
+    declines_daily: list[int],
+    lookback_days: int = BREADTH_LOOKBACK_DAYS,
+) -> dict:
+    """Market Breadth A/D Line + ratio + Mark felsefe yorum.
+
+    Args:
+        advances_daily: Gunluk yukselen hisse sayisi (kronolojik, eski->yeni)
+        declines_daily: Gunluk dusen hisse sayisi (ayni siralama)
+        lookback_days: Birikimli A/D Line penceresi (default 20)
+
+    Returns:
+        dict {
+            'ad_ratio': float | None,           # Bugun adv/dec
+            'ad_line_cumulative': int | None,   # 20-gun birikimli (adv-dec)
+            'breadth_health': str | None,       # STRONG/NEUTRAL/WEAK
+            'mark_says': str,                   # Mark felsefe yorum
+        }
+
+    Mark birebir kaynak:
+    - TLSMW Ch 5: "Healthy markets show advances exceeding declines on volume"
+    - O'Neil HowToMakeMoney: "A/D line breaks down before index = warning"
+
+    Production'da Cloud SQL minervini_scans + sector_rotation tablosundan
+    gunluk advance/decline sayim alinir (AÇIK KONU #75 yfinance pipeline).
+    """
+    if not advances_daily or not declines_daily:
+        return {
+            'ad_ratio': None,
+            'ad_line_cumulative': None,
+            'breadth_health': None,
+            'mark_says': 'Market breadth verisi yok — A/D Line hesaplanamiyor.',
+        }
+    if len(advances_daily) != len(declines_daily):
+        return {
+            'ad_ratio': None,
+            'ad_line_cumulative': None,
+            'breadth_health': None,
+            'mark_says': 'Market breadth: advances ve declines listesi uzunlugu farkli.',
+        }
+
+    # Bugunku A/D ratio (son gun)
+    today_adv = advances_daily[-1]
+    today_dec = declines_daily[-1]
+    ad_ratio = round(today_adv / today_dec, 2) if today_dec > 0 else float('inf')
+
+    # 20-gun birikimli A/D Line (advance - decline toplamı)
+    lookback = min(lookback_days, len(advances_daily))
+    recent_adv = advances_daily[-lookback:]
+    recent_dec = declines_daily[-lookback:]
+    ad_line_cumulative = sum(recent_adv) - sum(recent_dec)
+
+    # Saglik kategorisi
+    if ad_ratio >= BREADTH_STRONG_THRESHOLD:
+        breadth_health = 'STRONG'
+        says = (f'Market Breadth STRONG (A/D {ad_ratio:.2f}) — Mark: advances '
+                f'exceed declines, saglikli rally. 20-gun A/D cumulative '
+                f'+{ad_line_cumulative}. Yeni alim onaylar.')
+    elif ad_ratio >= BREADTH_WEAK_THRESHOLD:
+        breadth_health = 'NEUTRAL'
+        says = (f'Market Breadth NEUTRAL (A/D {ad_ratio:.2f}) — karisik sinyal. '
+                f'20-gun A/D {ad_line_cumulative:+d}. Mark: index ralliyse '
+                f'ama A/D zayifsa, ayrismaya dikkat.')
+    else:
+        breadth_health = 'WEAK'
+        says = (f'Market Breadth WEAK (A/D {ad_ratio:.2f}) — declines exceed '
+                f'advances. 20-gun A/D {ad_line_cumulative:+d}. O\'Neil: A/D '
+                f'index oncesi zayifliyorsa erken uyari.')
+
+    return {
+        'ad_ratio': ad_ratio,
+        'ad_line_cumulative': ad_line_cumulative,
+        'breadth_health': breadth_health,
+        'mark_says': says,
+    }
