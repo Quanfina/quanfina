@@ -2277,3 +2277,214 @@ def detect_leader_fingerprint(
         'tier': tier,
         'mark_says': says,
     }
+
+
+# =============================================================================
+# SPRINT 4-bis.7 — FAZ 2 GENİŞLETME 2 — Mark New High + Darvas Box
+# Tescil: Vizyon v22.04 + v22.05
+# KARAR ADAY #876 (New High Pivot Mandate) + #874 (Darvas Box)
+# Detay: notebook/Sprint_4_bis_7_Mark_HASSAS_Tarama.md
+# =============================================================================
+
+# Mark KESIN 52-week High sabitler (TLSMW Ch 10 s.221-224)
+NEW_HIGH_PIVOT_THRESHOLD_PCT: float = 5.0       # Mark KESIN: 52w high %5 içinde
+NEW_HIGH_BUY_READY_THRESHOLD_PCT: float = 2.0   # Yakın pivot trigger (elit)
+NEW_HIGH_BREAKOUT_THRESHOLD_PCT: float = -1.0   # 52w high üstüne %1 = breakout
+
+# Mark KESIN Darvas Box sabitler (TLSMW Ch 10 s.215)
+DARVAS_MIN_WEEKS: int = 4                       # Mark "4-7 hafta flat base"
+DARVAS_MAX_WEEKS: int = 7
+DARVAS_MAX_RANGE_PCT: float = 15.0              # Mark "%10-15 max correction"
+DARVAS_IDEAL_RANGE_PCT: float = 10.0            # Mark ideal
+
+
+def check_new_high_pivot(
+    current_price: float,
+    high_52w: float
+) -> dict:
+    """KARAR ADAY #876 — Mark New High Pivot Mandate (TLSMW s.221-224).
+
+    Mark birebir (TLSMW s.221-222):
+        "A stock making a new 52-week high during the early stages of a fresh
+        bull market could be a stellar performer in its infancy."
+
+        "Why Buy Near a New High? ... A stock hitting a new high has NO
+        OVERHEAD SUPPLY to contend with."
+
+    Mark KESIN Watchlist'ten Focus'a geçiş kriterleri:
+        - Stock 52-week high %5 içinde (Mark KESIN yakınlık)
+        - %2 içinde = "Buy Ready" tier (elit pozisyon)
+        - %1 üstünde = "Breakout" (Mark KESIN tetik)
+
+    Mark KESIN case studies:
+        - TASR +%540 → all-time high → +%1,800
+        - MNST Ağu 2003 ATH → +%8,000
+        - YHOO +%170 → ATH → +%4,300
+        - MSFT 1989 ATH → 54-fold (5,400%)
+
+    Args:
+        current_price: Bugünkü kapanış fiyatı
+        high_52w: 52-week high
+
+    Returns:
+        dict:
+        {
+            'tier': 'breakout' | 'buy_ready' | 'near_pivot' | 'too_far' | 'invalid',
+            'distance_from_high_pct': float,  # Negatif = üstünde, pozitif = altında
+            'mark_says': str,
+            'is_actionable': bool,  # Mark Watchlist'ten Focus'a geçiş onayı
+        }
+
+    Kaynak: TLSMW s.221-224 + Sprint_4_bis_7_Mark_HASSAS_Tarama.md KARAR ADAY #876
+    """
+    if current_price <= 0 or high_52w <= 0:
+        return {
+            'tier': 'invalid',
+            'distance_from_high_pct': 0.0,
+            'mark_says': 'Geçersiz fiyat verisi',
+            'is_actionable': False,
+        }
+
+    # Pozitif = high altında, negatif = high üstünde
+    distance_pct = ((high_52w - current_price) / high_52w) * 100
+
+    if distance_pct <= NEW_HIGH_BREAKOUT_THRESHOLD_PCT:
+        # Stock 52w high üstüne çıktı (breakout)
+        tier = 'breakout'
+        says = (f"Stock 52w high %{abs(distance_pct):.1f} üstünde — "
+                f"BREAKOUT (Mark KESIN no overhead supply, TLSMW s.221)")
+        actionable = True
+    elif distance_pct <= NEW_HIGH_BUY_READY_THRESHOLD_PCT:
+        # %2 içinde — Buy Ready
+        tier = 'buy_ready'
+        says = (f"Stock 52w high %{distance_pct:.1f} altında — "
+                f"BUY READY (Mark KESIN elit pozisyon)")
+        actionable = True
+    elif distance_pct <= NEW_HIGH_PIVOT_THRESHOLD_PCT:
+        # %5 içinde — pivot mandate uyuyor
+        tier = 'near_pivot'
+        says = (f"Stock 52w high %{distance_pct:.1f} altında — "
+                f"NEAR PIVOT (Mark KESIN Watchlist→Focus eşiği)")
+        actionable = True
+    else:
+        # %5'ten uzakta — Mark KESIN pivot mandate ihlal
+        tier = 'too_far'
+        says = (f"Stock 52w high %{distance_pct:.1f} altında — "
+                f"Mark KESIN %{NEW_HIGH_PIVOT_THRESHOLD_PCT} eşiği aşıldı, "
+                f"Watchlist'te bekle (TLSMW s.222)")
+        actionable = False
+
+    return {
+        'tier': tier,
+        'distance_from_high_pct': round(distance_pct, 2),
+        'mark_says': says,
+        'is_actionable': actionable,
+    }
+
+
+def detect_darvas_box(price_volume_history: Optional[list[dict]]) -> dict:
+    """KARAR ADAY #874 — Mark Darvas Box Detector (TLSMW s.215).
+
+    Mark birebir (TLSMW s.215):
+        "Flat base ... square-shaped Darvas box pattern, 4 to 7 weeks
+        in duration ... 10 to 15 percent correction from high point to low point."
+
+    Mark Darvas Box vs VCP:
+        - Darvas Box: TIGHT BOX, no real contraction (range sabit)
+        - VCP: Contraction Ts (halving)
+        - Her ikisi de Mark KESIN — bazı stoklar Darvas Box, bazıları VCP
+
+    Hesap:
+        - Lookback: 4-7 hafta = 20-35 trading günü
+        - Range: max(high) - min(low) / max(high)
+        - %10-15 max = Darvas Box (Mark KESIN)
+
+    Args:
+        price_volume_history: PVH dict listesi (her item: close, high, low, volume)
+            Index 0 = en eski, index -1 = en yeni
+
+    Returns:
+        dict:
+        {
+            'pattern': 'DARVAS_BOX' | 'DARVAS_LOOSE' | 'NOT_DARVAS' | 'INVALID',
+            'duration_days': int,
+            'range_pct': float,
+            'tier': 'ideal' | 'acceptable' | 'too_loose' | 'too_short' | 'invalid',
+            'mark_says': str,
+        }
+
+    Kaynak: TLSMW s.215 + Sprint_4_bis_7_Mark_HASSAS_Tarama.md KARAR ADAY #874
+    """
+    if not price_volume_history or len(price_volume_history) < DARVAS_MIN_WEEKS * 5:
+        return {
+            'pattern': 'INVALID',
+            'duration_days': 0,
+            'range_pct': 0.0,
+            'tier': 'invalid',
+            'mark_says': f'Yetersiz veri (min {DARVAS_MIN_WEEKS * 5} gün gerekli)',
+        }
+
+    # Son 4-7 hafta = 20-35 trading günü
+    pvh = price_volume_history
+    duration_days = min(len(pvh), DARVAS_MAX_WEEKS * 5)
+
+    # Range: en yüksek high ve en düşük low
+    window = pvh[-duration_days:]
+    highs = [d.get('high', d.get('close', 0)) for d in window]
+    lows = [d.get('low', d.get('close', 0)) for d in window]
+
+    max_high = max(highs) if highs else 0
+    min_low = min(lows) if lows else 0
+
+    if max_high <= 0:
+        return {
+            'pattern': 'INVALID',
+            'duration_days': duration_days,
+            'range_pct': 0.0,
+            'tier': 'invalid',
+            'mark_says': 'Geçersiz fiyat (max_high <= 0)',
+        }
+
+    range_pct = ((max_high - min_low) / max_high) * 100
+
+    # Süre kontrolü (hafta cinsi)
+    weeks = duration_days / 5
+    if weeks < DARVAS_MIN_WEEKS:
+        return {
+            'pattern': 'NOT_DARVAS',
+            'duration_days': duration_days,
+            'range_pct': round(range_pct, 2),
+            'tier': 'too_short',
+            'mark_says': (f"Süre {weeks:.1f} hafta < Mark min {DARVAS_MIN_WEEKS} "
+                          f"(TLSMW s.215 — flat base 4-7 hafta)"),
+        }
+
+    # Range kontrolü
+    if range_pct <= DARVAS_IDEAL_RANGE_PCT:
+        pattern = 'DARVAS_BOX'
+        tier = 'ideal'
+        says = (f"Range %{range_pct:.1f} ≤ %{DARVAS_IDEAL_RANGE_PCT} — "
+                f"DARVAS BOX ideal (Mark KESIN TLSMW s.215 tight box)")
+    elif range_pct <= DARVAS_MAX_RANGE_PCT:
+        pattern = 'DARVAS_BOX'
+        tier = 'acceptable'
+        says = (f"Range %{range_pct:.1f} — Mark eşiği içinde "
+                f"(%{DARVAS_IDEAL_RANGE_PCT}-{DARVAS_MAX_RANGE_PCT})")
+    elif range_pct <= 20.0:
+        pattern = 'DARVAS_LOOSE'
+        tier = 'too_loose'
+        says = (f"Range %{range_pct:.1f} — Mark Darvas eşiği (%{DARVAS_MAX_RANGE_PCT}) "
+                f"aşıldı, VCP kontrol et")
+    else:
+        pattern = 'NOT_DARVAS'
+        tier = 'too_loose'
+        says = (f"Range %{range_pct:.1f} >%20 — Darvas Box değil, "
+                f"loose base (Mark TLSMW s.225 deep correction)")
+
+    return {
+        'pattern': pattern,
+        'duration_days': duration_days,
+        'range_pct': round(range_pct, 2),
+        'tier': tier,
+        'mark_says': says,
+    }

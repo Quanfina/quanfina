@@ -1882,3 +1882,116 @@ class TestDetectLeaderFingerprint:
         assert TENNIS_BALL_RECOVERY_MAX_DAYS == 14
         assert LEADER_ADVANCE_MIN_PCT == 15.0
         assert LEADER_ADVANCE_MAX_PCT == 25.0
+
+
+# =============================================================================
+# Faz 2 Genisletme 2 — New High Pivot + Darvas Box
+# Tests for: check_new_high_pivot, detect_darvas_box
+# Tescil: Vizyon v22.04 + v22.05 (24 May 2026)
+# =============================================================================
+
+from quanfina_math import (
+    check_new_high_pivot,
+    detect_darvas_box,
+    NEW_HIGH_PIVOT_THRESHOLD_PCT,
+    NEW_HIGH_BUY_READY_THRESHOLD_PCT,
+    DARVAS_MIN_WEEKS,
+    DARVAS_MAX_RANGE_PCT,
+)
+
+
+class TestCheckNewHighPivot:
+    """KARAR ADAY #876 - Mark New High Pivot Mandate (TLSMW s.221)."""
+
+    def test_breakout_above_52w_high(self):
+        # Current $105, 52w high $100 → breakout %5 ustunde
+        result = check_new_high_pivot(105, 100)
+        assert result["tier"] == "breakout"
+        assert result["distance_from_high_pct"] < 0  # ustunde
+        assert result["is_actionable"] is True
+
+    def test_buy_ready_within_2_pct(self):
+        # Current $98, 52w high $100 → %2 altinda
+        result = check_new_high_pivot(98, 100)
+        assert result["tier"] == "buy_ready"
+        assert abs(result["distance_from_high_pct"] - 2.0) < 0.01
+        assert result["is_actionable"] is True
+
+    def test_near_pivot_within_5_pct(self):
+        # Current $96, 52w high $100 → %4 altinda
+        result = check_new_high_pivot(96, 100)
+        assert result["tier"] == "near_pivot"
+        assert result["is_actionable"] is True
+
+    def test_too_far_above_5_pct(self):
+        # Current $90, 52w high $100 → %10 altinda (Mark esigin disi)
+        result = check_new_high_pivot(90, 100)
+        assert result["tier"] == "too_far"
+        assert result["is_actionable"] is False
+
+    def test_invalid_zero_price(self):
+        result = check_new_high_pivot(0, 100)
+        assert result["tier"] == "invalid"
+        assert result["is_actionable"] is False
+
+    def test_constants(self):
+        assert NEW_HIGH_PIVOT_THRESHOLD_PCT == 5.0
+        assert NEW_HIGH_BUY_READY_THRESHOLD_PCT == 2.0
+
+
+class TestDetectDarvasBox:
+    """KARAR ADAY #874 - Mark Darvas Box Detector (TLSMW s.215)."""
+
+    def _make_box_history(self, days, range_pct, base_price=100):
+        # Tight box: high ve low base_price etrafinda dar bant
+        history = []
+        high_max = base_price * (1 + range_pct / 200)
+        low_min = base_price * (1 - range_pct / 200)
+        for i in range(days):
+            close = base_price + (i % 3 - 1) * 0.5
+            history.append({
+                "close": close,
+                "high": high_max if i % 5 == 0 else close + 0.5,
+                "low": low_min if i % 5 == 2 else close - 0.5,
+                "volume": 100000,
+            })
+        return history
+
+    def test_ideal_darvas_box(self):
+        # 25 gun (5 hafta), range %8 → DARVAS BOX ideal
+        history = self._make_box_history(25, 8)
+        result = detect_darvas_box(history)
+        assert result["pattern"] == "DARVAS_BOX"
+        assert result["tier"] in ("ideal", "acceptable")
+
+    def test_acceptable_darvas_box(self):
+        # 25 gun, range %12 → ideal eşik aşıldı ama Mark eşiği içinde
+        history = self._make_box_history(25, 12)
+        result = detect_darvas_box(history)
+        assert result["pattern"] == "DARVAS_BOX"
+        assert result["tier"] == "acceptable"
+
+    def test_too_loose_darvas(self):
+        # 25 gun, range %18 → loose
+        history = self._make_box_history(25, 18)
+        result = detect_darvas_box(history)
+        assert result["pattern"] == "DARVAS_LOOSE"
+        assert result["tier"] == "too_loose"
+
+    def test_too_short_duration(self):
+        # 15 gun (3 hafta) — Mark min 4 hafta gerek
+        history = self._make_box_history(15, 10)
+        result = detect_darvas_box(history)
+        assert result["pattern"] == "INVALID"  # min DARVAS_MIN_WEEKS*5 = 20 gun
+
+    def test_empty_history(self):
+        result = detect_darvas_box([])
+        assert result["pattern"] == "INVALID"
+
+    def test_none_input(self):
+        result = detect_darvas_box(None)
+        assert result["pattern"] == "INVALID"
+
+    def test_constants(self):
+        assert DARVAS_MIN_WEEKS == 4
+        assert DARVAS_MAX_RANGE_PCT == 15.0
