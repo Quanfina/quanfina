@@ -43,6 +43,7 @@ from quanfina_math import (  # noqa: E402
     compute_rba_metrics,
     should_drop_setup,
     compute_pyramid_tier,
+    count_distribution_days,
     MARK_PYRAMID_PILOT_PCT_RANGE,
     MARK_PYRAMID_STANDARD_PCT_RANGE,
     MARK_PYRAMID_FULL_PCT_RANGE,
@@ -975,12 +976,50 @@ MOCK_MARKET_STATUS = MarketStatus(
 )
 
 
+def _mock_spy_closes_volumes(days: int = 25) -> tuple[list[float], list[int]]:
+    """MOCK SPY closes + volumes - deterministik (tarih hash seed) MOCK uretim.
+
+    KARAR #488 alt-paket (Paket 22): count_distribution_days helper'i icin
+    gercek bir veri akisi gerektigi icin MOCK uretim. Production'da
+    yfinance/Cloud SQL SPY tarihsel verisi ile degisecek (AÇIK KONU #75).
+
+    Algoritma: bugune kadar son N gün, hafif uptrend + arada DD'ler
+    (tarihsel pattern simulasyon). Deterministik (tarih seed) ki UI
+    aynı günün çağrılarında aynı veri görsün.
+    """
+    seed = int(date.today().toordinal())
+    rng = random.Random(seed)
+    closes: list[float] = [400.0]
+    volumes: list[int] = []
+    for i in range(days):
+        # Hafif yukari drift + arada negatif gunler (DD adaylari)
+        pct = rng.gauss(0.05, 0.7)  # ortalama +%0.05, std %0.7
+        closes.append(closes[-1] * (1 + pct / 100.0))
+        # Volume: down gunlerde %20 daha yuksek (DD kriteri)
+        base_vol = 80_000_000
+        if pct < 0:
+            vol = int(base_vol * rng.uniform(1.0, 1.4))
+        else:
+            vol = int(base_vol * rng.uniform(0.8, 1.1))
+        volumes.append(vol)
+    # closes[0] başlangıç; volumes[i] -> closes[i+1] eşleşmesi
+    closes = closes[1:]  # closes ve volumes esit uzunluk (days)
+    return closes, volumes
+
+
 @app.get("/api/market/status", response_model=MarketStatus)
 def get_market_status() -> MarketStatus:
-    # KARAR #731: mark_regime distribution_days'tan canli hesaplanir
-    # (MOCK 3 DD -> CAUTION; production'da real DD tracking)
+    # KARAR #731 + #488 alt-paket (Paket 22): distribution_days deterministik
+    # MOCK SPY akisindan hesaplanir (count_distribution_days helper).
+    # Production'da yfinance/SQL real veri (AÇIK KONU #75).
+    closes, volumes = _mock_spy_closes_volumes(days=25)
+    dd_result = count_distribution_days(closes, volumes, lookback_days=20)
+    dd_count = dd_result["count"]
     status = MOCK_MARKET_STATUS.model_copy(
-        update={"mark_regime": _compute_mark_regime(MOCK_MARKET_STATUS.distribution_days)}
+        update={
+            "distribution_days": dd_count,
+            "mark_regime": _compute_mark_regime(dd_count),
+        }
     )
     return status
 
