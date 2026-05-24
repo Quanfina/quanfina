@@ -86,17 +86,24 @@ Show-Result "Hardcoded secret/key staged'de yok" ($hardHits.Count -eq 0) `
     $(if ($hardHits) { "BULUNDU: $($hardHits -join '; ')" } else { "" })
 
 # --- Kontrol 4: Yasaklı isim/marka taraması (tracked dosyalarda) ---
+# KARAR #733 alt-paket (Paket 48, 25 May 2026, Kural #14 proaktif): AG Grid
+# library std props (valueGetter, valueFormatter, cellRenderer, cellEditor)
+# YASAKLI listeden ÇIKARILDI. Sebep: Markets 360 minified internal isim degil,
+# AG Grid library normal API kullanim. 1. ortaya cikis Paket 23 (false positive
+# BLOK -> amend ile cozuldu). 2. ortaya cikis riski proaktif tescil ile kapatildi.
+# CLAUDE.md kendi kural metnini iceriyor — onu disla
 Write-Host ""
 Write-Host "4. Yasakli isim/marka taramasi" -ForegroundColor Yellow
-# CLAUDE.md kendi kural metnini iceriyor — onu disla
 $forbiddenPatterns = @{
     "Markets 360" = 'Markets 360'
     "Fab 5"       = '\bFab 5\b'
     "SEPA reg"    = 'SEPA®'
     "MonAlert"    = 'MonAlert'
     "MAI"         = '\bMAI\b'
-    "valueGetter" = '\bvalueGetter\b'
     "aB() M360"   = '\baB\('
+    # NOT: valueGetter / valueFormatter / cellRenderer / cellEditor AG Grid std
+    # props — yasakli listede YOK. Library normal kullanim, yabanci kod sizmasi
+    # degil (Paket 48 Kural #14 tescil).
 }
 $forbiddenHits = @()
 foreach ($label in $forbiddenPatterns.Keys) {
