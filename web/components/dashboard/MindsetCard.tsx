@@ -9,7 +9,8 @@ import {
   getTodayMindsetCard,
   type MindsetCard as MindsetCardType,
 } from "@/data/mindset-cards";
-import { isCardReadToday, markCardReadToday } from "@/lib/mindset-read-state";
+import { isCardReadToday, markCardReadToday, getReadStreak } from "@/lib/mindset-read-state";
+import { Flame } from "lucide-react";
 
 /**
  * KARAR ADAY #720 — Daily Mindset Cards (Dashboard üst bölüm)
@@ -26,10 +27,13 @@ export function MindsetCardWidget() {
   const [isManualPick, setIsManualPick] = useState(false);
   // KARAR #720 alt (Paket 28): "okundu" persistence — günlük disiplin
   const [isReadToday, setIsReadToday] = useState(false);
+  // KARAR #720 alt (Paket 29): Streak history — gün üst üste okuma
+  const [streak, setStreak] = useState(0);
 
-  // Mount + bugünün kartı değişince "okundu mu" yeniden kontrol et
+  // Mount + bugünün kartı değişince "okundu mu" + streak yeniden kontrol et
   useEffect(() => {
     setIsReadToday(isCardReadToday(todayCard.id));
+    setStreak(getReadStreak().streak);
   }, [todayCard.id]);
 
   function pickRandom() {
@@ -48,6 +52,7 @@ export function MindsetCardWidget() {
   function handleMarkRead() {
     markCardReadToday(todayCard.id);
     setIsReadToday(true);
+    setStreak(getReadStreak().streak);  // P29: streak güncelle
   }
 
   const accentColor = CATEGORY_COLORS[card.category];
@@ -83,7 +88,21 @@ export function MindsetCardWidget() {
             </span>
           </div>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
+          {/* KARAR #720 alt (Paket 29): Streak rozet — günlük disiplin motivasyon */}
+          {streak >= 2 && !isManualPick && (
+            <span
+              className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full"
+              style={{
+                background: "rgba(245, 158, 11, 0.15)",
+                color: "#F59E0B",
+              }}
+              title={`${streak} gün üst üste Mark hatırlatması okuma disiplini`}
+            >
+              <Flame size={12} />
+              {streak} gün
+            </span>
+          )}
           {isManualPick && (
             <button
               type="button"
