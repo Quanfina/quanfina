@@ -1176,6 +1176,55 @@ _STOCK_META: dict[str, dict] = {
 
 _STOCK_BY_SYM: dict[str, MinerviniStock] = {s.symbol: s for s in MOCK_STOCKS}
 
+# KARAR ADAY #723 (24 May 2026) — Hisse detay Mark Profil rozetleri MOCK feed.
+# Cloud SQL Migration 004-007 uygulanana kadar UI'in canli gosterimi icin
+# ornek sembollere Mark sinyalleri assign edilir. Production'da scanner.py
+# minervini_scans tablo kolonlarindan okunacak (KARAR #470 paten).
+_STOCK_MARK_SIGNALS: dict[str, dict] = {
+    "NVDA": {
+        "vcp_quality_score": "EXCELLENT",
+        "vcp_ready_score": 85,
+        "power_play_pass": True,
+        "tennis_ball_pattern": "TENNIS_BALL",
+        "volume_asymmetry_tier": "healthy",
+    },
+    "MSFT": {
+        "vcp_quality_score": "PASS",
+        "vcp_ready_score": 72,
+        "power_play_pass": False,
+        "volume_asymmetry_tier": "healthy",
+    },
+    "AVGO": {
+        "vcp_quality_score": "EXCELLENT",
+        "power_play_pass": True,
+        "tennis_ball_pattern": "TENNIS_BALL",
+    },
+    "AMD": {
+        "vcp_ready_score": 78,
+        "tennis_ball_pattern": "TENNIS_BALL",
+        "volume_asymmetry_tier": "healthy",
+    },
+    "META": {
+        "vcp_quality_score": "PASS",
+        "volume_asymmetry_tier": "neutral",
+    },
+    "TSLA": {
+        "volume_asymmetry_tier": "distribution",  # uyari rozet
+    },
+}
+
+
+class MarkSignalsBlock(BaseModel):
+    """KARAR ADAY #723 — Hisse detay Mark Profil rozetleri.
+    Cloud SQL Migration 004-007 uygulanmasi sonrasi populate edilir.
+    Tum alanlar Optional — UI undefined ise rozet gostermez (graceful)."""
+    vcp_quality_score: Optional[Literal["EXCELLENT", "PASS"]] = None
+    vcp_ready_score: Optional[int] = None
+    power_play_pass: Optional[bool] = None
+    tennis_ball_pattern: Optional[Literal["TENNIS_BALL", "partial", "none"]] = None
+    volume_asymmetry_tier: Optional[Literal["healthy", "neutral", "distribution"]] = None
+    code_33_pattern: Optional[Literal["CODE_33", "partial", "none"]] = None
+
 
 class StockInfo(BaseModel):
     symbol: str
@@ -1187,6 +1236,8 @@ class StockInfo(BaseModel):
     change_pct: float
     rs_rating: int
     active_strategies: list[WatchlistRow]
+    # KARAR ADAY #723 — Mark Profili rozetleri (Migration 004-007 sonrasi canli)
+    mark_signals: Optional[MarkSignalsBlock] = None
 
 
 class OhlcvBar(BaseModel):
@@ -1282,6 +1333,11 @@ def get_stock_info(symbol: str) -> StockInfo:
     sym = symbol.upper()
     stock = _STOCK_BY_SYM.get(sym)
     meta  = _STOCK_META.get(sym, {})
+    # KARAR ADAY #723 — Mark Profili rozetleri (MOCK feed; production'da
+    # minervini_scans tablo kolonlarindan okunacak)
+    raw_signals = _STOCK_MARK_SIGNALS.get(sym)
+    mark_signals = MarkSignalsBlock(**raw_signals) if raw_signals else None
+
     # DB down ortamda hisse detay sayfasi calismali — watchlist bos liste fallback
     try:
         active = [WatchlistRow(**r) for r in watchlist_get_all() if r["symbol"] == sym]
@@ -1299,6 +1355,7 @@ def get_stock_info(symbol: str) -> StockInfo:
             change_pct=stock.change_pct,
             rs_rating=int(stock.rs_ibd),
             active_strategies=active,
+            mark_signals=mark_signals,
         )
     if active:
         row = active[0]
@@ -1312,6 +1369,7 @@ def get_stock_info(symbol: str) -> StockInfo:
             change_pct=0.0,
             rs_rating=row.rs_rating,
             active_strategies=active,
+            mark_signals=mark_signals,
         )
     # 24 May 2026 — Tarama sonucu sembollerinde fallback (KARAR ADAY #498)
     # Sn. Ferit raporu: "hisselere tıklandığında grafik açılmıyor"
@@ -1327,6 +1385,7 @@ def get_stock_info(symbol: str) -> StockInfo:
             change_pct=0.0,
             rs_rating=scan_data["rs_ibd"],
             active_strategies=[],
+            mark_signals=mark_signals,
         )
     # Son fallback — Generic MOCK (DB down + scan yok), grafik acilsin
     return StockInfo(
@@ -1339,6 +1398,7 @@ def get_stock_info(symbol: str) -> StockInfo:
         change_pct=0.0,
         rs_rating=50,
         active_strategies=[],
+        mark_signals=mark_signals,
     )
 
 

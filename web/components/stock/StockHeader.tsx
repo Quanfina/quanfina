@@ -1,4 +1,5 @@
 import type { StockInfo } from "@/types/stock";
+import { MarkBadgeStrip } from "@/components/mark/MarkBadgeStrip";
 
 function rsBackground(rs: number): string {
   if (rs >= 90) return "color-mix(in srgb, var(--mtp-excellent) 35%, transparent)";
@@ -21,7 +22,7 @@ export function StockHeader({ info }: { info: StockInfo }) {
 
   return (
     <div className="flex items-start justify-between gap-4 flex-wrap">
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1.5">
         <div className="flex items-baseline gap-3">
           <h1
             className="text-2xl font-bold tracking-tight"
@@ -38,6 +39,12 @@ export function StockHeader({ info }: { info: StockInfo }) {
           <span>·</span>
           <span>Piyasa Değeri: {info.market_cap}</span>
         </div>
+        {/* KARAR ADAY #723 (24 May 2026): Mark Profili rozetleri (DRY MarkBadgeStrip) */}
+        {info.mark_signals && (
+          <div className="mt-1">
+            <MarkBadgeStrip signals={info.mark_signals} density="full" showEmpty={false} />
+          </div>
+        )}
       </div>
 
       <div className="flex items-center gap-3 shrink-0">
