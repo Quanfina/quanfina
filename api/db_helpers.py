@@ -344,6 +344,10 @@ def screen_get_results(slug: str, limit: int = 500) -> list[dict]:
     # "1 AS passed" hard-coded (gecti varsayilir)
     fundamental_tables = ("minervini_fundamental_only", "minervini_fundamental_scans")
     passed_expr = "1 AS passed" if table_name in fundamental_tables else "passed"
+    # minervini_fundamental_scans Cloud SQL'de grade kolonu YOK olabilir
+    # (scanner.py ALTER TABLE ile ekler, ama Cloud SQL'e deploy edilmemis)
+    # Defensive: NULL hard-coded, scanner deploy sonrasi grade SELECT edilir
+    grade_expr = "NULL::TEXT AS grade" if table_name == "minervini_fundamental_scans" else "grade"
 
     # Idempotent + parametre safety:
     # - filter SCREENS_READY_8 sabit dict'ten (SQL injection riski yok)
@@ -359,7 +363,7 @@ def screen_get_results(slug: str, limit: int = 500) -> list[dict]:
     # Sn. Ferit talimat (22 May 2026): "Adim 1 + Cup-Handle + Pocket Pivot tumu calisir...
     # bunlarida yapicaz ama hemen degil" -> B patch.
     query = f"""
-        SELECT ticker AS symbol, grade, rs_ibd, price, {passed_expr}, scan_date
+        SELECT ticker AS symbol, {grade_expr}, rs_ibd, price, {passed_expr}, scan_date
         FROM {table_name}
         WHERE scan_date = (SELECT MAX(scan_date) FROM {table_name})
           AND {sql_filter}
