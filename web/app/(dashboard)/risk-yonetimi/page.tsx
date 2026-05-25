@@ -60,6 +60,9 @@ export default function RiskYonetimiPage() {
   // KARAR #733 alt-paket (Paket 62, 25 May 2026): Divergence rozet — piyasa
   // rejimi yanında ek uyarı (DRY 5-katman tüketim 4. nokta)
   const divergence = marketStatus?.breadth_divergence;
+  // KARAR #733 alt-paket (Paket 69, 25 May 2026): FTD rozet — Piyasa +
+  // Divergence + FTD üçlü rozet (DRY 5-katman tüketim 4. nokta)
+  const followThrough = marketStatus?.follow_through;
 
   // Tier kilit mantık: UNDER_PRESSURE/BEAR_PRESSURE iken Standart/Full
   // "rejim kilitli" rozeti, sadece Pilot önerilir (Mark canon)
@@ -345,6 +348,28 @@ export default function RiskYonetimiPage() {
                     : divergence.divergence === "BULLISH_DIVERGENCE"
                     ? "A/D BULLISH ↗"
                     : "A/D ↓ ONAYLI"}
+                </span>
+              )}
+              {/* KARAR #733 alt-paket (Paket 69): FTD rozet — 3. rozet
+                  Piyasa + Divergence + FTD (Mark felsefe çift yön —
+                  risk + fırsat). ftd_detected=False gizli. */}
+              {followThrough?.ftd_detected && (
+                <span
+                  className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider"
+                  style={{
+                    background: followThrough.volume_confirmed
+                      ? "rgba(40,167,69,0.15)"
+                      : "rgba(245,158,11,0.15)",
+                    color: followThrough.volume_confirmed
+                      ? "var(--mtp-excellent)"
+                      : "#F59E0B",
+                    border: followThrough.volume_confirmed
+                      ? "1px solid var(--mtp-excellent)"
+                      : "1px solid #F59E0B",
+                  }}
+                  title={followThrough.mark_says}
+                >
+                  {followThrough.volume_confirmed ? "FTD ✓ ONAYLI" : "FTD ⚠️ ZAYIF"}
                 </span>
               )}
             </div>
