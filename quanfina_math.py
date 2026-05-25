@@ -3737,3 +3737,102 @@ def compute_pivot_breakout(
         'volume_confirmed': volume_confirmed,
         'mark_says': says,
     }
+
+
+# ======================================================================
+# KARAR #733 alt-paket (Paket 73, 25 May 2026) — Brandon Avg Gain Expectancy
+#
+# Mark Brandon Video canon: "Average gain %20, average loss %4, win
+# rate %50 minimum". Trader expectancy hesabı:
+# E = (P_win × Avg_gain) - (P_loss × Avg_loss)
+#
+# Mark birebir (Brandon interview, TLSMW Ch 12-13):
+# - Avg gain >= 20% (winning trades)
+# - Avg loss <= 4% (stop loss disciplined)
+# - Win rate >= 50% (consistency)
+# - Expectancy >= 10% per trade (asimetri)
+#
+# 4 kategori:
+# - EXCELLENT (E >= 15%): Mark canon zirvesi
+# - GOOD (E >= 10%): Brandon eşiği
+# - ACCEPTABLE (E >= 5%): asgari karlılık
+# - POOR (E < 5%): disiplinsizlik (RBA Drop Setup)
+# ======================================================================
+
+BRANDON_AVG_GAIN_TARGET_PCT: float = 20.0
+BRANDON_AVG_LOSS_TARGET_PCT: float = 4.0
+BRANDON_WIN_RATE_TARGET: float = 0.50
+BRANDON_EXPECTANCY_EXCELLENT_PCT: float = 15.0
+BRANDON_EXPECTANCY_GOOD_PCT: float = 10.0
+BRANDON_EXPECTANCY_ACCEPTABLE_PCT: float = 5.0
+
+
+def compute_brandon_expectancy(
+    avg_gain_pct: float,
+    avg_loss_pct: float,
+    win_rate: float,
+) -> dict:
+    """Mark Brandon Video expectancy hesabı.
+
+    Args:
+        avg_gain_pct: Kazanan trade'lerin ortalama getirisi (%)
+        avg_loss_pct: Kaybeden trade'lerin ortalama kaybı (% — pozitif değer!)
+        win_rate: Kazanma oranı (0.0-1.0)
+
+    Returns:
+        dict {
+            'expectancy_pct': float,    # Trade başına ortalama expectancy
+            'category': str,             # EXCELLENT/GOOD/ACCEPTABLE/POOR
+            'meets_brandon_targets': bool,
+            'mark_says': str,
+        }
+    """
+    if not (0.0 <= win_rate <= 1.0):
+        return {
+            'expectancy_pct': 0.0,
+            'category': None,
+            'meets_brandon_targets': False,
+            'mark_says': 'Win rate 0.0-1.0 arasında olmalı.',
+        }
+    if avg_gain_pct < 0 or avg_loss_pct < 0:
+        return {
+            'expectancy_pct': 0.0,
+            'category': None,
+            'meets_brandon_targets': False,
+            'mark_says': 'avg_gain_pct ve avg_loss_pct pozitif olmalı.',
+        }
+
+    expectancy = (win_rate * avg_gain_pct) - ((1 - win_rate) * avg_loss_pct)
+    expectancy = round(expectancy, 2)
+
+    meets_targets = (
+        avg_gain_pct >= BRANDON_AVG_GAIN_TARGET_PCT
+        and avg_loss_pct <= BRANDON_AVG_LOSS_TARGET_PCT
+        and win_rate >= BRANDON_WIN_RATE_TARGET
+    )
+
+    if expectancy >= BRANDON_EXPECTANCY_EXCELLENT_PCT:
+        category = 'EXCELLENT'
+        says = (f'✓ EXCELLENT Expectancy {expectancy:+.2f}% — Mark Brandon '
+                f'canon zirvesi. Win {win_rate*100:.0f}% × +{avg_gain_pct:.1f}% '
+                f'vs Lose × -{avg_loss_pct:.1f}%. Mark: disiplin pekiştir.')
+    elif expectancy >= BRANDON_EXPECTANCY_GOOD_PCT:
+        category = 'GOOD'
+        says = (f'Brandon eşiği OK — Expectancy {expectancy:+.2f}%. '
+                f'Mark video: %20 avg gain / %4 avg loss / %50 win rate '
+                f'hedeflerine yakın. Devam.')
+    elif expectancy >= BRANDON_EXPECTANCY_ACCEPTABLE_PCT:
+        category = 'ACCEPTABLE'
+        says = (f'Asgari karlılık — Expectancy {expectancy:+.2f}%. '
+                f'Mark: setup kalitesini artır veya stop disiplini sıkılaştır.')
+    else:
+        category = 'POOR'
+        says = (f'⚠️ POOR Expectancy {expectancy:+.2f}% — Mark TTLC Sec 4 '
+                f'RBA: setup terk et veya kayıt tut. Disiplin kontrol gerek.')
+
+    return {
+        'expectancy_pct': expectancy,
+        'category': category,
+        'meets_brandon_targets': meets_targets,
+        'mark_says': says,
+    }
