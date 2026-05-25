@@ -48,6 +48,7 @@ from quanfina_math import (  # noqa: E402
     compute_market_breadth,
     compute_breadth_divergence,
     compute_follow_through_day,
+    compute_pivot_breakout,
     MARK_PYRAMID_PILOT_PCT_RANGE,
     MARK_PYRAMID_STANDARD_PCT_RANGE,
     MARK_PYRAMID_FULL_PCT_RANGE,
@@ -1674,6 +1675,56 @@ def get_stock_info(symbol: str) -> StockInfo:
         rs_rating=50,
         active_strategies=[],
         mark_signals=mark_signals,
+    )
+
+
+# KARAR #733 alt-paket (Paket 71, 25 May 2026): pivot_breakout endpoint
+# (Mark TLSMW Ch 10 + O'Neil CANSLIM canon — P70 helper backend wire)
+class PivotBreakoutInfo(BaseModel):
+    status: Optional[Literal["CONFIRMED", "WEAK", "NEAR_PIVOT", "BELOW_PIVOT"]] = None
+    pivot_price: Optional[float] = None
+    current_price: float
+    breakout_pct: Optional[float] = None
+    volume_multiplier: Optional[float] = None
+    volume_confirmed: bool = False
+    mark_says: str
+
+
+@app.get("/api/stock/{symbol}/pivot", response_model=PivotBreakoutInfo)
+def get_pivot_breakout(symbol: str) -> PivotBreakoutInfo:
+    """Mark TLSMW Ch 10 pivot kırılım hesabı (P70 helper wire).
+
+    OHLCV MOCK feed kullanılır — Production'da real yfinance/Cloud SQL
+    historical veri (AÇIK KONU #75).
+    """
+    sym = symbol.upper()
+    # OHLCV oluştur (mevcut helper'lar)
+    stock = _STOCK_BY_SYM.get(sym)
+    if stock:
+        price = stock.price
+    else:
+        try:
+            wl = [r for r in watchlist_get_all() if r["symbol"] == sym]
+        except OperationalError:
+            wl = []
+        if wl:
+            price = float(wl[0]["price"])
+        else:
+            scan_data = _fetch_scan_symbol_data(sym)
+            price = scan_data["price"] if scan_data else 100.0
+    bars = _generate_ohlcv(sym, price)
+    closes = [b.close for b in bars]
+    volumes = [b.volume for b in bars]
+
+    result = compute_pivot_breakout(closes, volumes)
+    return PivotBreakoutInfo(
+        status=result.get("status"),
+        pivot_price=result.get("pivot_price"),
+        current_price=result.get("current_price", price),
+        breakout_pct=result.get("breakout_pct"),
+        volume_multiplier=result.get("volume_multiplier"),
+        volume_confirmed=bool(result.get("volume_confirmed", False)),
+        mark_says=result.get("mark_says", ""),
     )
 
 
