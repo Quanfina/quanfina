@@ -49,6 +49,7 @@ from quanfina_math import (  # noqa: E402
     compute_breadth_divergence,
     compute_follow_through_day,
     compute_pivot_breakout,
+    compute_overhead_supply,
     MARK_PYRAMID_PILOT_PCT_RANGE,
     MARK_PYRAMID_STANDARD_PCT_RANGE,
     MARK_PYRAMID_FULL_PCT_RANGE,
@@ -1675,6 +1676,44 @@ def get_stock_info(symbol: str) -> StockInfo:
         rs_rating=50,
         active_strategies=[],
         mark_signals=mark_signals,
+    )
+
+
+# KARAR #733 alt-paket (Paket 77, 25 May 2026): overhead_supply endpoint
+class OverheadSupplyInfo(BaseModel):
+    category: Optional[Literal["HEAVY", "MODERATE", "NONE"]] = None
+    overhead_price: Optional[float] = None
+    drop_pct: Optional[float] = None
+    proximity_pct: Optional[float] = None
+    mark_says: str
+
+
+@app.get("/api/stock/{symbol}/overhead", response_model=OverheadSupplyInfo)
+def get_overhead_supply(symbol: str) -> OverheadSupplyInfo:
+    """Mark TLSMW Ch 10 Overhead Supply hesabı (P76 helper wire)."""
+    sym = symbol.upper()
+    stock = _STOCK_BY_SYM.get(sym)
+    if stock:
+        price = stock.price
+    else:
+        try:
+            wl = [r for r in watchlist_get_all() if r["symbol"] == sym]
+        except OperationalError:
+            wl = []
+        if wl:
+            price = float(wl[0]["price"])
+        else:
+            scan_data = _fetch_scan_symbol_data(sym)
+            price = scan_data["price"] if scan_data else 100.0
+    bars = _generate_ohlcv(sym, price)
+    closes = [b.close for b in bars]
+    result = compute_overhead_supply(closes)
+    return OverheadSupplyInfo(
+        category=result.get("category"),
+        overhead_price=result.get("overhead_price"),
+        drop_pct=result.get("drop_pct"),
+        proximity_pct=result.get("proximity_pct"),
+        mark_says=result.get("mark_says", ""),
     )
 
 
