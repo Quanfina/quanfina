@@ -9,6 +9,7 @@ import { StockHeader } from "@/components/stock/StockHeader";
 import { ActiveStrategies } from "@/components/stock/ActiveStrategies";
 import { CarrStageCard } from "@/components/stock/CarrStageCard";
 import { PivotBreakoutCard } from "@/components/stock/PivotBreakoutCard";
+import { OverheadSupplyCard } from "@/components/stock/OverheadSupplyCard";
 import { MarkRegimeBanner } from "@/components/mark/MarkRegimeBanner";
 import { useCarrStage } from "@/hooks/use-carr-stage";
 import { AddTradeDialog } from "@/components/journal/AddTradeDialog";
@@ -148,6 +149,8 @@ export default function HissePage({
             <CarrStageCard symbol={sym} />
             {/* KARAR #733 alt-paket (Paket 72): Pivot Breakout Card */}
             <PivotBreakoutCard symbol={sym} />
+            {/* KARAR #733 alt-paket (Paket 78): Overhead Supply Card */}
+            <OverheadSupplyCard symbol={sym} />
           </div>
         </div>
 
