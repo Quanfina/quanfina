@@ -3580,3 +3580,160 @@ def compute_follow_through_day(
         'previous_low': round(previous_low, 2),
         'mark_says': says,
     }
+
+
+# ======================================================================
+# KARAR #733 alt-paket (Paket 70, 25 May 2026) — Pivot Breakout
+#
+# Mark TLSMW Ch 10 canon: VCP, Cup&Handle, Flat Base sonrasi pivot
+# noktasi (son N-gün tepe) üstüne kırılım = AL sinyali. Hacim teyit
+# zorunlu — kırılım hacim 50-gün ort >1.5x değilse "false breakout"
+# (Mark: "Volume confirms breakout").
+#
+# Algoritma:
+# 1. Lookback (default 20 gün) içinde en yüksek kapanış = pivot
+# 2. Son gün kapanış > pivot * (1 + buffer_pct) → BREAKOUT
+# 3. Kırılım günü hacim / 50-gün ortalama hacim >= 1.5x → confirmed
+# 4. Buffer (default %0.5) gun-içi gürültüye karşı küçük tampon
+#
+# 4 ana çıktı:
+# - CONFIRMED: pivot üzerinde + hacim teyit (Mark AL canon)
+# - WEAK: pivot üzerinde + hacim düşük (false breakout riski)
+# - NEAR_PIVOT: pivot yakını ama kırılmadı (izlemede)
+# - BELOW_PIVOT: pivot altı (henüz kırılım yok)
+#
+# Mark birebir kaynak:
+# - TLSMW Ch 10: "VCP pivot break + hacim teyit zorunlu"
+# - O'Neil CANSLIM: "breakout volume 40%+ üzeri ort"
+# ======================================================================
+
+PIVOT_BUFFER_PCT: float = 0.5            # %0.5 gun-ici gurultu tamponu
+PIVOT_VOLUME_CONFIRM_RATIO: float = 1.5  # Kırılım hacim 50g ort >=1.5x
+PIVOT_VOLUME_LOOKBACK_DAYS: int = 50     # Hacim ortalama penceresi
+PIVOT_PRICE_LOOKBACK_DAYS: int = 20      # Pivot noktasi (son N gun tepe)
+
+
+def compute_pivot_breakout(
+    closes: list[float],
+    volumes: list[int],
+    price_lookback: int = PIVOT_PRICE_LOOKBACK_DAYS,
+    volume_lookback: int = PIVOT_VOLUME_LOOKBACK_DAYS,
+) -> dict:
+    """Mark TLSMW Ch 10 pivot kırılım + hacim teyit canon.
+
+    Args:
+        closes: Hisse günlük kapanış fiyatları (kronolojik)
+        volumes: Aynı gün hacim
+        price_lookback: Pivot noktası lookback (default 20 gün)
+        volume_lookback: Hacim ortalama lookback (default 50 gün)
+
+    Returns:
+        dict {
+            'status': str,                # CONFIRMED/WEAK/NEAR_PIVOT/BELOW_PIVOT
+            'pivot_price': float | None,  # Tespit edilen pivot fiyat
+            'current_price': float,        # Bugün kapanış
+            'breakout_pct': float | None,  # Pivot üstü/altı % (+/-)
+            'volume_multiplier': float | None,  # Hacim / 50g ort
+            'volume_confirmed': bool,
+            'mark_says': str,
+        }
+
+    Mark birebir kaynak:
+    - TLSMW Ch 10: "VCP pivot break + hacim teyit zorunlu"
+    - O'Neil CANSLIM: "Volume confirms breakout"
+    """
+    if not closes or not volumes:
+        return {
+            'status': None,
+            'pivot_price': None,
+            'current_price': 0.0,
+            'breakout_pct': None,
+            'volume_multiplier': None,
+            'volume_confirmed': False,
+            'mark_says': 'Yetersiz veri — pivot breakout hesaplanamıyor.',
+        }
+    if len(closes) != len(volumes):
+        return {
+            'status': None,
+            'pivot_price': None,
+            'current_price': 0.0,
+            'breakout_pct': None,
+            'volume_multiplier': None,
+            'volume_confirmed': False,
+            'mark_says': 'Pivot: closes/volumes listesi uzunluğu farklı.',
+        }
+    if len(closes) < price_lookback + 1:
+        return {
+            'status': None,
+            'pivot_price': None,
+            'current_price': closes[-1] if closes else 0.0,
+            'breakout_pct': None,
+            'volume_multiplier': None,
+            'volume_confirmed': False,
+            'mark_says': f'Yetersiz veri — en az {price_lookback + 1} gün gerek.',
+        }
+
+    current_price = closes[-1]
+    current_volume = volumes[-1]
+
+    # Pivot = son lookback gün içinde en yüksek kapanış (BUGÜN HARİÇ)
+    # Bugün kırılıyor mu test edilecek, pivot geçmiş tepe.
+    pivot_window = closes[-(price_lookback + 1):-1]  # son lookback gün, bugün hariç
+    pivot_price = max(pivot_window)
+
+    # Hacim ortalama (son volume_lookback gün, bugün dahil değil)
+    vol_window_size = min(volume_lookback, len(volumes) - 1)
+    if vol_window_size <= 0:
+        avg_volume = current_volume  # fallback
+    else:
+        recent_volumes = volumes[-(vol_window_size + 1):-1]
+        avg_volume = sum(recent_volumes) / len(recent_volumes) if recent_volumes else 0
+    volume_multiplier = (
+        round(current_volume / avg_volume, 2) if avg_volume > 0 else None
+    )
+
+    # Breakout test
+    buffer_threshold = pivot_price * (1 + PIVOT_BUFFER_PCT / 100.0)
+    near_threshold = pivot_price * 0.97  # %3 alt yakın izleme bandı
+    breakout_pct = round((current_price - pivot_price) / pivot_price * 100, 2) if pivot_price > 0 else 0.0
+
+    # Hacim teyit
+    volume_confirmed = (
+        volume_multiplier is not None
+        and volume_multiplier >= PIVOT_VOLUME_CONFIRM_RATIO
+    )
+
+    # Status karar
+    if current_price > buffer_threshold:
+        if volume_confirmed:
+            status = 'CONFIRMED'
+            says = (f'✓ AL Sinyali — Pivot ${pivot_price:.2f} üstü '
+                    f'{breakout_pct:+.2f}%, hacim {volume_multiplier:.1f}x. '
+                    f'Mark TLSMW Ch 10: Volume confirms breakout. O\'Neil '
+                    f'CANSLIM canon — entry pozisyon zamanı.')
+        else:
+            status = 'WEAK'
+            says = (f'⚠️ ZAYIF Kırılım — Pivot ${pivot_price:.2f} üstü '
+                    f'{breakout_pct:+.2f}% AMA hacim {volume_multiplier or 0:.1f}x '
+                    f'(<{PIVOT_VOLUME_CONFIRM_RATIO}x). Mark: "false breakout" '
+                    f'riski, hacim onayi yok — beklemede kal.')
+    elif current_price >= near_threshold:
+        status = 'NEAR_PIVOT'
+        says = (f'⏳ Pivot Yakını — Mevcut ${current_price:.2f} / Pivot '
+                f'${pivot_price:.2f} ({breakout_pct:+.2f}%). Mark: izlemede '
+                f'kal, gerçek kırılım hacim onaylı olsun.')
+    else:
+        status = 'BELOW_PIVOT'
+        says = (f'Pivot Altı — Mevcut ${current_price:.2f} pivot '
+                f'${pivot_price:.2f} altında {breakout_pct:+.2f}%. Mark: '
+                f'henüz AL noktası değil, base oluşumunu bekle.')
+
+    return {
+        'status': status,
+        'pivot_price': round(pivot_price, 2),
+        'current_price': round(current_price, 2),
+        'breakout_pct': breakout_pct,
+        'volume_multiplier': volume_multiplier,
+        'volume_confirmed': volume_confirmed,
+        'mark_says': says,
+    }
