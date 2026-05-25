@@ -14,7 +14,7 @@
  * Hisse listesi varsa Stage 4 sayısı eklenir (extra mekanik karar metrik).
  */
 
-import { AlertTriangle, ShieldAlert, ShieldCheck, Activity } from "lucide-react";
+import { AlertTriangle, ShieldAlert, ShieldCheck, Activity, Sunrise } from "lucide-react";
 import { useMarketStatus } from "@/hooks/use-market-status";
 import type { MarkRegimeType } from "@/types/market";
 
@@ -91,13 +91,20 @@ export function MarkRegimeBanner({
   const divergence = data.breadth_divergence;
   const isCriticalDivergence = divergence?.severity === "critical";
 
+  // KARAR #733 alt-paket (Paket 68): FTD ONAYLI pozitif fırsat yakalama
+  // (P61 BEARISH paternin paraleli — 2003/2009/2020 dip recovery)
+  const followThrough = data.follow_through;
+  const isFtdConfirmed =
+    followThrough?.ftd_detected === true && followThrough.volume_confirmed === true;
+
   // HEALTHY iken sessiz olabilir (gürültü azaltma) — Sn. Ferit tercih flag
-  // İSTİSNA (Paket 61): Kritik divergence varsa HEALTHY iken bile gösterilir
+  // İSTİSNA: Kritik divergence VEYA FTD ONAYLI varsa HEALTHY iken bile gösterilir
   if (
     hideOnHealthy &&
     regime.regime === "HEALTHY" &&
     stage4Count === 0 &&
-    !isCriticalDivergence
+    !isCriticalDivergence &&
+    !isFtdConfirmed
   ) {
     return null;
   }
@@ -124,6 +131,15 @@ export function MarkRegimeBanner({
             title={divergence!.mark_says}
           >
             BEARISH ⚠️
+          </span>
+        )}
+        {isFtdConfirmed && (
+          <span
+            className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider"
+            style={{ background: "var(--mtp-excellent)", color: "#fff" }}
+            title={followThrough!.mark_says}
+          >
+            FTD ✓
           </span>
         )}
         <span className="opacity-60 ml-auto">DD {dd}/20</span>
@@ -203,6 +219,39 @@ export function MarkRegimeBanner({
                 </span>
               </div>
               <p className="opacity-90 leading-snug">{divergence.mark_says}</p>
+            </div>
+          </div>
+        )}
+
+        {/* KARAR #733 alt-paket (Paket 68): FTD ONAYLI pozitif fırsat bandı —
+            volume_confirmed=true durumunda yeşil pozitif bant (Mark Stage 1->2
+            geçiş sinyali). 2003/2009/2020 dip recovery tarihsel paten. P61
+            BEARISH paternin pozitif paraleli — 5 sayfa DRY canlı. */}
+        {isFtdConfirmed && followThrough && (
+          <div
+            className="mt-2 px-2 py-1.5 rounded text-[11px] flex items-start gap-2"
+            style={{
+              background: "rgba(40,167,69,0.15)",
+              border: "1px solid var(--mtp-excellent)",
+              color: "var(--mtp-excellent)",
+            }}
+          >
+            <Sunrise size={14} className="shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <span className="font-bold uppercase tracking-wider">
+                  FOLLOW-THROUGH DAY ✓ ONAYLI
+                </span>
+                <span className="opacity-75 font-mono tabular-nums">
+                  {followThrough.ftd_gain_pct != null && (
+                    <> · SPY +{followThrough.ftd_gain_pct.toFixed(2)}%</>
+                  )}
+                  {followThrough.days_after_low != null && (
+                    <> / Dip&apos;ten {followThrough.days_after_low} gün</>
+                  )}
+                </span>
+              </div>
+              <p className="opacity-90 leading-snug">{followThrough.mark_says}</p>
             </div>
           </div>
         )}
