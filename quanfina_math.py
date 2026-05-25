@@ -3836,3 +3836,113 @@ def compute_brandon_expectancy(
         'meets_brandon_targets': meets_targets,
         'mark_says': says,
     }
+
+
+# ======================================================================
+# KARAR #733 alt-paket (Paket 76, 25 May 2026) — Overhead Supply Detection
+#
+# Mark TLSMW Ch 10 canon: "Overhead supply" = bir hissenin geçmişte
+# bir fiyat seviyesinden düştüğü ve şimdi o seviyeye geri yaklaştığı
+# durumda eski sahipler "kayıp kapansın" diye satar — direnç oluşur.
+#
+# Algoritma:
+# - Mevcut fiyatın üstünde son N gün içinde max kapanış (overhead_price)
+# - O zirveden ne kadar düşüş yaşandı (drop_pct)
+# - O zirveye ne kadar yakınız (proximity_pct)
+# - Yüksek hacim günü o zirvede oldu mu (heavy_volume_at_top)
+#
+# Mark birebir kaynak:
+# - TLSMW Ch 10: "Detecting Overhead Supply"
+# - O'Neil: "Stocks have memory at old highs"
+#
+# 3 kategori:
+# - HEAVY: Overhead %20+ üstte + yakın yaklaşım (direnç kalın)
+# - MODERATE: Overhead %10-20 + orta yakınlık
+# - NONE: Overhead %3 altı veya çok uzak (temiz, breakout uygun)
+# ======================================================================
+
+OVERHEAD_PROXIMITY_HEAVY_PCT: float = 5.0    # %5 yakını = direnç kritik
+OVERHEAD_DROP_HEAVY_PCT: float = 20.0        # %20+ düşüş = ağır overhead
+OVERHEAD_DROP_MODERATE_PCT: float = 10.0     # %10-20 = orta
+OVERHEAD_LOOKBACK_DAYS: int = 60             # 60 gün geriye bak
+
+
+def compute_overhead_supply(
+    closes: list[float],
+    lookback_days: int = OVERHEAD_LOOKBACK_DAYS,
+) -> dict:
+    """Mark TLSMW Ch 10 Overhead Supply tespiti.
+
+    Args:
+        closes: Günlük kapanış fiyatları (kronolojik)
+        lookback_days: Geçmiş tepe arama penceresi (default 60)
+
+    Returns:
+        dict {
+            'category': str,           # HEAVY / MODERATE / NONE
+            'overhead_price': float | None,    # Tespit edilen geçmiş tepe
+            'drop_pct': float | None,           # Tepeden mevcut düşüş %
+            'proximity_pct': float | None,      # Tepeye yakınlık %
+            'mark_says': str,
+        }
+    """
+    if not closes:
+        return {
+            'category': None,
+            'overhead_price': None,
+            'drop_pct': None,
+            'proximity_pct': None,
+            'mark_says': 'Yetersiz veri — overhead supply hesaplanamıyor.',
+        }
+    if len(closes) < 10:
+        return {
+            'category': None,
+            'overhead_price': None,
+            'drop_pct': None,
+            'proximity_pct': None,
+            'mark_says': 'Yetersiz veri — en az 10 gün gerek.',
+        }
+
+    current_price = closes[-1]
+    window_size = min(lookback_days, len(closes))
+    window = closes[-window_size:]
+
+    # Mevcut fiyatın üstündeki en yüksek nokta (overhead)
+    overhead_candidates = [p for p in window if p > current_price]
+    if not overhead_candidates:
+        # Hiç overhead yok — temiz
+        return {
+            'category': 'NONE',
+            'overhead_price': None,
+            'drop_pct': 0.0,
+            'proximity_pct': None,
+            'mark_says': (f'Overhead supply yok — mevcut ${current_price:.2f} '
+                          f'lookback içinde en yüksek. Mark: temiz tarla, '
+                          f'breakout için uygun.'),
+        }
+
+    overhead_price = max(overhead_candidates)
+    drop_pct = round((overhead_price - current_price) / overhead_price * 100, 2)
+    proximity_pct = round((overhead_price - current_price) / current_price * 100, 2)
+
+    if drop_pct >= OVERHEAD_DROP_HEAVY_PCT:
+        category = 'HEAVY'
+        says = (f'⚠️ HEAVY Overhead — ${overhead_price:.2f} üstte (%{drop_pct:.1f} '
+                f'üzeri tepe), mevcut %{proximity_pct:.1f} uzakta. Mark TLSMW '
+                f'Ch 10: eski sahipler "kayıp kapansın" satışı — direnç kalın.')
+    elif drop_pct >= OVERHEAD_DROP_MODERATE_PCT:
+        category = 'MODERATE'
+        says = (f'MODERATE Overhead — ${overhead_price:.2f} (%{drop_pct:.1f} '
+                f'üzeri). Mark: orta direnç, kırılım hacim teyitli olmalı.')
+    else:
+        category = 'NONE'
+        says = (f'Hafif/Yok Overhead — ${overhead_price:.2f} sadece '
+                f'%{drop_pct:.1f} üzeri. Mark: temiz, breakout uygun.')
+
+    return {
+        'category': category,
+        'overhead_price': round(overhead_price, 2),
+        'drop_pct': drop_pct,
+        'proximity_pct': proximity_pct,
+        'mark_says': says,
+    }
