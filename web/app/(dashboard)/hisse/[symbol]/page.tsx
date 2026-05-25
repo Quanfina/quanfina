@@ -8,6 +8,7 @@ import dynamic from "next/dynamic";
 import { StockHeader } from "@/components/stock/StockHeader";
 import { ActiveStrategies } from "@/components/stock/ActiveStrategies";
 import { CarrStageCard } from "@/components/stock/CarrStageCard";
+import { PivotBreakoutCard } from "@/components/stock/PivotBreakoutCard";
 import { MarkRegimeBanner } from "@/components/mark/MarkRegimeBanner";
 import { useCarrStage } from "@/hooks/use-carr-stage";
 import { AddTradeDialog } from "@/components/journal/AddTradeDialog";
@@ -145,6 +146,8 @@ export default function HissePage({
           <div className="w-64 shrink-0 flex flex-col gap-3">
             <ActiveStrategies strategies={info.active_strategies} symbol={sym} />
             <CarrStageCard symbol={sym} />
+            {/* KARAR #733 alt-paket (Paket 72): Pivot Breakout Card */}
+            <PivotBreakoutCard symbol={sym} />
           </div>
         </div>
 
