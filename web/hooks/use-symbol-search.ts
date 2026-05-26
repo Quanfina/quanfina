@@ -11,6 +11,13 @@ export interface SymbolSearchResult {
   symbol: string;
   name: string;
   sector: string;
+  /**
+   * Paket 211 (27 May 2026): Kaynak ayrımı — kullanıcı bilgi.
+   * - "universe": Quanfina bilinen evren (_STOCK_META 106 sembol)
+   * - "yfinance": Evren dışı, yfinance Ticker.info ile doğrulandı
+   * Backward compat: alanı olmayan eski response'larda "universe" varsayılır.
+   */
+  source?: "universe" | "yfinance";
 }
 
 async function fetchSymbolSearch(q: string, limit: number): Promise<SymbolSearchResult[]> {

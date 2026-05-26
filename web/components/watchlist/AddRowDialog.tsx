@@ -122,7 +122,22 @@ export function AddRowDialog({ open, onOpenChange }: Props) {
                       style={{ borderColor: "var(--border)" }}
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <span className="font-mono font-semibold">{s.symbol}</span>
+                        <span className="font-mono font-semibold flex items-center gap-1.5">
+                          {s.symbol}
+                          {/* Paket 211 (27 May 2026): yfinance fallback rozet */}
+                          {s.source === "yfinance" && (
+                            <span
+                              className="text-[9px] font-bold px-1 py-0.5 rounded"
+                              style={{
+                                background: "color-mix(in srgb, var(--mtp-good, #4B9CD3) 18%, transparent)",
+                                color: "var(--mtp-good, #4B9CD3)",
+                              }}
+                              title="Quanfina evren dışı — yfinance ile doğrulandı"
+                            >
+                              yf
+                            </span>
+                          )}
+                        </span>
                         <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
                           {s.sector}
                         </span>

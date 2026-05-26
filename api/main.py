@@ -1693,10 +1693,16 @@ _STOCK_BY_SYM: dict[str, MinerviniStock] = {s.symbol: s for s in MOCK_STOCKS}
 # =============================================================================
 
 class SymbolSearchResult(BaseModel):
-    """Sembol arama sonucu — autocomplete için minimal."""
+    """Sembol arama sonucu — autocomplete için minimal.
+
+    Paket 211 (27 May 2026): source field — Quanfina evren vs yfinance fallback ayrımı.
+    Kullanıcı dropdown'da "universe" = _STOCK_META hit (bilinen), "yfinance" =
+    yfinance Ticker.info ile doğrulanmış (evren dışı) bilgisini görür.
+    """
     symbol: str
     name: str
     sector: str
+    source: Literal["universe", "yfinance"] = "universe"
 
 
 @app.get("/api/symbols/search", response_model=list[SymbolSearchResult])
@@ -1725,7 +1731,8 @@ def search_symbols(q: str, limit: int = 10) -> list[SymbolSearchResult]:
         name = meta.get("name", sym)
         name_lower = name.lower()
         sector = meta.get("sector") or meta.get("industry", "Unknown")
-        result = SymbolSearchResult(symbol=sym, name=name, sector=sector)
+        # P211: source="universe" — Quanfina bilinen evren
+        result = SymbolSearchResult(symbol=sym, name=name, sector=sector, source="universe")
         if sym_upper.startswith(q_upper):
             prefix_sym.append(result)
             seen.add(sym)
@@ -1748,6 +1755,7 @@ def search_symbols(q: str, limit: int = 10) -> list[SymbolSearchResult]:
             ts, payload = cached
             if now - ts < _YF_SYMBOL_CACHE_TTL_SEC:
                 if payload:
+                    # P211: cached payload zaten source="yfinance" içerir
                     combined.append(SymbolSearchResult(**payload))
                 # payload None ise: önceki sorguda yfinance bulamamış — yine boş dön
                 return combined[:limit]
@@ -1761,7 +1769,11 @@ def search_symbols(q: str, limit: int = 10) -> list[SymbolSearchResult]:
             name = info.get("longName") or info.get("shortName")
             sector = info.get("sector") or info.get("industry") or "Unknown"
             if name and (info.get("regularMarketPrice") or info.get("previousClose")):
-                result_payload = {"symbol": q_upper, "name": name, "sector": sector}
+                # P211: source="yfinance" — evren dışı, yfinance ile doğrulandı
+                result_payload = {
+                    "symbol": q_upper, "name": name, "sector": sector,
+                    "source": "yfinance",
+                }
                 combined.append(SymbolSearchResult(**result_payload))
         except Exception:
             pass  # yfinance fail — sessizce geç
