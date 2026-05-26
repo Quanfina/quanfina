@@ -22,6 +22,7 @@ import { ModBadge } from "@/components/mark/ModBadge";
 import { PreTradeChecklist } from "@/components/journal/PreTradeChecklist";
 import { useRsRating } from "@/hooks/use-rs-rating";
 import { usePivotBreakout } from "@/hooks/use-pivot-breakout";
+import { useTradingMode, isNewAlBlocked } from "@/hooks/use-trading-mode";
 import { useCarrStage } from "@/hooks/use-carr-stage";
 import { useClimaxRun } from "@/hooks/use-climax-run";
 import { AddTradeDialog } from "@/components/journal/AddTradeDialog";
@@ -63,6 +64,10 @@ export default function HissePage({
   // Paket 241 (27 May 2026): Pre-flight Mark canon mini-versiyon (sembol seviyesi)
   const { data: rsData } = useRsRating(sym);
   const { data: pivotData } = usePivotBreakout(sym);
+  // Paket 256 (27 May 2026): Defansif modda Trade Aç buton görsel disabled
+  // (AddTradeDialog override mevcut — yine de tıklanırsa dialog açılır)
+  const tradingMode = useTradingMode();
+  const alBlocked = isNewAlBlocked(tradingMode.mode);
 
   // KARAR #733 alt-paket (Paket 46): Hisse detay sayfasından doğrudan trade aç.
   // Sn. Ferit Watchlist/Hisse Tarama'dan hisseye girdiğinde direkt buradan
@@ -154,9 +159,19 @@ export default function HissePage({
           <Button
             size="sm"
             onClick={handleTradeClick}
-            style={{ background: isStage4 ? "var(--mtp-danger)" : "#28A745", color: "#fff" }}
+            style={{
+              // Paket 256: Defansif modda gri renk (AddTradeDialog override mevcut)
+              background: alBlocked
+                ? "#9CA3AF"
+                : isStage4
+                ? "var(--mtp-danger)"
+                : "#28A745",
+              color: "#fff",
+            }}
             title={
-              isStage4
+              alBlocked
+                ? "DEFANSİF mod aktif — Mark TTLC s.187 yeni AL BLOK. AddTradeDialog'da override checkbox gerektirir."
+                : isStage4
                 ? "Carr Stage 4 — Mark UZAK DUR uyarisi (yine de devam edebilirsin)"
                 : "Bu hisseye trade aç (form pre-fill ile)"
             }

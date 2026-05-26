@@ -14,6 +14,7 @@ import { PortfolioSummaryCard } from "@/components/dashboard/PortfolioSummaryCar
 import { AlertHistoryCard } from "@/components/dashboard/AlertHistoryCard";
 import { MarkRegimeBanner } from "@/components/mark/MarkRegimeBanner";
 import { ModBadge } from "@/components/mark/ModBadge";
+import { useTradingMode } from "@/hooks/use-trading-mode";
 import { fmtUsd, fmtPctSigned } from "@/lib/format-currency";
 
 // KARAR #474 (20 May 2026 ~08:15): Ana sayfa POC → Gerçek Dashboard.
@@ -73,6 +74,8 @@ export default function Home() {
   const trades = useTrades();
   const market = useMarketStatus();
   const watchlist = useWatchlist();
+  // Paket 255 (27 May 2026): Dashboard Defansif uyarı banner (6. sayfa Defansif zinciri)
+  const tradingMode = useTradingMode();
 
   // KARAR #480 (UX Bölüm 8): Pazar Günü Hazırlık Paneli (Aksiyon Modu)
   // Tarih bazlı checklist, localStorage persistence (SSR hydration guard)
@@ -195,6 +198,27 @@ export default function Home() {
           hideOnHealthy={false}
         />
       </div>
+
+      {/* Paket 255 (27 May 2026): Dashboard Defansif uyarı banner — 6. sayfa
+          Defansif zinciri (Vizyon İLKE #10 + Mark TTLC s.187). Sn. Ferit
+          Quanfina'yi açtığında Defansif modda ilk gördüğü uyarı. */}
+      {tradingMode.mode === "defansif" && (
+        <div
+          className="-mx-6 px-6 py-2 border-b text-xs flex items-center gap-2"
+          style={{
+            background: "rgba(220, 53, 69, 0.08)",
+            borderColor: "rgba(220, 53, 69, 0.30)",
+            color: "var(--mtp-danger)",
+          }}
+        >
+          <span aria-hidden="true">🛡️</span>
+          <span>
+            <b>DEFANSİF mod aktif</b> — Mark TTLC s.187: yeni AL pozisyonları BLOK.
+            Pazartesi açılış öncesi piyasa Stage 3-4 + MH&lt;30. Açık pozisyon stop
+            yönetimi öncelikli, yeni AL aramayı durdur.
+          </span>
+        </div>
+      )}
 
       {/* Header */}
       <div className="flex flex-col gap-1">
