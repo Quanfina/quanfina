@@ -4238,3 +4238,150 @@ def compute_relative_strength_rating(
         'outperform_pct': round(outperform, 2),
         'mark_says': says,
     }
+
+
+# ======================================================================
+# ATR VOLATILITY — Mark TLSMW Ch 11 / Wilder canon (Paket 100)
+# ======================================================================
+# Average True Range — günlük volatilite ölçüsü, Mark stop yerleştirme.
+#
+# Mark birebir:
+# - "ATR-based stops give the stock room to breathe"
+# - TLSMW Ch 11: "Don't get stopped out by noise"
+# - Stop = Entry - (ATR × multiplier), tipik multiplier 2-3 (sıkı/normal)
+#
+# Wilder formül (J. Welles Wilder 1978):
+# - TR_today = max(high-low, |high-prev_close|, |low-prev_close|)
+# - ATR = 14-day rolling average of TR
+#
+# Volatilite kategorisi (kapanış fiyatına göre ATR % normalize):
+# - LOW (<2%): Sessiz, sıkı (Mark VCP final daralma adayı)
+# - NORMAL (2-4%): Sağlıklı trend
+# - HIGH (4-7%): Yüksek volatilite — stop genişletilmeli
+# - EXTREME (>7%): Aşırı oynak — pozisyon küçült veya kaçın
+# ======================================================================
+
+ATR_PERIOD: int = 14                          # Wilder canon 14 gün
+ATR_VOL_LOW_PCT: float = 2.0
+ATR_VOL_NORMAL_PCT: float = 4.0
+ATR_VOL_HIGH_PCT: float = 7.0
+ATR_STOP_MULTIPLIER_TIGHT: float = 2.0       # Pivot bazlı
+ATR_STOP_MULTIPLIER_NORMAL: float = 2.5
+ATR_STOP_MULTIPLIER_LOOSE: float = 3.0       # Trail için
+
+
+def compute_atr_volatility(
+    highs: list[float],
+    lows: list[float],
+    closes: list[float],
+    period: int = ATR_PERIOD,
+) -> dict:
+    """Wilder canon ATR + Mark TLSMW Ch 11 stop placement.
+
+    Args:
+        highs: Günlük yüksek fiyatlar (kronolojik)
+        lows: Günlük düşük fiyatlar
+        closes: Günlük kapanışlar (önceki kapanış için)
+        period: ATR rolling penceresi (default 14)
+
+    Returns:
+        dict {
+            'atr': float | None,                    # Mutlak ATR ($)
+            'atr_pct': float | None,                 # ATR / current close %
+            'category': str,                         # LOW/NORMAL/HIGH/EXTREME
+            'suggested_stop_tight': float | None,    # Entry - 2×ATR
+            'suggested_stop_normal': float | None,   # Entry - 2.5×ATR
+            'suggested_stop_loose': float | None,    # Entry - 3×ATR
+            'mark_says': str,
+        }
+    """
+    if not highs or not lows or not closes:
+        return {
+            'atr': None,
+            'atr_pct': None,
+            'category': None,
+            'suggested_stop_tight': None,
+            'suggested_stop_normal': None,
+            'suggested_stop_loose': None,
+            'mark_says': 'Yetersiz veri — ATR hesaplanamıyor.',
+        }
+
+    if len(highs) != len(lows) or len(lows) != len(closes):
+        return {
+            'atr': None,
+            'atr_pct': None,
+            'category': None,
+            'suggested_stop_tight': None,
+            'suggested_stop_normal': None,
+            'suggested_stop_loose': None,
+            'mark_says': 'highs/lows/closes uzunlukları eşit olmalı.',
+        }
+
+    if len(closes) < period + 1:
+        return {
+            'atr': None,
+            'atr_pct': None,
+            'category': None,
+            'suggested_stop_tight': None,
+            'suggested_stop_normal': None,
+            'suggested_stop_loose': None,
+            'mark_says': f'Yetersiz veri — en az {period + 1} gün gerek.',
+        }
+
+    # True Range listesi (ilk gün yok — prev_close yok)
+    trs = []
+    for i in range(1, len(closes)):
+        h = highs[i]
+        l = lows[i]
+        prev_c = closes[i - 1]
+        tr = max(h - l, abs(h - prev_c), abs(l - prev_c))
+        trs.append(tr)
+
+    # ATR = son `period` gün TR ortalaması (basit ortalama Wilder yaklaşımı)
+    recent_trs = trs[-period:]
+    atr = sum(recent_trs) / len(recent_trs)
+    current_close = closes[-1]
+    if current_close <= 0:
+        return {
+            'atr': None,
+            'atr_pct': None,
+            'category': None,
+            'suggested_stop_tight': None,
+            'suggested_stop_normal': None,
+            'suggested_stop_loose': None,
+            'mark_says': 'Geçersiz kapanış fiyatı.',
+        }
+
+    atr_pct = round(atr / current_close * 100, 2)
+    atr = round(atr, 2)
+
+    if atr_pct < ATR_VOL_LOW_PCT:
+        category = 'LOW'
+        says = (f'LOW Volatilite — ATR ${atr} (%{atr_pct} kapanış). '
+                f'Mark VCP: sessiz daralma, final kontraksiyon adayı.')
+    elif atr_pct < ATR_VOL_NORMAL_PCT:
+        category = 'NORMAL'
+        says = (f'NORMAL Volatilite — ATR ${atr} (%{atr_pct}). Mark TLSMW '
+                f'Ch 11: sağlıklı trend, standart stop yeterli.')
+    elif atr_pct < ATR_VOL_HIGH_PCT:
+        category = 'HIGH'
+        says = (f'⚠️ HIGH Volatilite — ATR ${atr} (%{atr_pct}). Mark: '
+                f'stop genişletilmeli, pozisyon boyutu küçültülmeli.')
+    else:
+        category = 'EXTREME'
+        says = (f'🔴 EXTREME Volatilite — ATR ${atr} (%{atr_pct}). Mark: '
+                f'"Don\'t fight the noise" — pozisyon küçült veya kaçın.')
+
+    suggested_tight = round(current_close - ATR_STOP_MULTIPLIER_TIGHT * atr, 2)
+    suggested_normal = round(current_close - ATR_STOP_MULTIPLIER_NORMAL * atr, 2)
+    suggested_loose = round(current_close - ATR_STOP_MULTIPLIER_LOOSE * atr, 2)
+
+    return {
+        'atr': atr,
+        'atr_pct': atr_pct,
+        'category': category,
+        'suggested_stop_tight': suggested_tight,
+        'suggested_stop_normal': suggested_normal,
+        'suggested_stop_loose': suggested_loose,
+        'mark_says': says,
+    }
