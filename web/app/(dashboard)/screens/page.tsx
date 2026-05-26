@@ -32,6 +32,7 @@ import { SCREEN_CATEGORIES, SCREEN_CONDITIONS, CONDITION_SOURCE_LABEL } from "@/
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { GridLoadingOverlay } from "@/components/ag-grid/LoadingOverlay";
 import { SymbolCellRenderer } from "@/components/watchlist/SymbolCellRenderer";
+import { PivotBadgeCell } from "@/components/shared/PivotBadgeCell";
 import { MONO, MONO_RIGHT } from "@/lib/grid-styles";
 import { formatDateTR } from "@/lib/format-date";
 import { fmtUsd } from "@/lib/format-currency";
@@ -170,6 +171,7 @@ export default function ScreensPage() {
       },
       // KARAR #733 alt-paket (Paket 83): Pivot kolonu — Mark TLSMW Ch 10
       // (P81 Sinyaller + P82 Watchlist paten — Tarama'da da AL/Zayıf/Yakın/Altı)
+      // Paket 158 (26 May 2026): document.createElement -> PivotBadgeCell DRY (React 19 fix)
       {
         headerName: "PIVOT",
         field: "pivot_status",
@@ -177,23 +179,7 @@ export default function ScreensPage() {
         minWidth: 90,
         sortable: false,
         filter: false,
-        cellRenderer: (p: { data?: ScreenResultRow }) => {
-          const status = p.data?.pivot_status;
-          if (!status) return null;
-          const meta =
-            status === "CONFIRMED"
-              ? { label: "AL ✓", color: "var(--mtp-excellent)", bg: "rgba(40,167,69,0.15)" }
-              : status === "WEAK"
-              ? { label: "Zayıf ⚠️", color: "#F59E0B", bg: "rgba(245,158,11,0.15)" }
-              : status === "NEAR_PIVOT"
-              ? { label: "Yakın ⏳", color: "var(--mtp-good, #4B9CD3)", bg: "rgba(75,156,211,0.15)" }
-              : { label: "Altı ○", color: "var(--mtp-danger)", bg: "rgba(220,53,69,0.10)" };
-          const el = document.createElement("span");
-          el.textContent = meta.label;
-          el.style.cssText = `font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;text-transform:uppercase;letter-spacing:0.05em;background:${meta.bg};color:${meta.color};border:1px solid ${status === "CONFIRMED" ? "var(--mtp-excellent)" : "currentColor"};`;
-          el.title = `Mark TLSMW Ch 10 — Pivot ${status}`;
-          return el;
-        },
+        cellRenderer: PivotBadgeCell,
       },
     ],
     []

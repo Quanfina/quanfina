@@ -6,6 +6,7 @@ import { Plus } from "lucide-react";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef } from "ag-grid-community";
 import { useWatchlist } from "@/hooks/use-watchlist";
+import { useStockQuotes } from "@/hooks/use-stock-quote";
 import {
   useUpdateWatchlistRow,
   useDeleteWatchlistRow,
@@ -107,6 +108,27 @@ export default function WatchlistPage() {
     [] // stable: callbacksRef is a ref, wrapper lambdas don't change
   );
 
+  // Paket 154 (26 May 2026): Tüm watchlist sembolleri için canlı fiyat (paralel)
+  // useStockQuotes — useQueries 60s refetch, yfinance + 5dk backend cache.
+  const allSymbols = useMemo(
+    () => Array.from(new Set((data ?? []).map((r) => r.symbol))),
+    [data]
+  );
+  const quoteResults = useStockQuotes(allSymbols);
+  const quoteMap = useMemo(() => {
+    const map = new Map<string, { price: number; change_pct: number | null; source: string }>();
+    quoteResults.forEach((r) => {
+      if (r.data) {
+        map.set(r.data.symbol.toUpperCase(), {
+          price: r.data.price,
+          change_pct: r.data.change_pct,
+          source: r.data.source,
+        });
+      }
+    });
+    return map;
+  }, [quoteResults]);
+
   // KARAR ADAY (21 May 2026): Konsensus filter + siralama kaldirildi. Her strateji
   // ayri satir kanon. Siralama: strategy > symbol alfabetik (deterministik).
   const rowData = useMemo(() => {
@@ -123,10 +145,21 @@ export default function WatchlistPage() {
     if (leaderOnly) rows = rows.filter((r) => Math.round(r.rs_rating) >= 80);
     if (climaxOnly) rows = rows.filter((r) => r.mark_signals?.climax_category === "CLIMAX_TOP");
     if (stageConfirmedOnly) rows = rows.filter((r) => r.mark_signals?.stage_category === "CONFIRMED_STAGE_2");
-    return [...rows].sort(
+    // Paket 154: client-side enrich — quote price + günlük değişim
+    const enriched: WatchlistRow[] = rows.map((r) => {
+      const q = quoteMap.get(r.symbol.toUpperCase());
+      if (!q) return r;
+      return {
+        ...r,
+        current_price: q.price,
+        change_pct_today: q.change_pct,
+        quote_source: q.source as "yfinance" | "mock",
+      };
+    });
+    return enriched.sort(
       (a, b) => a.strategy.localeCompare(b.strategy) || a.symbol.localeCompare(b.symbol)
     );
-  }, [data, strategy, status, search, leaderOnly, climaxOnly, stageConfirmedOnly]);
+  }, [data, strategy, status, search, leaderOnly, climaxOnly, stageConfirmedOnly, quoteMap]);
 
   // KARAR #476: gridClass useGridTheme'den (SSR uyumu)
   // KARAR #733 alt-paket (Paket 36): Mark Regime banner Stage 4 sayim

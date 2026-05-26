@@ -9,6 +9,7 @@ import { SetupCellRenderer } from "./SetupCellRenderer";
 import { SymbolCellRenderer } from "./SymbolCellRenderer";
 import { MarkBadgeCell } from "./MarkBadgeCell";
 import { PivotBadgeCell } from "@/components/shared/PivotBadgeCell";
+import { RsRatingBadge } from "@/components/shared/RsRatingBadge";
 import { TermHeaderComponent } from "@/components/terminology/TermHeaderComponent";
 // KARAR #492 (20 May 2026 ~16:45): DRY hijyen - yerel MONO -> @/lib/grid-styles
 // Sinyaller + Hisse Tarama paterniyle eşitleme. Davranış: fontSize 13px global ->
@@ -63,10 +64,46 @@ export const COL_DEFS: ColDef<WatchlistRow>[] = [
   {
     field: "price",
     headerName: "FİYAT",
-    width: 100,
-    minWidth: 90,
+    width: 90,
+    minWidth: 80,
     valueFormatter: fmtPrice,
     cellStyle: MONO,
+    headerTooltip: "Eklendiği zamanki fiyat",
+  },
+  // Paket 154 (26 May 2026): Watchlist canlı fiyat — paper trading sabah bakışı
+  // useStockQuotes 60s refetch, yfinance + 5dk backend cache. MOCK fiyat değil.
+  {
+    field: "current_price",
+    headerName: "CANLI $",
+    width: 95,
+    minWidth: 85,
+    valueFormatter: fmtPrice,
+    cellStyle: (p: CellClassParams<WatchlistRow, number>) => ({
+      ...MONO,
+      color: p.value == null ? "var(--muted-foreground)" : "var(--mtp-good, #4B9CD3)",
+      fontWeight: 600,
+    }),
+    headerTooltip: "Anlık piyasa fiyatı (yfinance, 60s yenileme)",
+  },
+  {
+    field: "change_pct_today",
+    headerName: "GÜN %",
+    width: 85,
+    minWidth: 75,
+    valueFormatter: (p) => {
+      const v = p.value as number | null | undefined;
+      if (v == null) return "—";
+      return (v >= 0 ? "+" : "") + v.toFixed(2) + "%";
+    },
+    cellStyle: (p: CellClassParams<WatchlistRow, number>) => {
+      if (p.value == null) return { ...MONO, color: "var(--muted-foreground)" };
+      return {
+        ...MONO,
+        color: p.value >= 0 ? "var(--mtp-excellent)" : "var(--mtp-danger)",
+        fontWeight: 600,
+      };
+    },
+    headerTooltip: "Bugünkü yüzde değişim (son kapanış vs dünkü)",
   },
   {
     field: "setup_type",
@@ -78,6 +115,7 @@ export const COL_DEFS: ColDef<WatchlistRow>[] = [
   // KARAR #733 alt-paket (Paket 98, 26 May 2026): RS Rating kategori rozet
   // Mark TLSMW Ch 3-5 / IBD canon — sadece sayı değil, kategori rozet
   // (LEADER/STRONG/AVERAGE/LAGGARD) ile Sn. Ferit anında "Top 20%" tarar.
+  // Paket 158 (26 May 2026): document.createElement -> RsRatingBadge DRY (React 19 fix)
   {
     field: "rs_rating",
     headerName: "RS",
@@ -93,44 +131,7 @@ export const COL_DEFS: ColDef<WatchlistRow>[] = [
       justifyContent: "space-between",
       paddingRight: "4px",
     }),
-    cellRenderer: (p: { value?: number | null }) => {
-      const rs = p.value;
-      if (rs == null) {
-        const el = document.createElement("span");
-        el.textContent = "—";
-        el.style.color = "var(--muted-foreground)";
-        return el;
-      }
-      const container = document.createElement("span");
-      container.style.cssText = "display:flex;align-items:center;gap:4px;width:100%;";
-
-      const num = document.createElement("span");
-      num.textContent = String(rs);
-      num.style.cssText = "font-weight:600;font-variant-numeric:tabular-nums;";
-      container.appendChild(num);
-
-      // Kategori rozet (Mark/IBD canon)
-      let meta: { label: string; color: string } | null = null;
-      if (rs >= 80) meta = { label: "L", color: "var(--mtp-excellent)" };
-      else if (rs >= 70) meta = { label: "S", color: "var(--mtp-good, #4B9CD3)" };
-      else if (rs >= 50) meta = { label: "A", color: "#F59E0B" };
-      else meta = { label: "↓", color: "var(--mtp-danger)" };
-
-      if (meta) {
-        const badge = document.createElement("span");
-        badge.textContent = meta.label;
-        badge.style.cssText = `font-size:9px;font-weight:700;padding:0 4px;border-radius:3px;background:${meta.color};color:#fff;margin-left:auto;`;
-        const tooltip =
-          rs >= 80 ? "IBD LEADER (Top 20%)"
-          : rs >= 70 ? "STRONG"
-          : rs >= 50 ? "AVERAGE"
-          : "LAGGARD — Mark: uzak dur";
-        badge.title = `${tooltip} (RS ${rs})`;
-        container.appendChild(badge);
-      }
-
-      return container;
-    },
+    cellRenderer: RsRatingBadge,
   },
   // KONSENSUS kolonu kaldirildi (KARAR ADAY 21 May 2026): her strateji ayri satir
   // kanon, konsensus sayim noise.

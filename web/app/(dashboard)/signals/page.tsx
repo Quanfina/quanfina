@@ -22,6 +22,8 @@ import type { Signal } from "@/types/signal";
 import { MarkBadgeStrip } from "@/components/mark/MarkBadgeStrip";
 import { MarkRegimeBanner } from "@/components/mark/MarkRegimeBanner";
 import { fmtUsd } from "@/lib/format-currency";
+import { RsRatingBadge } from "@/components/shared/RsRatingBadge";
+import { SignalRREnrichedCell } from "@/components/signals/SignalRREnrichedCell";
 
 const SELECT =
   "h-8 rounded-md border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring";
@@ -170,38 +172,14 @@ export default function SignalsPage() {
     },
     // KARAR #733 alt-paket (Paket 99, 26 May 2026): RS Rating kategori rozet
     // (Watchlist P98 paten birebir — Mark TLSMW Ch 3-5 / IBD canon visual).
+    // Paket 158 (26 May 2026): document.createElement -> RsRatingBadge React component
+    // (React 19 crash önleme — DRY shared/RsRatingBadge.tsx).
     {
       field: "rs_rating",
       headerName: "RS",
       width: 100,
       minWidth: 85,
-      cellRenderer: (p: { value?: number | null }) => {
-        const rs = p.value;
-        if (rs == null) {
-          const el = document.createElement("span");
-          el.textContent = "—";
-          el.style.color = "var(--muted-foreground)";
-          return el;
-        }
-        const rsRounded = Math.round(rs);
-        const container = document.createElement("span");
-        container.style.cssText = "display:flex;align-items:center;gap:4px;width:100%;justify-content:flex-end;";
-        const num = document.createElement("span");
-        num.textContent = String(rsRounded);
-        num.style.cssText = "font-weight:600;font-variant-numeric:tabular-nums;";
-        container.appendChild(num);
-        let meta: { label: string; color: string; tip: string };
-        if (rsRounded >= 80) meta = { label: "L", color: "var(--mtp-excellent)", tip: "IBD LEADER (Top 20%)" };
-        else if (rsRounded >= 70) meta = { label: "S", color: "var(--mtp-good, #4B9CD3)", tip: "STRONG" };
-        else if (rsRounded >= 50) meta = { label: "A", color: "#F59E0B", tip: "AVERAGE" };
-        else meta = { label: "↓", color: "var(--mtp-danger)", tip: "LAGGARD — Mark: uzak dur" };
-        const badge = document.createElement("span");
-        badge.textContent = meta.label;
-        badge.style.cssText = `font-size:9px;font-weight:700;padding:0 4px;border-radius:3px;background:${meta.color};color:#fff;`;
-        badge.title = `${meta.tip} (RS ${rsRounded})`;
-        container.appendChild(badge);
-        return container;
-      },
+      cellRenderer: RsRatingBadge,
     },
     {
       field: "price",
@@ -231,57 +209,12 @@ export default function SignalsPage() {
       field: "risk_reward",
       // P113 (26 May 2026): R/R + RS rozet + Climax ikon birlesik hucre.
       // KARAR #473: R/R = (hedef - fiyat) / (fiyat - stop). Backend hesaplar.
-      // DOM createElement pattern (P98/P99 paten) — JSX yasak AG Grid cellRenderer'da.
+      // Paket 158 (26 May 2026): DOM createElement -> SignalRREnrichedCell React component
+      // (React 19 crash önleme — components/signals/SignalRREnrichedCell.tsx).
       headerName: "R/R",
       width: 150,
       type: "rightAligned",
-      cellRenderer: (p: ICellRendererParams<Signal>) => {
-        const v = p.value as number | null;
-        const row = p.data;
-        if (v == null) {
-          const el = document.createElement("span");
-          el.textContent = "—";
-          el.style.color = "var(--muted-foreground)";
-          return el;
-        }
-        const container = document.createElement("span");
-        container.style.cssText = "display:flex;align-items:center;gap:4px;width:100%;justify-content:flex-end;";
-        // Climax Top ikon
-        if (row?.mark_signals?.climax_category === "CLIMAX_TOP") {
-          const icon = document.createElement("span");
-          icon.textContent = "🔥";
-          icon.style.cssText = "font-size:10px;line-height:1;";
-          icon.title = "Climax Top — Mark: pozisyon azalt/kapat";
-          container.appendChild(icon);
-        }
-        // RS kategori rozet
-        const rs = row?.rs_rating;
-        if (rs != null) {
-          const rsR = Math.round(rs);
-          let label: string, color: string, tip: string;
-          if (rsR >= 80) { label = "L"; color = "var(--mtp-excellent)"; tip = "IBD LEADER"; }
-          else if (rsR >= 70) { label = "S"; color = "var(--mtp-good, #4B9CD3)"; tip = "STRONG"; }
-          else if (rsR >= 50) { label = "A"; color = "#F59E0B"; tip = "AVERAGE"; }
-          else { label = "↓"; color = "var(--mtp-danger)"; tip = "LAGGARD"; }
-          const badge = document.createElement("span");
-          badge.textContent = label;
-          badge.style.cssText = `font-size:9px;font-weight:700;padding:0 4px;border-radius:3px;background:${color};color:#fff;`;
-          badge.title = `${tip} (RS ${rsR})`;
-          container.appendChild(badge);
-        }
-        // R/R deger
-        const rrColor =
-          v >= 3 ? "var(--mtp-excellent)" :
-          v >= 2 ? "var(--mtp-good)" :
-          v >= 1 ? "var(--mtp-neutral)" :
-                   "var(--mtp-danger)";
-        const rrSpan = document.createElement("span");
-        rrSpan.textContent = v.toFixed(2);
-        rrSpan.style.cssText = `font-weight:600;font-variant-numeric:tabular-nums;color:${rrColor};font-family:var(--font-jetbrains-mono,monospace);font-size:12px;`;
-        rrSpan.title = `Risk/Reward = (hedef-fiyat) / (fiyat-stop) = ${v.toFixed(2)}`;
-        container.appendChild(rrSpan);
-        return container;
-      },
+      cellRenderer: SignalRREnrichedCell,
     },
     {
       field: "added_date",

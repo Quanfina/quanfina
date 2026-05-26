@@ -10,6 +10,7 @@ import { useWatchlist } from "@/hooks/use-watchlist";
 import { formatDateTR } from "@/lib/format-date";
 import { getDoneItems, toggleItem } from "@/lib/daily-checklist";
 import { MindsetCardWidget } from "@/components/dashboard/MindsetCard";
+import { PortfolioSummaryCard } from "@/components/dashboard/PortfolioSummaryCard";
 import { MarkRegimeBanner } from "@/components/mark/MarkRegimeBanner";
 import { fmtUsd, fmtPctSigned } from "@/lib/format-currency";
 
@@ -253,6 +254,10 @@ export default function Home() {
           color={ddSeverity ? (DD_SEV_COLOR[ddSeverity] ?? "inherit") : undefined}
         />
       </div>
+
+      {/* Paket 156-157 (26 May 2026): Portfolio canlı özet — paper trading sabah bakışı.
+          Açık trade × yfinance quote → toplam değer + unrealized P&L + bugünkü değişim. */}
+      <PortfolioSummaryCard />
 
       {/* 2 kolon: En İyi Sinyaller + Piyasa Özet */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

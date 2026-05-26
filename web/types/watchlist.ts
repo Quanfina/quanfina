@@ -22,6 +22,12 @@ export interface WatchlistRow {
   // KARAR #733 alt-paket (Paket 82, 26 May 2026): Pivot Breakout status
   // P81 Sinyaller paten — Watchlist'te de AL/Zayıf/Yakın/Altı kolon
   pivot_status?: PivotBreakoutStatus | null;
+  // Paket 154 (26 May 2026): Watchlist canlı fiyat — paper trading sabah bakışı.
+  // Quote endpoint /api/stock/{sym}/quote (yfinance + 5dk cache).
+  // FİYAT kolonu (price) eklendi anki fiyat; CANLI $ ise piyasanın o anki fiyatı.
+  current_price?: number | null;
+  change_pct_today?: number | null;
+  quote_source?: "yfinance" | "mock" | null;
 }
 
 export interface WatchlistRowCreate {
