@@ -794,6 +794,52 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
               </button>
             )}
 
+            {/* Paket 251 (27 May 2026): R/R Live Preview rozet — entry+stop+target
+                değiştikçe anlık hesap. Mark canon TTLC Sec 4 R/R minimum 2:1.
+                PreTradeChecklist'te de görünür ama bu rozet kullanıcının dikkatini
+                doğrudan Plan alanlarının altında çeker. */}
+            {(() => {
+              const ep = parseFloat(entryPrice);
+              const ps = parseFloat(planStop);
+              const pt = parseFloat(planTarget);
+              if (!ep || !ps || !pt || ep <= 0 || ps <= 0 || pt <= 0) return null;
+              const risk = ep - ps;
+              const reward = pt - ep;
+              if (risk <= 0) return null;
+              const rr = reward / risk;
+              const stopPct = (risk / ep) * 100;
+              const rrColor = rr >= 2 ? "var(--mtp-excellent)" : rr >= 1 ? "#F59E0B" : "var(--mtp-danger)";
+              const stopColor = stopPct <= 7 ? "var(--mtp-excellent)" : "var(--mtp-danger)";
+              return (
+                <div
+                  className="rounded-md border px-3 py-2 flex items-center gap-4 flex-wrap text-xs"
+                  style={{
+                    background: `color-mix(in srgb, ${rrColor} 6%, transparent)`,
+                    borderColor: `${rrColor}55`,
+                    fontFamily: "var(--font-jetbrains-mono, monospace)",
+                  }}
+                >
+                  <span>
+                    <b>R/R:</b>{" "}
+                    <span style={{ color: rrColor, fontWeight: 700 }}>
+                      {rr.toFixed(2)}:1
+                    </span>{" "}
+                    {rr >= 2 ? "✓ Mark uyumlu" : rr >= 1 ? "⚠️ Zayıf (Mark min 2:1)" : "🔴 Kabul edilemez"}
+                  </span>
+                  <span>
+                    <b>Stop %:</b>{" "}
+                    <span style={{ color: stopColor, fontWeight: 700 }}>
+                      {stopPct.toFixed(1)}%
+                    </span>{" "}
+                    {stopPct <= 7 ? "✓" : "🔴 TTLC s.131 LİMİT AŞILDI"}
+                  </span>
+                  <span className="text-muted-foreground">
+                    Risk: <b>${risk.toFixed(2)}</b> / Reward: <b>${reward.toFixed(2)}</b>
+                  </span>
+                </div>
+              );
+            })()}
+
             {/* Plan Row B — Stop + Target */}
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1.5">

@@ -33,6 +33,7 @@ import { demoteStatus } from "@/lib/watchlist-status";
 import { GridLoadingOverlay } from "@/components/ag-grid/LoadingOverlay";
 import { MarkRegimeBanner } from "@/components/mark/MarkRegimeBanner";
 import { ModBadge } from "@/components/mark/ModBadge";
+import { useTradingMode } from "@/hooks/use-trading-mode";
 
 export default function WatchlistPage() {
   const { gridClass } = useGridTheme();
@@ -46,6 +47,9 @@ export default function WatchlistPage() {
   const [stageConfirmedOnly, setStageConfirmedOnly] = useState(false);
   const { data, isLoading, isError, error, refetch, isFetching } = useWatchlist();
   const gridRef = useRef<AgGridReact<WatchlistRow>>(null);
+  // Paket 252 (27 May 2026): Defansif modda RS<70 satırlar görsel solgun.
+  // Mark canon TLSMW Leaders First — Defansif modda sadece Leaders öncelikli.
+  const tradingMode = useTradingMode();
 
   // Dialog state
   const [addOpen, setAddOpen] = useState(false);
@@ -278,6 +282,13 @@ export default function WatchlistPage() {
               rowHeight={36}
               headerHeight={36}
               suppressCellFocus={false}
+              // Paket 252: Defansif modda RS<70 satırlar solgun (Mark TLSMW Leaders First)
+              getRowStyle={(params) => {
+                if (tradingMode.mode === "defansif" && params.data && params.data.rs_rating < 70) {
+                  return { opacity: 0.45 };
+                }
+                return undefined;
+              }}
             />
           </div>
         )}
