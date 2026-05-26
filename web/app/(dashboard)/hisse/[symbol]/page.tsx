@@ -14,6 +14,7 @@ import { ClimaxRunCard } from "@/components/stock/ClimaxRunCard";
 import { RsRatingCard } from "@/components/stock/RsRatingCard";
 import { AtrVolatilityCard } from "@/components/stock/AtrVolatilityCard";
 import { StageTransitionCard } from "@/components/stock/StageTransitionCard";
+import { MarkProfileBar } from "@/components/stock/MarkProfileBar";
 import { MarkRegimeBanner } from "@/components/mark/MarkRegimeBanner";
 import { useCarrStage } from "@/hooks/use-carr-stage";
 import { useClimaxRun } from "@/hooks/use-climax-run";
