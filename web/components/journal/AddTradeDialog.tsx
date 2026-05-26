@@ -28,6 +28,7 @@ import { useStageTransition } from "@/hooks/use-stage-transition";
 import { useAtrVolatility } from "@/hooks/use-atr-volatility";
 import { useSymbolSearch } from "@/hooks/use-symbol-search";
 import { useStockQuote } from "@/hooks/use-stock-quote";
+import { useTradingMode } from "@/hooks/use-trading-mode";
 
 const SELECT = "h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring";
 const TEXTAREA = "w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm resize-none focus:outline-none focus:ring-1 focus:ring-ring";
@@ -86,6 +87,9 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
   // Paket 163: yfinance canlı quote — entry_price önerisi
   const trimmedSym = symbol.trim().toUpperCase();
   const { data: quoteData } = useStockQuote(open && trimmedSym.length >= 2 ? trimmedSym : "");
+  // Paket 196 (26 May 2026): Trading Mode kontrolü — Mark TTLC s.187 disiplini
+  // Rehab → uyarı + %0.5 R önerisi, Defansif → BLOK, Agresif → Conviction High notu
+  const tradingMode = useTradingMode();
 
   // KARAR #733 alt (Paket 33): Symbol Carr Stage pre-check (Stage 4 → uzak dur uyarısı)
   // Symbol ≥3 karakter olduğunda hook etkinleşir (gereksiz API gürültüsü engellenir)
@@ -204,6 +208,35 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
         <DialogHeader>
           <DialogTitle>Yeni Trade</DialogTitle>
         </DialogHeader>
+
+        {/* Paket 196 (26 May 2026): Trading Mode uyarısı (Vizyon İLKE #10).
+            Defansif → BLOK kırmızı uyarı, Rehab → sarı %0.5 R, Agresif → mavi Conviction High notu.
+            Normal mod: rozet yok (sade UX). */}
+        {tradingMode.mode !== "normal" && (
+          <div
+            className="rounded-md border px-3 py-2 flex items-start gap-2 text-xs"
+            style={{
+              background: `color-mix(in srgb, ${tradingMode.color} 8%, transparent)`,
+              borderColor: `${tradingMode.color}55`,
+              color: tradingMode.color,
+            }}
+          >
+            <span aria-hidden="true" className="text-base leading-none">
+              {tradingMode.emoji}
+            </span>
+            <div className="flex-1">
+              <span className="font-semibold">
+                Trade Modu: {tradingMode.mode.toUpperCase()} (%
+                {tradingMode.recommendedSizingPct === 0
+                  ? "0 — yeni AL BLOK"
+                  : tradingMode.recommendedSizingPct.toFixed(1).replace(".0", "") + " R sizing"}
+                )
+              </span>
+              <span className="block mt-1 italic">{tradingMode.reason}</span>
+              <span className="block mt-1 text-[10px] opacity-90">{tradingMode.uiBehavior}</span>
+            </div>
+          </div>
+        )}
 
         {/* KARAR #733 alt (Paket 33): Stage 4 'UZAK DUR' Mark uyarısı */}
         {carrStage && carrStage.stage === 4 && (
