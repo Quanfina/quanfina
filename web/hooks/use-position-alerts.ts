@@ -39,6 +39,10 @@ export interface PositionAlert {
 }
 
 const DISMISS_KEY = "position-alerts-dismissed";
+// Paket 168 (26 May 2026): Alert history log — son 24h timeline.
+const HISTORY_KEY = "position-alerts-history";
+const HISTORY_MAX = 50;        // En fazla 50 alert sakla (FIFO trim)
+const HISTORY_TTL_HOURS = 24;  // 24h içindeki alert'leri göster
 
 function getDismissed(): Set<string> {
   if (typeof window === "undefined") return new Set();
@@ -65,6 +69,37 @@ function setDismissed(ids: Set<string>) {
     DISMISS_KEY,
     JSON.stringify({ date: today, ids: Array.from(ids) })
   );
+}
+
+// Paket 168 (26 May 2026): Alert history persistence — Dashboard timeline card için
+export interface AlertHistoryEntry extends PositionAlert {
+  timestamp: number;  // Date.now()
+}
+
+export function getAlertHistory(): AlertHistoryEntry[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as AlertHistoryEntry[];
+    if (!Array.isArray(parsed)) return [];
+    // 24h dışındaki entry'leri filtrele
+    const cutoff = Date.now() - HISTORY_TTL_HOURS * 3600 * 1000;
+    return parsed.filter((e) => e.timestamp >= cutoff);
+  } catch {
+    return [];
+  }
+}
+
+function appendAlertHistory(alert: PositionAlert) {
+  if (typeof window === "undefined") return;
+  const history = getAlertHistory();
+  // Aynı ID varsa skip (alert.id zaten günlük UUID)
+  if (history.some((h) => h.id === alert.id)) return;
+  history.unshift({ ...alert, timestamp: Date.now() });
+  // FIFO trim
+  const trimmed = history.slice(0, HISTORY_MAX);
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(trimmed));
 }
 
 /**
@@ -199,6 +234,8 @@ export function usePositionAlerts(
         duration: a.severity === "critical" ? 15000 : 8000,
         id: a.id, // sonner dedup — aynı ID ile çağrı upsert
       });
+      // Paket 168: history log'a yaz (Dashboard timeline)
+      appendAlertHistory(a);
       dismissed.add(a.id);
       updated = true;
     });

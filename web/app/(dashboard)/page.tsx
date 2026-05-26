@@ -11,6 +11,7 @@ import { formatDateTR } from "@/lib/format-date";
 import { getDoneItems, toggleItem } from "@/lib/daily-checklist";
 import { MindsetCardWidget } from "@/components/dashboard/MindsetCard";
 import { PortfolioSummaryCard } from "@/components/dashboard/PortfolioSummaryCard";
+import { AlertHistoryCard } from "@/components/dashboard/AlertHistoryCard";
 import { MarkRegimeBanner } from "@/components/mark/MarkRegimeBanner";
 import { fmtUsd, fmtPctSigned } from "@/lib/format-currency";
 
@@ -256,8 +257,12 @@ export default function Home() {
       </div>
 
       {/* Paket 156-157 (26 May 2026): Portfolio canlı özet — paper trading sabah bakışı.
-          Açık trade × yfinance quote → toplam değer + unrealized P&L + bugünkü değişim. */}
-      <PortfolioSummaryCard />
+          Açık trade × yfinance quote → toplam değer + unrealized P&L + bugünkü değişim.
+          Paket 168 (26 May 2026): AlertHistoryCard — son 24h uyarı timeline yan yana. */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <PortfolioSummaryCard />
+        <AlertHistoryCard />
+      </div>
 
       {/* 2 kolon: En İyi Sinyaller + Piyasa Özet */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

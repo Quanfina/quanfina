@@ -1673,10 +1673,21 @@ def search_symbols(q: str, limit: int = 10) -> list[SymbolSearchResult]:
     combined = prefix_sym + prefix_name + contains
 
     # Paket 164 (26 May 2026): yfinance fallback — Quanfina evreni 56 sembol dışı.
-    # Kullanıcı tam sembol yazıp boş dönerse yfinance Ticker.info ile doğrula
-    # (Sn. Ferit ZM, ROKU, SOFI vb. dışındaki popüler hisseleri de ekleyebilsin).
-    # Sadece exact symbol match denemesi (genel arama maliyetli — yfinance arama API'si yok).
+    # Kullanıcı tam sembol yazıp boş dönerse yfinance Ticker.info ile doğrula.
+    # Paket 167 (26 May 2026): 5 dk TTL cache — aynı sembol için 0s (negative cache dahil).
     if not combined and 2 <= len(q_upper) <= 6 and q_upper.replace(".", "").isalpha() and not _YF_DISABLED:
+        now = _time_module.time()
+        cached = _YF_SYMBOL_CACHE.get(q_upper)
+        if cached:
+            ts, payload = cached
+            if now - ts < _YF_SYMBOL_CACHE_TTL_SEC:
+                if payload:
+                    combined.append(SymbolSearchResult(**payload))
+                # payload None ise: önceki sorguda yfinance bulamamış — yine boş dön
+                return combined[:limit]
+
+        # Cache miss — yfinance fetch
+        result_payload: Optional[dict] = None
         try:
             import yfinance as yf
             ticker = yf.Ticker(q_upper)
@@ -1684,13 +1695,12 @@ def search_symbols(q: str, limit: int = 10) -> list[SymbolSearchResult]:
             name = info.get("longName") or info.get("shortName")
             sector = info.get("sector") or info.get("industry") or "Unknown"
             if name and (info.get("regularMarketPrice") or info.get("previousClose")):
-                combined.append(SymbolSearchResult(
-                    symbol=q_upper,
-                    name=name,
-                    sector=sector,
-                ))
+                result_payload = {"symbol": q_upper, "name": name, "sector": sector}
+                combined.append(SymbolSearchResult(**result_payload))
         except Exception:
-            pass  # yfinance fail — sessizce geç (kullanıcı uyarı görmesin)
+            pass  # yfinance fail — sessizce geç
+        # Pozitif veya negatif cache yaz (None = "bulunamadı")
+        _YF_SYMBOL_CACHE[q_upper] = (now, result_payload)
 
     return combined[:limit]
 
@@ -1800,6 +1810,12 @@ _OHLCV_CACHE_TTL_SEC = 300  # 5 dakika
 # Cache ile 5 dk içinde tekrar isteklerinde watchlist endpoint <0.5s.
 _MARK_SIGNALS_CACHE: dict[str, tuple[float, dict]] = {}
 _MARK_SIGNALS_CACHE_TTL_SEC = 300  # 5 dakika
+
+# Paket 167 (26 May 2026): yfinance symbol search fallback cache.
+# P164 evren dışı sembol için yfinance Ticker.info çağırır (~1-2s).
+# 5 dk TTL cache — aynı sembol için 0s. None = "yfinance bulamadı" (negative cache).
+_YF_SYMBOL_CACHE: dict[str, tuple[float, Optional[dict]]] = {}
+_YF_SYMBOL_CACHE_TTL_SEC = 300
 _YF_DISABLED = False  # yfinance import veya runtime fail -> True (tek seferlik)
 
 
