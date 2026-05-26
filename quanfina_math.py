@@ -3946,3 +3946,137 @@ def compute_overhead_supply(
         'proximity_pct': proximity_pct,
         'mark_says': says,
     }
+
+
+# ======================================================================
+# CLIMAX RUN — Mark TLSMW Ch 9 (KARAR #733 alt-paket, Paket 86)
+# ======================================================================
+# Climax run = parabolic / exhaustion / "last gasp" zirve.
+# Mark: "When everyone is screaming buy at the top, that's when you sell".
+#
+# Tanım:
+# - Hisse uzun süredir trend halinde (advance)
+# - Son 1-3 haftada keskin hızlanma (parabolic curve)
+# - %25+ yükseliş kısa sürede
+# - Yüksek hacim + gap-up'lar (exhaustion gap)
+# - Slope hızlanıyor (acceleration > normal)
+#
+# Mark birebir kaynak:
+# - TLSMW Ch 9: "Selling Short and Climax Runs"
+# - O'Neil: "Exhaustion gap" terimi
+# - Minervini Trade Like a Stock Market Wizard: "Climax top" karakteristikleri
+#
+# 4 kategori:
+# - CLIMAX_TOP: Güçlü kanıt — parabolic + büyük kazanç + exhaustion gap (SAT)
+# - POTENTIAL_CLIMAX: Bazı işaretler — büyük kazanç ama tam parabolic değil (DİKKAT)
+# - HEALTHY_ADVANCE: Normal yükseliş trendi (TUT)
+# - NONE: Veri yetersiz veya trend yok
+# ======================================================================
+
+CLIMAX_RUN_LOOKBACK_DAYS: int = 15           # Son 15 gün climax penceresi
+CLIMAX_RUN_GAIN_TOP_PCT: float = 25.0        # %25+ kısa sürede = climax
+CLIMAX_RUN_GAIN_POTENTIAL_PCT: float = 15.0  # %15-25 = potansiyel
+CLIMAX_GAP_UP_PCT: float = 3.0               # Tek günde %3+ gap = exhaustion adayı
+CLIMAX_MIN_GAP_DAYS: int = 2                 # En az 2 gap-up gerek = climax kanıt
+
+
+def compute_climax_run(
+    closes: list[float],
+    opens: list[float] | None = None,
+    volumes: list[float] | None = None,
+    lookback_days: int = CLIMAX_RUN_LOOKBACK_DAYS,
+) -> dict:
+    """Mark TLSMW Ch 9 Climax Run tespiti.
+
+    Args:
+        closes: Günlük kapanışlar (kronolojik)
+        opens: Günlük açılışlar (opsiyonel — gap analizi için)
+        volumes: Günlük hacimler (opsiyonel — exhaustion teyidi)
+        lookback_days: Climax penceresi (default 15 gün)
+
+    Returns:
+        dict {
+            'category': str,        # CLIMAX_TOP/POTENTIAL_CLIMAX/HEALTHY_ADVANCE/NONE
+            'gain_pct': float | None,        # Pencere içi kazanç %
+            'gap_up_days': int | None,       # Gap-up gün sayısı
+            'avg_volume_ratio': float | None, # Son 5 gün / önceki 10 gün hacim
+            'mark_says': str,
+        }
+    """
+    if not closes or len(closes) < lookback_days + 5:
+        return {
+            'category': None,
+            'gain_pct': None,
+            'gap_up_days': None,
+            'avg_volume_ratio': None,
+            'mark_says': f'Yetersiz veri — en az {lookback_days + 5} gün gerek.',
+        }
+
+    window = closes[-lookback_days:]
+    start_price = window[0]
+    current_price = window[-1]
+    if start_price <= 0:
+        return {
+            'category': None,
+            'gain_pct': None,
+            'gap_up_days': None,
+            'avg_volume_ratio': None,
+            'mark_says': 'Geçersiz fiyat verisi.',
+        }
+
+    gain_pct = round((current_price - start_price) / start_price * 100, 2)
+
+    # Gap-up analizi (opens vs prev close)
+    gap_up_days = 0
+    if opens is not None and len(opens) >= lookback_days:
+        opens_window = opens[-lookback_days:]
+        for i in range(1, len(window)):
+            prev_close = window[i - 1]
+            today_open = opens_window[i]
+            if prev_close > 0:
+                gap_pct = (today_open - prev_close) / prev_close * 100
+                if gap_pct >= CLIMAX_GAP_UP_PCT:
+                    gap_up_days += 1
+
+    # Hacim oranı — son 5 gün vs önceki 10 gün
+    avg_volume_ratio = None
+    if volumes is not None and len(volumes) >= lookback_days:
+        vol_window = volumes[-lookback_days:]
+        recent_5 = vol_window[-5:]
+        prior_10 = vol_window[-15:-5] if len(vol_window) >= 15 else vol_window[:-5]
+        if prior_10:
+            avg_recent = sum(recent_5) / len(recent_5)
+            avg_prior = sum(prior_10) / len(prior_10)
+            if avg_prior > 0:
+                avg_volume_ratio = round(avg_recent / avg_prior, 2)
+
+    # Kategori karar matrisi
+    if gain_pct >= CLIMAX_RUN_GAIN_TOP_PCT and gap_up_days >= CLIMAX_MIN_GAP_DAYS:
+        category = 'CLIMAX_TOP'
+        says = (f'🔴 CLIMAX TOP — %{gain_pct} kazanç {lookback_days} günde + '
+                f'{gap_up_days} exhaustion gap. Mark TLSMW Ch 9: "Last gasp — '
+                f'satın al çığlığı zirvede. SAT veya stop sıkılaştır."')
+    elif gain_pct >= CLIMAX_RUN_GAIN_TOP_PCT:
+        category = 'POTENTIAL_CLIMAX'
+        says = (f'⚠️ POTENTIAL CLIMAX — %{gain_pct} kazanç {lookback_days} günde, '
+                f'gap yetersiz ({gap_up_days}). Mark: "parabolic ama kanıt eksik, '
+                f'stop sıkılaştır, çıkışa hazırlan."')
+    elif gain_pct >= CLIMAX_RUN_GAIN_POTENTIAL_PCT:
+        category = 'POTENTIAL_CLIMAX'
+        says = (f'⚠️ POTENTIAL CLIMAX — %{gain_pct} kazanç orta, dikkat. '
+                f'Mark: "ivme yüksek, breakout sonrası normal mi yoksa climax mı?".')
+    elif gain_pct > 0:
+        category = 'HEALTHY_ADVANCE'
+        says = (f'✅ HEALTHY ADVANCE — %{gain_pct} normal trend, climax sinyali yok. '
+                f'Mark: "let winners run".')
+    else:
+        category = 'NONE'
+        says = (f'Trend yok / negatif (%{gain_pct}) — climax mantıken geçersiz.')
+
+    return {
+        'category': category,
+        'gain_pct': gain_pct,
+        'gap_up_days': gap_up_days if opens else None,
+        'avg_volume_ratio': avg_volume_ratio,
+        'mark_says': says,
+    }
