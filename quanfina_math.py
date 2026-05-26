@@ -4552,3 +4552,83 @@ def compute_relative_volume(
         'category': category,
         'mark_says': says,
     }
+
+
+# ======================================================================
+# BREAKOUT QUALITY — Mark TLSMW Ch 10 puan kompoziti (Paket 107)
+# ======================================================================
+# Pivot kırılım kalitesi 0-100 puan. Mark canon birleşik:
+# - Hacim teyit (50g >=1.5x) -> 30 puan
+# - Gap-up open (kırılım günü) -> 20 puan
+# - %1.7+ kazanç -> 25 puan (FTD eşiği paralel)
+# - Önceki kontraksiyon (VCP daralma) -> 15 puan
+# - Overhead temiz -> 10 puan
+#
+# 4 kategori:
+# - EXCELLENT (>=85): A++ kırılım, full size pozisyon
+# - GOOD (70-84): Standart Mark canon, normal size
+# - MARGINAL (50-69): Zayıf teyit, pilot pozisyon
+# - POOR (<50): Mark "alma" - başka aday ara
+# ======================================================================
+
+BREAKOUT_QUALITY_EXCELLENT_MIN: int = 85
+BREAKOUT_QUALITY_GOOD_MIN: int = 70
+BREAKOUT_QUALITY_MARGINAL_MIN: int = 50
+
+
+def compute_breakout_quality(
+    volume_confirmed: bool,
+    gap_up: bool,
+    breakout_pct: float,
+    prior_contraction: bool = False,
+    overhead_clean: bool = False,
+) -> dict:
+    """Mark TLSMW Ch 10 pivot kırılım kalite kompoziti.
+
+    Args:
+        volume_confirmed: Hacim >=1.5x 50g ort
+        gap_up: Kırılım günü open > prev close +%3
+        breakout_pct: Pivot üstü % (Mark FTD paralel %1.7+)
+        prior_contraction: Önceki VCP daralma (volatilite düşmüş)
+        overhead_clean: Overhead %3 altı (temiz tarla)
+
+    Returns:
+        dict {
+            'score': int 0-100,
+            'category': str EXCELLENT/GOOD/MARGINAL/POOR
+            'breakdown': dict,
+            'mark_says': str,
+        }
+    """
+    breakdown = {
+        'volume': 30 if volume_confirmed else 0,
+        'gap_up': 20 if gap_up else 0,
+        'breakout_strength': 25 if breakout_pct >= 1.7 else (15 if breakout_pct >= 0.5 else 0),
+        'prior_contraction': 15 if prior_contraction else 0,
+        'overhead_clean': 10 if overhead_clean else 0,
+    }
+    score = sum(breakdown.values())
+
+    if score >= BREAKOUT_QUALITY_EXCELLENT_MIN:
+        category = 'EXCELLENT'
+        says = (f'✓ EXCELLENT Breakout {score}/100 — Mark A++ canon. '
+                f'Full size pozisyon aday, hacim+gap+momentum birleşik.')
+    elif score >= BREAKOUT_QUALITY_GOOD_MIN:
+        category = 'GOOD'
+        says = (f'GOOD Breakout {score}/100 — Mark standart canon. '
+                f'Normal size pozisyon, ana kriterler tutuyor.')
+    elif score >= BREAKOUT_QUALITY_MARGINAL_MIN:
+        category = 'MARGINAL'
+        says = (f'⚠️ MARGINAL Breakout {score}/100 — Mark zayıf teyit. '
+                f'Sadece pilot %1-2 pozisyon, kanıt eksik.')
+    else:
+        category = 'POOR'
+        says = (f'POOR Breakout {score}/100 — Mark "fake breakout" riski. '
+                f'Alma, başka aday ara veya bekle.')
+
+    return {
+        'score': score,
+        'category': category,
+        'breakdown': breakdown,
+        'mark_says': says,
+    }
