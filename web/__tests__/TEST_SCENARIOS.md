@@ -146,9 +146,32 @@ import '@testing-library/jest-dom/vitest';
 - ✅ Normal/Rehab/Agresif → tüm satırlar normal
 - ✅ AG Grid re-render: useTradingMode değişince getRowStyle yenilenir
 
+## P259-P262 DRY helper senaryolar (27 May 2026)
+
+### useTradingMode helper'ları (P233+P234+P259)
+- ✅ `isNewAlBlocked('defansif')` → true; diğer 3 mod → false
+- ✅ `getDefansifBlockMessage('defansif')` → "DEFANSİF mod aktif..." mesaj
+- ✅ `getDefansifBlockMessage('normal'|'rehab'|'agresif')` → null
+- ✅ `getModUiTheme('defansif')` → ModUiTheme nesnesi (kırmızı tema, 🛡️ emoji)
+- ✅ `getModUiTheme('rehab')` → sarı tema (#F59E0B, 🩹 emoji)
+- ✅ `getModUiTheme('agresif')` → yeşil tema (--mtp-excellent, 🚀 emoji)
+- ✅ `getModUiTheme('normal')` → null (banner gizlenir)
+
+### Dashboard + Tarama + Sinyaller Defansif banner (P260+P261+P262)
+- ✅ mode=defansif → kırmızı banner görünür (3 sayfa: Dashboard, Tarama, Sinyaller)
+- ✅ mode=normal → banner gizlidir (3 sayfada da)
+- ✅ Helper çağrısı yenileme: mode değişince useState/useEffect react renders
+- ✅ Banner içeriği: theme.shortMessage + sayfa-özel ek metin
+
+### PreTradeChecklist compact prop (P257)
+- ✅ `compact=true` → 4 koşul (Stage + RS + Setup + Mod)
+- ✅ `compact=false` (default) → 7 koşul (yukarıdaki 4 + Plan trigger + Stop + R/R)
+- ✅ Plan alanları compact'ta gizli — "Stop $ tanımlı değil" fail yok
+
 ## İlişkili
 
 - Kural #24 (Sağlam Gidelim) — 6 Aşama Aşama 5 PYTEST
 - Vizyon KALICI İLKE #11 (Objektif Ayna Dili) — test sonucu sayı + renk
 - KARAR #197 + #214 (Backend pytest)
 - Manifesto Özellik #8 (Öğrenen) — sistem kendi disiplinini test eder
+- Bilgi Mimarisi İlke #4 (Tekrarsızlık/DRY) — getModUiTheme tek kaynak

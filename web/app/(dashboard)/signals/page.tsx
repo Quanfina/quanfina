@@ -22,7 +22,7 @@ import type { Signal } from "@/types/signal";
 import { MarkBadgeStrip } from "@/components/mark/MarkBadgeStrip";
 import { MarkRegimeBanner } from "@/components/mark/MarkRegimeBanner";
 import { ModBadge } from "@/components/mark/ModBadge";
-import { useTradingMode, isNewAlBlocked } from "@/hooks/use-trading-mode";
+import { useTradingMode, isNewAlBlocked, getModUiTheme } from "@/hooks/use-trading-mode";
 import { fmtUsd } from "@/lib/format-currency";
 import { RsRatingBadge } from "@/components/shared/RsRatingBadge";
 import { SignalRREnrichedCell } from "@/components/signals/SignalRREnrichedCell";
@@ -428,6 +428,29 @@ export default function SignalsPage() {
           </Button>
         </div>
       </div>
+
+      {/* Paket 262 (27 May 2026): Sinyaller Defansif uyarı banner — Mark TTLC s.187.
+          getModUiTheme DRY helper (P259) kullanır. P260+P261 paten devam. */}
+      {(() => {
+        const theme = getModUiTheme(tradingMode.mode);
+        if (!theme || tradingMode.mode !== "defansif") return null;
+        return (
+          <div
+            className="px-6 py-2 border-b text-xs flex items-center gap-2"
+            style={{
+              background: theme.background,
+              borderColor: theme.borderColor,
+              color: theme.color,
+            }}
+          >
+            <span aria-hidden="true">{theme.emoji}</span>
+            <span>
+              <b>{theme.shortMessage}</b> AL sinyalleri görsel inceleme amaçlı — AL
+              butonu disabled (gri), AddTradeDialog override gerektirir.
+            </span>
+          </div>
+        );
+      })()}
 
       {/* KARAR #733 alt-paket (Paket 36): Mark Regime üst-uyarı banner */}
       <MarkRegimeBanner
