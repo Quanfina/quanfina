@@ -4632,3 +4632,150 @@ def compute_breakout_quality(
         'breakdown': breakdown,
         'mark_says': says,
     }
+
+
+# ======================================================================
+# STAGE TRANSITION — Mark TLSMW Ch 4 (Paket 120)
+# ======================================================================
+# Stan Weinstein 4-Stage + Mark Minervini: Stage 1 (birikim/dip) ->
+# Stage 2 (advancing) geçişi erken uyarı.
+#
+# Mark birebir (TLSMW Ch 4):
+# - Stage 1: Quiet accumulation under resistance (30W MA düz veya hafif aşağı)
+# - Stage 2 BEGIN: Break above 30W MA on volume (volume confirmation şart)
+# - Stage 2 CONFIRMED: Üst trend kanıtlı (price > 30W MA, slope yukarı)
+#
+# 30W MA = 150 günlük SMA (Mark canon "30-week moving average").
+#
+# 4 kategori:
+# - NO_TRANSITION: Stage 1 sürüyor veya Stage 3/4 (geçiş yok)
+# - EARLY_STAGE_2: Yeni kırılım (1-10 gün, fragile, henüz teyit yok)
+# - CONFIRMED_STAGE_2: Sağlam Stage 2 (>10 gün üstte + slope yukarı + hacim)
+# - STAGE_2_MATURE: Olgun trend (>60 gün, climax riski artıyor)
+# ======================================================================
+
+STAGE_MA_PERIOD: int = 150              # 30W MA
+STAGE_EARLY_DAYS_MAX: int = 10          # 1-10 gün = early
+STAGE_MATURE_DAYS_MIN: int = 60         # 60+ gün = mature
+STAGE_SLOPE_LOOKBACK: int = 30          # 30 gün slope hesap
+
+
+def compute_stage_transition(
+    closes: list[float],
+    volumes: Optional[list[float]] = None,
+    ma_period: int = STAGE_MA_PERIOD,
+) -> dict:
+    """Mark TLSMW Ch 4 Stage 1->2 geçiş tespiti.
+
+    Args:
+        closes: Günlük kapanışlar (kronolojik, en az ma_period gün)
+        volumes: Opsiyonel hacim listesi (teyit için)
+        ma_period: SMA penceresi (default 150 = 30 hafta)
+
+    Returns:
+        dict {
+            'category': str,                 # NO_TRANSITION / EARLY / CONFIRMED / MATURE
+            'ma_value': float | None,         # Mevcut 30W MA
+            'price_above_ma_pct': float | None,  # Mevcut % üst
+            'slope_pct': float | None,        # 30 gün MA slope %
+            'days_above_ma': int | None,      # Üstte kalınan gün
+            'volume_trend': str | None,       # RISING/STABLE/FALLING (opsiyonel)
+            'mark_says': str,
+        }
+    """
+    if not closes or len(closes) < ma_period + STAGE_SLOPE_LOOKBACK:
+        return {
+            'category': None,
+            'ma_value': None,
+            'price_above_ma_pct': None,
+            'slope_pct': None,
+            'days_above_ma': None,
+            'volume_trend': None,
+            'mark_says': f'Yetersiz veri — en az {ma_period + STAGE_SLOPE_LOOKBACK} gün gerek.',
+        }
+
+    # MA hesabı (son ma_period gün)
+    ma_window = closes[-ma_period:]
+    ma_value = sum(ma_window) / ma_period
+
+    current = closes[-1]
+    if ma_value <= 0:
+        return {
+            'category': None,
+            'ma_value': None,
+            'price_above_ma_pct': None,
+            'slope_pct': None,
+            'days_above_ma': None,
+            'volume_trend': None,
+            'mark_says': 'Geçersiz MA değeri.',
+        }
+
+    price_above_ma_pct = round((current - ma_value) / ma_value * 100, 2)
+
+    # MA slope (30 gün önceki MA ile karşılaştır)
+    earlier_ma_window = closes[-(ma_period + STAGE_SLOPE_LOOKBACK):-STAGE_SLOPE_LOOKBACK]
+    earlier_ma = sum(earlier_ma_window) / ma_period
+    slope_pct = round((ma_value - earlier_ma) / earlier_ma * 100, 2) if earlier_ma > 0 else 0.0
+
+    # Üstte kalınan gün sayısı (geriye saymak)
+    days_above = 0
+    for i in range(len(closes) - 1, -1, -1):
+        # MA'nın o günkü değeri için pencere kaydır
+        if i < ma_period - 1:
+            break
+        window = closes[i - ma_period + 1:i + 1]
+        ma_at = sum(window) / ma_period
+        if closes[i] > ma_at:
+            days_above += 1
+        else:
+            break
+
+    # Hacim trendi (opsiyonel)
+    volume_trend = None
+    if volumes is not None and len(volumes) >= 30:
+        recent_10 = sum(volumes[-10:]) / 10
+        prior_20 = sum(volumes[-30:-10]) / 20
+        if prior_20 > 0:
+            ratio = recent_10 / prior_20
+            if ratio >= 1.20:
+                volume_trend = 'RISING'
+            elif ratio <= 0.80:
+                volume_trend = 'FALLING'
+            else:
+                volume_trend = 'STABLE'
+
+    # Kategori belirleme
+    if current <= ma_value:
+        # MA altı = Stage 1 veya 3/4 (geçiş yok)
+        category = 'NO_TRANSITION'
+        says = (f'NO_TRANSITION — Fiyat ${current:.2f} <= 30W MA ${ma_value:.2f}. '
+                f'Mark TLSMW Ch 4: "Stage 1 quiet accumulation" sürüyor veya Stage '
+                f'3/4 zayıflık. Henüz kırılım yok.')
+    elif days_above <= STAGE_EARLY_DAYS_MAX:
+        category = 'EARLY_STAGE_2'
+        vol_extra = f' Hacim trendi: {volume_trend}.' if volume_trend else ''
+        says = (f'⚡ EARLY STAGE 2 — Fiyat %{price_above_ma_pct} 30W MA üstünde '
+                f'({days_above} gün). Mark: "yeni kırılım, fragile". Stop {ma_value:.2f} '
+                f'altına. Hacim teyit gerek.{vol_extra}')
+    elif days_above >= STAGE_MATURE_DAYS_MIN:
+        category = 'STAGE_2_MATURE'
+        says = (f'STAGE 2 MATURE — {days_above} gün 30W MA üstünde. Mark: trend '
+                f'olgun, climax riski yaklaşıyor. Stop sıkılaştır, kâr koru. '
+                f'Slope %{slope_pct}.')
+    else:
+        category = 'CONFIRMED_STAGE_2'
+        vol_extra = f' Hacim: {volume_trend}.' if volume_trend else ''
+        slope_note = 'pozitif slope' if slope_pct > 0 else 'düz slope (dikkat)'
+        says = (f'✓ CONFIRMED STAGE 2 — {days_above} gün üstte, {slope_note} '
+                f'%{slope_pct}, fiyat %{price_above_ma_pct} üst. Mark: trend takip, '
+                f'pyramid uygun.{vol_extra}')
+
+    return {
+        'category': category,
+        'ma_value': round(ma_value, 2),
+        'price_above_ma_pct': price_above_ma_pct,
+        'slope_pct': slope_pct,
+        'days_above_ma': days_above,
+        'volume_trend': volume_trend,
+        'mark_says': says,
+    }
