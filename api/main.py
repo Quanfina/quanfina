@@ -53,6 +53,7 @@ from quanfina_math import (  # noqa: E402
     compute_climax_run,
     compute_brandon_expectancy,
     compute_relative_strength_rating,
+    compute_atr_volatility,
     MARK_PYRAMID_PILOT_PCT_RANGE,
     MARK_PYRAMID_STANDARD_PCT_RANGE,
     MARK_PYRAMID_FULL_PCT_RANGE,
@@ -1902,6 +1903,57 @@ def get_rs_rating(symbol: str) -> RsRatingInfo:
         stock_return_pct=result.get("stock_return_pct"),
         benchmark_return_pct=result.get("benchmark_return_pct"),
         outperform_pct=result.get("outperform_pct"),
+        mark_says=result.get("mark_says", ""),
+    )
+
+
+# KARAR #733 alt-paket (Paket 101, 26 May 2026): ATR Volatility endpoint
+# Mark TLSMW Ch 11 / Wilder canon ATR — stop placement disiplini.
+class AtrVolatilityInfo(BaseModel):
+    atr: Optional[float] = None
+    atr_pct: Optional[float] = None
+    category: Optional[Literal["LOW", "NORMAL", "HIGH", "EXTREME"]] = None
+    suggested_stop_tight: Optional[float] = None
+    suggested_stop_normal: Optional[float] = None
+    suggested_stop_loose: Optional[float] = None
+    mark_says: str
+
+
+@app.get("/api/stock/{symbol}/atr", response_model=AtrVolatilityInfo)
+def get_atr_volatility(symbol: str) -> AtrVolatilityInfo:
+    """Mark TLSMW Ch 11 / Wilder canon ATR (P100 helper wire).
+
+    OHLCV MOCK feed (AÇIK KONU #75 production yfinance).
+    Sonuc: ATR + kategori + 3 stop seviyesi.
+    """
+    sym = symbol.upper()
+    stock = _STOCK_BY_SYM.get(sym)
+    if stock:
+        price = stock.price
+    else:
+        try:
+            wl = [r for r in watchlist_get_all() if r["symbol"] == sym]
+        except OperationalError:
+            wl = []
+        if wl:
+            price = float(wl[0]["price"])
+        else:
+            scan_data = _fetch_scan_symbol_data(sym)
+            price = scan_data["price"] if scan_data else 100.0
+
+    bars = _generate_ohlcv(sym, price)
+    highs = [b.high for b in bars]
+    lows = [b.low for b in bars]
+    closes = [b.close for b in bars]
+
+    result = compute_atr_volatility(highs, lows, closes)
+    return AtrVolatilityInfo(
+        atr=result.get("atr"),
+        atr_pct=result.get("atr_pct"),
+        category=result.get("category"),
+        suggested_stop_tight=result.get("suggested_stop_tight"),
+        suggested_stop_normal=result.get("suggested_stop_normal"),
+        suggested_stop_loose=result.get("suggested_stop_loose"),
         mark_says=result.get("mark_says", ""),
     )
 
