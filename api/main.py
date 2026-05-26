@@ -2647,6 +2647,9 @@ class Trade(BaseModel):
     # KARAR #733 alt-paket (Paket 84, 26 May 2026): Pivot status
     # P81-P83 paten — Journal'da trade'in mevcut pivot durumu (kapanmamış için)
     pivot_status: Optional[Literal["CONFIRMED", "WEAK", "NEAR_PIVOT", "BELOW_PIVOT"]] = None
+    # Paket 190 (26 May 2026): Sektör konsantrasyon uyarısı (Mark TTLC s.85).
+    # _STOCK_META lookup ile doldurulur (Quanfina evren). Bilinmeyen sembolde None.
+    sector: Optional[str] = None
 
 
 class TradeCreate(BaseModel):
@@ -2727,6 +2730,13 @@ def _enrich_trade_with_mark_signals(trade: Trade) -> Trade:
     pivot_status = _compute_signal_pivot_status(trade.symbol, trade.entry_price)
     if pivot_status:
         updates["pivot_status"] = pivot_status
+    # Paket 190: sektör konsantrasyon uyarısı için sector enrichment (_STOCK_META)
+    # Fallback: sector field yoksa industry kullan (eski 28 sembol)
+    meta = _STOCK_META.get(trade.symbol.upper())
+    if meta:
+        sec = meta.get("sector") or meta.get("industry")
+        if sec:
+            updates["sector"] = sec
     if updates:
         return trade.model_copy(update=updates)
     return trade

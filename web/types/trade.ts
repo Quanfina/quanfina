@@ -81,6 +81,9 @@ export interface Trade {
   unrealized_pl_dollar?: number | null;  // (current_price - entry_price) × shares
   unrealized_pl_pct?: number | null;     // ((current_price / entry_price) - 1) × 100
   quote_source?: "yfinance" | "mock" | null;
+  // Paket 190 (26 May 2026): Sektör konsantrasyon uyarısı (Mark TTLC s.85).
+  // Backend _enrich_trade_with_mark_signals _STOCK_META lookup ile doldurur.
+  sector?: string | null;
 }
 
 export interface TradeCreate {

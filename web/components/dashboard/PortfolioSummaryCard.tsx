@@ -6,7 +6,7 @@ import { useTrades } from "@/hooks/use-trades";
 import { useStockQuotes } from "@/hooks/use-stock-quote";
 import { usePositionAlerts } from "@/hooks/use-position-alerts";
 import { fmtUsd } from "@/lib/format-currency";
-import { TrendingUp, TrendingDown, Activity, ArrowRight, AlertCircle } from "lucide-react";
+import { TrendingUp, TrendingDown, Activity, ArrowRight, AlertCircle, AlertTriangle } from "lucide-react";
 
 /**
  * Paket 156 (26 May 2026): Dashboard Portfolio özet kartı.
@@ -57,6 +57,8 @@ export function PortfolioSummaryCard() {
     let bestPct = -Infinity;
     let worstSymbol = "";
     let worstPct = Infinity;
+    // Paket 190 (26 May 2026): Sektör konsantrasyon (Mark TTLC s.85 max 25-30%)
+    const sectorValues = new Map<string, number>();
 
     openTrades.forEach((t) => {
       const invested = t.entry_price * t.shares;
@@ -76,12 +78,25 @@ export function PortfolioSummaryCard() {
         // Canlı yoksa entry'i değer kabul et (eksik veri)
         currentValue += invested;
       }
+      // P190: Sektör konsantrasyon (Mark TTLC s.85 max 25-30% single sector)
+      const sector = t.sector || "Bilinmiyor";
+      const tradeValue = (t.current_price ?? t.entry_price) * t.shares;
+      sectorValues.set(sector, (sectorValues.get(sector) ?? 0) + tradeValue);
     });
 
     const unrealizedPlDollar = currentValue - investedCapital;
     const unrealizedPlPct = investedCapital > 0
       ? (unrealizedPlDollar / investedCapital) * 100
       : 0;
+
+    // P190: En yüksek sektör konsantrasyonu (uyarı 30% üstü)
+    let topSector = "";
+    let topSectorValue = 0;
+    sectorValues.forEach((v, sec) => {
+      if (v > topSectorValue) { topSectorValue = v; topSector = sec; }
+    });
+    const topSectorPct = currentValue > 0 ? (topSectorValue / currentValue) * 100 : 0;
+    const sectorWarning = topSectorPct > 30; // Mark TTLC s.85
 
     return {
       openCount: openTrades.length,
@@ -95,6 +110,9 @@ export function PortfolioSummaryCard() {
       bestPct,
       worstSymbol,
       worstPct,
+      topSector,
+      topSectorPct,
+      sectorWarning,
     };
   }, [openTrades, quoteResults]);
 
@@ -204,6 +222,46 @@ export function PortfolioSummaryCard() {
           </span>
         </div>
       </div>
+
+      {/* Paket 190: Sektör konsantrasyon (Mark TTLC s.85 max 25-30% single sector) */}
+      {summary.topSector && summary.topSectorPct > 0 && (
+        <div
+          className="flex items-center gap-2 text-xs px-2 py-1.5 rounded border"
+          style={{
+            borderColor: summary.sectorWarning
+              ? "var(--mtp-danger)"
+              : summary.topSectorPct > 20
+              ? "#F59E0B"
+              : "var(--border)",
+            background: summary.sectorWarning
+              ? "color-mix(in srgb, var(--mtp-danger) 8%, transparent)"
+              : "transparent",
+          }}
+        >
+          {summary.sectorWarning ? (
+            <AlertTriangle size={12} style={{ color: "var(--mtp-danger)" }} />
+          ) : (
+            <Activity size={12} className="text-muted-foreground" />
+          )}
+          <span className="flex-1">
+            <span className="text-muted-foreground">En yoğun sektör: </span>
+            <span className="font-semibold">{summary.topSector}</span>
+            <span
+              className="font-mono ml-1 tabular-nums"
+              style={{
+                color: summary.sectorWarning ? "var(--mtp-danger)" : "inherit",
+              }}
+            >
+              {summary.topSectorPct.toFixed(0)}%
+            </span>
+            {summary.sectorWarning && (
+              <span className="ml-2 text-[10px]" style={{ color: "var(--mtp-danger)" }}>
+                — Mark TTLC s.85: max 25-30%
+              </span>
+            )}
+          </span>
+        </div>
+      )}
 
       {/* Footer: yatırılan sermaye + canlı veri kapsama */}
       <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-2 border-t border-muted-foreground/10">
