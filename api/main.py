@@ -1616,6 +1616,72 @@ _STOCK_META: dict[str, dict] = {
     "VZ":   {"name": "Verizon Communications", "industry": "Telecom",                 "market_cap": "$170B", "sector": "Communication Services"},
     "SPY":  {"name": "SPDR S&P 500 ETF",       "industry": "ETF",                     "market_cap": "$520B", "sector": "ETF"},
     "QQQ":  {"name": "Invesco QQQ Trust",      "industry": "ETF",                     "market_cap": "$280B", "sector": "ETF"},
+    # Paket 186 (26 May 2026): Sembol evren genişletme — paper trading
+    # autocomplete daha zengin. AI/Semiconductors + Software + Biotech +
+    # Defense + Energy + REIT + ETF kategorileri.
+    # AI / Yarı İletken eklemeleri
+    "ARM":  {"name": "Arm Holdings PLC",       "industry": "Semiconductors",          "market_cap": "$135B", "sector": "Technology"},
+    "SMCI": {"name": "Super Micro Computer",   "industry": "Server Hardware",         "market_cap": "$25B",  "sector": "Technology"},
+    "AMAT": {"name": "Applied Materials",       "industry": "Semiconductor Equipment", "market_cap": "$152B", "sector": "Technology"},
+    "LRCX": {"name": "Lam Research Corp",      "industry": "Semiconductor Equipment", "market_cap": "$110B", "sector": "Technology"},
+    "KLAC": {"name": "KLA Corp",               "industry": "Semiconductor Equipment", "market_cap": "$95B",  "sector": "Technology"},
+    "ASML": {"name": "ASML Holding",           "industry": "Semiconductor Equipment", "market_cap": "$290B", "sector": "Technology"},
+    "TSM":  {"name": "Taiwan Semiconductor ADR","industry": "Semiconductors",         "market_cap": "$735B", "sector": "Technology"},
+    # Software / SaaS
+    "NOW":  {"name": "ServiceNow Inc",         "industry": "Enterprise Software",     "market_cap": "$165B", "sector": "Technology"},
+    "PANW": {"name": "Palo Alto Networks",     "industry": "Cybersecurity",           "market_cap": "$95B",  "sector": "Technology"},
+    "CRWD": {"name": "CrowdStrike Holdings",   "industry": "Cybersecurity",           "market_cap": "$78B",  "sector": "Technology"},
+    "ZS":   {"name": "Zscaler Inc",            "industry": "Cybersecurity",           "market_cap": "$28B",  "sector": "Technology"},
+    "SNOW": {"name": "Snowflake Inc",          "industry": "Cloud Data",              "market_cap": "$58B",  "sector": "Technology"},
+    "DDOG": {"name": "Datadog Inc",            "industry": "Monitoring SaaS",         "market_cap": "$42B",  "sector": "Technology"},
+    "NET":  {"name": "Cloudflare Inc",         "industry": "Edge Computing",          "market_cap": "$28B",  "sector": "Technology"},
+    "MDB":  {"name": "MongoDB Inc",            "industry": "Database SaaS",           "market_cap": "$25B",  "sector": "Technology"},
+    # Streaming / Comm
+    "ROKU": {"name": "Roku Inc",               "industry": "Streaming Platform",      "market_cap": "$9B",   "sector": "Communication Services"},
+    "SPOT": {"name": "Spotify Technology",     "industry": "Music Streaming",         "market_cap": "$60B",  "sector": "Communication Services"},
+    # Auto / EV
+    "RIVN": {"name": "Rivian Automotive",      "industry": "EV Manufacturer",         "market_cap": "$13B",  "sector": "Consumer Discretionary"},
+    "LCID": {"name": "Lucid Group",            "industry": "EV Manufacturer",         "market_cap": "$8B",   "sector": "Consumer Discretionary"},
+    # Biotech / Pharma
+    "MRNA": {"name": "Moderna Inc",            "industry": "Biotech",                 "market_cap": "$28B",  "sector": "Health Care"},
+    "REGN": {"name": "Regeneron Pharmaceuticals","industry": "Biotech",               "market_cap": "$100B", "sector": "Health Care"},
+    "VRTX": {"name": "Vertex Pharmaceuticals", "industry": "Biotech",                 "market_cap": "$110B", "sector": "Health Care"},
+    "ABBV": {"name": "AbbVie Inc",             "industry": "Pharmaceuticals",         "market_cap": "$315B", "sector": "Health Care"},
+    "LLY":  {"name": "Eli Lilly",              "industry": "Pharmaceuticals",         "market_cap": "$680B", "sector": "Health Care"},
+    "MRK":  {"name": "Merck & Co",             "industry": "Pharmaceuticals",         "market_cap": "$315B", "sector": "Health Care"},
+    # Defense / Industrials
+    "LMT":  {"name": "Lockheed Martin",        "industry": "Defense",                 "market_cap": "$115B", "sector": "Industrials"},
+    "RTX":  {"name": "RTX Corp",               "industry": "Defense & Aerospace",     "market_cap": "$160B", "sector": "Industrials"},
+    "NOC":  {"name": "Northrop Grumman",       "industry": "Defense",                 "market_cap": "$72B",  "sector": "Industrials"},
+    "GD":   {"name": "General Dynamics",       "industry": "Defense",                 "market_cap": "$78B",  "sector": "Industrials"},
+    # Energy
+    "CVX":  {"name": "Chevron Corp",           "industry": "Oil & Gas Integrated",    "market_cap": "$285B", "sector": "Energy"},
+    "COP":  {"name": "ConocoPhillips",         "industry": "Oil & Gas E&P",           "market_cap": "$125B", "sector": "Energy"},
+    "SLB":  {"name": "Schlumberger NV",        "industry": "Oilfield Services",       "market_cap": "$65B",  "sector": "Energy"},
+    # Crypto-adjacent
+    "MSTR": {"name": "MicroStrategy Inc",      "industry": "Bitcoin Treasury",        "market_cap": "$28B",  "sector": "Technology"},
+    "MARA": {"name": "Marathon Digital",       "industry": "Bitcoin Mining",          "market_cap": "$5B",   "sector": "Technology"},
+    # ETFs (sektör + tematik)
+    "IWM":  {"name": "iShares Russell 2000 ETF","industry": "ETF",                    "market_cap": "$65B",  "sector": "ETF"},
+    "DIA":  {"name": "SPDR Dow Jones ETF",     "industry": "ETF",                     "market_cap": "$35B",  "sector": "ETF"},
+    "XLK":  {"name": "Tech Select Sector ETF", "industry": "ETF Tech",                "market_cap": "$72B",  "sector": "ETF"},
+    "XLF":  {"name": "Financial Select Sector ETF","industry": "ETF Financials",      "market_cap": "$45B",  "sector": "ETF"},
+    "XLE":  {"name": "Energy Select Sector ETF","industry": "ETF Energy",             "market_cap": "$38B",  "sector": "ETF"},
+    "XLV":  {"name": "Health Care Select ETF", "industry": "ETF Health",              "market_cap": "$42B",  "sector": "ETF"},
+    "XLI":  {"name": "Industrial Select ETF",  "industry": "ETF Industrials",         "market_cap": "$18B",  "sector": "ETF"},
+    "XLU":  {"name": "Utilities Select ETF",   "industry": "ETF Utilities",           "market_cap": "$14B",  "sector": "ETF"},
+    "XLP":  {"name": "Consumer Staples ETF",   "industry": "ETF Staples",             "market_cap": "$17B",  "sector": "ETF"},
+    "XLY":  {"name": "Consumer Discretionary ETF","industry": "ETF Discretionary",    "market_cap": "$22B",  "sector": "ETF"},
+    "XLC":  {"name": "Communication Services ETF","industry": "ETF Communication",    "market_cap": "$22B",  "sector": "ETF"},
+    "XLB":  {"name": "Materials Select ETF",   "industry": "ETF Materials",           "market_cap": "$5B",   "sector": "ETF"},
+    "XLRE": {"name": "Real Estate Select ETF", "industry": "ETF REIT",                "market_cap": "$6B",   "sector": "ETF"},
+    # Fintech / Payments
+    "PYPL": {"name": "PayPal Holdings",        "industry": "Payments",                "market_cap": "$70B",  "sector": "Financials"},
+    "SQ":   {"name": "Block Inc",              "industry": "Payments",                "market_cap": "$45B",  "sector": "Financials"},
+    "AXP":  {"name": "American Express",       "industry": "Credit Cards",            "market_cap": "$190B", "sector": "Financials"},
+    # Retail / Consumer
+    "TGT":  {"name": "Target Corp",            "industry": "Retail Discount",         "market_cap": "$72B",  "sector": "Consumer Discretionary"},
+    "LOW":  {"name": "Lowe's Companies",       "industry": "Home Improvement",        "market_cap": "$135B", "sector": "Consumer Discretionary"},
 }
 
 _STOCK_BY_SYM: dict[str, MinerviniStock] = {s.symbol: s for s in MOCK_STOCKS}

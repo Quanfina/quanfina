@@ -156,9 +156,14 @@ export default function WatchlistPage() {
         quote_source: q.source as "yfinance" | "mock",
       };
     });
-    return enriched.sort(
-      (a, b) => a.strategy.localeCompare(b.strategy) || a.symbol.localeCompare(b.symbol)
-    );
+    // Paket 187 (26 May 2026): Mark TLSMW "Leaders first" — RS desc default.
+    // Sn. Ferit sabah Watchlist açtığında en yüksek RS hisseler üstte görünür.
+    // İkincil sıralama: strateji + sembol (deterministik, RS eşit ise).
+    return enriched.sort((a, b) => {
+      const rsDiff = (b.rs_rating ?? 0) - (a.rs_rating ?? 0);
+      if (rsDiff !== 0) return rsDiff;
+      return a.strategy.localeCompare(b.strategy) || a.symbol.localeCompare(b.symbol);
+    });
   }, [data, strategy, status, search, leaderOnly, climaxOnly, stageConfirmedOnly, quoteMap]);
 
   // KARAR #476: gridClass useGridTheme'den (SSR uyumu)
