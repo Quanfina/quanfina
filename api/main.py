@@ -1298,25 +1298,125 @@ class WatchlistRow(BaseModel):
     pivot_status: Optional[Literal["CONFIRMED", "WEAK", "NEAR_PIVOT", "BELOW_PIVOT"]] = None
 
 
+def _compute_live_mark_signals(symbol: str, price: float) -> dict:
+    """KARAR #733 alt-paket (Paket 144, 26 May 2026): yfinance gerçek Mark canon.
+
+    Sembol için yfinance OHLCV çek + 4 helper çağrısı (RS Rating + Stage
+    Transition + Climax Run + Volume Asymmetry). MOCK _STOCK_MARK_SIGNALS
+    ile birleştirir (helper sonuç bulamazsa MOCK kalır).
+
+    Cache: _OHLCV_CACHE 5 dakika TTL (sembol seri çağrı 0s).
+    Fail: yfinance fail → MOCK fallback.
+
+    Paket 145 alt-katman: _MARK_SIGNALS_CACHE 5 dk TTL (helper hesap GIL).
+    """
+    # Paket 145 alt-katman: sembol başına cache (NumPy hesap maliyetli)
+    now = _time_module.time()
+    cached = _MARK_SIGNALS_CACHE.get(symbol)
+    if cached:
+        ts, result = cached
+        if now - ts < _MARK_SIGNALS_CACHE_TTL_SEC:
+            return dict(result)  # Defensive copy
+
+    result: dict = {}
+    # 1. MOCK base (eğer varsa) — Carr Stage gibi henüz live olmayan alanlar
+    mock = _STOCK_MARK_SIGNALS.get(symbol, {})
+    if mock:
+        result.update(mock)
+
+    # 2. yfinance OHLCV çek (cache varsa 0s)
+    bars = _fetch_ohlcv_real(symbol, 252)
+    if not bars or len(bars) < 60:
+        return result  # MOCK ile devam, live overlay yok
+
+    closes = [b.close for b in bars]
+    volumes = [b.volume for b in bars]
+
+    # 3. RS Rating gerçek (vs SPY benchmark)
+    # yfinance 1y = 251 bar (helper default 252 lookback) — 250 ile çağır
+    try:
+        spy_bars = _fetch_ohlcv_real("SPY", 252)
+        if spy_bars and len(spy_bars) >= 250:
+            spy_closes = [b.close for b in spy_bars]
+            if len(closes) >= 250:
+                lookback = min(250, len(closes), len(spy_closes))
+                rs = compute_relative_strength_rating(closes, spy_closes, lookback_days=lookback)
+                if rs.get("rs_rating") is not None:
+                    result["live_rs_rating"] = rs.get("rs_rating")
+                    result["live_rs_category"] = rs.get("category")
+    except Exception:
+        pass
+
+    # 4. Stage Transition gerçek (30W MA + slope)
+    try:
+        stage = compute_stage_transition(closes, volumes)
+        if stage.get("category"):
+            result["stage_category"] = stage.get("category")
+            result["live_stage_days_above"] = stage.get("days_above_ma")
+    except Exception:
+        pass
+
+    # 5. Climax Run gerçek (parabolic + exhaustion)
+    try:
+        opens = [b.open for b in bars]
+        climax = compute_climax_run(closes, opens, volumes)
+        if climax.get("category"):
+            result["climax_category"] = climax.get("category")
+    except Exception:
+        pass
+
+    # Paket 145 alt-katman: cache yaz (sonraki çağrılar 0s)
+    _MARK_SIGNALS_CACHE[symbol] = (now, dict(result))
+    return result
+
+
 def _enrich_with_mark_signals(row: WatchlistRow) -> WatchlistRow:
-    """KARAR ADAY #724 — Watchlist satirina Mark Profili rozetlerini ekler.
+    """KARAR ADAY #724 + Paket 144 (26 May 2026 yfinance overlay).
 
-    KARAR #733 alt-paket (Paket 82): Aynı zamanda pivot_status enrichment
-    (P81 _compute_signal_pivot_status pateni). Tek helper'da iki alan.
-
-    Production'da minervini_scans tablo join'i ile gelir; simdilik
-    _STOCK_MARK_SIGNALS MOCK lookup (Migration 004-007 sonrasi degisecek).
+    Watchlist satirina Mark Profili rozetlerini ekler:
+    - mark_signals (MOCK + yfinance gerçek RS/Stage/Climax)
+    - pivot_status (gerçek pivot kırılım)
     """
     updates: dict = {}
-    signals = _STOCK_MARK_SIGNALS.get(row.symbol)
-    if signals:
-        updates["mark_signals"] = signals
+    # P144: yfinance live overlay (MOCK base + gerçek 3 alan)
+    live_signals = _compute_live_mark_signals(row.symbol, row.price)
+    if live_signals:
+        updates["mark_signals"] = live_signals
     pivot_status = _compute_signal_pivot_status(row.symbol, row.price)
     if pivot_status:
         updates["pivot_status"] = pivot_status
     if updates:
         return row.model_copy(update=updates)
     return row
+
+
+def _enrich_watchlist_batch(rows: list[WatchlistRow]) -> list[WatchlistRow]:
+    """KARAR #733 alt-paket (Paket 145, 26 May 2026): Paralel watchlist enrich.
+
+    10 sembol seri yfinance fetch = ~11s. ThreadPoolExecutor ile paralel = ~2s.
+    Cache hit'lerde 0s. SPY benchmark için bir kez fetch (paralel başlamadan ön-warm).
+    """
+    if not rows:
+        return rows
+
+    # Pre-warm SPY (RS Rating benchmark) — paralelden önce
+    try:
+        _fetch_ohlcv_real("SPY", 252)
+    except Exception:
+        pass
+
+    from concurrent.futures import ThreadPoolExecutor
+
+    def _enrich_one(row: WatchlistRow) -> WatchlistRow:
+        try:
+            return _enrich_with_mark_signals(row)
+        except Exception:
+            return row
+
+    # 10 sembol için 10 worker yeterli (yfinance internal rate limit'i var)
+    with ThreadPoolExecutor(max_workers=10) as pool:
+        enriched = list(pool.map(_enrich_one, rows))
+    return enriched
 
 
 @app.get("/api/watchlist", response_model=list[WatchlistRow])
@@ -1336,11 +1436,11 @@ def get_watchlist() -> list[WatchlistRow]:
             WatchlistRow(symbol="META",  strategy="carr",      status="watch",   price=512.80,  added_date="2026-05-16 12:18", setup_type="Pullback",           pivot_price=518.00,  rs_rating=80, consensus_count=1, consensus_strategies=["carr"]),
             WatchlistRow(symbol="AVGO",  strategy="minervini", status="buy",     price=1450.30, added_date="2026-05-19 10:09", setup_type="VCP",                pivot_price=1460.00, rs_rating=78, consensus_count=1, consensus_strategies=["minervini"]),
         ]
-        return [_enrich_with_mark_signals(r) for r in rows]
+        return _enrich_watchlist_batch(rows)
 
     try:
         rows = [WatchlistRow(**r) for r in watchlist_get_all()]
-        return [_enrich_with_mark_signals(r) for r in rows]
+        return _enrich_watchlist_batch(rows)
     except OperationalError as e:
         # Cloud SQL paused / IP whitelist eski / network problemi
         raise HTTPException(
@@ -1589,6 +1689,12 @@ import time as _time_module
 
 _OHLCV_CACHE: dict[str, tuple[float, list]] = {}
 _OHLCV_CACHE_TTL_SEC = 300  # 5 dakika
+
+# Paket 145 alt-katman: live Mark signals (RS + Stage + Climax) cache.
+# 10 sembol × 3 helper × ~0.7s = ~21s seri Python (NumPy GIL paralel olmaz).
+# Cache ile 5 dk içinde tekrar isteklerinde watchlist endpoint <0.5s.
+_MARK_SIGNALS_CACHE: dict[str, tuple[float, dict]] = {}
+_MARK_SIGNALS_CACHE_TTL_SEC = 300  # 5 dakika
 _YF_DISABLED = False  # yfinance import veya runtime fail -> True (tek seferlik)
 
 
@@ -2368,19 +2474,45 @@ def _enrich_trade_with_mark_signals(trade: Trade) -> Trade:
     KARAR #733 alt-paket (Paket 84, 26 May 2026): pivot_status enrichment
     (P81-P83 paten). Açık trade'lerde anlamlı (kapanmış için referans).
 
-    Production'da minervini_scans tablo join'i ile gelir; simdilik
-    _STOCK_MARK_SIGNALS MOCK lookup (Migration 004-007 sonrasi degisecek).
+    Paket 146 (26 May 2026): yfinance live overlay (RS Rating / Stage / Climax).
+    Açık trade'lerde gerçek piyasa durumu — Mark canon paper trading temeli.
     """
     updates: dict = {}
-    signals = _STOCK_MARK_SIGNALS.get(trade.symbol)
-    if signals:
-        updates["mark_signals"] = signals
+    # P146: yfinance + MOCK birleşik (Watchlist pateni)
+    live_signals = _compute_live_mark_signals(trade.symbol, trade.entry_price)
+    if live_signals:
+        updates["mark_signals"] = live_signals
     pivot_status = _compute_signal_pivot_status(trade.symbol, trade.entry_price)
     if pivot_status:
         updates["pivot_status"] = pivot_status
     if updates:
         return trade.model_copy(update=updates)
     return trade
+
+
+def _enrich_trade_batch(trades: list[Trade]) -> list[Trade]:
+    """Paket 146 (26 May 2026): Trade'leri paralel zenginleştir.
+
+    Watchlist _enrich_watchlist_batch pateni — ThreadPoolExecutor + SPY pre-warm.
+    Cache hit'lerle 0s, soğuk başlangıçta n trade × ~0.2s.
+    """
+    if not trades:
+        return trades
+    try:
+        _fetch_ohlcv_real("SPY", 252)
+    except Exception:
+        pass
+    from concurrent.futures import ThreadPoolExecutor
+
+    def _enrich_one(t: Trade) -> Trade:
+        try:
+            return _enrich_trade_with_mark_signals(t)
+        except Exception:
+            return t
+
+    with ThreadPoolExecutor(max_workers=10) as pool:
+        enriched = list(pool.map(_enrich_one, trades))
+    return enriched
 
 
 @app.get("/api/trades", response_model=list[Trade])
@@ -2398,12 +2530,12 @@ def get_trades() -> list[Trade]:
             Trade(id=7, symbol="META",  strategy="carr",      setup_type="Pullback",           signal_source="manual_self",     entry_date="2026-04-05 11:20", entry_price=485.30,  shares=30,  status="closed", exit_date="2026-04-30 09:47", exit_price=510.20, pl_dollar=747.00,   pl_pct=5.13,  grade="B",  exit_reason="trailing_stop",  lessons="Trailing stop biraz sıkı kalmış, sabırlı kalsaydım daha iyi"),
             Trade(id=8, symbol="AVGO",  strategy="minervini", setup_type="VCP",                signal_source="strategy",        entry_date="2026-05-08 09:42", entry_price=1392.00, shares=10,  status="open",   exit_date=None,                exit_price=None,    pl_dollar=None,     pl_pct=None,  grade=None, exit_reason=None,              lessons=None),
         ]
-        # KARAR #733 alt-paket (Paket 41): Mark Profili enrichment (DRY watchlist pateni)
-        return [_enrich_trade_with_mark_signals(t) for t in rows]
+        # KARAR #733 alt-paket (Paket 41 + Paket 146): Mark enrichment paralel batch
+        return _enrich_trade_batch(rows)
 
     try:
         rows = [Trade(**t) for t in trades_get_all()]
-        return [_enrich_trade_with_mark_signals(t) for t in rows]
+        return _enrich_trade_batch(rows)
     except OperationalError as e:
         raise HTTPException(
             status_code=503,
@@ -2759,20 +2891,35 @@ class Signal(BaseModel):
     pivot_status: Optional[Literal["CONFIRMED", "WEAK", "NEAR_PIVOT", "BELOW_PIVOT"]] = None
 
 
+_PIVOT_STATUS_CACHE: dict[str, tuple[float, Optional[str]]] = {}
+_PIVOT_STATUS_CACHE_TTL_SEC = 300
+
+
 def _compute_signal_pivot_status(symbol: str, price: float) -> Optional[str]:
     """KARAR #733 alt-paket (Paket 81): Sinyal satırı için pivot status.
 
     MOCK OHLCV üretip compute_pivot_breakout çağırır. Deterministik
     (sembol+tarih seed) — aynı gün aynı sembol aynı status.
+
+    Paket 145 alt-katman: 5 dk cache (yfinance fetch maliyetli).
     """
+    # Cache hit
+    now = _time_module.time()
+    cached = _PIVOT_STATUS_CACHE.get(symbol)
+    if cached:
+        ts, status = cached
+        if now - ts < _PIVOT_STATUS_CACHE_TTL_SEC:
+            return status
     try:
         bars = _get_ohlcv(symbol, price)
         closes = [b.close for b in bars]
         volumes = [b.volume for b in bars]
         result = compute_pivot_breakout(closes, volumes)
-        return result.get("status")
+        status = result.get("status")
     except Exception:
-        return None
+        status = None
+    _PIVOT_STATUS_CACHE[symbol] = (now, status)
+    return status
 
 
 def _calc_rr(price: float, stop: Optional[float], target: Optional[float]) -> Optional[float]:
@@ -2797,13 +2944,14 @@ def get_signals() -> list[Signal]:
     if not db_health_check():
         # KARAR #473: stop_loss + target_price + risk_reward (R/R 2:1 ile 3.5:1 arasında gerçekçi dağılım)
         # KARAR #726: mark_signals MOCK lookup (_STOCK_MARK_SIGNALS dict)
+        # Paket 147 (26 May 2026): _compute_live_mark_signals yfinance overlay (Watchlist pateni)
         def s(symbol, strategy, status, setup, rs, price, stop, target, added, new=False):
             return Signal(
                 symbol=symbol, strategy=strategy, status=status, setup_type=setup,
                 rs_rating=rs, price=price, stop_loss=stop, target_price=target,
                 risk_reward=_calc_rr(price, stop, target),
                 added_date=added, is_new_today=new,
-                mark_signals=_STOCK_MARK_SIGNALS.get(symbol),
+                mark_signals=_compute_live_mark_signals(symbol, price),
                 pivot_status=_compute_signal_pivot_status(symbol, price),
             )
         mock_signals = [
@@ -2836,6 +2984,7 @@ def get_signals() -> list[Signal]:
     #   — added_date "YYYY-MM-DD" veya "YYYY-MM-DD HH:MM" formatında olabilir
     # KARAR #473: stop_loss/target_price şu an web_watchlist'te yok (gelecek migration)
     #   → None döndürülür, R/R hesaplanmaz. MOCK fallback'te dolu.
+    # Paket 147 (26 May 2026): _compute_live_mark_signals yfinance overlay (Watchlist pateni)
     signals: list[Signal] = []
     for row in all_rows:
         added_prefix = (row.added_date or "")[:10]
@@ -2851,7 +3000,7 @@ def get_signals() -> list[Signal]:
             risk_reward=None,
             added_date=row.added_date,
             is_new_today=(added_prefix == today),
-            mark_signals=_STOCK_MARK_SIGNALS.get(row.symbol),  # KARAR #726
+            mark_signals=_compute_live_mark_signals(row.symbol, row.price),
             pivot_status=_compute_signal_pivot_status(row.symbol, row.price),
         ))
 

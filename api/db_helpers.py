@@ -705,10 +705,26 @@ def screen_get_results_dispatch(slug: str, limit: int = 500) -> list[dict]:
 # Health check
 # =============================================================
 
+# Paket 145 alt-katman (26 May 2026): db_health_check cache.
+# Cloud SQL paused/IP whitelist eski durumunda her çağrı 5s timeout bekliyor.
+# Watchlist endpoint her satırın MOCK fallback kontrolü için bu çağırıyordu →
+# 7s sabit gecikme. 30s TTL cache ile paper trading dev UX akıcı.
+import time as _time_db
+_DB_HEALTH_CACHE: tuple[float, bool] = (0.0, False)
+_DB_HEALTH_CACHE_TTL_SEC = 30
+
+
 def db_health_check() -> bool:
+    global _DB_HEALTH_CACHE
+    now = _time_db.time()
+    ts, ok = _DB_HEALTH_CACHE
+    if now - ts < _DB_HEALTH_CACHE_TTL_SEC:
+        return ok
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
-        return True
+        result = True
     except Exception:
-        return False
+        result = False
+    _DB_HEALTH_CACHE = (now, result)
+    return result
