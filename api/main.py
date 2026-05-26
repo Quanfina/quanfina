@@ -1671,6 +1671,27 @@ def search_symbols(q: str, limit: int = 10) -> list[SymbolSearchResult]:
             seen.add(sym)
 
     combined = prefix_sym + prefix_name + contains
+
+    # Paket 164 (26 May 2026): yfinance fallback — Quanfina evreni 56 sembol dışı.
+    # Kullanıcı tam sembol yazıp boş dönerse yfinance Ticker.info ile doğrula
+    # (Sn. Ferit ZM, ROKU, SOFI vb. dışındaki popüler hisseleri de ekleyebilsin).
+    # Sadece exact symbol match denemesi (genel arama maliyetli — yfinance arama API'si yok).
+    if not combined and 2 <= len(q_upper) <= 6 and q_upper.replace(".", "").isalpha() and not _YF_DISABLED:
+        try:
+            import yfinance as yf
+            ticker = yf.Ticker(q_upper)
+            info = ticker.info or {}
+            name = info.get("longName") or info.get("shortName")
+            sector = info.get("sector") or info.get("industry") or "Unknown"
+            if name and (info.get("regularMarketPrice") or info.get("previousClose")):
+                combined.append(SymbolSearchResult(
+                    symbol=q_upper,
+                    name=name,
+                    sector=sector,
+                ))
+        except Exception:
+            pass  # yfinance fail — sessizce geç (kullanıcı uyarı görmesin)
+
     return combined[:limit]
 
 # KARAR ADAY #723 (24 May 2026) — Hisse detay Mark Profil rozetleri MOCK feed.

@@ -26,6 +26,8 @@ import { useClimaxRun } from "@/hooks/use-climax-run";
 import { useRsRating } from "@/hooks/use-rs-rating";
 import { useStageTransition } from "@/hooks/use-stage-transition";
 import { useAtrVolatility } from "@/hooks/use-atr-volatility";
+import { useSymbolSearch } from "@/hooks/use-symbol-search";
+import { useStockQuote } from "@/hooks/use-stock-quote";
 
 const SELECT = "h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring";
 const TEXTAREA = "w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm resize-none focus:outline-none focus:ring-1 focus:ring-ring";
@@ -77,6 +79,13 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
   useEffect(() => {
     if (open) setMindsetReadToday(isReadTodayAny());
   }, [open]);
+
+  // Paket 163 (26 May 2026): Symbol autocomplete (P149 Watchlist pateni)
+  const [showSymbolSuggest, setShowSymbolSuggest] = useState(false);
+  const { data: symbolSuggestions } = useSymbolSearch(symbol, 8);
+  // Paket 163: yfinance canlı quote — entry_price önerisi
+  const trimmedSym = symbol.trim().toUpperCase();
+  const { data: quoteData } = useStockQuote(open && trimmedSym.length >= 2 ? trimmedSym : "");
 
   // KARAR #733 alt (Paket 33): Symbol Carr Stage pre-check (Stage 4 → uzak dur uyarısı)
   // Symbol ≥3 karakter olduğunda hook etkinleşir (gereksiz API gürültüsü engellenir)
@@ -379,10 +388,55 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3 py-2">
           {/* Row 1 — Symbol + Strategy */}
+          {/* Paket 163 (26 May 2026): Symbol autocomplete (P149 Watchlist pateni) */}
           <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-1.5 relative">
               <Label htmlFor="at-sym">Hisse *</Label>
-              <Input id="at-sym" value={symbol} onChange={(e) => setSymbol(e.target.value.toUpperCase())} placeholder="NVDA" maxLength={10} autoFocus />
+              <Input
+                id="at-sym"
+                value={symbol}
+                onChange={(e) => {
+                  setSymbol(e.target.value.toUpperCase());
+                  setShowSymbolSuggest(true);
+                }}
+                onFocus={() => setShowSymbolSuggest(true)}
+                onBlur={() => setTimeout(() => setShowSymbolSuggest(false), 150)}
+                placeholder="NVDA, TSLA, AAPL..."
+                maxLength={10}
+                autoFocus
+                autoComplete="off"
+              />
+              {showSymbolSuggest && symbolSuggestions && symbolSuggestions.length > 0 && (
+                <ul
+                  className="absolute z-50 top-full left-0 right-0 mt-1 max-h-56 overflow-y-auto rounded-md border bg-popover shadow-lg"
+                  style={{ borderColor: "var(--border)" }}
+                >
+                  {symbolSuggestions.map((s) => (
+                    <li
+                      key={s.symbol}
+                      role="option"
+                      aria-selected={trimmedSym === s.symbol}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        setSymbol(s.symbol);
+                        setShowSymbolSuggest(false);
+                      }}
+                      className="px-3 py-2 text-sm cursor-pointer hover:bg-accent border-b last:border-b-0"
+                      style={{ borderColor: "var(--border)" }}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono font-semibold">{s.symbol}</span>
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                          {s.sector}
+                        </span>
+                      </div>
+                      <div className="text-xs text-muted-foreground truncate mt-0.5">
+                        {s.name}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="at-strat">Strateji *</Label>
@@ -440,7 +494,24 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
               <Input id="at-edate" type="date" value={entryDate} onChange={(e) => setEntryDate(e.target.value)} />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="at-eprice">Giriş $ *</Label>
+              <Label htmlFor="at-eprice" className="flex items-center justify-between">
+                <span>Giriş $ *</span>
+                {/* Paket 163: yfinance canlı fiyat öneri rozet (tek-tık doldur) */}
+                {quoteData?.price != null && quoteData.source === "yfinance" && (
+                  <button
+                    type="button"
+                    onClick={() => setEntryPrice(String(quoteData.price.toFixed(2)))}
+                    className="text-[10px] font-semibold px-1.5 py-0.5 rounded hover:bg-accent transition-colors"
+                    style={{
+                      color: "var(--mtp-good, #4B9CD3)",
+                      border: "1px solid var(--mtp-good, #4B9CD3)",
+                    }}
+                    title={`yfinance canlı: $${quoteData.price.toFixed(2)} — tek tık doldur`}
+                  >
+                    🔴 ${quoteData.price.toFixed(2)}
+                  </button>
+                )}
+              </Label>
               <Input id="at-eprice" type="number" value={entryPrice} onChange={(e) => setEntryPrice(e.target.value)} placeholder="700.00" step="0.01" min="0" />
             </div>
             <div className="flex flex-col gap-1.5">
