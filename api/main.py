@@ -50,6 +50,7 @@ from quanfina_math import (  # noqa: E402
     compute_follow_through_day,
     compute_pivot_breakout,
     compute_overhead_supply,
+    compute_climax_run,
     MARK_PYRAMID_PILOT_PCT_RANGE,
     MARK_PYRAMID_STANDARD_PCT_RANGE,
     MARK_PYRAMID_FULL_PCT_RANGE,
@@ -1790,6 +1791,53 @@ def get_pivot_breakout(symbol: str) -> PivotBreakoutInfo:
         breakout_pct=result.get("breakout_pct"),
         volume_multiplier=result.get("volume_multiplier"),
         volume_confirmed=bool(result.get("volume_confirmed", False)),
+        mark_says=result.get("mark_says", ""),
+    )
+
+
+# KARAR #733 alt-paket (Paket 87, 26 May 2026): climax_run endpoint
+# Mark TLSMW Ch 9 "Selling Short and Climax Runs" canon.
+# Parabolic / exhaustion / "last gasp" tepe tespiti.
+class ClimaxRunInfo(BaseModel):
+    category: Optional[Literal["CLIMAX_TOP", "POTENTIAL_CLIMAX", "HEALTHY_ADVANCE", "NONE"]] = None
+    gain_pct: Optional[float] = None
+    gap_up_days: Optional[int] = None
+    avg_volume_ratio: Optional[float] = None
+    mark_says: str
+
+
+@app.get("/api/stock/{symbol}/climax", response_model=ClimaxRunInfo)
+def get_climax_run(symbol: str) -> ClimaxRunInfo:
+    """Mark TLSMW Ch 9 Climax Run hesabı (P86 helper wire).
+
+    Parabolic / exhaustion / "last gasp" tepe tespiti — gap-up + hacim teyitli.
+    OHLCV MOCK feed kullanılır (AÇIK KONU #75 production yfinance).
+    """
+    sym = symbol.upper()
+    stock = _STOCK_BY_SYM.get(sym)
+    if stock:
+        price = stock.price
+    else:
+        try:
+            wl = [r for r in watchlist_get_all() if r["symbol"] == sym]
+        except OperationalError:
+            wl = []
+        if wl:
+            price = float(wl[0]["price"])
+        else:
+            scan_data = _fetch_scan_symbol_data(sym)
+            price = scan_data["price"] if scan_data else 100.0
+    bars = _generate_ohlcv(sym, price)
+    closes = [b.close for b in bars]
+    opens = [b.open for b in bars]
+    volumes = [b.volume for b in bars]
+
+    result = compute_climax_run(closes, opens, volumes)
+    return ClimaxRunInfo(
+        category=result.get("category"),
+        gain_pct=result.get("gain_pct"),
+        gap_up_days=result.get("gap_up_days"),
+        avg_volume_ratio=result.get("avg_volume_ratio"),
         mark_says=result.get("mark_says", ""),
     )
 
