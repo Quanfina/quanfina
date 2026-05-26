@@ -6,7 +6,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Menu, Home, Activity, Globe,
   ListChecks, NotebookText, ScanLine, ChevronDown,
-  Quote, Calculator,
+  Quote, Calculator, CalendarDays,
 } from "lucide-react";
 // KARAR ADAY (22 May 2026): BarChart2, TrendingUp, Layers ikonlari kaldirildi -
 // Stratejiler grup sidebar'dan cikti (Secenek E). NavGroup tip ve rendering KORUNDU
@@ -40,6 +40,9 @@ const NAV_ITEMS: NavItem[] = [
   { kind: "leaf", href: "/zihinsel-disiplin", label: "Mark Disiplin", icon: Quote },
   // KARAR #733 alt-paket (Paket 38, 24 May 2026) — Risk Yönetimi Pyramid Calculator
   { kind: "leaf", href: "/risk-yonetimi", label: "Risk Yönetimi", icon: Calculator },
+  // Paket 228 (27 May 2026, KARAR #480 — UX Bölüm 8 Aksiyon Modu)
+  // Pazar Günü Hazırlık Paneli — haftalık 30 dk ritüel (geçen hafta + plan + odak)
+  { kind: "leaf", href: "/pazar-hazirligi", label: "Pazar Hazırlığı", icon: CalendarDays },
 ];
 // KARAR ADAY (22 May 2026): Stratejiler grup (Minervini + Carr) kaldirildi (Secenek E).
 // Sebep: Minervini akisi mevcut sayfalarda zaten coziluyor (Tarama -> Izleme Listesi
