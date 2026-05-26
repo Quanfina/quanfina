@@ -144,6 +144,10 @@ export default function HissePage({
         </Button>
       </div>
 
+      {/* KARAR #733 alt-paket (Paket 125): Mark Profili kompakt rozet bar
+          — 10 sidebar kart yerine yatay özet, 1 bakışta Mark canon profili */}
+      <MarkProfileBar symbol={sym} />
+
       {/* Main content */}
       <div className="flex-1 px-6 py-4 flex flex-col gap-4 overflow-auto">
         <div className="flex gap-4 items-start">
