@@ -29,7 +29,7 @@ import { useStageTransition } from "@/hooks/use-stage-transition";
 import { useAtrVolatility } from "@/hooks/use-atr-volatility";
 import { useSymbolSearch } from "@/hooks/use-symbol-search";
 import { useStockQuote } from "@/hooks/use-stock-quote";
-import { useTradingMode } from "@/hooks/use-trading-mode";
+import { useTradingMode, getDefansifBlockMessage } from "@/hooks/use-trading-mode";
 import { useTrades } from "@/hooks/use-trades";
 import { useStockQuotes } from "@/hooks/use-stock-quote";
 
@@ -241,7 +241,9 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
     // onay vermezse submit BLOK (görsel uyarıdan AKSİYON disiplinine evrim).
     // Sadece açık (open) trade'ler için — kapalı kayıt geçmiş için override gerekmez.
     if (!isClosed && tradingMode.mode === "defansif" && !defansifOverride) {
-      setError("DEFANSİF mod aktif (piyasa Stage 3-4 + MH<30) — Mark TTLC s.187: yeni AL BLOK. Aşağıdaki 'Riski biliyorum' kutusunu işaretleyin.");
+      // Paket 264 (P233 helper DRY): getDefansifBlockMessage tek kaynak mesaj
+      const baseMsg = getDefansifBlockMessage(tradingMode.mode);
+      setError(`${baseMsg} Aşağıdaki "Riski biliyorum" kutusunu işaretleyin.`);
       return;
     }
 
