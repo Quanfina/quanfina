@@ -246,6 +246,43 @@ export default function SignalsPage() {
         return <MarkBadgeStrip signals={sig.mark_signals} density="compact" showEmpty={false} />;
       },
     },
+    // KARAR #733 alt-paket (Paket 81): Pivot kolonu — Mark TLSMW Ch 10
+    // AL/Zayıf/Yakın/Altı kompakt rozet (DRY MarkBadgeStrip pateni paralel).
+    {
+      headerName: "Pivot",
+      field: "pivot_status",
+      width: 110,
+      sortable: false,
+      filter: false,
+      cellRenderer: (p: ICellRendererParams<Signal>) => {
+        const status = p.data?.pivot_status;
+        if (!status) return <span className="text-xs text-muted-foreground">—</span>;
+        const meta =
+          status === "CONFIRMED"
+            ? { label: "AL ✓", color: "var(--mtp-excellent)", bg: "rgba(40,167,69,0.15)" }
+            : status === "WEAK"
+            ? { label: "Zayıf ⚠️", color: "#F59E0B", bg: "rgba(245,158,11,0.15)" }
+            : status === "NEAR_PIVOT"
+            ? { label: "Yakın ⏳", color: "var(--mtp-good, #4B9CD3)", bg: "rgba(75,156,211,0.15)" }
+            : { label: "Altı ○", color: "var(--mtp-danger)", bg: "rgba(220,53,69,0.10)" };
+        return (
+          <span
+            className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider"
+            style={{
+              background: meta.bg,
+              color: meta.color,
+              border:
+                status === "CONFIRMED"
+                  ? "1px solid var(--mtp-excellent)"
+                  : "1px solid currentColor",
+            }}
+            title={`Mark TLSMW Ch 10 — Pivot ${status}`}
+          >
+            {meta.label}
+          </span>
+        );
+      },
+    },
     {
       headerName: "",
       width: 130,

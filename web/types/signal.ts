@@ -1,4 +1,5 @@
 import type { MarkSignals } from "@/components/mark/MarkBadgeStrip";
+import type { PivotBreakoutStatus } from "@/hooks/use-pivot-breakout";
 
 // KARAR #469 (20 May 2026): konsensus yapısı kaldırıldı.
 // Her watchlist satırı = 1 Signal (NVDA-Minervini ayrı kart, NVDA-Carr ayrı kart).
@@ -21,4 +22,7 @@ export interface Signal {
   is_new_today: boolean;
   // KARAR ADAY #726 — Backend signals derive watchlist; mark_signals join
   mark_signals?: MarkSignals;
+  // KARAR #733 alt-paket (Paket 81, 26 May 2026): Pivot Breakout status
+  // P70+P71 helper enrichment — sinyal listesinde AL/Zayıf/Yakın/Altı görünür
+  pivot_status?: PivotBreakoutStatus | null;
 }

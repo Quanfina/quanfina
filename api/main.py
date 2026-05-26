@@ -2224,6 +2224,25 @@ class Signal(BaseModel):
     is_new_today: bool
     # KARAR ADAY #726 — Sinyaller Mark Profili (MOCK feed + Migration 004-007 sonra canli)
     mark_signals: Optional[dict] = None
+    # KARAR #733 alt-paket (Paket 81, 26 May 2026): Pivot breakout status
+    # P70+P71 helper enrichment — sinyal listesinde AL/Zayıf/Yakın/Altı görünür
+    pivot_status: Optional[Literal["CONFIRMED", "WEAK", "NEAR_PIVOT", "BELOW_PIVOT"]] = None
+
+
+def _compute_signal_pivot_status(symbol: str, price: float) -> Optional[str]:
+    """KARAR #733 alt-paket (Paket 81): Sinyal satırı için pivot status.
+
+    MOCK OHLCV üretip compute_pivot_breakout çağırır. Deterministik
+    (sembol+tarih seed) — aynı gün aynı sembol aynı status.
+    """
+    try:
+        bars = _generate_ohlcv(symbol, price)
+        closes = [b.close for b in bars]
+        volumes = [b.volume for b in bars]
+        result = compute_pivot_breakout(closes, volumes)
+        return result.get("status")
+    except Exception:
+        return None
 
 
 def _calc_rr(price: float, stop: Optional[float], target: Optional[float]) -> Optional[float]:
@@ -2255,6 +2274,7 @@ def get_signals() -> list[Signal]:
                 risk_reward=_calc_rr(price, stop, target),
                 added_date=added, is_new_today=new,
                 mark_signals=_STOCK_MARK_SIGNALS.get(symbol),
+                pivot_status=_compute_signal_pivot_status(symbol, price),
             )
         mock_signals = [
             s("NVDA",  "minervini", "buy",     "VCP",                 99.0, 145.20,  141.50,  157.00,  f"{today} 09:32",     True),
@@ -2302,6 +2322,7 @@ def get_signals() -> list[Signal]:
             added_date=row.added_date,
             is_new_today=(added_prefix == today),
             mark_signals=_STOCK_MARK_SIGNALS.get(row.symbol),  # KARAR #726
+            pivot_status=_compute_signal_pivot_status(row.symbol, row.price),
         ))
 
     # Sıralama: RS rating descending (UX Bölüm 4 madde 6 ile uyumlu — sonra R/R sırası)
