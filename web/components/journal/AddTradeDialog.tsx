@@ -25,6 +25,7 @@ import { usePivotBreakout } from "@/hooks/use-pivot-breakout";
 import { useClimaxRun } from "@/hooks/use-climax-run";
 import { useRsRating } from "@/hooks/use-rs-rating";
 import { useStageTransition } from "@/hooks/use-stage-transition";
+import { useAtrVolatility } from "@/hooks/use-atr-volatility";
 
 const SELECT = "h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring";
 const TEXTAREA = "w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm resize-none focus:outline-none focus:ring-1 focus:ring-ring";
@@ -92,6 +93,16 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
   const { data: climaxData } = useClimaxRun(markPreCheckSymbol);
   const { data: rsData } = useRsRating(markPreCheckSymbol);
   const { data: stageData } = useStageTransition(markPreCheckSymbol);
+  // KARAR #733 alt-paket (Paket 128, 26 May 2026): ATR Stop auto-fill
+  // Mark TLSMW Ch 11: ATR-based stop "give the stock room to breathe"
+  const { data: atrData } = useAtrVolatility(markPreCheckSymbol);
+
+  // ATR Stop suggestion → planStop default (sadece kullanıcı henüz girmediyse)
+  useEffect(() => {
+    if (open && !planStop && atrData?.suggested_stop_normal != null) {
+      setPlanStop(String(atrData.suggested_stop_normal));
+    }
+  }, [open, planStop, atrData?.suggested_stop_normal]);
 
   useEffect(() => {
     if (!open || !initialData) return;
