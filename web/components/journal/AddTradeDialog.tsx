@@ -21,6 +21,10 @@ import { isReadTodayAny } from "@/lib/mindset-read-state";
 import Link from "next/link";
 import { Quote, AlertTriangle } from "lucide-react";
 import { useCarrStage } from "@/hooks/use-carr-stage";
+import { usePivotBreakout } from "@/hooks/use-pivot-breakout";
+import { useClimaxRun } from "@/hooks/use-climax-run";
+import { useRsRating } from "@/hooks/use-rs-rating";
+import { useStageTransition } from "@/hooks/use-stage-transition";
 
 const SELECT = "h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring";
 const TEXTAREA = "w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm resize-none focus:outline-none focus:ring-1 focus:ring-ring";
@@ -79,6 +83,15 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
   const { data: carrStage } = useCarrStage(
     open && trimmedSymbol.length >= 2 ? trimmedSymbol : undefined,
   );
+
+  // KARAR #733 alt-paket (Paket 124, 26 May 2026): Mark Profili pre-check
+  // Sembol girince Pivot+Climax+RS+Stage rozet bar göster — Mark canon checklist
+  // trade açmadan önce. Sn. Ferit anında profili görür, disiplin pekişir.
+  const markPreCheckSymbol = open && trimmedSymbol.length >= 2 ? trimmedSymbol : undefined;
+  const { data: pivotData } = usePivotBreakout(markPreCheckSymbol);
+  const { data: climaxData } = useClimaxRun(markPreCheckSymbol);
+  const { data: rsData } = useRsRating(markPreCheckSymbol);
+  const { data: stageData } = useStageTransition(markPreCheckSymbol);
 
   useEffect(() => {
     if (!open || !initialData) return;
@@ -191,6 +204,139 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
                 Mark felsefesi: <b>UZAK DUR</b>. 30W MA altı + slope negatif.
                 Stage 2'ye dönene kadar yeni alım önerilmez (KARAR #733).
               </span>
+            </div>
+          </div>
+        )}
+
+        {/* KARAR #733 alt-paket (Paket 124, 26 May 2026): Mark Profili pre-check
+            rozet bar — sembol girince Pivot+Climax+RS+Stage tek bakışta.
+            Trade açmadan önce Mark canon checklist görür → disiplin pekişir. */}
+        {markPreCheckSymbol && (pivotData || climaxData || rsData || stageData) && (
+          <div
+            className="rounded-md border px-3 py-2 flex flex-col gap-1.5 text-xs"
+            style={{
+              background: "rgba(75,156,211,0.05)",
+              borderColor: "rgba(75,156,211,0.30)",
+            }}
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Mark Profili
+              </span>
+              <span className="text-[10px] text-muted-foreground italic">
+                ({trimmedSymbol} — trade öncesi checklist)
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {/* Pivot rozet */}
+              {pivotData?.status && (
+                <span
+                  className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider"
+                  style={{
+                    background:
+                      pivotData.status === "CONFIRMED"
+                        ? "rgba(40,167,69,0.15)"
+                        : pivotData.status === "WEAK"
+                        ? "rgba(245,158,11,0.15)"
+                        : pivotData.status === "NEAR_PIVOT"
+                        ? "rgba(75,156,211,0.15)"
+                        : "rgba(220,53,69,0.10)",
+                    color:
+                      pivotData.status === "CONFIRMED"
+                        ? "var(--mtp-excellent)"
+                        : pivotData.status === "WEAK"
+                        ? "#F59E0B"
+                        : pivotData.status === "NEAR_PIVOT"
+                        ? "var(--mtp-good, #4B9CD3)"
+                        : "var(--mtp-danger)",
+                  }}
+                  title={`Pivot — ${pivotData.mark_says}`}
+                >
+                  Pivot:{" "}
+                  {pivotData.status === "CONFIRMED"
+                    ? "AL ✓"
+                    : pivotData.status === "WEAK"
+                    ? "Zayıf ⚠️"
+                    : pivotData.status === "NEAR_PIVOT"
+                    ? "Yakın ⏳"
+                    : "Altı ○"}
+                </span>
+              )}
+              {/* RS rozet */}
+              {rsData?.rs_rating != null && (
+                <span
+                  className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider"
+                  style={{
+                    background:
+                      rsData.rs_rating >= 80
+                        ? "rgba(40,167,69,0.15)"
+                        : rsData.rs_rating >= 70
+                        ? "rgba(75,156,211,0.15)"
+                        : rsData.rs_rating >= 50
+                        ? "rgba(245,158,11,0.10)"
+                        : "rgba(220,53,69,0.10)",
+                    color:
+                      rsData.rs_rating >= 80
+                        ? "var(--mtp-excellent)"
+                        : rsData.rs_rating >= 70
+                        ? "var(--mtp-good, #4B9CD3)"
+                        : rsData.rs_rating >= 50
+                        ? "#F59E0B"
+                        : "var(--mtp-danger)",
+                  }}
+                  title={`RS Rating — ${rsData.mark_says}`}
+                >
+                  RS {rsData.rs_rating}
+                </span>
+              )}
+              {/* Climax rozet — sadece CLIMAX_TOP/POTENTIAL_CLIMAX uyarı */}
+              {(climaxData?.category === "CLIMAX_TOP" ||
+                climaxData?.category === "POTENTIAL_CLIMAX") && (
+                <span
+                  className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider"
+                  style={{
+                    background:
+                      climaxData.category === "CLIMAX_TOP"
+                        ? "rgba(220,53,69,0.15)"
+                        : "rgba(245,158,11,0.15)",
+                    color:
+                      climaxData.category === "CLIMAX_TOP"
+                        ? "var(--mtp-danger)"
+                        : "#F59E0B",
+                  }}
+                  title={`Climax — ${climaxData.mark_says}`}
+                >
+                  Climax {climaxData.category === "CLIMAX_TOP" ? "🔴" : "⚠️"}
+                </span>
+              )}
+              {/* Stage rozet */}
+              {stageData?.category && stageData.category !== "NO_TRANSITION" && (
+                <span
+                  className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider"
+                  style={{
+                    background:
+                      stageData.category === "CONFIRMED_STAGE_2"
+                        ? "rgba(40,167,69,0.15)"
+                        : stageData.category === "EARLY_STAGE_2"
+                        ? "rgba(245,158,11,0.15)"
+                        : "rgba(75,156,211,0.15)",
+                    color:
+                      stageData.category === "CONFIRMED_STAGE_2"
+                        ? "var(--mtp-excellent)"
+                        : stageData.category === "EARLY_STAGE_2"
+                        ? "#F59E0B"
+                        : "var(--mtp-good, #4B9CD3)",
+                  }}
+                  title={`Stage — ${stageData.mark_says}`}
+                >
+                  Stage:{" "}
+                  {stageData.category === "CONFIRMED_STAGE_2"
+                    ? "Onaylı ✓"
+                    : stageData.category === "EARLY_STAGE_2"
+                    ? "Erken ⚡"
+                    : "Olgun ⏳"}
+                </span>
+              )}
             </div>
           </div>
         )}
