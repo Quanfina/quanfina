@@ -14,6 +14,7 @@ import { useMarketStatus } from "@/hooks/use-market-status";
 import { AtrVolatilityCard } from "@/components/stock/AtrVolatilityCard";
 import { useStageTransition } from "@/hooks/use-stage-transition";
 import { fmtUsd } from "@/lib/format-currency";
+import { ModBadge } from "@/components/mark/ModBadge";
 
 /**
  * KARAR #733 alt-paket (Paket 38): Risk Yönetimi Pyramid Calculator sayfası.
@@ -109,14 +110,19 @@ export default function RiskYonetimiPage() {
   return (
     <div className="p-6 flex flex-col gap-6 max-w-4xl">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <Calculator size={24} className="text-muted-foreground" />
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Risk Yönetimi — Pyramid Calculator</h1>
-          <p className="text-sm text-muted-foreground">
-            Mark Minervini 3-Tier Pyramiding (KARAR #487 v20.98) — Pilot / Standart / Full
-          </p>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <Calculator size={24} className="text-muted-foreground" />
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Risk Yönetimi — Pyramid Calculator</h1>
+            <p className="text-sm text-muted-foreground">
+              Mark Minervini 3-Tier Pyramiding (KARAR #487 v20.98) — Pilot / Standart / Full
+            </p>
+          </div>
         </div>
+        {/* Paket 199 (26 May 2026): ModBadge compact — Vizyon İLKE #10 (Mod Geçişleri).
+            Sn. Ferit Pyramid sizing yaparken mod kontrolü tek bakışta. */}
+        <ModBadge variant="compact" />
       </div>
 
       {/* Input Form */}
