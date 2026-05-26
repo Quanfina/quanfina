@@ -124,6 +124,7 @@ export default function JournalPage() {
       <MarkRegimeBanner
         stage4Count={(data ?? []).filter((t) => t.status === "open" && t.mark_signals?.carr_stage === 4).length}
         totalCount={(data ?? []).filter((t) => t.status === "open").length}
+        climaxTopCount={(data ?? []).filter((t) => t.status === "open" && t.mark_signals?.climax_category === "CLIMAX_TOP").length}
       />
 
       {/* KARAR ADAY #722 (24 May 2026): Mark RBA Summary Card (TTLC Sec 4) */}

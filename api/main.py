@@ -1487,6 +1487,9 @@ _STOCK_MARK_SIGNALS: dict[str, dict] = {
         "tennis_ball_pattern": "TENNIS_BALL",
         "volume_asymmetry_tier": "healthy",
         "carr_stage": 2,  # Advancing - Mark+Carr alim fazi
+        # KARAR #733 alt-paket (Paket 95): Climax category MOCK — Mark TLSMW Ch 9
+        # CLIMAX_TOP = parabolic + exhaustion gap (Mark "SAT" sinyali).
+        "climax_category": "CLIMAX_TOP",
     },
     "MSFT": {
         "vcp_quality_score": "PASS",

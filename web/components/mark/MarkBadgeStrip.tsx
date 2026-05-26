@@ -31,6 +31,9 @@ export interface MarkSignals {
   code_33_pattern?: "CODE_33" | "partial" | "none" | null;
   // KARAR ADAY #735 (24 May 2026): Carr Stage rozet (Mark+Carr birleşik)
   carr_stage?: 1 | 2 | 3 | 4 | null;
+  // KARAR #733 alt-paket (Paket 95, 26 May 2026): Climax Run kategorisi
+  // Mark TLSMW Ch 9 — açık trade'de CLIMAX_TOP varsa banner kırmızı bant
+  climax_category?: "CLIMAX_TOP" | "POTENTIAL_CLIMAX" | "HEALTHY_ADVANCE" | "NONE" | null;
 }
 
 interface BadgeProps {

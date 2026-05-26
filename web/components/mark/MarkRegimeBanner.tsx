@@ -71,6 +71,11 @@ interface MarkRegimeBannerProps {
   compact?: boolean;
   /** Kullanıcının dismiss etmesi için (gelecek). */
   hideOnHealthy?: boolean;
+  /**
+   * KARAR #733 alt-paket (Paket 95): Açık trade'lerde CLIMAX_TOP sayısı.
+   * Mark TLSMW Ch 9 — parabolic / exhaustion uyarısı. Kırmızı bant göstertir.
+   */
+  climaxTopCount?: number;
 }
 
 export function MarkRegimeBanner({
@@ -78,6 +83,7 @@ export function MarkRegimeBanner({
   totalCount = 0,
   compact = false,
   hideOnHealthy = true,
+  climaxTopCount = 0,
 }: MarkRegimeBannerProps) {
   const { data, isLoading, isError } = useMarketStatus();
 
@@ -99,12 +105,17 @@ export function MarkRegimeBanner({
 
   // HEALTHY iken sessiz olabilir (gürültü azaltma) — Sn. Ferit tercih flag
   // İSTİSNA: Kritik divergence VEYA FTD ONAYLI varsa HEALTHY iken bile gösterilir
+  // KARAR #733 alt-paket (Paket 95): CLIMAX_TOP uyarı yakalama
+  // Mark TLSMW Ch 9 — açık trade parabolic exhaustion sinyali
+  const showClimaxWarn = climaxTopCount > 0;
+
   if (
     hideOnHealthy &&
     regime.regime === "HEALTHY" &&
     stage4Count === 0 &&
     !isCriticalDivergence &&
-    !isFtdConfirmed
+    !isFtdConfirmed &&
+    !showClimaxWarn
   ) {
     return null;
   }
@@ -140,6 +151,15 @@ export function MarkRegimeBanner({
             title={followThrough!.mark_says}
           >
             FTD ✓
+          </span>
+        )}
+        {showClimaxWarn && (
+          <span
+            className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider"
+            style={{ background: "var(--mtp-danger)", color: "#fff" }}
+            title={`${climaxTopCount} açık trade CLIMAX_TOP — Mark TLSMW Ch 9 parabolic exhaustion`}
+          >
+            CLIMAX 🔴 {climaxTopCount}
           </span>
         )}
         <span className="opacity-60 ml-auto">DD {dd}/20</span>
@@ -252,6 +272,38 @@ export function MarkRegimeBanner({
                 </span>
               </div>
               <p className="opacity-90 leading-snug">{followThrough.mark_says}</p>
+            </div>
+          </div>
+        )}
+
+        {/* KARAR #733 alt-paket (Paket 95): Climax Run uyarı bandı —
+            açık trade'lerde CLIMAX_TOP varsa kırmızı bant (Mark TLSMW Ch 9
+            "Selling Short and Climax Runs" canon — parabolic + exhaustion
+            gap = SAT sinyali). DRY 5 sayfa kuyruğunda Journal'da öncelikli
+            (en sık tetiklenir, açık pozisyonlar). */}
+        {showClimaxWarn && (
+          <div
+            className="mt-2 px-2 py-1.5 rounded text-[11px] flex items-start gap-2"
+            style={{
+              background: "rgba(220,53,69,0.18)",
+              border: "1px solid var(--mtp-danger)",
+              color: "var(--mtp-danger)",
+            }}
+          >
+            <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <span className="font-bold uppercase tracking-wider">
+                  CLIMAX RUN 🔴 SAT/ÇIKIŞ SİNYALİ
+                </span>
+                <span className="opacity-75 font-mono tabular-nums">
+                  · {climaxTopCount} açık trade parabolic
+                </span>
+              </div>
+              <p className="opacity-90 leading-snug">
+                Mark TLSMW Ch 9: &quot;When everyone is screaming buy at the top,
+                that&apos;s when you sell.&quot; Stop sıkılaştır veya kısmi çıkış değerlendir.
+              </p>
             </div>
           </div>
         )}
