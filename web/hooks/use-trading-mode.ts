@@ -1,0 +1,136 @@
+"use client";
+
+import { useMemo } from "react";
+import { useTrades } from "@/hooks/use-trades";
+import { useMarketStatus } from "@/hooks/use-market-status";
+
+/**
+ * Paket 193 (26 May 2026): Trading Mode otomatik tetik (Vizyon KALICI İLKE #10).
+ *
+ * Sn. Ferit'in trade davranış mod sistemi — disiplin = içsel, sistem = dışsal.
+ * Sn. Ferit kuralla TARTIŞMAZ; mod otomatik tetik, sistem öneri verir.
+ *
+ * 4 Mod:
+ * | Mod       | Tetik                                                       | Sizing  | Davranış                            |
+ * |-----------|-------------------------------------------------------------|---------|-------------------------------------|
+ * | Normal    | Default (hiçbiri yok)                                       | %1 R    | Tüm sinyaller AL/GEÇ                |
+ * | Rehab     | Ardışık 3+ kayıp VEYA drawdown >%10                         | %0.5 R  | Yeni AL önce ⚠️ rehab uyarısı       |
+ * | Defansif  | Market Health <30 VEYA Stage 3-4 piyasa                     | Kapanış | Yeni AL'lar BLOK                    |
+ * | Agresif   | Market Health >70 + ardışık 5+ kazanç                       | %1.5-2 R| Conviction High sinyaller öncelikli |
+ *
+ * Disiplin: AI MANUEL OVERRIDE YASAK. Sn. Ferit "Normal mode hep" demek
+ * için manuel ayar yapar (gelecek paket). Şu an pure deterministic hesap.
+ */
+
+export type TradingMode = "normal" | "rehab" | "defansif" | "agresif";
+
+export interface TradingModeInfo {
+  mode: TradingMode;
+  reason: string;            // İnsan okunabilir tetik açıklaması
+  emoji: string;
+  color: string;
+  recommendedSizingPct: number;   // 0.5 / 1.0 / 1.5
+  uiBehavior: string;
+  // İstatistikler (UI için)
+  consecutiveWins: number;
+  consecutiveLosses: number;
+  totalClosedTrades: number;
+}
+
+/**
+ * Açık + kapalı trade'lerden + piyasa sağlığından mod hesap.
+ * Trade verisi: useTrades zaten cache'li (60s).
+ * Market: useMarketStatus zaten cache'li.
+ */
+export function useTradingMode(): TradingModeInfo {
+  const trades = useTrades();
+  const market = useMarketStatus();
+
+  return useMemo(() => {
+    const allTrades = trades.data ?? [];
+    const closedTrades = allTrades
+      .filter((t) => t.status === "closed" && t.pl_dollar != null)
+      .sort((a, b) => (b.exit_date ?? "").localeCompare(a.exit_date ?? ""));  // En yeni ÖNCE
+
+    // Ardışık kazanç/kayıp sayım (en yeni'den geriye)
+    let consecutiveWins = 0;
+    let consecutiveLosses = 0;
+    for (const t of closedTrades) {
+      const pl = t.pl_dollar ?? 0;
+      if (pl > 0) {
+        if (consecutiveLosses > 0) break;  // Streak kırıldı
+        consecutiveWins += 1;
+      } else if (pl < 0) {
+        if (consecutiveWins > 0) break;
+        consecutiveLosses += 1;
+      } else {
+        break;
+      }
+    }
+
+    const totalClosedTrades = closedTrades.length;
+    const marketHealthScore = market.data?.market_health_score ?? null;
+    // Piyasa Stage Mark canon — health_label / mode kullan
+    const marketMode = market.data?.suggested_mode ?? null;  // LONG / SHORT / NEUTRAL
+    const isMarketWeak = marketHealthScore != null && marketHealthScore < 30;
+    const isMarketStrong = marketHealthScore != null && marketHealthScore > 70;
+
+    // Tetik sırası (önce kötü, sonra iyi):
+    // 1. Defansif (piyasa zayıf)
+    if (isMarketWeak) {
+      return {
+        mode: "defansif",
+        reason: `Piyasa sağlığı ${marketHealthScore ?? "—"}/100 (<30). Yeni AL'lar bloklu, kapanış öncelikli.`,
+        emoji: "🛡️",
+        color: "var(--mtp-danger)",
+        recommendedSizingPct: 0,
+        uiBehavior: "Yeni AL'lar BLOK — sadece SAT/STOP işlemleri",
+        consecutiveWins,
+        consecutiveLosses,
+        totalClosedTrades,
+      };
+    }
+    // 2. Rehab (ardışık kayıp)
+    if (consecutiveLosses >= 3) {
+      return {
+        mode: "rehab",
+        reason: `${consecutiveLosses} ardışık kayıp. Mark TTLC s.187: yeni trade'lerde pozisyon yarıya.`,
+        emoji: "⚠️",
+        color: "#F59E0B",
+        recommendedSizingPct: 0.5,
+        uiBehavior: "Yeni AL önce ⚠️ uyarısı — %0.5 R sizing (yarım pozisyon)",
+        consecutiveWins,
+        consecutiveLosses,
+        totalClosedTrades,
+      };
+    }
+    // 3. Agresif (piyasa güçlü + ardışık kazanç)
+    if (isMarketStrong && consecutiveWins >= 5) {
+      return {
+        mode: "agresif",
+        reason: `Piyasa sağlığı ${marketHealthScore}/100 (>70) + ${consecutiveWins} ardışık kazanç. Mark "Hot hand" — Conviction High odaklı.`,
+        emoji: "🚀",
+        color: "var(--mtp-excellent)",
+        recommendedSizingPct: 1.5,
+        uiBehavior: "Conviction High sinyaller öncelikli — %1.5-2 R sizing",
+        consecutiveWins,
+        consecutiveLosses,
+        totalClosedTrades,
+      };
+    }
+    // 4. Default Normal
+    return {
+      mode: "normal",
+      reason: `Normal mod — piyasa stabil${
+        marketHealthScore != null ? ` (sağlık ${marketHealthScore}/100)` : ""
+      }${marketMode ? `, ${marketMode}` : ""}.`,
+      emoji: "●",
+      color: "var(--mtp-good, #4B9CD3)",
+      recommendedSizingPct: 1.0,
+      uiBehavior: "Standart R (%1) sizing, tüm sinyaller değerlendir.",
+      consecutiveWins,
+      consecutiveLosses,
+      totalClosedTrades,
+    };
+  }, [trades.data, market.data]);
+}

@@ -13,6 +13,7 @@ import { MindsetCardWidget } from "@/components/dashboard/MindsetCard";
 import { PortfolioSummaryCard } from "@/components/dashboard/PortfolioSummaryCard";
 import { AlertHistoryCard } from "@/components/dashboard/AlertHistoryCard";
 import { MarkRegimeBanner } from "@/components/mark/MarkRegimeBanner";
+import { ModBadge } from "@/components/mark/ModBadge";
 import { fmtUsd, fmtPctSigned } from "@/lib/format-currency";
 
 // KARAR #474 (20 May 2026 ~08:15): Ana sayfa POC → Gerçek Dashboard.
@@ -258,9 +259,11 @@ export default function Home() {
 
       {/* Paket 156-157 (26 May 2026): Portfolio canlı özet — paper trading sabah bakışı.
           Açık trade × yfinance quote → toplam değer + unrealized P&L + bugünkü değişim.
-          Paket 168 (26 May 2026): AlertHistoryCard — son 24h uyarı timeline yan yana. */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          Paket 168 (26 May 2026): AlertHistoryCard — son 24h uyarı timeline.
+          Paket 193 (26 May 2026): ModBadge — Trading Mode otomatik (Vizyon İLKE #10). */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <PortfolioSummaryCard />
+        <ModBadge variant="full" />
         <AlertHistoryCard />
       </div>
 
