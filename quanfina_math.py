@@ -4080,3 +4080,161 @@ def compute_climax_run(
         'avg_volume_ratio': avg_volume_ratio,
         'mark_says': says,
     }
+
+
+# ======================================================================
+# RELATIVE STRENGTH RATING — Mark TLSMW Ch 3-5 / IBD canon (Paket 91)
+# ======================================================================
+# Mark Minervini ve O'Neil IBD RS Rating: Hisseyi son 12 ay getirisinde
+# tüm evrene göre yüzdelik dilime (1-99) yerleştirir.
+#
+# Mark birebir:
+# - "I only buy stocks with RS Rating 80+" (IBD threshold)
+# - "Top 25% momentum stocks lead market" (CANSLIM 'C' kriteri)
+# - TLSMW Ch 4: "Strength leading strength" — leader hisse trend takibi
+#
+# Quanfina basitleştirilmiş hesap (canon yorumu):
+# - 12 aylık getiri AĞIRLIKLI: son çeyrek %40, önceki 3 çeyrek %20 her biri
+# - Benchmark (SPY) getirisi ile oran -> percentile-mimic 1-99
+# - 4 kategori:
+#   LEADER (>=80): IBD canon — alım adayı (Mark "Top 20%")
+#   STRONG (70-79): Üst orta — izleme
+#   AVERAGE (50-69): Vasat
+#   LAGGARD (<50): Zayıf — Mark "uzak dur"
+# ======================================================================
+
+RS_LOOKBACK_DAYS: int = 252                    # 12 ay yaklaşık
+RS_QUARTER_DAYS: int = 63                       # 3 ay yaklaşık
+RS_WEIGHT_RECENT_Q: float = 0.40                # Son çeyrek %40
+RS_WEIGHT_PRIOR_Q: float = 0.20                 # Diğer 3 çeyrek %20 her
+RS_THRESHOLD_LEADER: int = 80                   # IBD canon Mark
+RS_THRESHOLD_STRONG: int = 70
+RS_THRESHOLD_AVERAGE: int = 50
+
+
+def compute_relative_strength_rating(
+    stock_closes: list[float],
+    benchmark_closes: list[float],
+    lookback_days: int = RS_LOOKBACK_DAYS,
+) -> dict:
+    """Mark/IBD canon RS Rating hesabı.
+
+    Args:
+        stock_closes: Hisse günlük kapanışları (kronolojik, >= lookback_days)
+        benchmark_closes: SPY veya QQQ benchmark kapanışları (aynı uzunluk)
+        lookback_days: Geriye bakış (default 252 = ~12 ay)
+
+    Returns:
+        dict {
+            'rs_rating': int | None,        # 1-99 IBD-mimic skoru
+            'category': str,                 # LEADER/STRONG/AVERAGE/LAGGARD
+            'stock_return_pct': float | None,  # Ağırlıklı stok getirisi
+            'benchmark_return_pct': float | None,  # Benchmark getirisi
+            'outperform_pct': float | None,  # Stock - Benchmark (mutlak fark)
+            'mark_says': str,
+        }
+    """
+    if not stock_closes or not benchmark_closes:
+        return {
+            'rs_rating': None,
+            'category': None,
+            'stock_return_pct': None,
+            'benchmark_return_pct': None,
+            'outperform_pct': None,
+            'mark_says': 'Yetersiz veri — RS Rating hesaplanamıyor.',
+        }
+    if len(stock_closes) < lookback_days or len(benchmark_closes) < lookback_days:
+        return {
+            'rs_rating': None,
+            'category': None,
+            'stock_return_pct': None,
+            'benchmark_return_pct': None,
+            'outperform_pct': None,
+            'mark_says': f'Yetersiz veri — en az {lookback_days} gün gerek '
+                         f'(stok: {len(stock_closes)}, benchmark: {len(benchmark_closes)}).',
+        }
+
+    # Son lookback_days dilimi al
+    s = stock_closes[-lookback_days:]
+    b = benchmark_closes[-lookback_days:]
+
+    # Ağırlıklı çeyrek getirileri
+    def weighted_return(closes: list[float]) -> float:
+        # 4 çeyrek: Q1 (son), Q2, Q3, Q4 (en eski)
+        q1_start = -RS_QUARTER_DAYS
+        q2_start = -2 * RS_QUARTER_DAYS
+        q3_start = -3 * RS_QUARTER_DAYS
+        q4_start = -4 * RS_QUARTER_DAYS
+
+        # Çeyrek başlangıçları geçerli mi?
+        if abs(q4_start) > len(closes):
+            # Sadece toplam getiri (fallback)
+            if closes[0] <= 0:
+                return 0.0
+            return (closes[-1] - closes[0]) / closes[0] * 100
+
+        # Her çeyreğin başı ve sonu
+        q1_ret = (closes[-1] - closes[q1_start]) / closes[q1_start] if closes[q1_start] > 0 else 0.0
+        q2_ret = (closes[q1_start] - closes[q2_start]) / closes[q2_start] if closes[q2_start] > 0 else 0.0
+        q3_ret = (closes[q2_start] - closes[q3_start]) / closes[q3_start] if closes[q3_start] > 0 else 0.0
+        q4_ret = (closes[q3_start] - closes[q4_start]) / closes[q4_start] if closes[q4_start] > 0 else 0.0
+
+        return (
+            RS_WEIGHT_RECENT_Q * q1_ret
+            + RS_WEIGHT_PRIOR_Q * q2_ret
+            + RS_WEIGHT_PRIOR_Q * q3_ret
+            + RS_WEIGHT_PRIOR_Q * q4_ret
+        ) * 100
+
+    stock_ret = weighted_return(s)
+    bench_ret = weighted_return(b)
+    outperform = stock_ret - bench_ret
+
+    # IBD-mimic 1-99 skor — outperform aralık bazlı
+    # +50% outperform -> 99, +20% -> 80, 0% -> 50, -20% -> 30, -50% -> 1
+    if outperform >= 50:
+        rs = 99
+    elif outperform >= 20:
+        # 20-50 arası 80-99 lineer
+        rs = int(80 + (outperform - 20) / 30 * 19)
+    elif outperform >= 0:
+        # 0-20 arası 50-79 lineer
+        rs = int(50 + outperform / 20 * 29)
+    elif outperform >= -20:
+        # -20 to 0 arası 30-49 lineer
+        rs = int(30 + (outperform + 20) / 20 * 19)
+    elif outperform >= -50:
+        # -50 to -20 arası 1-29 lineer
+        rs = int(1 + (outperform + 50) / 30 * 28)
+    else:
+        rs = 1
+
+    rs = max(1, min(99, rs))  # Clamp [1, 99]
+
+    if rs >= RS_THRESHOLD_LEADER:
+        category = 'LEADER'
+        says = (f'✓ LEADER RS {rs} — IBD canon "Top 20%". Mark: '
+                f'"strength leading strength" — alım adayı. '
+                f'Outperform: %{outperform:+.1f} vs benchmark.')
+    elif rs >= RS_THRESHOLD_STRONG:
+        category = 'STRONG'
+        says = (f'STRONG RS {rs} — üst orta dilim. Mark: izleme listesi, '
+                f'breakout için bekle. Outperform: %{outperform:+.1f}.')
+    elif rs >= RS_THRESHOLD_AVERAGE:
+        category = 'AVERAGE'
+        says = (f'AVERAGE RS {rs} — vasat performans. Mark: leadership '
+                f'eksik, başka aday bul. Outperform: %{outperform:+.1f}.')
+    else:
+        category = 'LAGGARD'
+        says = (f'⚠️ LAGGARD RS {rs} — alt dilim. Mark TLSMW Ch 4: '
+                f'"uzak dur, leader olmadan kazanç zor". '
+                f'Underperform: %{outperform:+.1f}.')
+
+    return {
+        'rs_rating': rs,
+        'category': category,
+        'stock_return_pct': round(stock_ret, 2),
+        'benchmark_return_pct': round(bench_ret, 2),
+        'outperform_pct': round(outperform, 2),
+        'mark_says': says,
+    }
