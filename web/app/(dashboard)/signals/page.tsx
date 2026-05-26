@@ -403,7 +403,11 @@ export default function SignalsPage() {
       </div>
 
       {/* KARAR #733 alt-paket (Paket 36): Mark Regime üst-uyarı banner */}
-      <MarkRegimeBanner stage4Count={stage4Count} totalCount={totalSignals} />
+      <MarkRegimeBanner
+        stage4Count={stage4Count}
+        totalCount={totalSignals}
+        climaxTopCount={(data ?? []).filter((s) => s.mark_signals?.climax_category === "CLIMAX_TOP").length}
+      />
 
       {/* Stats */}
       {!isLoading && !isError && (

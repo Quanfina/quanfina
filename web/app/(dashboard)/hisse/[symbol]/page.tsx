@@ -15,6 +15,7 @@ import { RsRatingCard } from "@/components/stock/RsRatingCard";
 import { AtrVolatilityCard } from "@/components/stock/AtrVolatilityCard";
 import { MarkRegimeBanner } from "@/components/mark/MarkRegimeBanner";
 import { useCarrStage } from "@/hooks/use-carr-stage";
+import { useClimaxRun } from "@/hooks/use-climax-run";
 import { AddTradeDialog } from "@/components/journal/AddTradeDialog";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -48,6 +49,9 @@ export default function HissePage({
   // KARAR #733 alt-paket (Paket 39): hisse Stage 4 ise banner'da somut uyarı
   const { data: carrStage } = useCarrStage(sym);
   const isStage4 = carrStage?.stage === 4;
+  // KARAR #733 alt-paket (Paket 104): /hisse sayfasında climax_top tetiği MarkRegimeBanner'a
+  const { data: climaxData } = useClimaxRun(sym);
+  const isClimaxTop = climaxData?.category === "CLIMAX_TOP";
 
   // KARAR #733 alt-paket (Paket 46): Hisse detay sayfasından doğrudan trade aç.
   // Sn. Ferit Watchlist/Hisse Tarama'dan hisseye girdiğinde direkt buradan
@@ -109,7 +113,11 @@ export default function HissePage({
       {/* KARAR #733 alt-paket (Paket 39): Mark Regime banner + bu hissenin
           Stage 4 olup olmadığı sayım payı (isStage4 ? 1 : 0). hideOnHealthy
           default — HEALTHY iken sadece bu hisse Stage 4 olursa banner kalır. */}
-      <MarkRegimeBanner stage4Count={isStage4 ? 1 : 0} totalCount={1} />
+      <MarkRegimeBanner
+        stage4Count={isStage4 ? 1 : 0}
+        totalCount={1}
+        climaxTopCount={isClimaxTop ? 1 : 0}
+      />
 
       {/* Stock header + Trade Aç buton (KARAR #733 alt-paket Paket 46) */}
       <div className="px-6 py-4 border-b flex items-start justify-between gap-3 flex-wrap">

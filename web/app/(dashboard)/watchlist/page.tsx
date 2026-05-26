@@ -139,7 +139,11 @@ export default function WatchlistPage() {
       </div>
 
       {/* KARAR #733 alt-paket (Paket 36): Mark Regime üst-uyarı banner */}
-      <MarkRegimeBanner stage4Count={stage4Count} totalCount={data?.length ?? 0} />
+      <MarkRegimeBanner
+        stage4Count={stage4Count}
+        totalCount={data?.length ?? 0}
+        climaxTopCount={(data ?? []).filter((r) => r.mark_signals?.climax_category === "CLIMAX_TOP").length}
+      />
 
       <div className="px-6 py-3 border-b">
         <WatchlistFilters
