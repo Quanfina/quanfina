@@ -39,6 +39,12 @@ export interface PreTradeChecklistProps {
   planStop?: number | null;
   planTarget?: number | null;
   entryPrice?: number | null;
+  /**
+   * Paket 257 (27 May 2026): compact prop — sembol seviyesi mini-versiyon.
+   * compact=true ise plan alanları gösterilmez (sadece Stage + RS + Setup + Mod).
+   * Default false (tam 7 koşul).
+   */
+  compact?: boolean;
 }
 
 interface CheckRow {
@@ -57,6 +63,7 @@ export function PreTradeChecklist({
   planStop,
   planTarget,
   entryPrice,
+  compact = false,
 }: PreTradeChecklistProps) {
   const tradingMode = useTradingMode();
 
@@ -93,15 +100,19 @@ export function PreTradeChecklist({
         : { label: "VCP / Pivot Setup", status: "warn", detail: "Belirli bir setup tanımlı değil (TTLC Sec 4)" }
     );
 
-    // 4. Plan giriş tetikleyicisi
-    result.push(
-      planEntryTrigger && planEntryTrigger.trim().length > 0
-        ? { label: "Plan: Giriş tetikleyicisi", status: "ok", detail: planEntryTrigger.slice(0, 60) }
-        : { label: "Plan: Giriş tetikleyicisi", status: "fail", detail: "Mark TTLC Sec 1.6 — ZORUNLU" }
-    );
+    // 4. Plan giriş tetikleyicisi (compact modda gizli — sembol seviyesi sayfa)
+    if (!compact) {
+      result.push(
+        planEntryTrigger && planEntryTrigger.trim().length > 0
+          ? { label: "Plan: Giriş tetikleyicisi", status: "ok", detail: planEntryTrigger.slice(0, 60) }
+          : { label: "Plan: Giriş tetikleyicisi", status: "fail", detail: "Mark TTLC Sec 1.6 — ZORUNLU" }
+      );
+    }
 
-    // 5. Plan stop (Mark TTLC s.131 %7 mutlak)
-    if (planStop != null && entryPrice != null && entryPrice > 0) {
+    // 5. Plan stop (Mark TTLC s.131 %7 mutlak) — compact modda gizli
+    if (compact) {
+      // Compact: sadece Stage + RS + Setup + Mod (4 koşul)
+    } else if (planStop != null && entryPrice != null && entryPrice > 0) {
       const stopPct = ((entryPrice - planStop) / entryPrice) * 100;
       if (stopPct > 0 && stopPct <= 7) {
         result.push({ label: "Plan: Stop loss", status: "ok", detail: `${stopPct.toFixed(1)}% (Mark %7 limit içinde)` });
@@ -114,8 +125,10 @@ export function PreTradeChecklist({
       result.push({ label: "Plan: Stop loss", status: "fail", detail: "Stop $ tanımlı değil" });
     }
 
-    // 6. Plan hedef (R/R ≥ 2)
-    if (planTarget != null && planStop != null && entryPrice != null && entryPrice > 0) {
+    // 6. Plan hedef (R/R ≥ 2) — compact modda gizli
+    if (compact) {
+      // skip — sembol seviyesi sayfa hedef hesap yapmaz
+    } else if (planTarget != null && planStop != null && entryPrice != null && entryPrice > 0) {
       const risk = entryPrice - planStop;
       const reward = planTarget - entryPrice;
       const rr = risk > 0 ? reward / risk : 0;
@@ -142,7 +155,7 @@ export function PreTradeChecklist({
     }
 
     return result;
-  }, [stage, rsRating, vcpPass, pivotPass, planEntryTrigger, planStop, planTarget, entryPrice, tradingMode.mode]);
+  }, [stage, rsRating, vcpPass, pivotPass, planEntryTrigger, planStop, planTarget, entryPrice, tradingMode.mode, compact]);
 
   const okCount = rows.filter((r) => r.status === "ok").length;
   const failCount = rows.filter((r) => r.status === "fail").length;

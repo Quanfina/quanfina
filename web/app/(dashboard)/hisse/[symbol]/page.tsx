@@ -144,6 +144,7 @@ export default function HissePage({
           stage={carrStage?.stage}
           rsRating={rsData?.rs_rating ?? null}
           pivotPass={pivotData?.status === "CONFIRMED" || pivotData?.status === "WEAK"}
+          compact
         />
       </div>
 
