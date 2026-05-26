@@ -15,6 +15,8 @@ import { RsRatingCard } from "@/components/stock/RsRatingCard";
 import { AtrVolatilityCard } from "@/components/stock/AtrVolatilityCard";
 import { StageTransitionCard } from "@/components/stock/StageTransitionCard";
 import { MarkProfileBar } from "@/components/stock/MarkProfileBar";
+import { RelativeVolumeCard } from "@/components/stock/RelativeVolumeCard";
+import { BreakoutQualityCard } from "@/components/stock/BreakoutQualityCard";
 import { MarkRegimeBanner } from "@/components/mark/MarkRegimeBanner";
 import { useCarrStage } from "@/hooks/use-carr-stage";
 import { useClimaxRun } from "@/hooks/use-climax-run";
@@ -172,6 +174,10 @@ export default function HissePage({
             <AtrVolatilityCard symbol={sym} />
             {/* KARAR #733 alt-paket (Paket 122): Stage Transition — Mark TLSMW Ch 4 / Weinstein */}
             <StageTransitionCard symbol={sym} />
+            {/* KARAR #733 alt-paket (Paket 133): Relative Volume — Mark TLSMW Ch 6 */}
+            <RelativeVolumeCard symbol={sym} />
+            {/* KARAR #733 alt-paket (Paket 134): Breakout Quality — Mark TLSMW Ch 10 */}
+            <BreakoutQualityCard symbol={sym} />
           </div>
         </div>
 
