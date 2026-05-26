@@ -54,6 +54,9 @@ from quanfina_math import (  # noqa: E402
     compute_brandon_expectancy,
     compute_relative_strength_rating,
     compute_atr_volatility,
+    compute_distribution_day_severity,
+    compute_relative_volume,
+    compute_breakout_quality,
     MARK_PYRAMID_PILOT_PCT_RANGE,
     MARK_PYRAMID_STANDARD_PCT_RANGE,
     MARK_PYRAMID_FULL_PCT_RANGE,
@@ -1019,6 +1022,10 @@ class MarketStatus(BaseModel):
     # KARAR #733 alt-paket (Paket 65, 25 May 2026): Follow-Through Day backend
     # pre-compute (P64 compute_follow_through_day helper wire — Mark/O'Neil)
     follow_through: Optional[FollowThroughDayInfo] = None
+    # P110 (26 May 2026): DD Severity — O'Neil CLEAN/CAUTION/HEAVY/EXTREME
+    dd_severity: Optional[str] = None
+    dd_allocation_factor: Optional[float] = None
+    dd_severity_mark_says: Optional[str] = None
 
 
 MOCK_MARKET_STATUS = MarketStatus(
@@ -1188,6 +1195,8 @@ def get_market_status() -> MarketStatus:
         mark_says=ftd_result.get("mark_says", ""),
     )
 
+    dd_sev = compute_distribution_day_severity(dd_count)
+
     status = MOCK_MARKET_STATUS.model_copy(
         update={
             "distribution_days": dd_count,
@@ -1198,6 +1207,9 @@ def get_market_status() -> MarketStatus:
             "market_breadth": market_breadth,
             "breadth_divergence": breadth_divergence,
             "follow_through": follow_through,
+            "dd_severity": dd_sev["severity"],
+            "dd_allocation_factor": dd_sev["allocation_factor"],
+            "dd_severity_mark_says": dd_sev["mark_says"],
         }
     )
     return status
@@ -1954,6 +1966,105 @@ def get_atr_volatility(symbol: str) -> AtrVolatilityInfo:
         suggested_stop_tight=result.get("suggested_stop_tight"),
         suggested_stop_normal=result.get("suggested_stop_normal"),
         suggested_stop_loose=result.get("suggested_stop_loose"),
+        mark_says=result.get("mark_says", ""),
+    )
+
+
+# P111 (26 May 2026): Relative Volume endpoint
+# Mark TLSMW Ch 6 / O'Neil canon — pivot hacim teyit + VCP contraction.
+class RelativeVolumeInfo(BaseModel):
+    rel_vol: Optional[float] = None
+    today_volume: Optional[int] = None
+    avg_volume: Optional[int] = None
+    category: Optional[Literal["DRYING", "QUIET", "NORMAL", "HIGH", "SURGE"]] = None
+    mark_says: str
+
+
+@app.get("/api/stock/{symbol}/relative-volume", response_model=RelativeVolumeInfo)
+def get_relative_volume(symbol: str) -> RelativeVolumeInfo:
+    """Mark TLSMW Ch 6 / O'Neil canon Relative Volume (P106 helper wire).
+
+    OHLCV MOCK feed (ACIK KONU #75 production yfinance).
+    Sonuc: rel_vol + kategori (DRYING/QUIET/NORMAL/HIGH/SURGE).
+    """
+    sym = symbol.upper()
+    stock = _STOCK_BY_SYM.get(sym)
+    if stock:
+        price = stock.price
+    else:
+        try:
+            wl = [r for r in watchlist_get_all() if r["symbol"] == sym]
+        except OperationalError:
+            wl = []
+        if wl:
+            price = float(wl[0]["price"])
+        else:
+            scan_data = _fetch_scan_symbol_data(sym)
+            price = scan_data["price"] if scan_data else 100.0
+
+    bars = _generate_ohlcv(sym, price)
+    volumes = [b.volume for b in bars]
+
+    result = compute_relative_volume(volumes)
+    return RelativeVolumeInfo(
+        rel_vol=result.get("rel_vol"),
+        today_volume=result.get("today_volume"),
+        avg_volume=result.get("avg_volume"),
+        category=result.get("category"),
+        mark_says=result.get("mark_says", ""),
+    )
+
+
+# P112 (26 May 2026): Breakout Quality endpoint
+# Mark TLSMW Ch 10 — pivot kirilim kalite kompoziti (0-100 puan).
+class BreakoutQualityInfo(BaseModel):
+    score: int = 0
+    category: Optional[Literal["EXCELLENT", "GOOD", "MARGINAL", "POOR"]] = None
+    breakdown: dict = {}
+    mark_says: str
+
+
+@app.get("/api/stock/{symbol}/breakout-quality", response_model=BreakoutQualityInfo)
+def get_breakout_quality(symbol: str) -> BreakoutQualityInfo:
+    """Mark TLSMW Ch 10 pivot kirilim kalite kompoziti (P107 helper wire).
+
+    OHLCV MOCK feed — volume_confirmed + gap_up + breakout_pct deterministik.
+    ACIK KONU #75: production'da gercek pivot tarihi gerekir.
+    """
+    sym = symbol.upper()
+    stock = _STOCK_BY_SYM.get(sym)
+    if stock:
+        price = stock.price
+    else:
+        try:
+            wl = [r for r in watchlist_get_all() if r["symbol"] == sym]
+        except OperationalError:
+            wl = []
+        if wl:
+            price = float(wl[0]["price"])
+        else:
+            scan_data = _fetch_scan_symbol_data(sym)
+            price = scan_data["price"] if scan_data else 100.0
+
+    bars = _generate_ohlcv(sym, price)
+    volumes = [b.volume for b in bars]
+
+    # rel_vol hesapla — volume_confirmed icin (>=1.5x = teyit)
+    rv = compute_relative_volume(volumes)
+    volume_confirmed = (rv.get("rel_vol") or 0.0) >= 1.5
+
+    # Diger parametreler MOCK (ACIK KONU #75: gercek pivot tarihi)
+    result = compute_breakout_quality(
+        volume_confirmed=volume_confirmed,
+        gap_up=False,
+        breakout_pct=1.5,
+        prior_contraction=False,
+        overhead_clean=False,
+    )
+    return BreakoutQualityInfo(
+        score=result.get("score", 0),
+        category=result.get("category"),
+        breakdown=result.get("breakdown", {}),
         mark_says=result.get("mark_says", ""),
     )
 

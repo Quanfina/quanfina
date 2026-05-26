@@ -9,6 +9,11 @@ interface WatchlistFiltersProps {
   onStatusChange: (v: string) => void;
   search: string;
   onSearchChange: (v: string) => void;
+  // P114 (26 May 2026): LEADER only + Climax UYARI chip'leri
+  leaderOnly: boolean;
+  onLeaderOnlyChange: (v: boolean) => void;
+  climaxOnly: boolean;
+  onClimaxOnlyChange: (v: boolean) => void;
   totalRows: number;
   filteredRows: number;
 }
@@ -25,6 +30,8 @@ export function WatchlistFilters({
   strategy, onStrategyChange,
   status, onStatusChange,
   search, onSearchChange,
+  leaderOnly, onLeaderOnlyChange,
+  climaxOnly, onClimaxOnlyChange,
   totalRows, filteredRows,
 }: WatchlistFiltersProps) {
   return (
@@ -58,6 +65,32 @@ export function WatchlistFilters({
         placeholder="Hisse ara..."
         className={SELECT_CLS}
       />
+
+      {/* P114: LEADER only chip (rs_rating >= 80) */}
+      <button
+        onClick={() => onLeaderOnlyChange(!leaderOnly)}
+        className={`text-xs font-semibold px-3 py-1.5 rounded border transition-colors ${
+          leaderOnly
+            ? "bg-[var(--mtp-excellent)] border-[var(--mtp-excellent)] text-white"
+            : "border-input bg-background text-muted-foreground hover:border-[var(--mtp-excellent)] hover:text-[var(--mtp-excellent)]"
+        }`}
+        title="Sadece IBD LEADER hisseler (RS ≥ 80)"
+      >
+        L LEADER
+      </button>
+
+      {/* P114: Climax UYARI chip */}
+      <button
+        onClick={() => onClimaxOnlyChange(!climaxOnly)}
+        className={`text-xs font-semibold px-3 py-1.5 rounded border transition-colors ${
+          climaxOnly
+            ? "bg-orange-500 border-orange-500 text-white"
+            : "border-input bg-background text-muted-foreground hover:border-orange-500 hover:text-orange-500"
+        }`}
+        title="Sadece Climax Top uyarılı hisseler"
+      >
+        🔥 Climax
+      </button>
 
       <span className="text-xs font-mono text-muted-foreground ml-auto">
         {filteredRows}/{totalRows} satır

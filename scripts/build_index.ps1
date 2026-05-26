@@ -40,30 +40,21 @@ if (-not (Test-Path (Join-Path $repoRoot "CLAUDE.md"))) {
     exit 1
 }
 
-# notebook/ .gitignore'da -> worktree'de yok. Ana repoya fallback:
-$indexPath = Join-Path $repoRoot "notebook\_INDEX.md"
-if (-not (Test-Path $indexPath)) {
-    # Git common-dir uzerinden ana repoyu bul (worktree fallback)
-    $gitCommonDir = (git rev-parse --git-common-dir).Trim()
-    if ($gitCommonDir) {
-        # Ana repo .git path'inden parent al
-        if (-not [System.IO.Path]::IsPathRooted($gitCommonDir)) {
-            $gitCommonDir = Join-Path $repoRoot $gitCommonDir
-        }
-        $mainRepo = Split-Path -Parent $gitCommonDir
-        $mainIndex = Join-Path $mainRepo "notebook\_INDEX.md"
-        if (Test-Path $mainIndex) {
-            Write-Host "[bilgi] worktree icindeyim, ana repo notebook/ kullaniliyor: $mainRepo" -ForegroundColor DarkCyan
-            $repoRoot = $mainRepo
-            $indexPath = $mainIndex
-        }
+# worktree-aware: git common-dir uzerinden ana repoyu bul
+$gitCommonDir = (git rev-parse --git-common-dir).Trim()
+if ($gitCommonDir -and ($gitCommonDir -ne ".git")) {
+    if (-not [System.IO.Path]::IsPathRooted($gitCommonDir)) {
+        $gitCommonDir = Join-Path $repoRoot $gitCommonDir
+    }
+    $mainRepo = Split-Path -Parent $gitCommonDir
+    if (Test-Path (Join-Path $mainRepo "notebook")) {
+        Write-Host "[bilgi] worktree icindeyim, ana repo notebook/ kullaniliyor: $mainRepo" -ForegroundColor DarkCyan
+        $repoRoot = $mainRepo
     }
 }
 
-if (-not (Test-Path $indexPath)) {
-    Write-Host "[hata] notebook/_INDEX.md bulunamadi (hem worktree hem ana repo tarandi)." -ForegroundColor Red
-    exit 1
-}
+# P117 (26 May 2026): notebook/_INDEX.md 22 May konsolidasyon sonrasi arsivlendi.
+# build_index.ps1 artik envanterin kendisidir — _INDEX.md kontrol kaldirildi.
 
 Write-Host ""
 Write-Host "=== Quanfina Master Indeks Dogrulama ===" -ForegroundColor Cyan
@@ -91,7 +82,7 @@ $systemFiles = @(
     "notebook/_BASLAT.md",
     "notebook/_ROADMAP.md",
     "notebook/_LINKLER.md",
-    "notebook/_INDEX.md",
+    # notebook/_INDEX.md 22 May 2026 arsivlendi — build_index.ps1 envanterin kendisi
     "notebook/_KOD_ENVANTERI.md",
     "notebook/YAPILANLAR.md",
     "notebook/Notebook_A_Vizyon.md"

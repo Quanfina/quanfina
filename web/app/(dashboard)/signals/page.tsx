@@ -227,28 +227,58 @@ export default function SignalsPage() {
     },
     {
       field: "risk_reward",
-      headerName: "R/R",
-      width: 80,
-      type: "rightAligned",
+      // P113 (26 May 2026): R/R + RS rozet + Climax ikon birlesik hucre.
       // KARAR #473: R/R = (hedef - fiyat) / (fiyat - stop). Backend hesaplar.
-      // 1.0+ kabul edilebilir, 2.0+ iyi, 3.0+ mükemmel (mekanik karar referansı).
+      // DOM createElement pattern (P98/P99 paten) — JSX yasak AG Grid cellRenderer'da.
+      headerName: "R/R",
+      width: 150,
+      type: "rightAligned",
       cellRenderer: (p: ICellRendererParams<Signal>) => {
         const v = p.value as number | null;
-        if (v == null) return <span className="text-muted-foreground">—</span>;
-        const color =
+        const row = p.data;
+        if (v == null) {
+          const el = document.createElement("span");
+          el.textContent = "—";
+          el.style.color = "var(--muted-foreground)";
+          return el;
+        }
+        const container = document.createElement("span");
+        container.style.cssText = "display:flex;align-items:center;gap:4px;width:100%;justify-content:flex-end;";
+        // Climax Top ikon
+        if (row?.mark_signals?.climax_category === "CLIMAX_TOP") {
+          const icon = document.createElement("span");
+          icon.textContent = "🔥";
+          icon.style.cssText = "font-size:10px;line-height:1;";
+          icon.title = "Climax Top — Mark: pozisyon azalt/kapat";
+          container.appendChild(icon);
+        }
+        // RS kategori rozet
+        const rs = row?.rs_rating;
+        if (rs != null) {
+          const rsR = Math.round(rs);
+          let label: string, color: string, tip: string;
+          if (rsR >= 80) { label = "L"; color = "var(--mtp-excellent)"; tip = "IBD LEADER"; }
+          else if (rsR >= 70) { label = "S"; color = "var(--mtp-good, #4B9CD3)"; tip = "STRONG"; }
+          else if (rsR >= 50) { label = "A"; color = "#F59E0B"; tip = "AVERAGE"; }
+          else { label = "↓"; color = "var(--mtp-danger)"; tip = "LAGGARD"; }
+          const badge = document.createElement("span");
+          badge.textContent = label;
+          badge.style.cssText = `font-size:9px;font-weight:700;padding:0 4px;border-radius:3px;background:${color};color:#fff;`;
+          badge.title = `${tip} (RS ${rsR})`;
+          container.appendChild(badge);
+        }
+        // R/R deger
+        const rrColor =
           v >= 3 ? "var(--mtp-excellent)" :
           v >= 2 ? "var(--mtp-good)" :
           v >= 1 ? "var(--mtp-neutral)" :
                    "var(--mtp-danger)";
-        return (
-          <span
-            className="font-semibold tabular-nums"
-            style={{ color, fontFamily: "var(--font-jetbrains-mono, monospace)", fontSize: "12px" }}
-            title={`Risk/Reward = (hedef-fiyat) / (fiyat-stop) = ${v.toFixed(2)}`}
-          >
-            {v.toFixed(2)}
-          </span>
-        );
+        const rrSpan = document.createElement("span");
+        rrSpan.textContent = v.toFixed(2);
+        rrSpan.style.cssText = `font-weight:600;font-variant-numeric:tabular-nums;color:${rrColor};font-family:var(--font-jetbrains-mono,monospace);font-size:12px;`;
+        rrSpan.title = `Risk/Reward = (hedef-fiyat) / (fiyat-stop) = ${v.toFixed(2)}`;
+        container.appendChild(rrSpan);
+        return container;
       },
     },
     {

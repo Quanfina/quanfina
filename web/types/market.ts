@@ -74,4 +74,8 @@ export interface MarketStatus {
   breadth_divergence?: BreadthDivergenceInfo | null;
   // KARAR #733 alt-paket (Paket 65): Mark/O'Neil Follow-Through Day backend
   follow_through?: FollowThroughDayInfo | null;
+  // P110 (26 May 2026): DD Severity — O'Neil CLEAN/CAUTION/HEAVY/EXTREME
+  dd_severity?: string | null;
+  dd_allocation_factor?: number | null;
+  dd_severity_mark_says?: string | null;
 }

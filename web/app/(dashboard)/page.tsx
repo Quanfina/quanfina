@@ -118,6 +118,15 @@ export default function Home() {
   const marketHealthColor = HEALTH_COLORS[marketHealth] ?? "inherit";
   const marketScore = market.data?.market_health_score ?? null;
   const marketMode = market.data?.suggested_mode ?? "—";
+  // P115 (26 May 2026): DD Severity 5. metrik — O'Neil CLEAN/CAUTION/HEAVY/EXTREME
+  const ddSeverity = market.data?.dd_severity;
+  const ddCount = market.data?.distribution_days ?? null;
+  const DD_SEV_COLOR: Record<string, string> = {
+    CLEAN: "var(--mtp-excellent)",
+    CAUTION: "var(--mtp-neutral)",
+    HEAVY: "#F97316",
+    EXTREME: "var(--mtp-danger)",
+  };
 
   // KARAR #480: Aksiyon Modu dinamik checklist (UX Bölüm 8)
   // Veri-bağlamlı 5 madde — Sn. Ferit sabah ne yapacağını görür
@@ -192,8 +201,8 @@ export default function Home() {
         </p>
       </div>
 
-      {/* Quick Stats — 4 metrik */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      {/* Quick Stats — 5 metrik (P115: DD Severity eklendi) */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <StatCard
           label="Sinyaller"
           value={`${signalCount}`}
@@ -234,6 +243,14 @@ export default function Home() {
               ? "var(--mtp-excellent)"
               : "var(--mtp-danger)"
           }
+        />
+        {/* P115: DD Severity kart — O'Neil CLEAN/CAUTION/HEAVY/EXTREME */}
+        <StatCard
+          label="Dağıtım Günü"
+          value={ddSeverity ?? "—"}
+          subValue={ddCount != null ? `${ddCount} DD` : "veri bekleniyor"}
+          href="/piyasa-durumu"
+          color={ddSeverity ? (DD_SEV_COLOR[ddSeverity] ?? "inherit") : undefined}
         />
       </div>
 
