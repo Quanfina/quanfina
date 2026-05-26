@@ -166,12 +166,40 @@ export default function SignalsPage() {
       width: 160,
       valueFormatter: (p) => (p.value as string | null) ?? "—",
     },
+    // KARAR #733 alt-paket (Paket 99, 26 May 2026): RS Rating kategori rozet
+    // (Watchlist P98 paten birebir — Mark TLSMW Ch 3-5 / IBD canon visual).
     {
       field: "rs_rating",
       headerName: "RS",
-      width: 80,
-      type: "rightAligned",
-      valueFormatter: (p) => Math.round(p.value as number).toString(),
+      width: 100,
+      minWidth: 85,
+      cellRenderer: (p: { value?: number | null }) => {
+        const rs = p.value;
+        if (rs == null) {
+          const el = document.createElement("span");
+          el.textContent = "—";
+          el.style.color = "var(--muted-foreground)";
+          return el;
+        }
+        const rsRounded = Math.round(rs);
+        const container = document.createElement("span");
+        container.style.cssText = "display:flex;align-items:center;gap:4px;width:100%;justify-content:flex-end;";
+        const num = document.createElement("span");
+        num.textContent = String(rsRounded);
+        num.style.cssText = "font-weight:600;font-variant-numeric:tabular-nums;";
+        container.appendChild(num);
+        let meta: { label: string; color: string; tip: string };
+        if (rsRounded >= 80) meta = { label: "L", color: "var(--mtp-excellent)", tip: "IBD LEADER (Top 20%)" };
+        else if (rsRounded >= 70) meta = { label: "S", color: "var(--mtp-good, #4B9CD3)", tip: "STRONG" };
+        else if (rsRounded >= 50) meta = { label: "A", color: "#F59E0B", tip: "AVERAGE" };
+        else meta = { label: "↓", color: "var(--mtp-danger)", tip: "LAGGARD — Mark: uzak dur" };
+        const badge = document.createElement("span");
+        badge.textContent = meta.label;
+        badge.style.cssText = `font-size:9px;font-weight:700;padding:0 4px;border-radius:3px;background:${meta.color};color:#fff;`;
+        badge.title = `${meta.tip} (RS ${rsRounded})`;
+        container.appendChild(badge);
+        return container;
+      },
     },
     {
       field: "price",
