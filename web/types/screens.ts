@@ -70,6 +70,9 @@ export interface ScreenResultRow {
   code_33_pattern?: "CODE_33" | "partial" | "none" | null;
   // KARAR ADAY #735 — Carr Stage rozet (Mark+Carr birleşik)
   carr_stage?: 1 | 2 | 3 | 4 | null;
+  // KARAR #733 alt-paket (Paket 83, 26 May 2026): Pivot Breakout status
+  // P81 Sinyaller + P82 Watchlist paten — Tarama'da AL/Zayıf/Yakın/Altı kolon
+  pivot_status?: "CONFIRMED" | "WEAK" | "NEAR_PIVOT" | "BELOW_PIVOT" | null;
 }
 
 /**

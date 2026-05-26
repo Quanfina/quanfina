@@ -298,6 +298,9 @@ class ScreenResultRow(BaseModel):
     # KARAR #467 (20 May 2026) — Power Play (HTF) Mark canon
     # power_play_ready slug + tight_low_volume slug'larda anlamli
     power_play_pass: Optional[bool] = None
+    # KARAR #733 alt-paket (Paket 83, 26 May 2026): Pivot Breakout status
+    # P81+P82 paten — Tarama'da AL/Zayıf/Yakın/Altı kolon
+    pivot_status: Optional[Literal["CONFIRMED", "WEAK", "NEAR_PIVOT", "BELOW_PIVOT"]] = None
 
 
 @app.get("/api/screens", response_model=list[ScreenMeta])
@@ -380,14 +383,27 @@ def get_screen_results(slug: str, limit: int = 500) -> list[ScreenResultRow]:
                          if r.vcp_ready_score is not None and r.vcp_ready_score >= 70]
         elif slug == "power_play_ready":
             mock_rows = [r for r in mock_rows if r.power_play_pass is True]
-        return mock_rows[:limit]
+        # KARAR #733 alt-paket (Paket 83): pivot_status enrichment
+        return [
+            r.model_copy(update={
+                "pivot_status": _compute_signal_pivot_status(r.symbol, r.price or 100.0),
+            })
+            for r in mock_rows[:limit]
+        ]
 
     # Gerçek DB sorgusu — ready VEYA parse VEYA diff (dispatch)
     rows = screen_get_results_dispatch(slug, limit=limit)
-    return [ScreenResultRow(**{k: r.get(k) for k in
+    db_results = [ScreenResultRow(**{k: r.get(k) for k in
                                 ("symbol","grade","rs_ibd","price","passed","scan_date",
                                  "vcp_quality_score","vcp_ready_score","power_play_pass")})
             for r in rows]
+    # KARAR #733 alt-paket (Paket 83): pivot_status enrichment (DB yol)
+    return [
+        row.model_copy(update={
+            "pivot_status": _compute_signal_pivot_status(row.symbol, row.price or 100.0),
+        })
+        for row in db_results
+    ]
 
 
 @app.get("/api/health", response_model=HealthResponse)
