@@ -40,9 +40,15 @@ export interface PreTradeChecklistProps {
   planTarget?: number | null;
   entryPrice?: number | null;
   /**
+   * Paket 265 (27 May 2026): planSizePct — Pozisyon büyüklük yüzdesi (Mark
+   * TTLC s.85 sektör konsantrasyon paralel — tek pozisyon ≤25% disiplini).
+   * 0-100 arası. compact modda gizli.
+   */
+  planSizePct?: number | null;
+  /**
    * Paket 257 (27 May 2026): compact prop — sembol seviyesi mini-versiyon.
    * compact=true ise plan alanları gösterilmez (sadece Stage + RS + Setup + Mod).
-   * Default false (tam 7 koşul).
+   * Default false (tam 8 koşul — P265 ile genişledi).
    */
   compact?: boolean;
 }
@@ -63,6 +69,7 @@ export function PreTradeChecklist({
   planStop,
   planTarget,
   entryPrice,
+  planSizePct,
   compact = false,
 }: PreTradeChecklistProps) {
   const tradingMode = useTradingMode();
@@ -143,6 +150,21 @@ export function PreTradeChecklist({
       result.push({ label: "Plan: Hedef R/R ≥ 2", status: "fail", detail: "Hedef $ tanımlı değil" });
     }
 
+    // 7'. Pozisyon büyüklük disiplini (Mark TTLC s.85) — compact modda gizli
+    if (!compact) {
+      if (planSizePct != null && planSizePct > 0) {
+        if (planSizePct <= 25) {
+          result.push({ label: "Plan: Pozisyon ≤ 25%", status: "ok", detail: `${planSizePct.toFixed(0)}% (Mark TTLC s.85 sektör limiti içinde)` });
+        } else if (planSizePct <= 30) {
+          result.push({ label: "Plan: Pozisyon ≤ 25%", status: "warn", detail: `${planSizePct.toFixed(0)}% — Mark canon 25-30% sınır bölgesi` });
+        } else {
+          result.push({ label: "Plan: Pozisyon ≤ 25%", status: "fail", detail: `${planSizePct.toFixed(0)}% — Mark TTLC s.85 LİMİT AŞILDI` });
+        }
+      } else {
+        result.push({ label: "Plan: Pozisyon ≤ 25%", status: "warn", detail: "Pozisyon % tanımlı değil" });
+      }
+    }
+
     // 7. Mod farkındalığı
     if (tradingMode.mode === "defansif") {
       result.push({ label: "Mod farkındalığı", status: "fail", detail: "DEFANSİF mod — Mark TTLC s.187 yeni AL BLOK" });
@@ -155,7 +177,7 @@ export function PreTradeChecklist({
     }
 
     return result;
-  }, [stage, rsRating, vcpPass, pivotPass, planEntryTrigger, planStop, planTarget, entryPrice, tradingMode.mode, compact]);
+  }, [stage, rsRating, vcpPass, pivotPass, planEntryTrigger, planStop, planTarget, entryPrice, planSizePct, tradingMode.mode, compact]);
 
   const okCount = rows.filter((r) => r.status === "ok").length;
   const failCount = rows.filter((r) => r.status === "fail").length;

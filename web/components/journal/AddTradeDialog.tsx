@@ -346,6 +346,7 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
             planStop={parseFloat(planStop) || null}
             planTarget={parseFloat(planTarget) || null}
             entryPrice={parseFloat(entryPrice) || null}
+            planSizePct={parseFloat(planSizePct) || null}
           />
         )}
 
