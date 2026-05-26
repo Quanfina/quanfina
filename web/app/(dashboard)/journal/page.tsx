@@ -12,6 +12,7 @@ import { AddTradeDialog } from "@/components/journal/AddTradeDialog";
 import { CloseTradeDialog } from "@/components/journal/CloseTradeDialog";
 import { RbaSummaryCard } from "@/components/journal/RbaSummaryCard";
 import { MarkRegimeBanner } from "@/components/mark/MarkRegimeBanner";
+import { BrandonExpectancyCard } from "@/components/journal/BrandonExpectancyCard";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -131,6 +132,13 @@ export default function JournalPage() {
           strategy={strategyFilter !== "all" ? strategyFilter : undefined}
           variant="full"
         />
+      </div>
+
+      {/* KARAR #733 alt-paket (Paket 90): Brandon Expectancy /journal canon
+          Mark Brandon Video — kapali trade'ler agregasyon expectancy hesabi.
+          RBA Summary Card felsefe simetrisi: RBA setup-bazli, Brandon trade-bazli. */}
+      <div className="px-6 py-3 border-b">
+        <BrandonExpectancyCard />
       </div>
 
       {/* Filters */}
