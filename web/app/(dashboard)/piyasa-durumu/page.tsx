@@ -7,6 +7,7 @@ import { ModeSuggestionCard } from "@/components/market/ModeSuggestionCard";
 import { SectorSummaryCard } from "@/components/market/SectorSummaryCard";
 import { MarketStatusBadge } from "@/components/market/MarketStatusBadge";
 import { MarkRegimeCard } from "@/components/market/MarkRegimeCard";
+import { ModBadge } from "@/components/mark/ModBadge";
 
 export default function PiyasaDurumuPage() {
   const { data, isLoading, isError, error } = useMarketStatus();
@@ -33,11 +34,17 @@ export default function PiyasaDurumuPage() {
   return (
     <div className="p-6 flex flex-col gap-6">
       <div className="flex flex-col gap-3">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Piyasa Durumu</h1>
-          <p className="text-sm text-muted-foreground">
-            SPY / QQQ / IWM stage analizi + Market Health Score
-          </p>
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="flex flex-col gap-1">
+            <h1 className="text-2xl font-semibold tracking-tight">Piyasa Durumu</h1>
+            <p className="text-sm text-muted-foreground">
+              SPY / QQQ / IWM stage analizi + Market Health Score
+            </p>
+          </div>
+          {/* Paket 225 (27 May 2026): Vizyon İLKE #10 — Piyasa'da mevcut mod farkındalığı
+              Backend "suggested_mode" (piyasa rejimine göre öneri) vs ModBadge (Sn. Ferit
+              kişisel streak-bazlı güncel mod) karşılaştırması. */}
+          <ModBadge variant="compact" />
         </div>
         {/* ABD borsa açık/kapalı + TR/ET saat + sonraki açılış (Sprint 4-bis.7) */}
         <MarketStatusBadge />

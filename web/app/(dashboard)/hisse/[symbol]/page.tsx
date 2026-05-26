@@ -18,6 +18,7 @@ import { MarkProfileBar } from "@/components/stock/MarkProfileBar";
 import { RelativeVolumeCard } from "@/components/stock/RelativeVolumeCard";
 import { BreakoutQualityCard } from "@/components/stock/BreakoutQualityCard";
 import { MarkRegimeBanner } from "@/components/mark/MarkRegimeBanner";
+import { ModBadge } from "@/components/mark/ModBadge";
 import { useCarrStage } from "@/hooks/use-carr-stage";
 import { useClimaxRun } from "@/hooks/use-climax-run";
 import { AddTradeDialog } from "@/components/journal/AddTradeDialog";
@@ -128,20 +129,24 @@ export default function HissePage({
         <div className="flex-1 min-w-0">
           <StockHeader info={info} />
         </div>
-        <Button
-          size="sm"
-          onClick={handleTradeClick}
-          className="shrink-0"
-          style={{ background: isStage4 ? "var(--mtp-danger)" : "#28A745", color: "#fff" }}
-          title={
-            isStage4
-              ? "Carr Stage 4 — Mark UZAK DUR uyarisi (yine de devam edebilirsin)"
-              : "Bu hisseye trade aç (form pre-fill ile)"
-          }
-        >
-          <Plus size={14} className="mr-1.5" />
-          Trade Aç
-        </Button>
+        <div className="flex items-center gap-3 shrink-0">
+          {/* Paket 224 (27 May 2026): Vizyon İLKE #10 — Hisse detayında mod farkındalığı
+              Sn. Ferit "Trade Aç" tıklamadan ÖNCE mod rozeti görür (Rehab/Defansif uyarı). */}
+          <ModBadge variant="compact" />
+          <Button
+            size="sm"
+            onClick={handleTradeClick}
+            style={{ background: isStage4 ? "var(--mtp-danger)" : "#28A745", color: "#fff" }}
+            title={
+              isStage4
+                ? "Carr Stage 4 — Mark UZAK DUR uyarisi (yine de devam edebilirsin)"
+                : "Bu hisseye trade aç (form pre-fill ile)"
+            }
+          >
+            <Plus size={14} className="mr-1.5" />
+            Trade Aç
+          </Button>
+        </div>
       </div>
 
       {/* KARAR #733 alt-paket (Paket 125): Mark Profili kompakt rozet bar
