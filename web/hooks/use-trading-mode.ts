@@ -139,6 +139,16 @@ export function useTradingMode(): TradingModeInfo {
  * Paket 234 (27 May 2026): DRY helper — Defansif modda yeni AL bloklayan
  * tutarlı kullanıcı-yüzü mesajı. P227 AddTradeDialog + P235 Sinyaller AL
  * butonu paralel kullanımı için tek kaynak.
+ *
+ * @example
+ * // AddTradeDialog handleSubmit error mesajı (P264)
+ * const baseMsg = getDefansifBlockMessage(tradingMode.mode);
+ * if (baseMsg) setError(`${baseMsg} 'Riski biliyorum' kutusunu işaretleyin.`);
+ *
+ * @example
+ * // null check (Normal/Rehab/Agresif)
+ * getDefansifBlockMessage("normal")    // → null
+ * getDefansifBlockMessage("defansif")  // → "DEFANSİF mod aktif..."
  */
 export function getDefansifBlockMessage(mode: TradingMode): string | null {
   if (mode === "defansif") {
@@ -151,6 +161,18 @@ export function getDefansifBlockMessage(mode: TradingMode): string | null {
  * Paket 234 (27 May 2026): isNewAlBlocked = mod yeni AL'ı blokluyor mu?
  * Sn. Ferit override seçeneği UI tarafında ayrı state. Helper sadece
  * "default davranış" cevabı.
+ *
+ * @example
+ * // Sinyaller AL butonu disabled (P235)
+ * const alBlocked = isNewAlBlocked(tradingMode.mode);
+ * <button disabled={alBlocked} title={alBlocked ? "Defansif mod aktif" : ""}>
+ *
+ * @example
+ * // AddTradeDialog submit guard (P227)
+ * if (!isClosed && isNewAlBlocked(tradingMode.mode) && !defansifOverride) {
+ *   setError(getDefansifBlockMessage(tradingMode.mode));
+ *   return;
+ * }
  */
 export function isNewAlBlocked(mode: TradingMode): boolean {
   return mode === "defansif";
@@ -165,6 +187,22 @@ export function isNewAlBlocked(mode: TradingMode): boolean {
  * - background/borderColor/color: inline style için CSS değerleri
  * - emoji: aria-hidden ikon
  * - message: kısa kullanıcı mesajı (default — sayfaya özel override mümkün)
+ *
+ * @example
+ * // Dashboard Defansif banner (P260)
+ * const theme = getModUiTheme(tradingMode.mode);
+ * if (!theme) return null;  // Normal: banner gizli
+ * <div style={{ background: theme.background, color: theme.color }}>
+ *   <span>{theme.emoji}</span>
+ *   <b>{theme.shortMessage}</b> ek metin...
+ * </div>
+ *
+ * @example
+ * // 4 mod tema dönüş değerleri
+ * getModUiTheme("normal")    // → null (banner gizlenir)
+ * getModUiTheme("defansif")  // → { emoji: "🛡️", color: "--mtp-danger", ... }
+ * getModUiTheme("rehab")     // → { emoji: "🩹", color: "#F59E0B", ... }
+ * getModUiTheme("agresif")   // → { emoji: "🚀", color: "--mtp-excellent", ... }
  */
 export interface ModUiTheme {
   background: string;
