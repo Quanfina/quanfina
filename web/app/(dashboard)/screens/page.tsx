@@ -29,7 +29,7 @@ import { useScreenResults } from "@/hooks/use-screen-results";
 import type { ScreenSlug, ScreenResultRow } from "@/types/screens";
 import { MarkBadgeStrip } from "@/components/mark/MarkBadgeStrip";
 import { ModBadge } from "@/components/mark/ModBadge";
-import { useTradingMode } from "@/hooks/use-trading-mode";
+import { useTradingMode, getModUiTheme } from "@/hooks/use-trading-mode";
 import { SCREEN_CATEGORIES, SCREEN_CONDITIONS, CONDITION_SOURCE_LABEL } from "@/types/screens";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { GridLoadingOverlay } from "@/components/ag-grid/LoadingOverlay";
@@ -199,26 +199,28 @@ export default function ScreensPage() {
         <ModBadge variant="compact" />
       </div>
 
-      {/* Paket 253 (27 May 2026): Defansif modda Tarama'da uyarı banner
-          (Mark TTLC s.187 + AT TTLC s.187). Sn. Ferit Defansif modda
-          yeni AL aramamalı — bu sayfa AL ekran sonuçları gösteriyor. */}
-      {tradingMode.mode === "defansif" && (
-        <div
-          className="px-6 py-2 border-b text-xs flex items-center gap-2"
-          style={{
-            background: "rgba(220, 53, 69, 0.08)",
-            borderColor: "rgba(220, 53, 69, 0.30)",
-            color: "var(--mtp-danger)",
-          }}
-        >
-          <span aria-hidden="true">🛡️</span>
-          <span>
-            <b>DEFANSİF mod aktif</b> (piyasa Stage 3-4 + MH&lt;30) — Mark TTLC s.187:
-            yeni AL pozisyonları BLOK. Tarama sonuçları görsel inceleme amaçlı.
-            AddTradeDialog override gerektirir.
-          </span>
-        </div>
-      )}
+      {/* Paket 253 (P261 refactor — getModUiTheme DRY helper P259):
+          Defansif modda Tarama'da uyarı banner (Mark TTLC s.187). */}
+      {(() => {
+        const theme = getModUiTheme(tradingMode.mode);
+        if (!theme || tradingMode.mode !== "defansif") return null;
+        return (
+          <div
+            className="px-6 py-2 border-b text-xs flex items-center gap-2"
+            style={{
+              background: theme.background,
+              borderColor: theme.borderColor,
+              color: theme.color,
+            }}
+          >
+            <span aria-hidden="true">{theme.emoji}</span>
+            <span>
+              <b>{theme.shortMessage}</b> Tarama sonuçları görsel inceleme amaçlı.
+              AddTradeDialog override gerektirir.
+            </span>
+          </div>
+        );
+      })()}
 
       {/* Filter bar — başlık altında ayrı satır (Watchlist + Journal pateni) */}
       {SCREEN_SLUGS.length > 0 && (
