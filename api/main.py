@@ -51,6 +51,7 @@ from quanfina_math import (  # noqa: E402
     compute_pivot_breakout,
     compute_overhead_supply,
     compute_climax_run,
+    compute_brandon_expectancy,
     MARK_PYRAMID_PILOT_PCT_RANGE,
     MARK_PYRAMID_STANDARD_PCT_RANGE,
     MARK_PYRAMID_FULL_PCT_RANGE,
@@ -2050,6 +2051,81 @@ def get_trades() -> list[Trade]:
             status_code=503,
             detail="Veritabanına ulaşılamıyor (Cloud SQL). GCP Console → SQL → instance durum/Authorized Networks kontrol et."
         ) from e
+
+
+# KARAR #733 alt-paket (Paket 89, 26 May 2026): Brandon expectancy endpoint
+# Mark Brandon Video canon: %20 avg gain / %4 avg loss / %50 win rate hedef
+# E = (P_win × avg_gain) - (P_loss × avg_loss) trader expectancy.
+class BrandonExpectancyInfo(BaseModel):
+    expectancy_pct: float
+    category: Optional[Literal["EXCELLENT", "GOOD", "ACCEPTABLE", "POOR"]] = None
+    meets_brandon_targets: bool
+    mark_says: str
+    # Bağlam metrikleri (UI bilgi amaçlı)
+    total_closed: int
+    winners: int
+    losers: int
+    avg_gain_pct: float
+    avg_loss_pct: float
+    win_rate: float
+
+
+@app.get("/api/trades/expectancy", response_model=BrandonExpectancyInfo)
+def get_trades_expectancy() -> BrandonExpectancyInfo:
+    """Mark Brandon Video expectancy hesabı (P86 helper + P89 wire).
+
+    Tüm kapalı trade'lerin pl_pct'i üzerinden:
+    - Avg gain (winners) — pozitif pl_pct ortalaması
+    - Avg loss (losers) — negatif pl_pct |mutlak| ortalaması
+    - Win rate — winners / total closed
+    -> compute_brandon_expectancy(avg_gain, avg_loss, win_rate)
+
+    Hiç kapalı trade yoksa POOR + 0 expectancy (RBA disiplin sıfırı).
+    """
+    # Trade listesini al (DB veya MOCK fallback)
+    trades = get_trades()  # endpoint fonksiyonu reuse
+    closed = [t for t in trades if t.status == "closed" and t.pl_pct is not None]
+
+    if not closed:
+        return BrandonExpectancyInfo(
+            expectancy_pct=0.0,
+            category=None,
+            meets_brandon_targets=False,
+            mark_says="Henüz kapalı trade yok. RBA için en az 1 closed trade gerek.",
+            total_closed=0,
+            winners=0,
+            losers=0,
+            avg_gain_pct=0.0,
+            avg_loss_pct=0.0,
+            win_rate=0.0,
+        )
+
+    winners = [t for t in closed if (t.pl_pct or 0) > 0]
+    losers = [t for t in closed if (t.pl_pct or 0) <= 0]
+    avg_gain = (
+        sum(t.pl_pct for t in winners if t.pl_pct is not None) / len(winners)
+        if winners else 0.0
+    )
+    avg_loss = (
+        abs(sum(t.pl_pct for t in losers if t.pl_pct is not None) / len(losers))
+        if losers else 0.0
+    )
+    win_rate = len(winners) / len(closed)
+
+    result = compute_brandon_expectancy(avg_gain, avg_loss, win_rate)
+
+    return BrandonExpectancyInfo(
+        expectancy_pct=result.get("expectancy_pct", 0.0),
+        category=result.get("category"),
+        meets_brandon_targets=bool(result.get("meets_brandon_targets", False)),
+        mark_says=result.get("mark_says", ""),
+        total_closed=len(closed),
+        winners=len(winners),
+        losers=len(losers),
+        avg_gain_pct=round(avg_gain, 2),
+        avg_loss_pct=round(avg_loss, 2),
+        win_rate=round(win_rate, 3),
+    )
 
 
 @app.post("/api/trades", response_model=Trade, status_code=201)
