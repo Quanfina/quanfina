@@ -134,3 +134,24 @@ export function useTradingMode(): TradingModeInfo {
     };
   }, [trades.data, market.data]);
 }
+
+/**
+ * Paket 234 (27 May 2026): DRY helper — Defansif modda yeni AL bloklayan
+ * tutarlı kullanıcı-yüzü mesajı. P227 AddTradeDialog + P235 Sinyaller AL
+ * butonu paralel kullanımı için tek kaynak.
+ */
+export function getDefansifBlockMessage(mode: TradingMode): string | null {
+  if (mode === "defansif") {
+    return "DEFANSİF mod aktif (piyasa Stage 3-4 + MH<30) — Mark TTLC s.187: yeni AL BLOK";
+  }
+  return null;
+}
+
+/**
+ * Paket 234 (27 May 2026): isNewAlBlocked = mod yeni AL'ı blokluyor mu?
+ * Sn. Ferit override seçeneği UI tarafında ayrı state. Helper sadece
+ * "default davranış" cevabı.
+ */
+export function isNewAlBlocked(mode: TradingMode): boolean {
+  return mode === "defansif";
+}

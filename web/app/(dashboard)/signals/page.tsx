@@ -22,6 +22,7 @@ import type { Signal } from "@/types/signal";
 import { MarkBadgeStrip } from "@/components/mark/MarkBadgeStrip";
 import { MarkRegimeBanner } from "@/components/mark/MarkRegimeBanner";
 import { ModBadge } from "@/components/mark/ModBadge";
+import { useTradingMode, isNewAlBlocked } from "@/hooks/use-trading-mode";
 import { fmtUsd } from "@/lib/format-currency";
 import { RsRatingBadge } from "@/components/shared/RsRatingBadge";
 import { SignalRREnrichedCell } from "@/components/signals/SignalRREnrichedCell";
@@ -64,6 +65,9 @@ export default function SignalsPage() {
   const { gridClass } = useGridTheme();
   const { data, isLoading, isError, error, refetch, isFetching } = useSignals();
   const gridRef = useRef<AgGridReact<Signal>>(null);
+  // Paket 235 (27 May 2026): Defansif modda AL butonu disabled (Mark TTLC s.187)
+  const tradingMode = useTradingMode();
+  const alBlocked = isNewAlBlocked(tradingMode.mode);
 
   const [statusFilter, setStatusFilter] = useState<"all" | "buy" | "focus_buy">("all");
   const [strategyFilter, setStrategyFilter] = useState<"all" | "minervini" | "carr">("all");
@@ -328,12 +332,18 @@ export default function SignalsPage() {
         if (!signal) return null;
         return (
           <div className="flex items-center justify-center gap-1 h-full">
+            {/* Paket 235: Defansif modda AL disabled (Mark TTLC s.187) */}
             <button
               type="button"
-              onClick={() => tradeClickRef.current(signal)}
-              className="inline-flex items-center gap-1 h-6 rounded-md px-2 text-[11px] font-semibold transition-colors"
-              style={{ background: "#28A745", color: "#fff" }}
-              title="Trade aç (form pre-fill ile)"
+              onClick={() => !alBlocked && tradeClickRef.current(signal)}
+              disabled={alBlocked}
+              className="inline-flex items-center gap-1 h-6 rounded-md px-2 text-[11px] font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ background: alBlocked ? "#9CA3AF" : "#28A745", color: "#fff" }}
+              title={
+                alBlocked
+                  ? "Defansif mod aktif — Mark TTLC s.187: yeni AL BLOK (AddTradeDialog override mevcut)"
+                  : "Trade aç (form pre-fill ile)"
+              }
             >
               <Plus size={11} />
               AL
@@ -351,7 +361,7 @@ export default function SignalsPage() {
         );
       },
     },
-  ], []);
+  ], [alBlocked]); // Paket 235: alBlocked değişince cellRenderer yenilensin
 
   const defaultColDef = useMemo<ColDef<Signal>>(() => ({
     sortable: true,

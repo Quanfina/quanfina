@@ -30,6 +30,7 @@ import { useTradingMode } from "@/hooks/use-trading-mode";
 import { ModBadge } from "@/components/mark/ModBadge";
 import { fmtPLDollar, fmtPLPct } from "@/lib/math";
 import { Button } from "@/components/ui/button";
+import { Stat } from "@/components/ui/stat";
 
 export default function PazarHazirligiPage() {
   const tradesQuery = useTrades();
@@ -228,6 +229,17 @@ export default function PazarHazirligiPage() {
                 Mod streak ve piyasa rejimine göre otomatik hesaplandı. Mark canon
                 disiplini hafta başında bilinçli giriş.
               </p>
+              {/* Paket 232 (27 May 2026): Risk Yönetimi referansı —
+                  mod-aware Pyramid Calculator + Tier kilit Sn. Ferit'in
+                  haftalık planının somut sayısal sonucu. */}
+              <div className="mt-3">
+                <Link
+                  href="/risk-yonetimi"
+                  className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+                >
+                  Risk Yönetimi: Pyramid + Tier sizing <ArrowRight size={12} />
+                </Link>
+              </div>
             </section>
 
             {/* Bölüm 5 — Yeni Hafta Plan */}
@@ -271,29 +283,4 @@ export default function PazarHazirligiPage() {
   );
 }
 
-function Stat({
-  label,
-  value,
-  color,
-}: {
-  label: string;
-  value: string;
-  color?: string;
-}) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-        {label}
-      </span>
-      <span
-        className="text-base font-semibold"
-        style={{
-          color,
-          fontFamily: "var(--font-jetbrains-mono, monospace)",
-        }}
-      >
-        {value}
-      </span>
-    </div>
-  );
-}
+// Paket 237: local Stat çıkarıldı, web/components/ui/stat.tsx DRY tek kaynak
