@@ -1,7 +1,7 @@
 "use client";
 
 import { TrendingUp, AlertCircle, XCircle, Clock } from "lucide-react";
-import { useCarrStage, type CarrStage } from "@/hooks/use-carr-stage";
+import { useCarrStage } from "@/hooks/use-carr-stage";
 import { fmtUsd } from "@/lib/format-currency";
 
 /**

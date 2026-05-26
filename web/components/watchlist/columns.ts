@@ -1,4 +1,4 @@
-import type { ColDef, ValueFormatterParams, CellClassParams, CellStyle } from "ag-grid-community";
+import type { ColDef, ValueFormatterParams, CellClassParams } from "ag-grid-community";
 import type { WatchlistRow } from "@/types/watchlist";
 import { StatusBadge } from "./StatusBadge";
 // ConsensusBadge import kaldirildi (KARAR ADAY 21 May 2026): Konsensus kavrami kaldirildi,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMarketCalendar, type MarketSession } from "@/hooks/use-market-calendar";
-import { CircleDot, AlertCircle, Clock } from "lucide-react";
+import { AlertCircle, Clock } from "lucide-react";
 
 /**
  * ABD Borsa Durum Rozeti — Sprint 4-bis.7 (22 May 2026).
