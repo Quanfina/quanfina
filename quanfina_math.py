@@ -4456,3 +4456,99 @@ def compute_distribution_day_severity(dd_count: int) -> dict:
         'allocation_factor': factor,
         'mark_says': says,
     }
+
+
+# ======================================================================
+# RELATIVE VOLUME — Mark hacim asimetri canon (Paket 106)
+# ======================================================================
+# Mark TLSMW Ch 6: "Volume tells the story" — bugünkü hacim normal mi,
+# pivot kırılım/distribution sinyali mi?
+#
+# Formül: rel_vol = today_volume / 50-day average volume
+#
+# 5 kategori:
+# - DRYING (<0.7x): Mark VCP final contraction — hacim kuruyor
+# - QUIET (0.7-1.0): Sıradan, gürültüsüz
+# - NORMAL (1.0-1.5): Sağlıklı katılım
+# - HIGH (1.5-2.5): Mark pivot kırılım eşiği (>=1.5x)
+# - SURGE (>2.5x): Mark "smart money" — climax veya breakout zirvesi
+# ======================================================================
+
+REL_VOL_DRYING_MAX: float = 0.7
+REL_VOL_QUIET_MAX: float = 1.0
+REL_VOL_NORMAL_MAX: float = 1.5
+REL_VOL_HIGH_MAX: float = 2.5
+REL_VOL_50D_PERIOD: int = 50
+
+
+def compute_relative_volume(
+    volumes: list[float],
+    period: int = REL_VOL_50D_PERIOD,
+) -> dict:
+    """Mark TLSMW Ch 6 / O'Neil canon Relative Volume.
+
+    Args:
+        volumes: Günlük hacim listesi (kronolojik, en az period+1 gün)
+        period: 50 gün ortalama baz
+
+    Returns:
+        dict {
+            'rel_vol': float | None,  # Bugün / 50g ortalama
+            'today_volume': int | None,
+            'avg_volume': int | None,
+            'category': str,           # DRYING/QUIET/NORMAL/HIGH/SURGE
+            'mark_says': str,
+        }
+    """
+    if not volumes or len(volumes) < period + 1:
+        return {
+            'rel_vol': None,
+            'today_volume': None,
+            'avg_volume': None,
+            'category': None,
+            'mark_says': f'Yetersiz veri — en az {period + 1} gün gerek.',
+        }
+
+    today_vol = volumes[-1]
+    historical = volumes[-(period + 1):-1]  # son period gün, bugün hariç
+    avg = sum(historical) / len(historical)
+    if avg <= 0:
+        return {
+            'rel_vol': None,
+            'today_volume': int(today_vol),
+            'avg_volume': 0,
+            'category': None,
+            'mark_says': 'Geçersiz ortalama hacim (sıfır).',
+        }
+
+    rel_vol = round(today_vol / avg, 2)
+
+    if rel_vol < REL_VOL_DRYING_MAX:
+        category = 'DRYING'
+        says = (f'DRYING — rel_vol {rel_vol}x. Mark VCP final contraction: '
+                f'"hacim kuruyor, kırılım yakın". %50 altı = ideal sıkışma.')
+    elif rel_vol < REL_VOL_QUIET_MAX:
+        category = 'QUIET'
+        says = (f'QUIET — rel_vol {rel_vol}x. Sıradan, gürültüsüz seyir. '
+                f'Mark: bekleme modunda.')
+    elif rel_vol < REL_VOL_NORMAL_MAX:
+        category = 'NORMAL'
+        says = (f'NORMAL — rel_vol {rel_vol}x. Sağlıklı katılım, trend '
+                f'devamı.')
+    elif rel_vol < REL_VOL_HIGH_MAX:
+        category = 'HIGH'
+        says = (f'HIGH — rel_vol {rel_vol}x. Mark pivot kırılım eşiği '
+                f'(>=1.5x). "Smart money giriyor" — breakout teyit adayı.')
+    else:
+        category = 'SURGE'
+        says = (f'🔴 SURGE — rel_vol {rel_vol}x. Mark TLSMW Ch 9: '
+                f'"abnormal volume" — climax veya distribution. Stop '
+                f'sıkılaştır, kâr koru.')
+
+    return {
+        'rel_vol': rel_vol,
+        'today_volume': int(today_vol),
+        'avg_volume': int(avg),
+        'category': category,
+        'mark_says': says,
+    }
