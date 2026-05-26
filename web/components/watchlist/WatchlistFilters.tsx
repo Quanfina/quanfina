@@ -14,6 +14,9 @@ interface WatchlistFiltersProps {
   onLeaderOnlyChange: (v: boolean) => void;
   climaxOnly: boolean;
   onClimaxOnlyChange: (v: boolean) => void;
+  // P129 (26 May 2026): Stage Onaylı chip (mark_signals.stage_category === "CONFIRMED_STAGE_2")
+  stageConfirmedOnly: boolean;
+  onStageConfirmedOnlyChange: (v: boolean) => void;
   totalRows: number;
   filteredRows: number;
 }
@@ -32,6 +35,7 @@ export function WatchlistFilters({
   search, onSearchChange,
   leaderOnly, onLeaderOnlyChange,
   climaxOnly, onClimaxOnlyChange,
+  stageConfirmedOnly, onStageConfirmedOnlyChange,
   totalRows, filteredRows,
 }: WatchlistFiltersProps) {
   return (
@@ -90,6 +94,19 @@ export function WatchlistFilters({
         title="Sadece Climax Top uyarılı hisseler"
       >
         🔥 Climax
+      </button>
+
+      {/* P129 (26 May 2026): Stage Onaylı chip — Mark TLSMW Ch 4 CONFIRMED_STAGE_2 */}
+      <button
+        onClick={() => onStageConfirmedOnlyChange(!stageConfirmedOnly)}
+        className={`text-xs font-semibold px-3 py-1.5 rounded border transition-colors ${
+          stageConfirmedOnly
+            ? "bg-purple-600 border-purple-600 text-white"
+            : "border-input bg-background text-muted-foreground hover:border-purple-600 hover:text-purple-600"
+        }`}
+        title="Sadece Stage 2 Onaylı hisseler (Mark TLSMW Ch 4)"
+      >
+        ✓ Stage 2
       </button>
 
       <span className="text-xs font-mono text-muted-foreground ml-auto">

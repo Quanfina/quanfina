@@ -40,6 +40,8 @@ export default function WatchlistPage() {
   // P114 (26 May 2026): LEADER only + Climax UYARI filter chip'leri
   const [leaderOnly, setLeaderOnly] = useState(false);
   const [climaxOnly, setClimaxOnly] = useState(false);
+  // P129 (26 May 2026): Stage Onaylı chip
+  const [stageConfirmedOnly, setStageConfirmedOnly] = useState(false);
   const { data, isLoading, isError, error, refetch, isFetching } = useWatchlist();
   const gridRef = useRef<AgGridReact<WatchlistRow>>(null);
 
@@ -120,10 +122,11 @@ export default function WatchlistPage() {
     // P114: LEADER only (rs_rating >= 80) ve Climax UYARI chip filtreleri
     if (leaderOnly) rows = rows.filter((r) => Math.round(r.rs_rating) >= 80);
     if (climaxOnly) rows = rows.filter((r) => r.mark_signals?.climax_category === "CLIMAX_TOP");
+    if (stageConfirmedOnly) rows = rows.filter((r) => r.mark_signals?.stage_category === "CONFIRMED_STAGE_2");
     return [...rows].sort(
       (a, b) => a.strategy.localeCompare(b.strategy) || a.symbol.localeCompare(b.symbol)
     );
-  }, [data, strategy, status, search, leaderOnly, climaxOnly]);
+  }, [data, strategy, status, search, leaderOnly, climaxOnly, stageConfirmedOnly]);
 
   // KARAR #476: gridClass useGridTheme'den (SSR uyumu)
   // KARAR #733 alt-paket (Paket 36): Mark Regime banner Stage 4 sayim
@@ -163,6 +166,8 @@ export default function WatchlistPage() {
           onLeaderOnlyChange={setLeaderOnly}
           climaxOnly={climaxOnly}
           onClimaxOnlyChange={setClimaxOnly}
+          stageConfirmedOnly={stageConfirmedOnly}
+          onStageConfirmedOnlyChange={setStageConfirmedOnly}
           totalRows={data?.length ?? 0}
           filteredRows={rowData.length}
         />

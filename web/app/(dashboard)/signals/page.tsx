@@ -66,6 +66,8 @@ export default function SignalsPage() {
   const [strategyFilter, setStrategyFilter] = useState<"all" | "minervini" | "carr">("all");
   const [newTodayOnly, setNewTodayOnly] = useState(false);
   const [showPassed, setShowPassed] = useState(false);
+  // P130 (26 May 2026): Climax Uyarı filter chip — Mark TLSMW Ch 9 SAT sinyali
+  const [climaxWarnOnly, setClimaxWarnOnly] = useState(false);
 
   const [tradeOpen, setTradeOpen] = useState(false);
   const [tradeSignal, setTradeSignal] = useState<Signal | null>(null);
@@ -434,8 +436,16 @@ export default function SignalsPage() {
       rows = rows.filter((s) => s.status === "buy" || s.status === "focus");
     if (strategyFilter !== "all") rows = rows.filter((s) => s.strategy === strategyFilter);
     if (newTodayOnly) rows = rows.filter((s) => s.is_new_today);
+    // P130: Climax Uyarı filter — CLIMAX_TOP veya POTENTIAL_CLIMAX
+    if (climaxWarnOnly) {
+      rows = rows.filter(
+        (s) =>
+          s.mark_signals?.climax_category === "CLIMAX_TOP" ||
+          s.mark_signals?.climax_category === "POTENTIAL_CLIMAX"
+      );
+    }
     return rows;
-  }, [data, statusFilter, strategyFilter, newTodayOnly, passedKeys, showPassed]);
+  }, [data, statusFilter, strategyFilter, newTodayOnly, passedKeys, showPassed, climaxWarnOnly]);
 
   const totalSignals = data?.length ?? 0;
   const newTodayCount = data?.filter((s) => s.is_new_today).length ?? 0;
@@ -528,6 +538,19 @@ export default function SignalsPage() {
           />
           Yeni Bugün
         </label>
+
+        {/* P130 (26 May 2026): Climax UYARI filter chip — Mark TLSMW Ch 9 SAT sinyali */}
+        <button
+          onClick={() => setClimaxWarnOnly(!climaxWarnOnly)}
+          className={`text-xs font-semibold px-3 py-1.5 rounded border transition-colors ${
+            climaxWarnOnly
+              ? "bg-[var(--mtp-danger)] border-[var(--mtp-danger)] text-white"
+              : "border-input bg-background text-muted-foreground hover:border-[var(--mtp-danger)] hover:text-[var(--mtp-danger)]"
+          }`}
+          title="Sadece Climax UYARI sinyalleri (CLIMAX_TOP / POTENTIAL_CLIMAX) — Mark TLSMW Ch 9"
+        >
+          🔴 Climax UYARI
+        </button>
 
         {passedCount > 0 && (
           <label className="flex items-center gap-1.5 text-xs cursor-pointer select-none">
