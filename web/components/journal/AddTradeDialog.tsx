@@ -70,6 +70,10 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
   const [exitReason, setExitReason] = useState<ExitReason>("stop_loss");
   const [lessons, setLessons]       = useState("");
   const [error, setError]           = useState<string | null>(null);
+  // Paket 227 (27 May 2026): Vizyon İLKE #10 — Defansif modda submit BLOK
+  // Mark canon TTLC s.187: "Defansif modda yeni AL pozisyonu yasak" disiplinini
+  // explicit override checkbox ile koru. Sn. Ferit hatalı pozisyon açmasın.
+  const [defansifOverride, setDefansifOverride] = useState(false);
   // KARAR ADAY #717 — Mark TTLC Sec 1 6 zorunlu plan alani (Mark birebir disiplin)
   const [planEntryTrigger, setPlanEntryTrigger]   = useState("");
   const [planStop, setPlanStop]                   = useState("");
@@ -202,6 +206,8 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
     // KARAR ADAY #717 plan alanlari reset
     setPlanEntryTrigger(""); setPlanStop(""); setPlanTarget("");
     setPlanSizePct(""); setPlanExitStrategy(""); setPlanTimeHorizon("swing");
+    // Paket 227: Defansif override checkbox reset
+    setDefansifOverride(false);
   }
 
   function handleOpenChange(v: boolean) {
@@ -228,6 +234,15 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
     if (isNaN(pTarget) || pTarget <= 0) { setError("Plan: Geçerli hedef $ gerekli (Mark)"); return; }
     if (isNaN(pSize)   || pSize   <= 0 || pSize > 100) { setError("Plan: Pozisyon % (0-100 arası) gerekli"); return; }
     if (!planExitStrategy.trim()) { setError("Plan: Çıkış stratejisi gerekli (Mark)"); return; }
+
+    // Paket 227 (27 May 2026): Vizyon İLKE #10 — Defansif modda override gerekli
+    // Mark TTLC s.187: Defansif modda yeni AL pozisyonu YASAK. Sn. Ferit explicit
+    // onay vermezse submit BLOK (görsel uyarıdan AKSİYON disiplinine evrim).
+    // Sadece açık (open) trade'ler için — kapalı kayıt geçmiş için override gerekmez.
+    if (!isClosed && tradingMode.mode === "defansif" && !defansifOverride) {
+      setError("DEFANSİF mod aktif (piyasa Stage 3-4 + MH<30) — Mark TTLC s.187: yeni AL BLOK. Aşağıdaki 'Riski biliyorum' kutusunu işaretleyin.");
+      return;
+    }
 
     const body: TradeCreate = {
       symbol: sym, strategy, setup_type: setupType,
@@ -850,9 +865,47 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
 
           {error && <p className="text-sm" style={{ color: "var(--mtp-danger)" }}>{error}</p>}
 
+          {/* Paket 227 (27 May 2026): Vizyon İLKE #10 — Defansif modda override
+              checkbox. Mark TTLC s.187 disiplini AKSİYON kilidi. Sadece açık trade
+              + defansif modda görünür. Sn. Ferit "Riski biliyorum" işaretlemeden
+              Kaydet butonu disabled. */}
+          {!isClosed && tradingMode.mode === "defansif" && (
+            <label
+              className="flex items-start gap-2 rounded-md border px-3 py-2 text-xs cursor-pointer"
+              style={{
+                background: "rgba(220, 53, 69, 0.06)",
+                borderColor: "rgba(220, 53, 69, 0.5)",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={defansifOverride}
+                onChange={(e) => setDefansifOverride(e.target.checked)}
+                className="mt-0.5 shrink-0"
+                style={{ accentColor: "var(--mtp-danger)" }}
+              />
+              <span style={{ color: "var(--mtp-danger)" }}>
+                <b>Defansif modda yeni AL açıyorum.</b> Mark TTLC s.187 disiplinini
+                aşıyorum — piyasa Stage 3-4 + MH&lt;30 olduğunu kabul ediyorum, riski
+                kendim üstleniyorum.
+              </span>
+            </label>
+          )}
+
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>İptal</Button>
-            <Button type="submit" disabled={addMutation.isPending}>
+            <Button
+              type="submit"
+              disabled={
+                addMutation.isPending ||
+                (!isClosed && tradingMode.mode === "defansif" && !defansifOverride)
+              }
+              title={
+                !isClosed && tradingMode.mode === "defansif" && !defansifOverride
+                  ? "Defansif modda yeni AL BLOK — 'Riski biliyorum' kutusunu işaretle"
+                  : undefined
+              }
+            >
               {addMutation.isPending ? "Kaydediliyor..." : "Kaydet"}
             </Button>
           </DialogFooter>
