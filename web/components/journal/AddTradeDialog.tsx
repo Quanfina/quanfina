@@ -17,6 +17,7 @@ import type { TradeCreate, TradeGrade, ExitReason, TradeStatus, SignalSource, Ti
 import { GRADE_OPTIONS, EXIT_REASON_LABELS, SIGNAL_SOURCE_LABELS, SIGNAL_SOURCE_DESCRIPTIONS, TIME_HORIZON_LABELS, TIME_HORIZON_DESCRIPTIONS } from "@/types/trade";
 import { MarkRiskAdvisor } from "./MarkRiskAdvisor";
 import { MarkPyramidCard } from "./MarkPyramidCard";
+import { PreTradeChecklist } from "./PreTradeChecklist";
 import { isReadTodayAny } from "@/lib/mindset-read-state";
 import Link from "next/link";
 import { Quote, AlertTriangle } from "lucide-react";
@@ -328,6 +329,22 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
               </span>
             </div>
           </div>
+        )}
+
+        {/* Paket 239 (27 May 2026): PreTradeChecklist Mark canon 7 koşul pre-flight
+            Sembol girince + plan alanları dolduruldukça canlı yenilenir.
+            Disiplin: AddTradeDialog 5 katmanlı zinciri tamamlar (görme→submit→pre-flight). */}
+        {markPreCheckSymbol && !isClosed && (
+          <PreTradeChecklist
+            symbol={trimmedSymbol}
+            stage={carrStage?.stage}
+            rsRating={rsData?.rs_rating ?? null}
+            pivotPass={pivotData?.status === "CONFIRMED" || pivotData?.status === "WEAK"}
+            planEntryTrigger={planEntryTrigger}
+            planStop={parseFloat(planStop) || null}
+            planTarget={parseFloat(planTarget) || null}
+            entryPrice={parseFloat(entryPrice) || null}
+          />
         )}
 
         {/* KARAR #733 alt-paket (Paket 124, 26 May 2026): Mark Profili pre-check
