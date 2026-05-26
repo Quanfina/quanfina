@@ -32,6 +32,7 @@ import type { WatchlistRow } from "@/types/watchlist";
 import { demoteStatus } from "@/lib/watchlist-status";
 import { GridLoadingOverlay } from "@/components/ag-grid/LoadingOverlay";
 import { MarkRegimeBanner } from "@/components/mark/MarkRegimeBanner";
+import { ModBadge } from "@/components/mark/ModBadge";
 
 export default function WatchlistPage() {
   const { gridClass } = useGridTheme();
@@ -179,10 +180,14 @@ export default function WatchlistPage() {
             Tüm stratejiler — çapraz görünüm (İLKE #44 / KARAR #350)
           </p>
         </div>
-        <Button size="sm" onClick={() => setAddOpen(true)}>
-          <Plus size={14} className="mr-1.5" />
-          Hisse Ekle
-        </Button>
+        <div className="flex items-center gap-3">
+          {/* Paket 221 (27 May 2026): Vizyon İLKE #10 — Watchlist'te mod farkındalığı */}
+          <ModBadge variant="compact" />
+          <Button size="sm" onClick={() => setAddOpen(true)}>
+            <Plus size={14} className="mr-1.5" />
+            Hisse Ekle
+          </Button>
+        </div>
       </div>
 
       {/* KARAR #733 alt-paket (Paket 36): Mark Regime üst-uyarı banner */}

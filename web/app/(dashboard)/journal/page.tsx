@@ -14,6 +14,7 @@ import { AddTradeDialog } from "@/components/journal/AddTradeDialog";
 import { CloseTradeDialog } from "@/components/journal/CloseTradeDialog";
 import { RbaSummaryCard } from "@/components/journal/RbaSummaryCard";
 import { MarkRegimeBanner } from "@/components/mark/MarkRegimeBanner";
+import { ModBadge } from "@/components/mark/ModBadge";
 import { BrandonExpectancyCard } from "@/components/journal/BrandonExpectancyCard";
 import { Button } from "@/components/ui/button";
 import {
@@ -148,10 +149,14 @@ export default function JournalPage() {
             Tüm trade kayıtları — grade, P/L, dersler
           </p>
         </div>
-        <Button size="sm" onClick={() => setAddOpen(true)}>
-          <Plus size={14} className="mr-1.5" />
-          Yeni Trade
-        </Button>
+        <div className="flex items-center gap-3">
+          {/* Paket 221 (27 May 2026): Vizyon İLKE #10 — Journal'da mod farkındalığı */}
+          <ModBadge variant="compact" />
+          <Button size="sm" onClick={() => setAddOpen(true)}>
+            <Plus size={14} className="mr-1.5" />
+            Yeni Trade
+          </Button>
+        </div>
       </div>
 
       {/* KARAR #733 alt-paket (Paket 39+41): Mark Regime banner — trade aç/kapa
