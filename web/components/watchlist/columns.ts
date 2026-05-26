@@ -74,17 +74,62 @@ export const COL_DEFS: ColDef<WatchlistRow>[] = [
     minWidth: 140,
     cellRenderer: SetupCellRenderer,
   },
+  // KARAR #733 alt-paket (Paket 98, 26 May 2026): RS Rating kategori rozet
+  // Mark TLSMW Ch 3-5 / IBD canon — sadece sayı değil, kategori rozet
+  // (LEADER/STRONG/AVERAGE/LAGGARD) ile Sn. Ferit anında "Top 20%" tarar.
   {
     field: "rs_rating",
     headerName: "RS",
     headerComponent: TermHeaderComponent,
     headerComponentParams: { termKey: "rs_ibd" },
-    width: 80,
-    minWidth: 70,
+    width: 100,
+    minWidth: 85,
     cellStyle: (p: CellClassParams<WatchlistRow, number>) => ({
       ...MONO,
       background: rsBackground(p.value ?? null),
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingRight: "4px",
     }),
+    cellRenderer: (p: { value?: number | null }) => {
+      const rs = p.value;
+      if (rs == null) {
+        const el = document.createElement("span");
+        el.textContent = "—";
+        el.style.color = "var(--muted-foreground)";
+        return el;
+      }
+      const container = document.createElement("span");
+      container.style.cssText = "display:flex;align-items:center;gap:4px;width:100%;";
+
+      const num = document.createElement("span");
+      num.textContent = String(rs);
+      num.style.cssText = "font-weight:600;font-variant-numeric:tabular-nums;";
+      container.appendChild(num);
+
+      // Kategori rozet (Mark/IBD canon)
+      let meta: { label: string; color: string } | null = null;
+      if (rs >= 80) meta = { label: "L", color: "var(--mtp-excellent)" };
+      else if (rs >= 70) meta = { label: "S", color: "var(--mtp-good, #4B9CD3)" };
+      else if (rs >= 50) meta = { label: "A", color: "#F59E0B" };
+      else meta = { label: "↓", color: "var(--mtp-danger)" };
+
+      if (meta) {
+        const badge = document.createElement("span");
+        badge.textContent = meta.label;
+        badge.style.cssText = `font-size:9px;font-weight:700;padding:0 4px;border-radius:3px;background:${meta.color};color:#fff;margin-left:auto;`;
+        const tooltip =
+          rs >= 80 ? "IBD LEADER (Top 20%)"
+          : rs >= 70 ? "STRONG"
+          : rs >= 50 ? "AVERAGE"
+          : "LAGGARD — Mark: uzak dur";
+        badge.title = `${tooltip} (RS ${rs})`;
+        container.appendChild(badge);
+      }
+
+      return container;
+    },
   },
   // KONSENSUS kolonu kaldirildi (KARAR ADAY 21 May 2026): her strateji ayri satir
   // kanon, konsensus sayim noise.
