@@ -4385,3 +4385,74 @@ def compute_atr_volatility(
         'suggested_stop_loose': suggested_loose,
         'mark_says': says,
     }
+
+
+# ======================================================================
+# DISTRIBUTION DAY SEVERITY — O'Neil canon refine (Paket 105)
+# ======================================================================
+# DD count var (count_distribution_days), severity kategorisi eksikti.
+# O'Neil "Three to four distribution days within four weeks is a warning."
+# Mark TLSMW Ch 8: piyasa zayıflık göstergesi DD birikimi.
+#
+# 4 kategori (son 25 gün penceresi):
+# - CLEAN (0-2 DD): Piyasa sağlıklı, alıma açık
+# - CAUTION (3-4 DD): Mark "stop sıkılaştır, yeni alımları yavaşlat"
+# - HEAVY (5-6 DD): Mark "yeni alım YASAK, açık trade'ler taranıyor"
+# - EXTREME (7+ DD): Mark "piyasa under pressure, BEAR PRESSURE yaklaşıyor"
+# ======================================================================
+
+DD_SEVERITY_CAUTION_MIN: int = 3
+DD_SEVERITY_HEAVY_MIN: int = 5
+DD_SEVERITY_EXTREME_MIN: int = 7
+
+
+def compute_distribution_day_severity(dd_count: int) -> dict:
+    """O'Neil DD severity kategorisi.
+
+    Args:
+        dd_count: Son 25 gün içindeki DD sayısı (count_distribution_days
+                  çıktısı)
+
+    Returns:
+        dict {
+            'severity': str,           # CLEAN/CAUTION/HEAVY/EXTREME
+            'allocation_factor': float, # 1.0=normal, 0.5=yarı, 0.0=yasak
+            'mark_says': str,
+        }
+    """
+    if dd_count < 0:
+        return {
+            'severity': None,
+            'allocation_factor': 0.0,
+            'mark_says': 'Geçersiz DD sayısı.',
+        }
+
+    if dd_count >= DD_SEVERITY_EXTREME_MIN:
+        severity = 'EXTREME'
+        factor = 0.0
+        says = (f'🔴 EXTREME — {dd_count} DD son 25 günde. Mark: piyasa '
+                f'"under pressure", BEAR PRESSURE yaklaşıyor. Yeni alım '
+                f'YASAK, açık trade defansif moda.')
+    elif dd_count >= DD_SEVERITY_HEAVY_MIN:
+        severity = 'HEAVY'
+        factor = 0.25
+        says = (f'⚠️ HEAVY — {dd_count} DD. Mark: yeni alım YASAK, açık '
+                f'trade\'ler stop sıkılaştır. O\'Neil "5+ DD = piyasa '
+                f'kuruyor". Pilot pozisyon (%1-2) sadece lider hisse.')
+    elif dd_count >= DD_SEVERITY_CAUTION_MIN:
+        severity = 'CAUTION'
+        factor = 0.50
+        says = (f'CAUTION — {dd_count} DD. O\'Neil "3-4 DD 4 hafta = uyarı". '
+                f'Mark: yeni alımları yavaşlat, allocation %50, stop '
+                f'sıkılaştır.')
+    else:
+        severity = 'CLEAN'
+        factor = 1.0
+        says = (f'CLEAN — {dd_count} DD son 25 günde. Mark: piyasa sağlıklı, '
+                f'tam allocation, leadership güçlü.')
+
+    return {
+        'severity': severity,
+        'allocation_factor': factor,
+        'mark_says': says,
+    }
