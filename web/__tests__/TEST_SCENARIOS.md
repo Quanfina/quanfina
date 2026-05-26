@@ -96,6 +96,56 @@ export default defineConfig({
 import '@testing-library/jest-dom/vitest';
 ```
 
+## P227-P253 ek senaryolar (27 May 2026)
+
+### AddTradeDialog Defansif AKSİYON kilidi (P227)
+- ✅ Defansif modda submit BLOK (override checkbox yok → disabled)
+- ✅ Override checkbox işaretle → submit aktif
+- ✅ isClosed=true → blok yok (geçmiş kayıt için override gerekmez)
+- ✅ Reset: dialog kapanışında defansifOverride=false sıfırlanır
+
+### PreTradeChecklist (P229)
+- ✅ Stage 2 → ok, Stage 4 → fail "UZAK DUR", Stage null → warn
+- ✅ RS ≥ 70 → ok "Leader", 50-69 → warn "Average", <50 → fail "Laggard"
+- ✅ Setup: vcpPass=true → ok "VCP onaylı"; pivotPass=true → ok "Pivot breakout"
+- ✅ planEntryTrigger boş → fail "TTLC Sec 1.6 ZORUNLU"
+- ✅ Stop %7+ → fail "TTLC s.131 limit AŞILDI"
+- ✅ Stop entry üstünde → fail "long için imkansız"
+- ✅ R/R ≥ 2 → ok; 1-2 → warn "zayıf"; <1 → fail "kabul edilemez"
+- ✅ Mod defansif → fail; rehab → warn; agresif → ok; normal → ok
+
+### Sinyaller AL Defansif disabled (P235)
+- ✅ alBlocked=true → button disabled + gri background
+- ✅ tooltip "Defansif mod aktif — yeni AL BLOK"
+- ✅ Normal/Rehab/Agresif → button aktif
+- ✅ columnDefs deps [alBlocked] → mode değişince re-render
+
+### Tarama Defansif uyarı banner (P253)
+- ✅ mode=defansif → header altında kırmızı banner görünür
+- ✅ 🛡️ emoji + "Mark TTLC s.187: yeni AL BLOK"
+- ✅ Normal/Rehab/Agresif → banner görünmez
+
+### Mark Otomatik Plan buton (P250)
+- ✅ entry_price boş → buton görünmez
+- ✅ entry_price=100 + tık → planStop=94 (%6), planTarget=112 (2R)
+- ✅ Tooltip: "stop = entry × 0.94, target = entry + 2R"
+- ✅ ATR-based default (P163) korunuyor — Mark buton manuel override
+
+### R/R Live Preview (P251)
+- ✅ entry+stop+target dolu → rozet görünür
+- ✅ R/R ≥ 2 → yeşil "Mark uyumlu"
+- ✅ R/R 1-2 → sarı "Zayıf"
+- ✅ R/R <1 → kırmızı "Kabul edilemez"
+- ✅ Stop ≤ 7% → yeşil ✓
+- ✅ Stop > 7% → kırmızı "TTLC s.131 LİMİT AŞILDI"
+- ✅ Risk $ + Reward $ side-by-side gösterilir
+
+### Watchlist Defansif Leaders First (P252)
+- ✅ getRowStyle: mode=defansif + rs<70 → opacity 0.45
+- ✅ mode=defansif + rs≥70 → normal opacity
+- ✅ Normal/Rehab/Agresif → tüm satırlar normal
+- ✅ AG Grid re-render: useTradingMode değişince getRowStyle yenilenir
+
 ## İlişkili
 
 - Kural #24 (Sağlam Gidelim) — 6 Aşama Aşama 5 PYTEST
