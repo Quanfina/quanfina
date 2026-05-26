@@ -6,6 +6,7 @@ import { Plus } from "lucide-react";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef } from "ag-grid-community";
 import { useTrades, useDeleteTrade } from "@/hooks/use-trades";
+import { useStockQuotes } from "@/hooks/use-stock-quote";
 import { TRADE_COL_DEFS, TRADE_DEFAULT_COL_DEF } from "@/components/journal/columns";
 import { TradeRowActions } from "@/components/journal/TradeRowActions";
 import { AddTradeDialog } from "@/components/journal/AddTradeDialog";
@@ -84,6 +85,21 @@ export default function JournalPage() {
     []
   );
 
+  // Paket 151 (26 May 2026): Açık trade'ler için canlı fiyat fetch (paralel)
+  // useStockQuotes 60s refetchInterval — yfinance + 5dk backend cache.
+  const openSymbols = useMemo(
+    () => Array.from(new Set((data ?? []).filter((t) => t.status === "open").map((t) => t.symbol))),
+    [data]
+  );
+  const quoteResults = useStockQuotes(openSymbols);
+  const quoteMap = useMemo(() => {
+    const map = new Map<string, { price: number; source: string }>();
+    quoteResults.forEach((r) => {
+      if (r.data) map.set(r.data.symbol.toUpperCase(), { price: r.data.price, source: r.data.source });
+    });
+    return map;
+  }, [quoteResults]);
+
   const rowData = useMemo(() => {
     let rows: Trade[] = data ?? [];
     if (statusFilter !== "all")   rows = rows.filter((r) => r.status === statusFilter);
@@ -96,8 +112,23 @@ export default function JournalPage() {
       const q = search.toUpperCase();
       rows = rows.filter((r) => r.symbol.includes(q) || r.setup_type.toUpperCase().includes(q));
     }
-    return [...rows].sort((a, b) => b.entry_date.localeCompare(a.entry_date));
-  }, [data, statusFilter, strategyFilter, gradeFilter, search]);
+    // Paket 151: client-side enrich — quote price + unrealized P&L (sadece açık trade)
+    const enriched: Trade[] = rows.map((t) => {
+      if (t.status !== "open") return t;
+      const q = quoteMap.get(t.symbol.toUpperCase());
+      if (!q) return t;
+      const unrealized_pl_dollar = (q.price - t.entry_price) * t.shares;
+      const unrealized_pl_pct = ((q.price / t.entry_price) - 1) * 100;
+      return {
+        ...t,
+        current_price: q.price,
+        unrealized_pl_dollar,
+        unrealized_pl_pct,
+        quote_source: q.source as "yfinance" | "mock",
+      };
+    });
+    return enriched.sort((a, b) => b.entry_date.localeCompare(a.entry_date));
+  }, [data, statusFilter, strategyFilter, gradeFilter, search, quoteMap]);
 
   // KARAR #476: gridClass useGridTheme'den (SSR uyumu)
 

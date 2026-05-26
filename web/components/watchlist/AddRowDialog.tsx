@@ -12,6 +12,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { useAddWatchlistRow } from "@/hooks/use-watchlist-mutations";
+import { useSymbolSearch } from "@/hooks/use-symbol-search";
 import type { WatchlistRowCreate, WatchlistStatus, WatchlistStrategy } from "@/types/watchlist";
 
 interface Props {
@@ -32,6 +33,9 @@ export function AddRowDialog({ open, onOpenChange }: Props) {
   const [pivotPrice, setPivotPrice] = useState("");
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // Paket 149 (26 May 2026): autocomplete state
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const { data: suggestions } = useSymbolSearch(symbol, 8);
 
   function resetForm() {
     setSymbol("");
@@ -41,6 +45,7 @@ export function AddRowDialog({ open, onOpenChange }: Props) {
     setPivotPrice("");
     setNote("");
     setError(null);
+    setShowSuggestions(false);
   }
 
   function handleOpenChange(v: boolean) {
@@ -78,16 +83,57 @@ export function AddRowDialog({ open, onOpenChange }: Props) {
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4 py-2">
           <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-1.5 relative">
               <Label htmlFor="ar-symbol">Hisse *</Label>
               <Input
                 id="ar-symbol"
                 value={symbol}
-                onChange={(e) => setSymbol(e.target.value.toUpperCase())}
-                placeholder="NVDA"
+                onChange={(e) => {
+                  setSymbol(e.target.value.toUpperCase());
+                  setShowSuggestions(true);
+                }}
+                onFocus={() => setShowSuggestions(true)}
+                onBlur={() => {
+                  // 150ms delay — click selection için
+                  setTimeout(() => setShowSuggestions(false), 150);
+                }}
+                placeholder="NVDA, TSLA, AAPL..."
                 maxLength={10}
                 autoFocus
+                autoComplete="off"
               />
+              {showSuggestions && suggestions && suggestions.length > 0 && (
+                <ul
+                  className="absolute z-50 top-full left-0 right-0 mt-1 max-h-64 overflow-y-auto rounded-md border bg-popover shadow-lg"
+                  style={{ borderColor: "var(--border)" }}
+                >
+                  {suggestions.map((s) => (
+                    <li
+                      key={s.symbol}
+                      role="option"
+                      aria-selected={symbol.toUpperCase() === s.symbol}
+                      onMouseDown={(e) => {
+                        // mousedown blur'dan önce — selection sağlam
+                        e.preventDefault();
+                        setSymbol(s.symbol);
+                        setShowSuggestions(false);
+                      }}
+                      className="px-3 py-2 text-sm cursor-pointer hover:bg-accent border-b last:border-b-0"
+                      style={{ borderColor: "var(--border)" }}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono font-semibold">{s.symbol}</span>
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                          {s.sector}
+                        </span>
+                      </div>
+                      <div className="text-xs text-muted-foreground truncate mt-0.5">
+                        {s.name}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="ar-strategy">Strateji *</Label>

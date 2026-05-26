@@ -118,6 +118,48 @@ export const TRADE_COL_DEFS: ColDef<Trade>[] = [
     valueFormatter: fmtPLPct,
     cellStyle: plStyle as (p: CellClassParams) => CellStyle,
   },
+  // Paket 151 (26 May 2026): Paper trading canlı P&L — açık trade'lerde
+  // yfinance current_price + unrealized P&L. Closed trade'ler için boş ("—").
+  {
+    field: "current_price",
+    headerName: "CANLI $",
+    width: 95,
+    minWidth: 80,
+    valueFormatter: (p) => {
+      const v = p.value as number | null | undefined;
+      if (v == null) return "—";
+      return fmtUsd(v);
+    },
+    cellStyle: (p: CellClassParams<Trade, number>): CellStyle => {
+      if (p.value == null) return { color: "var(--muted-foreground)", ...MONO };
+      // Yeşil tonlu vurgu — canlı piyasa
+      return { ...MONO, color: "var(--mtp-good, #4B9CD3)", fontWeight: 600 };
+    },
+  },
+  {
+    field: "unrealized_pl_dollar",
+    headerName: "P/L $ (CANLI)",
+    width: 115,
+    minWidth: 95,
+    valueFormatter: (p) => {
+      const v = p.value as number | null | undefined;
+      if (v == null) return "—";
+      return (v >= 0 ? "+" : "-") + fmtUsd(Math.abs(v));
+    },
+    cellStyle: plStyle as (p: CellClassParams) => CellStyle,
+  },
+  {
+    field: "unrealized_pl_pct",
+    headerName: "P/L % (CANLI)",
+    width: 100,
+    minWidth: 85,
+    valueFormatter: (p) => {
+      const v = p.value as number | null | undefined;
+      if (v == null) return "—";
+      return (v >= 0 ? "+" : "") + v.toFixed(2) + "%";
+    },
+    cellStyle: plStyle as (p: CellClassParams) => CellStyle,
+  },
   // KARAR ADAY #734 (24 May 2026): R-Multiple sutunu — Mark RBA disiplinini guclendir.
   // Plan_stop + entry + exit + shares ile hesaplanir; plan_stop yoksa "—".
   // NOT: sortable false (hesaplanan field, AG Grid sort fonksiyonu kullanmiyoruz).

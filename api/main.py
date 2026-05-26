@@ -1585,9 +1585,93 @@ _STOCK_META: dict[str, dict] = {
     "COIN": {"name": "Coinbase Global Inc",    "industry": "Crypto Exchange",         "market_cap": "$38B",  "sector": "Financials"},
     "DASH": {"name": "DoorDash Inc",           "industry": "Food Delivery",           "market_cap": "$47B",  "sector": "Consumer Discretionary"},
     "SHOP": {"name": "Shopify Inc",            "industry": "E-Commerce",              "market_cap": "$96B",  "sector": "Technology"},
+    # Paket 148 (26 May 2026): paper trading için popüler eklemeler
+    "TSLA": {"name": "Tesla Inc",              "industry": "Auto Manufacturers",      "market_cap": "$780B", "sector": "Consumer Discretionary"},
+    "GOOG": {"name": "Alphabet Inc Class C",   "industry": "Internet Services",       "market_cap": "$2.2T", "sector": "Technology"},
+    "BRK.B":{"name": "Berkshire Hathaway B",   "industry": "Holding Company",         "market_cap": "$925B", "sector": "Financials"},
+    "JNJ":  {"name": "Johnson & Johnson",      "industry": "Pharmaceuticals",         "market_cap": "$385B", "sector": "Health Care"},
+    "UNH":  {"name": "UnitedHealth Group",     "industry": "Health Insurance",        "market_cap": "$540B", "sector": "Health Care"},
+    "XOM":  {"name": "Exxon Mobil Corp",       "industry": "Oil & Gas",               "market_cap": "$450B", "sector": "Energy"},
+    "DIS":  {"name": "Walt Disney Co",         "industry": "Entertainment",           "market_cap": "$170B", "sector": "Communication Services"},
+    "BAC":  {"name": "Bank of America",        "industry": "Banking",                 "market_cap": "$310B", "sector": "Financials"},
+    "PFE":  {"name": "Pfizer Inc",             "industry": "Pharmaceuticals",         "market_cap": "$155B", "sector": "Health Care"},
+    "KO":   {"name": "Coca-Cola Co",           "industry": "Beverages",               "market_cap": "$265B", "sector": "Consumer Staples"},
+    "PEP":  {"name": "PepsiCo Inc",            "industry": "Beverages",               "market_cap": "$235B", "sector": "Consumer Staples"},
+    "MCD":  {"name": "McDonald's Corp",        "industry": "Restaurants",             "market_cap": "$210B", "sector": "Consumer Discretionary"},
+    "NKE":  {"name": "Nike Inc",               "industry": "Apparel",                 "market_cap": "$135B", "sector": "Consumer Discretionary"},
+    "SBUX": {"name": "Starbucks Corp",         "industry": "Restaurants",             "market_cap": "$110B", "sector": "Consumer Discretionary"},
+    "BA":   {"name": "Boeing Co",              "industry": "Aerospace",               "market_cap": "$135B", "sector": "Industrials"},
+    "GE":   {"name": "General Electric",       "industry": "Industrial Conglomerate", "market_cap": "$170B", "sector": "Industrials"},
+    "CAT":  {"name": "Caterpillar Inc",        "industry": "Heavy Machinery",         "market_cap": "$165B", "sector": "Industrials"},
+    "IBM":  {"name": "IBM Corp",               "industry": "IT Services",             "market_cap": "$165B", "sector": "Technology"},
+    "INTC": {"name": "Intel Corp",             "industry": "Semiconductors",          "market_cap": "$135B", "sector": "Technology"},
+    "QCOM": {"name": "Qualcomm Inc",           "industry": "Semiconductors",          "market_cap": "$180B", "sector": "Technology"},
+    "MU":   {"name": "Micron Technology",      "industry": "Semiconductors",          "market_cap": "$135B", "sector": "Technology"},
+    "F":    {"name": "Ford Motor Co",          "industry": "Auto Manufacturers",      "market_cap": "$45B",  "sector": "Consumer Discretionary"},
+    "GM":   {"name": "General Motors",         "industry": "Auto Manufacturers",      "market_cap": "$52B",  "sector": "Consumer Discretionary"},
+    "GS":   {"name": "Goldman Sachs Group",    "industry": "Investment Banking",      "market_cap": "$135B", "sector": "Financials"},
+    "WFC":  {"name": "Wells Fargo & Co",       "industry": "Banking",                 "market_cap": "$220B", "sector": "Financials"},
+    "C":    {"name": "Citigroup Inc",          "industry": "Banking",                 "market_cap": "$110B", "sector": "Financials"},
+    "T":    {"name": "AT&T Inc",               "industry": "Telecom",                 "market_cap": "$150B", "sector": "Communication Services"},
+    "VZ":   {"name": "Verizon Communications", "industry": "Telecom",                 "market_cap": "$170B", "sector": "Communication Services"},
+    "SPY":  {"name": "SPDR S&P 500 ETF",       "industry": "ETF",                     "market_cap": "$520B", "sector": "ETF"},
+    "QQQ":  {"name": "Invesco QQQ Trust",      "industry": "ETF",                     "market_cap": "$280B", "sector": "ETF"},
 }
 
 _STOCK_BY_SYM: dict[str, MinerviniStock] = {s.symbol: s for s in MOCK_STOCKS}
+
+
+# =============================================================================
+# Paket 148 (26 May 2026): Sembol arama autocomplete
+# Sn. Ferit paper trading: AddRowDialog'da hızlı sembol bulma
+# =============================================================================
+
+class SymbolSearchResult(BaseModel):
+    """Sembol arama sonucu — autocomplete için minimal."""
+    symbol: str
+    name: str
+    sector: str
+
+
+@app.get("/api/symbols/search", response_model=list[SymbolSearchResult])
+def search_symbols(q: str, limit: int = 10) -> list[SymbolSearchResult]:
+    """Quanfina hisse evreninde sembol arama (_STOCK_META 56 sembol).
+
+    Sıralama: önce symbol prefix match (NVDA, NVD), sonra company name
+    prefix match (Apple → AAPL), sonra contains match. Case-insensitive.
+
+    Production: minervini_scans + symbol_lists tablo birleşimi (gelecek).
+    """
+    if not q or len(q) < 1:
+        return []
+    q_upper = q.upper().strip()
+    q_lower = q.lower().strip()
+
+    prefix_sym: list[SymbolSearchResult] = []
+    prefix_name: list[SymbolSearchResult] = []
+    contains: list[SymbolSearchResult] = []
+    seen: set[str] = set()
+
+    for sym, meta in _STOCK_META.items():
+        if sym in seen:
+            continue
+        sym_upper = sym.upper()
+        name = meta.get("name", sym)
+        name_lower = name.lower()
+        sector = meta.get("sector") or meta.get("industry", "Unknown")
+        result = SymbolSearchResult(symbol=sym, name=name, sector=sector)
+        if sym_upper.startswith(q_upper):
+            prefix_sym.append(result)
+            seen.add(sym)
+        elif name_lower.startswith(q_lower):
+            prefix_name.append(result)
+            seen.add(sym)
+        elif q_upper in sym_upper or q_lower in name_lower:
+            contains.append(result)
+            seen.add(sym)
+
+    combined = prefix_sym + prefix_name + contains
+    return combined[:limit]
 
 # KARAR ADAY #723 (24 May 2026) — Hisse detay Mark Profil rozetleri MOCK feed.
 # Cloud SQL Migration 004-007 uygulanana kadar UI'in canli gosterimi icin
@@ -2325,6 +2409,61 @@ def get_stock_ohlcv(symbol: str) -> list[OhlcvBar]:
             scan_data = _fetch_scan_symbol_data(sym)
             price = scan_data["price"] if scan_data else 100.0  # Generic MOCK son fallback
     return _get_ohlcv(sym, price)
+
+
+# =============================================================================
+# Paket 150 (26 May 2026): Stock Quote endpoint — current price for paper P&L
+# Sn. Ferit paper trading: açık trade'lerde canlı kar/zarar gösterimi
+# =============================================================================
+
+class StockQuote(BaseModel):
+    symbol: str
+    price: float           # Son kapanış (yfinance) veya MOCK fallback
+    change_dollar: Optional[float] = None  # Bugünkü dolar değişim
+    change_pct: Optional[float] = None     # Bugünkü yüzde değişim
+    source: Literal["yfinance", "mock"]
+
+
+@app.get("/api/stock/{symbol}/quote", response_model=StockQuote)
+def get_stock_quote(symbol: str) -> StockQuote:
+    """Sembolün güncel fiyat + değişim bilgisi (yfinance priority + MOCK fallback).
+
+    Paper trading açık trade canlı P&L hesabı için. Cache: _OHLCV_CACHE 5dk TTL
+    paylaşımı (Watchlist/Trade/Signal enrichment ile aynı veri).
+    """
+    sym = symbol.upper()
+    bars = _fetch_ohlcv_real(sym, 2)  # Son 2 gün — bugün + dün (değişim hesabı)
+    if bars and len(bars) >= 2:
+        last = bars[-1]
+        prev = bars[-2]
+        change_dollar = round(last.close - prev.close, 4)
+        change_pct = round((change_dollar / prev.close) * 100, 2) if prev.close else None
+        return StockQuote(
+            symbol=sym,
+            price=round(last.close, 4),
+            change_dollar=change_dollar,
+            change_pct=change_pct,
+            source="yfinance",
+        )
+    if bars and len(bars) >= 1:
+        return StockQuote(
+            symbol=sym,
+            price=round(bars[-1].close, 4),
+            change_dollar=None,
+            change_pct=None,
+            source="yfinance",
+        )
+    # MOCK fallback
+    stock = _STOCK_BY_SYM.get(sym)
+    if stock:
+        return StockQuote(
+            symbol=sym,
+            price=stock.price,
+            change_dollar=None,
+            change_pct=stock.change_pct,
+            source="mock",
+        )
+    return StockQuote(symbol=sym, price=100.0, source="mock")
 
 
 # ── Setup Types ───────────────────────────────────────────────────────────────

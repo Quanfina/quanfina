@@ -74,6 +74,13 @@ export interface Trade {
   mark_signals?: MarkSignals;
   // KARAR #733 alt-paket (Paket 84, 26 May 2026): Pivot status enrichment
   pivot_status?: PivotBreakoutStatus | null;
+  // Paket 151 (26 May 2026): Paper trading canlı P&L — client-side enriched.
+  // useStockQuote ile fetch edilen güncel piyasa fiyatı (yfinance + 5dk cache).
+  // Sadece açık trade'lerde dolu. Closed trade için pl_dollar/pl_pct geçerli.
+  current_price?: number | null;       // yfinance son kapanış
+  unrealized_pl_dollar?: number | null;  // (current_price - entry_price) × shares
+  unrealized_pl_pct?: number | null;     // ((current_price / entry_price) - 1) × 100
+  quote_source?: "yfinance" | "mock" | null;
 }
 
 export interface TradeCreate {
