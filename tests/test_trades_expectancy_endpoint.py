@@ -75,3 +75,41 @@ class TestExpectancyEndpointAggregation:
         data = client.get("/api/trades/expectancy").json()
         # En az MOCK'taki 4 kapalı trade görülmeli (DB up ise daha fazla olabilir)
         assert data["total_closed"] >= 0
+
+
+class TestExpectancyStrategyFilter:
+    """KARAR #733 alt-paket (Paket 96): strategy query filter."""
+
+    def test_strategy_minervini_filter(self, client):
+        data = client.get("/api/trades/expectancy?strategy=minervini").json()
+        assert "category" in data
+        # Filter sonucu total_closed <= unfiltered total_closed olmalı
+        all_data = client.get("/api/trades/expectancy").json()
+        assert data["total_closed"] <= all_data["total_closed"]
+
+    def test_strategy_carr_filter(self, client):
+        data = client.get("/api/trades/expectancy?strategy=carr").json()
+        assert "category" in data
+
+    def test_strategy_all_equals_no_filter(self, client):
+        all_data = client.get("/api/trades/expectancy?strategy=all").json()
+        no_filter = client.get("/api/trades/expectancy").json()
+        assert all_data["total_closed"] == no_filter["total_closed"]
+
+    def test_strategy_uppercase_normalize(self, client):
+        a = client.get("/api/trades/expectancy?strategy=MINERVINI").json()
+        b = client.get("/api/trades/expectancy?strategy=minervini").json()
+        # Lowercase normalize sayesinde eşit sonuç
+        assert a["total_closed"] == b["total_closed"]
+
+    def test_minervini_plus_carr_equals_all(self, client):
+        """Minervini + Carr total = unfiltered total (MOCK 8 trade hepsi minervini veya carr)."""
+        m = client.get("/api/trades/expectancy?strategy=minervini").json()
+        c = client.get("/api/trades/expectancy?strategy=carr").json()
+        all_data = client.get("/api/trades/expectancy").json()
+        assert m["total_closed"] + c["total_closed"] == all_data["total_closed"]
+
+    def test_strategy_unknown_returns_empty(self, client):
+        """Bilinmeyen strategy = 0 closed."""
+        data = client.get("/api/trades/expectancy?strategy=nonexistent").json()
+        assert data["total_closed"] == 0

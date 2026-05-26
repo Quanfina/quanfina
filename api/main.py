@@ -2134,8 +2134,13 @@ class BrandonExpectancyInfo(BaseModel):
 
 
 @app.get("/api/trades/expectancy", response_model=BrandonExpectancyInfo)
-def get_trades_expectancy() -> BrandonExpectancyInfo:
+def get_trades_expectancy(strategy: Optional[str] = None) -> BrandonExpectancyInfo:
     """Mark Brandon Video expectancy hesabı (P86 helper + P89 wire).
+
+    Query param strategy (opsiyonel, P96):
+    - "minervini" -> sadece Minervini trade'leri
+    - "carr" -> sadece Carr trade'leri
+    - None / "all" -> tüm strateji ortalama
 
     Tüm kapalı trade'lerin pl_pct'i üzerinden:
     - Avg gain (winners) — pozitif pl_pct ortalaması
@@ -2147,6 +2152,10 @@ def get_trades_expectancy() -> BrandonExpectancyInfo:
     """
     # Trade listesini al (DB veya MOCK fallback)
     trades = get_trades()  # endpoint fonksiyonu reuse
+    # KARAR #733 alt-paket (Paket 96): strategy filter
+    if strategy and strategy not in ("all", "ALL"):
+        strat_lower = strategy.lower()
+        trades = [t for t in trades if (t.strategy or "").lower() == strat_lower]
     closed = [t for t in trades if t.status == "closed" and t.pl_pct is not None]
 
     if not closed:
