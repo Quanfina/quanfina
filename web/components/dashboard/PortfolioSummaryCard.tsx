@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { useTrades } from "@/hooks/use-trades";
 import { useStockQuotes } from "@/hooks/use-stock-quote";
+import { usePositionAlerts } from "@/hooks/use-position-alerts";
 import { fmtUsd } from "@/lib/format-currency";
 import { TrendingUp, TrendingDown, Activity, ArrowRight, AlertCircle } from "lucide-react";
 
@@ -30,6 +31,11 @@ export function PortfolioSummaryCard() {
     [openTrades]
   );
   const quoteResults = useStockQuotes(openSymbols);
+
+  // Paket 160-161 (26 May 2026): Açık trade stop loss canlı uyarı (Mark TTLC s.131 %7 +
+  // TLSMW Ch 12 plan_stop). Dashboard + Journal her ikisinde de tetiklenir — sonner ID
+  // dedup spam etmez. Sn. Ferit sabah Dashboard açtığında stop'a değen pozisyonu görür.
+  usePositionAlerts(openTrades, quoteResults);
 
   const summary = useMemo(() => {
     if (openTrades.length === 0) return null;

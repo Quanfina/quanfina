@@ -7,6 +7,7 @@ import { AgGridReact } from "ag-grid-react";
 import type { ColDef } from "ag-grid-community";
 import { useTrades, useDeleteTrade } from "@/hooks/use-trades";
 import { useStockQuotes } from "@/hooks/use-stock-quote";
+import { usePositionAlerts } from "@/hooks/use-position-alerts";
 import { TRADE_COL_DEFS, TRADE_DEFAULT_COL_DEF } from "@/components/journal/columns";
 import { TradeRowActions } from "@/components/journal/TradeRowActions";
 import { AddTradeDialog } from "@/components/journal/AddTradeDialog";
@@ -92,6 +93,11 @@ export default function JournalPage() {
     [data]
   );
   const quoteResults = useStockQuotes(openSymbols);
+
+  // Paket 160 (26 May 2026): Açık trade canlı stop loss uyarısı.
+  // Mark TTLC s.131 %7 + TLSMW Ch 12 plan_stop disiplini → toast notification.
+  // Hook quote değişiminde otomatik tetik (Toaster top-right, sonner dedup).
+  usePositionAlerts(data ?? [], quoteResults);
   const quoteMap = useMemo(() => {
     const map = new Map<string, { price: number; source: string }>();
     quoteResults.forEach((r) => {
