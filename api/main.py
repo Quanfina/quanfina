@@ -52,6 +52,7 @@ from quanfina_math import (  # noqa: E402
     compute_overhead_supply,
     compute_climax_run,
     compute_brandon_expectancy,
+    compute_relative_strength_rating,
     MARK_PYRAMID_PILOT_PCT_RANGE,
     MARK_PYRAMID_STANDARD_PCT_RANGE,
     MARK_PYRAMID_FULL_PCT_RANGE,
@@ -1839,6 +1840,65 @@ def get_climax_run(symbol: str) -> ClimaxRunInfo:
         gain_pct=result.get("gain_pct"),
         gap_up_days=result.get("gap_up_days"),
         avg_volume_ratio=result.get("avg_volume_ratio"),
+        mark_says=result.get("mark_says", ""),
+    )
+
+
+# KARAR #733 alt-paket (Paket 93, 26 May 2026): RS Rating endpoint
+# Mark TLSMW Ch 3-5 / IBD canon Relative Strength Rating (1-99).
+class RsRatingInfo(BaseModel):
+    rs_rating: Optional[int] = None
+    category: Optional[Literal["LEADER", "STRONG", "AVERAGE", "LAGGARD"]] = None
+    stock_return_pct: Optional[float] = None
+    benchmark_return_pct: Optional[float] = None
+    outperform_pct: Optional[float] = None
+    mark_says: str
+
+
+@app.get("/api/stock/{symbol}/rs", response_model=RsRatingInfo)
+def get_rs_rating(symbol: str) -> RsRatingInfo:
+    """Mark TLSMW Ch 3-5 / IBD canon RS Rating (P91 helper wire).
+
+    Hisse vs SPY benchmark 12 ay agirlikli getiri -> 1-99 yuzdelik skoru.
+    OHLCV MOCK feed (AÇIK KONU #75 production yfinance).
+    """
+    sym = symbol.upper()
+    if sym == "SPY":
+        # SPY kendi-kendine RS = AVERAGE (50) garantili
+        return RsRatingInfo(
+            rs_rating=50,
+            category="AVERAGE",
+            stock_return_pct=0.0,
+            benchmark_return_pct=0.0,
+            outperform_pct=0.0,
+            mark_says="SPY benchmark — RS Rating tanım gereği AVERAGE (50).",
+        )
+    stock = _STOCK_BY_SYM.get(sym)
+    if stock:
+        stock_price = stock.price
+    else:
+        try:
+            wl = [r for r in watchlist_get_all() if r["symbol"] == sym]
+        except OperationalError:
+            wl = []
+        if wl:
+            stock_price = float(wl[0]["price"])
+        else:
+            scan_data = _fetch_scan_symbol_data(sym)
+            stock_price = scan_data["price"] if scan_data else 100.0
+
+    stock_bars = _generate_ohlcv(sym, stock_price)
+    bench_bars = _generate_ohlcv("SPY", 450.0)
+    stock_closes = [b.close for b in stock_bars]
+    bench_closes = [b.close for b in bench_bars]
+
+    result = compute_relative_strength_rating(stock_closes, bench_closes)
+    return RsRatingInfo(
+        rs_rating=result.get("rs_rating"),
+        category=result.get("category"),
+        stock_return_pct=result.get("stock_return_pct"),
+        benchmark_return_pct=result.get("benchmark_return_pct"),
+        outperform_pct=result.get("outperform_pct"),
         mark_says=result.get("mark_says", ""),
     )
 
