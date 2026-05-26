@@ -765,6 +765,35 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
               </div>
             </div>
 
+            {/* Paket 250 (27 May 2026): Mark Canon Otomatik Plan buton.
+                Sn. Ferit entry_price'a sahipken tek tıkla Mark canon
+                defaults: stop = entry × (1 - %6) = %6 stop (Mark TTLC s.131
+                %7 mutlak limitin altında güvenli marj), target = entry +
+                2×risk = 2R minimum (Mark canon). */}
+            {entryPrice && parseFloat(entryPrice) > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  const ep = parseFloat(entryPrice);
+                  if (!ep || ep <= 0) return;
+                  const markStop = (ep * 0.94).toFixed(2);   // %6 stop (TTLC s.131 %7 marjı içinde)
+                  const risk = ep - parseFloat(markStop);
+                  const markTarget = (ep + 2 * risk).toFixed(2);  // 2R minimum
+                  setPlanStop(markStop);
+                  setPlanTarget(markTarget);
+                }}
+                className="text-xs px-3 py-1.5 rounded-md border self-start font-medium hover:bg-accent transition-colors"
+                style={{
+                  background: "rgba(75,156,211,0.08)",
+                  borderColor: "rgba(75,156,211,0.4)",
+                  color: "var(--mtp-good, #4B9CD3)",
+                }}
+                title="Mark canon: stop = entry × 0.94 (%6 — TTLC s.131 %7 marjı), target = entry + 2R"
+              >
+                ⚡ Mark Otomatik Plan (%6 stop + 2R target)
+              </button>
+            )}
+
             {/* Plan Row B — Stop + Target */}
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1.5">
