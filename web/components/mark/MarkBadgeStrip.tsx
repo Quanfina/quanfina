@@ -34,6 +34,9 @@ export interface MarkSignals {
   // KARAR #733 alt-paket (Paket 95, 26 May 2026): Climax Run kategorisi
   // Mark TLSMW Ch 9 — açık trade'de CLIMAX_TOP varsa banner kırmızı bant
   climax_category?: "CLIMAX_TOP" | "POTENTIAL_CLIMAX" | "HEALTHY_ADVANCE" | "NONE" | null;
+  // KARAR #733 alt-paket (Paket 123, 26 May 2026): Stage Transition kategorisi
+  // Mark TLSMW Ch 4 / Weinstein — Stage 1→2 geçiş tespiti
+  stage_category?: "NO_TRANSITION" | "EARLY_STAGE_2" | "CONFIRMED_STAGE_2" | "STAGE_2_MATURE" | null;
 }
 
 interface BadgeProps {

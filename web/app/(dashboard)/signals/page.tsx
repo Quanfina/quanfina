@@ -341,6 +341,44 @@ export default function SignalsPage() {
         );
       },
     },
+    // KARAR #733 alt-paket (Paket 123, 26 May 2026): Stage Transition kolonu
+    // Mark TLSMW Ch 4 + Weinstein — Stage 1→2 geçiş kategorisi (Pivot pateni).
+    {
+      headerName: "Stage",
+      field: "mark_signals.stage_category" as keyof Signal,
+      width: 110,
+      sortable: false,
+      filter: false,
+      valueGetter: (p) => p.data?.mark_signals?.stage_category ?? null,
+      cellRenderer: (p: ICellRendererParams<Signal>) => {
+        const cat = p.data?.mark_signals?.stage_category;
+        if (!cat) return <span className="text-xs text-muted-foreground">—</span>;
+        const meta =
+          cat === "CONFIRMED_STAGE_2"
+            ? { label: "Onaylı ✓", color: "var(--mtp-excellent)", bg: "rgba(40,167,69,0.15)" }
+            : cat === "EARLY_STAGE_2"
+            ? { label: "Erken ⚡", color: "#F59E0B", bg: "rgba(245,158,11,0.15)" }
+            : cat === "STAGE_2_MATURE"
+            ? { label: "Olgun ⏳", color: "var(--mtp-good, #4B9CD3)", bg: "rgba(75,156,211,0.15)" }
+            : { label: "Yok ○", color: "var(--muted-foreground)", bg: "rgba(128,128,128,0.10)" };
+        return (
+          <span
+            className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider"
+            style={{
+              background: meta.bg,
+              color: meta.color,
+              border:
+                cat === "CONFIRMED_STAGE_2"
+                  ? "1px solid var(--mtp-excellent)"
+                  : "1px solid currentColor",
+            }}
+            title={`Mark TLSMW Ch 4 — Stage ${cat}`}
+          >
+            {meta.label}
+          </span>
+        );
+      },
+    },
     {
       headerName: "",
       width: 130,

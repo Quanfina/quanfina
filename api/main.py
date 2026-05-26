@@ -1504,6 +1504,9 @@ _STOCK_MARK_SIGNALS: dict[str, dict] = {
         # KARAR #733 alt-paket (Paket 95): Climax category MOCK — Mark TLSMW Ch 9
         # CLIMAX_TOP = parabolic + exhaustion gap (Mark "SAT" sinyali).
         "climax_category": "CLIMAX_TOP",
+        # KARAR #733 alt-paket (Paket 123, 26 May 2026): Stage Transition MOCK
+        # Mark TLSMW Ch 4 — 30W MA bazli Stage 1->2 gecis.
+        "stage_category": "STAGE_2_MATURE",
     },
     "MSFT": {
         "vcp_quality_score": "PASS",
@@ -1511,12 +1514,14 @@ _STOCK_MARK_SIGNALS: dict[str, dict] = {
         "power_play_pass": False,
         "volume_asymmetry_tier": "healthy",
         "carr_stage": 2,
+        "stage_category": "CONFIRMED_STAGE_2",
     },
     "AVGO": {
         "vcp_quality_score": "EXCELLENT",
         "power_play_pass": True,
         "tennis_ball_pattern": "TENNIS_BALL",
         "carr_stage": 2,
+        "stage_category": "EARLY_STAGE_2",
     },
     "AMD": {
         "vcp_ready_score": 78,
