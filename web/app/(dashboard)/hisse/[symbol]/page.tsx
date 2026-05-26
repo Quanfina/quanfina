@@ -19,6 +19,9 @@ import { RelativeVolumeCard } from "@/components/stock/RelativeVolumeCard";
 import { BreakoutQualityCard } from "@/components/stock/BreakoutQualityCard";
 import { MarkRegimeBanner } from "@/components/mark/MarkRegimeBanner";
 import { ModBadge } from "@/components/mark/ModBadge";
+import { PreTradeChecklist } from "@/components/journal/PreTradeChecklist";
+import { useRsRating } from "@/hooks/use-rs-rating";
+import { usePivotBreakout } from "@/hooks/use-pivot-breakout";
 import { useCarrStage } from "@/hooks/use-carr-stage";
 import { useClimaxRun } from "@/hooks/use-climax-run";
 import { AddTradeDialog } from "@/components/journal/AddTradeDialog";
@@ -57,6 +60,9 @@ export default function HissePage({
   // KARAR #733 alt-paket (Paket 104): /hisse sayfasında climax_top tetiği MarkRegimeBanner'a
   const { data: climaxData } = useClimaxRun(sym);
   const isClimaxTop = climaxData?.category === "CLIMAX_TOP";
+  // Paket 241 (27 May 2026): Pre-flight Mark canon mini-versiyon (sembol seviyesi)
+  const { data: rsData } = useRsRating(sym);
+  const { data: pivotData } = usePivotBreakout(sym);
 
   // KARAR #733 alt-paket (Paket 46): Hisse detay sayfasından doğrudan trade aç.
   // Sn. Ferit Watchlist/Hisse Tarama'dan hisseye girdiğinde direkt buradan
@@ -123,6 +129,18 @@ export default function HissePage({
         totalCount={1}
         climaxTopCount={isClimaxTop ? 1 : 0}
       />
+
+      {/* Paket 241 (27 May 2026): Pre-flight Mark canon checklist (sembol seviyesi).
+          Stage + RS + Pivot canlı bağlı; plan alanları yok (sembol sayfa, dialog değil).
+          Sn. Ferit Trade Aç tıklamadan ÖNCE Mark canon profili tek bakışta görür. */}
+      <div className="px-6 py-3 border-b">
+        <PreTradeChecklist
+          symbol={sym}
+          stage={carrStage?.stage}
+          rsRating={rsData?.rs_rating ?? null}
+          pivotPass={pivotData?.status === "CONFIRMED" || pivotData?.status === "WEAK"}
+        />
+      </div>
 
       {/* Stock header + Trade Aç buton (KARAR #733 alt-paket Paket 46) */}
       <div className="px-6 py-4 border-b flex items-start justify-between gap-3 flex-wrap">

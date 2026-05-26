@@ -28,6 +28,7 @@ import type { ColDef, CellClassParams } from "ag-grid-community";
 import { useScreenResults } from "@/hooks/use-screen-results";
 import type { ScreenSlug, ScreenResultRow } from "@/types/screens";
 import { MarkBadgeStrip } from "@/components/mark/MarkBadgeStrip";
+import { ModBadge } from "@/components/mark/ModBadge";
 import { SCREEN_CATEGORIES, SCREEN_CONDITIONS, CONDITION_SOURCE_LABEL } from "@/types/screens";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { GridLoadingOverlay } from "@/components/ag-grid/LoadingOverlay";
@@ -189,9 +190,10 @@ export default function ScreensPage() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header — sadece başlık (İzleme Listesi + Sinyaller + İşlem Günlüğü pateni) */}
-      <div className="px-6 py-3 border-b">
+      {/* Header — başlık + ModBadge (Vizyon İLKE #10 — 10. UI nokta P246) */}
+      <div className="px-6 py-3 border-b flex items-center justify-between">
         <h1 className="text-xl font-semibold tracking-tight">Tarama</h1>
+        <ModBadge variant="compact" />
       </div>
 
       {/* Filter bar — başlık altında ayrı satır (Watchlist + Journal pateni) */}

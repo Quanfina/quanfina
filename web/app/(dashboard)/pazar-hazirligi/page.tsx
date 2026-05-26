@@ -276,6 +276,37 @@ export default function PazarHazirligiPage() {
                 </Link>
               </div>
             </section>
+
+            {/* Paket 243 (27 May 2026): Mark Pre-flight uyarısı — Sn. Ferit
+                Pazar günü ritüel sonrası ilk trade'i açmadan ÖNCE PreTradeChecklist
+                7 koşulunu görmeli (Mark TTLC s.131 + TLSMW Leaders First). */}
+            <section
+              className="rounded-lg border p-4"
+              style={{
+                background: "rgba(75,156,211,0.06)",
+                borderColor: "rgba(75,156,211,0.30)",
+              }}
+            >
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                ⚠️ Pazartesi Açılış: Mark Canon Pre-flight
+              </h2>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Hafta başlangıcı her trade için <b>7 Mark canon koşulu</b> AddTradeDialog ve
+                hisse detay sayfasında otomatik görünür:
+              </p>
+              <ul className="text-xs text-muted-foreground mt-2 space-y-0.5 ml-4 list-disc">
+                <li>Stage 2 piyasa (Carr/Weinstein) — 30W MA üstü</li>
+                <li>RS Rating ≥ 70 (Mark TLSMW Leaders First)</li>
+                <li>VCP / Pivot Setup mevcut (TTLC Sec 4)</li>
+                <li>Plan: Giriş tetikleyicisi net (TTLC Sec 1.6 ZORUNLU)</li>
+                <li>Plan: Stop %7 limit içinde (TTLC s.131 mutlak)</li>
+                <li>Plan: Hedef R/R ≥ 2 (Mark minimum)</li>
+                <li>Mod farkındalığı (Vizyon İLKE #10)</li>
+              </ul>
+              <p className="text-xs italic mt-2" style={{ color: "var(--mtp-good, #4B9CD3)" }}>
+                Disiplin: 7/7 yeşil değilse trade aç&apos;ma — Mark canon felsefesi.
+              </p>
+            </section>
           </>
         )}
       </div>
