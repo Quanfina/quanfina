@@ -11,6 +11,7 @@ import { CarrStageCard } from "@/components/stock/CarrStageCard";
 import { PivotBreakoutCard } from "@/components/stock/PivotBreakoutCard";
 import { OverheadSupplyCard } from "@/components/stock/OverheadSupplyCard";
 import { ClimaxRunCard } from "@/components/stock/ClimaxRunCard";
+import { RsRatingCard } from "@/components/stock/RsRatingCard";
 import { MarkRegimeBanner } from "@/components/mark/MarkRegimeBanner";
 import { useCarrStage } from "@/hooks/use-carr-stage";
 import { AddTradeDialog } from "@/components/journal/AddTradeDialog";
@@ -154,6 +155,8 @@ export default function HissePage({
             <OverheadSupplyCard symbol={sym} />
             {/* KARAR #733 alt-paket (Paket 88): Climax Run Card — Mark TLSMW Ch 9 */}
             <ClimaxRunCard symbol={sym} />
+            {/* KARAR #733 alt-paket (Paket 94): RS Rating Card — Mark TLSMW Ch 3-5 / IBD */}
+            <RsRatingCard symbol={sym} />
           </div>
         </div>
 
