@@ -57,6 +57,7 @@ from quanfina_math import (  # noqa: E402
     compute_distribution_day_severity,
     compute_relative_volume,
     compute_breakout_quality,
+    compute_stage_transition,
     MARK_PYRAMID_PILOT_PCT_RANGE,
     MARK_PYRAMID_STANDARD_PCT_RANGE,
     MARK_PYRAMID_FULL_PCT_RANGE,
@@ -2065,6 +2066,58 @@ def get_breakout_quality(symbol: str) -> BreakoutQualityInfo:
         score=result.get("score", 0),
         category=result.get("category"),
         breakdown=result.get("breakdown", {}),
+        mark_says=result.get("mark_says", ""),
+    )
+
+
+# KARAR #733 alt-paket (Paket 121, 26 May 2026): Stage Transition endpoint
+# Mark TLSMW Ch 4 + Weinstein Stage 1->2 gecis tespiti backend wire.
+class StageTransitionInfo(BaseModel):
+    category: Optional[Literal[
+        "NO_TRANSITION", "EARLY_STAGE_2", "CONFIRMED_STAGE_2", "STAGE_2_MATURE"
+    ]] = None
+    ma_value: Optional[float] = None
+    price_above_ma_pct: Optional[float] = None
+    slope_pct: Optional[float] = None
+    days_above_ma: Optional[int] = None
+    volume_trend: Optional[Literal["RISING", "STABLE", "FALLING"]] = None
+    mark_says: str
+
+
+@app.get("/api/stock/{symbol}/stage", response_model=StageTransitionInfo)
+def get_stage_transition(symbol: str) -> StageTransitionInfo:
+    """Mark TLSMW Ch 4 Stage 1->2 transition (P120 helper wire).
+
+    30W MA (150 day SMA) bazli kirilim erken uyari + hacim teyit.
+    OHLCV MOCK feed kullanir.
+    """
+    sym = symbol.upper()
+    stock = _STOCK_BY_SYM.get(sym)
+    if stock:
+        price = stock.price
+    else:
+        try:
+            wl = [r for r in watchlist_get_all() if r["symbol"] == sym]
+        except OperationalError:
+            wl = []
+        if wl:
+            price = float(wl[0]["price"])
+        else:
+            scan_data = _fetch_scan_symbol_data(sym)
+            price = scan_data["price"] if scan_data else 100.0
+
+    bars = _generate_ohlcv(sym, price)
+    closes = [b.close for b in bars]
+    volumes = [b.volume for b in bars]
+
+    result = compute_stage_transition(closes, volumes)
+    return StageTransitionInfo(
+        category=result.get("category"),
+        ma_value=result.get("ma_value"),
+        price_above_ma_pct=result.get("price_above_ma_pct"),
+        slope_pct=result.get("slope_pct"),
+        days_above_ma=result.get("days_above_ma"),
+        volume_trend=result.get("volume_trend"),
         mark_says=result.get("mark_says", ""),
     )
 
