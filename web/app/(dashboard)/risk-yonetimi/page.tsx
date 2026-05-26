@@ -15,6 +15,7 @@ import { AtrVolatilityCard } from "@/components/stock/AtrVolatilityCard";
 import { useStageTransition } from "@/hooks/use-stage-transition";
 import { fmtUsd } from "@/lib/format-currency";
 import { ModBadge } from "@/components/mark/ModBadge";
+import { useTradingMode } from "@/hooks/use-trading-mode";
 
 /**
  * KARAR #733 alt-paket (Paket 38): Risk Yönetimi Pyramid Calculator sayfası.
@@ -75,6 +76,23 @@ export default function RiskYonetimiPage() {
     PILOT: false, // pilot her zaman acik (pilot_override=true)
     STANDARD: !newBuyAllowed,
     FULL: !newBuyAllowed,
+  };
+
+  // Paket 208 (27 May 2026): Mod-aware tier kilit (Vizyon İLKE #10 Mod Geçişleri).
+  // Rehab → STANDARD+FULL kilit (sadece PILOT %0.5 R sizing)
+  // Defansif → hepsi kilit (yeni AL bloklu)
+  // Agresif/Normal → mod açısından kilit yok (rejim kilidi geçerli kalır)
+  const tradingMode = useTradingMode();
+  const tierLockedByMode: Record<PyramidTier, boolean> = {
+    PILOT: tradingMode.mode === "defansif",
+    STANDARD: tradingMode.mode === "rehab" || tradingMode.mode === "defansif",
+    FULL: tradingMode.mode === "rehab" || tradingMode.mode === "defansif",
+  };
+  // Birleşik kilit: regime VEYA mod kilitli ise pratikte kilit
+  const tierLocked: Record<PyramidTier, boolean> = {
+    PILOT: tierLockedByRegime.PILOT || tierLockedByMode.PILOT,
+    STANDARD: tierLockedByRegime.STANDARD || tierLockedByMode.STANDARD,
+    FULL: tierLockedByRegime.FULL || tierLockedByMode.FULL,
   };
 
   // Backend hook (DRY) + client fallback
@@ -413,7 +431,10 @@ export default function RiskYonetimiPage() {
             {tierDollarRanges.map(({ tier: t, min, max }) => {
               const meta = TIER_LIMITS[t];
               const isCurrent = tier === t;
-              const isLocked = tierLockedByRegime[t];
+              const isLocked = tierLocked[t];
+              // Paket 208: kilit kaynağı (regime VEYA mod) — UI mesajı için ayrım
+              const lockedByRegime = tierLockedByRegime[t];
+              const lockedByMode = tierLockedByMode[t];
               return (
                 <div
                   key={t}
@@ -440,9 +461,20 @@ export default function RiskYonetimiPage() {
                         <span
                           className="text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase"
                           style={{ background: "var(--mtp-danger)", color: "#fff" }}
-                          title={`Piyasa ${marketStatus?.mark_regime?.label} — bu tier kilitli`}
+                          title={
+                            lockedByMode && lockedByRegime
+                              ? `Mod (${tradingMode.mode.toUpperCase()}) + Piyasa (${marketStatus?.mark_regime?.label}) — çift kilit`
+                              : lockedByMode
+                              ? `Trade Modu: ${tradingMode.mode.toUpperCase()} — ${tradingMode.uiBehavior}`
+                              : `Piyasa ${marketStatus?.mark_regime?.label} — bu tier kilitli`
+                          }
                         >
-                          Rejim Kilitli
+                          {/* Paket 208: kilit kaynağı emoji */}
+                          {lockedByMode && lockedByRegime
+                            ? "🔒 2x"
+                            : lockedByMode
+                            ? `${tradingMode.emoji} Mod Kilit`
+                            : "Rejim Kilit"}
                         </span>
                       )}
                       {isCurrent && (
