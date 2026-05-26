@@ -155,3 +155,52 @@ export function getDefansifBlockMessage(mode: TradingMode): string | null {
 export function isNewAlBlocked(mode: TradingMode): boolean {
   return mode === "defansif";
 }
+
+/**
+ * Paket 259 (27 May 2026): DRY helper — mode rengine göre UI theme.
+ * Dashboard (P255), Tarama (P253), AddTradeDialog banner (P196) gibi
+ * 5+ yerde tekrarlayan banner stilini tek kaynaktan al.
+ *
+ * Returns: { background, borderColor, color, emoji, message }
+ * - background/borderColor/color: inline style için CSS değerleri
+ * - emoji: aria-hidden ikon
+ * - message: kısa kullanıcı mesajı (default — sayfaya özel override mümkün)
+ */
+export interface ModUiTheme {
+  background: string;
+  borderColor: string;
+  color: string;
+  emoji: string;
+  shortMessage: string;
+}
+
+export function getModUiTheme(mode: TradingMode): ModUiTheme | null {
+  if (mode === "defansif") {
+    return {
+      background: "rgba(220, 53, 69, 0.08)",
+      borderColor: "rgba(220, 53, 69, 0.30)",
+      color: "var(--mtp-danger)",
+      emoji: "🛡️",
+      shortMessage: "DEFANSİF mod aktif — Mark TTLC s.187: yeni AL pozisyonları BLOK.",
+    };
+  }
+  if (mode === "rehab") {
+    return {
+      background: "rgba(245, 158, 11, 0.08)",
+      borderColor: "rgba(245, 158, 11, 0.30)",
+      color: "#F59E0B",
+      emoji: "🩹",
+      shortMessage: "REHAB mod aktif — %0.5 R sizing (yarım pozisyon), yeni AL önce uyarı.",
+    };
+  }
+  if (mode === "agresif") {
+    return {
+      background: "color-mix(in srgb, var(--mtp-excellent) 8%, transparent)",
+      borderColor: "color-mix(in srgb, var(--mtp-excellent) 30%, transparent)",
+      color: "var(--mtp-excellent)",
+      emoji: "🚀",
+      shortMessage: "AGRESİF mod aktif — Hot hand: Conviction High odaklı %1.5-2 R sizing.",
+    };
+  }
+  return null; // normal: banner gösterme
+}
