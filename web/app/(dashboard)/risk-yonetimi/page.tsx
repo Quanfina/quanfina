@@ -11,6 +11,8 @@ import {
 } from "@/lib/pyramid-calculator";
 import { usePyramidTier } from "@/hooks/use-pyramid-tier";
 import { useMarketStatus } from "@/hooks/use-market-status";
+import { AtrVolatilityCard } from "@/components/stock/AtrVolatilityCard";
+import { useStageTransition } from "@/hooks/use-stage-transition";
 import { fmtUsd } from "@/lib/format-currency";
 
 /**
@@ -47,6 +49,8 @@ export default function RiskYonetimiPage() {
   const [portfolioStr, setPortfolioStr] = useState("100000");
   const [positionStr, setPositionStr] = useState("");
   const [prevProfitable, setPrevProfitable] = useState(false);
+  // KARAR #733 alt-paket (Paket 126, 26 May 2026): ATR sembol input
+  const [atrSymbol, setAtrSymbol] = useState("NVDA");
 
   const portfolioValue = parseFloat(portfolioStr) || 0;
   const positionValue = parseFloat(positionStr) || 0;
@@ -281,6 +285,11 @@ export default function RiskYonetimiPage() {
         </div>
       )}
 
+      {/* KARAR #733 alt-paket (Paket 126+127, 26 May 2026): ATR-based Stop Suggestion
+          + Stage Transition rozet — Sn. Ferit pyramid hesabı yaparken aynı sayfada
+          sembol bazlı ATR stop önerisi ve Stage Transition canon. */}
+      <AtrStageSection symbol={atrSymbol} onSymbolChange={setAtrSymbol} />
+
       {/* 3 Tier $ aralık tablosu */}
       {tierDollarRanges && (
         <div className="rounded-lg border bg-card p-4 flex flex-col gap-3">
@@ -496,6 +505,68 @@ export default function RiskYonetimiPage() {
           </p>
         </div>
       </details>
+    </div>
+  );
+}
+
+// KARAR #733 alt-paket (Paket 126+127, 26 May 2026): ATR sembol input + Stage rozet
+// Pyramid hesabı yaparken sembol bazlı ATR stop önerisi ve Stage Transition canon.
+function AtrStageSection({
+  symbol,
+  onSymbolChange,
+}: {
+  symbol: string;
+  onSymbolChange: (s: string) => void;
+}) {
+  const { data: stageData } = useStageTransition(symbol.toUpperCase());
+
+  const stageMeta: Record<string, { label: string; color: string; bg: string }> = {
+    NO_TRANSITION: { label: "Kırılım Yok ○", color: "var(--muted-foreground)", bg: "rgba(128,128,128,0.10)" },
+    EARLY_STAGE_2: { label: "Erken Stage 2 ⚡", color: "#F59E0B", bg: "rgba(245,158,11,0.15)" },
+    CONFIRMED_STAGE_2: { label: "Stage 2 Onaylı ✓", color: "var(--mtp-excellent)", bg: "rgba(40,167,69,0.15)" },
+    STAGE_2_MATURE: { label: "Olgun Trend ⏳", color: "var(--mtp-good, #4B9CD3)", bg: "rgba(75,156,211,0.15)" },
+  };
+  const stage = stageData?.category;
+  const meta = stage ? stageMeta[stage] : null;
+
+  return (
+    <div className="rounded-lg border bg-card p-4 flex flex-col gap-3">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <h2 className="text-sm font-semibold">
+          ATR Stop Önerisi + Stage Transition
+          <span className="ml-1.5 text-[10px] font-normal text-muted-foreground italic">
+            (Mark TLSMW Ch 11 + Ch 4)
+          </span>
+        </h2>
+        {meta && (
+          <span
+            className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider"
+            style={{ background: meta.bg, color: meta.color, border: `1px solid ${meta.color}` }}
+            title={stageData?.mark_says ?? ""}
+          >
+            {meta.label}
+          </span>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-1.5 max-w-xs">
+        <label htmlFor="atr-symbol" className="text-xs font-medium text-muted-foreground">
+          Sembol (ATR + Stage hesabı için)
+        </label>
+        <input
+          id="atr-symbol"
+          type="text"
+          value={symbol}
+          onChange={(e) => onSymbolChange(e.target.value)}
+          placeholder="NVDA"
+          className="h-10 rounded-md border border-input bg-background px-3 text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-ring"
+          maxLength={5}
+        />
+      </div>
+
+      {symbol.length >= 2 && (
+        <AtrVolatilityCard symbol={symbol.toUpperCase()} />
+      )}
     </div>
   );
 }
