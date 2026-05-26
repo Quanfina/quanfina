@@ -53,8 +53,8 @@ const CATEGORY_META: Record<BrandonExpectancyCategory, CategoryMeta> = {
   },
 };
 
-export function BrandonExpectancyCard() {
-  const { data, isLoading, isError } = useTradesExpectancy();
+export function BrandonExpectancyCard({ strategy }: { strategy?: string } = {}) {
+  const { data, isLoading, isError } = useTradesExpectancy(strategy);
 
   if (isLoading) {
     return (

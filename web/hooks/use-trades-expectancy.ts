@@ -26,18 +26,19 @@ export interface BrandonExpectancyInfo {
   win_rate: number;
 }
 
-async function fetchExpectancy(): Promise<BrandonExpectancyInfo> {
-  const res = await fetch(`/api/trades/expectancy`);
+async function fetchExpectancy(strategy?: string): Promise<BrandonExpectancyInfo> {
+  const params = strategy && strategy !== "all" ? `?strategy=${encodeURIComponent(strategy)}` : "";
+  const res = await fetch(`/api/trades/expectancy${params}`);
   if (!res.ok) {
     throw new Error(`Expectancy alınamadı: ${res.status}`);
   }
   return res.json();
 }
 
-export function useTradesExpectancy() {
+export function useTradesExpectancy(strategy?: string) {
   return useQuery({
-    queryKey: ["trades-expectancy"],
-    queryFn: fetchExpectancy,
+    queryKey: ["trades-expectancy", strategy ?? "all"],
+    queryFn: () => fetchExpectancy(strategy),
     staleTime: 5 * 60_000,
   });
 }

@@ -135,11 +135,12 @@ export default function JournalPage() {
         />
       </div>
 
-      {/* KARAR #733 alt-paket (Paket 90): Brandon Expectancy /journal canon
+      {/* KARAR #733 alt-paket (Paket 90+97): Brandon Expectancy /journal canon
           Mark Brandon Video — kapali trade'ler agregasyon expectancy hesabi.
-          RBA Summary Card felsefe simetrisi: RBA setup-bazli, Brandon trade-bazli. */}
+          RBA Summary Card felsefe simetrisi: RBA setup-bazli, Brandon trade-bazli.
+          P97: strategyFilter prop -> canli filter (Mark vs Carr ayri E hesabi). */}
       <div className="px-6 py-3 border-b">
-        <BrandonExpectancyCard />
+        <BrandonExpectancyCard strategy={strategyFilter !== "all" ? strategyFilter : undefined} />
       </div>
 
       {/* Filters */}
