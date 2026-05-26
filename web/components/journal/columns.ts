@@ -7,6 +7,7 @@ import { SymbolCellRenderer } from "@/components/watchlist/SymbolCellRenderer";
 import { formatDateTR } from "@/lib/format-date";
 import { fmtUsd, fmtPctSigned } from "@/lib/format-currency";
 import { RMultipleCell } from "./RMultipleCell";
+import { PivotBadgeCell } from "@/components/shared/PivotBadgeCell";
 // KARAR #492 (20 May 2026 ~16:45): DRY hijyen - yerel MONO -> @/lib/grid-styles
 // 4 sayfa tek noktada toplandi (signals/screens/watchlist/journal). fontSize 12px
 // MONO_RIGHT global tutarlilik (Sinyaller pateniyle exact match).
@@ -176,6 +177,8 @@ export const TRADE_COL_DEFS: ColDef<Trade>[] = [
   // (P81 Sinyaller + P82 Watchlist + P83 Tarama paten birebir). Trade enrichment
   // _enrich_trade_with_mark_signals -> _compute_signal_pivot_status (entry_price baz).
   // Trade gecmis kayit oldugundan pivot status "snapshot" niteliginde (anlik degil).
+  // Paket 153 (26 May 2026): document.createElement -> PivotBadgeCell React component
+  // (React 19 crash fix — "Objects are not valid as a React child").
   {
     headerName: "PIVOT",
     field: "pivot_status",
@@ -183,23 +186,7 @@ export const TRADE_COL_DEFS: ColDef<Trade>[] = [
     minWidth: 90,
     sortable: false,
     filter: false,
-    cellRenderer: (p: { data?: Trade }) => {
-      const status = p.data?.pivot_status;
-      if (!status) return null;
-      const meta =
-        status === "CONFIRMED"
-          ? { label: "AL ✓", color: "var(--mtp-excellent)", bg: "rgba(40,167,69,0.15)" }
-          : status === "WEAK"
-          ? { label: "Zayıf ⚠️", color: "#F59E0B", bg: "rgba(245,158,11,0.15)" }
-          : status === "NEAR_PIVOT"
-          ? { label: "Yakın ⏳", color: "var(--mtp-good, #4B9CD3)", bg: "rgba(75,156,211,0.15)" }
-          : { label: "Altı ○", color: "var(--mtp-danger)", bg: "rgba(220,53,69,0.10)" };
-      const el = document.createElement("span");
-      el.textContent = meta.label;
-      el.style.cssText = `font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;text-transform:uppercase;letter-spacing:0.05em;background:${meta.bg};color:${meta.color};border:1px solid ${status === "CONFIRMED" ? "var(--mtp-excellent)" : "currentColor"};`;
-      el.title = `Mark TLSMW Ch 10 — Pivot ${status}`;
-      return el;
-    },
+    cellRenderer: PivotBadgeCell,
   },
   {
     field: "grade",
