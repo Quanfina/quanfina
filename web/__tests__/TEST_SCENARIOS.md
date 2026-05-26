@@ -165,8 +165,17 @@ import '@testing-library/jest-dom/vitest';
 
 ### PreTradeChecklist compact prop (P257)
 - ✅ `compact=true` → 4 koşul (Stage + RS + Setup + Mod)
-- ✅ `compact=false` (default) → 7 koşul (yukarıdaki 4 + Plan trigger + Stop + R/R)
+- ✅ `compact=false` (default) → 8 koşul (P265 ile genişledi: yukarıdaki 4 + Plan trigger + Stop + R/R + Pozisyon ≤25%)
 - ✅ Plan alanları compact'ta gizli — "Stop $ tanımlı değil" fail yok
+
+### PreTradeChecklist 8. koşul planSizePct (P265+P266)
+- ✅ `planSizePct=null` → warn "Pozisyon % tanımlı değil"
+- ✅ `planSizePct=20` → ok yeşil "20% (Mark TTLC s.85 sektör limiti içinde)"
+- ✅ `planSizePct=25` → ok (sınırda)
+- ✅ `planSizePct=28` → warn sarı "28% — Mark canon 25-30% sınır bölgesi"
+- ✅ `planSizePct=35` → fail kırmızı "35% — Mark TTLC s.85 LİMİT AŞILDI"
+- ✅ compact=true → 8. koşul gizli (sembol seviyesi sayfa)
+- ✅ useMemo deps array `planSizePct` dahil — form input değişiminde rerender
 
 ## İlişkili
 
