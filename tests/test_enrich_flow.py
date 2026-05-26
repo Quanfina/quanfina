@@ -169,6 +169,66 @@ class TestEnrichTradeBatch:
         assert result[0].mark_signals.get("carr_stage") == 2
 
 
+class TestTradeSectorEnrichment:
+    """Paket 205 (27 May 2026): P190 sector field enrichment regresyon koruma.
+
+    Mark TTLC s.85 sektör konsantrasyon uyarısı altyapısı:
+    _STOCK_META lookup ile Trade.sector doldurulur. Eski 28 sembolde
+    "industry" field fallback (P190 alt-fix).
+    """
+
+    def _make_trade(self, symbol: str) -> Trade:
+        return Trade(
+            id=1, symbol=symbol, strategy="minervini",
+            setup_type="VCP", signal_source="strategy",
+            entry_date="2026-05-01", entry_price=100.0, shares=10,
+            status="open",
+            exit_date=None, exit_price=None,
+            pl_dollar=None, pl_pct=None,
+            grade=None, exit_reason=None, lessons=None,
+        )
+
+    def test_new_symbol_has_sector_field(self):
+        """Yeni eklenen sembol (P186): TSLA → Consumer Discretionary."""
+        trade = self._make_trade("TSLA")
+        result = api_main._enrich_trade_with_mark_signals(trade)
+        assert result.sector == "Consumer Discretionary"
+
+    def test_old_symbol_industry_fallback(self):
+        """Eski sembol (sector field yok, sadece industry): NVDA → Semiconductors."""
+        trade = self._make_trade("NVDA")
+        result = api_main._enrich_trade_with_mark_signals(trade)
+        # NVDA _STOCK_META'da "industry": "Semiconductors" var, "sector" yok
+        # Fallback ile sector = "Semiconductors" doldurulmalı
+        assert result.sector == "Semiconductors"
+
+    def test_etf_symbol_sector_etf(self):
+        """ETF eklemeleri (P186): XLK → ETF."""
+        trade = self._make_trade("XLK")
+        result = api_main._enrich_trade_with_mark_signals(trade)
+        assert result.sector == "ETF"
+
+    def test_unknown_symbol_no_sector(self):
+        """_STOCK_META'da olmayan sembol → sector None (Bilinmiyor)."""
+        trade = self._make_trade("UNKNOWN_XYZ")
+        result = api_main._enrich_trade_with_mark_signals(trade)
+        assert result.sector is None
+
+    def test_lowercase_symbol_upper_normalize(self):
+        """Sembol uppercase normalize ediliyor (Trade.symbol genelde upper)."""
+        # Trade Pydantic uppercase'e otomatik çevirmez, _enrich'te .upper() var
+        trade = self._make_trade("aapl")
+        result = api_main._enrich_trade_with_mark_signals(trade)
+        # AAPL "sector": "Technology" mevcut
+        assert result.sector == "Technology"
+
+    def test_biotech_symbol(self):
+        """Biotech eklemeleri (P186): MRNA → Health Care."""
+        trade = self._make_trade("MRNA")
+        result = api_main._enrich_trade_with_mark_signals(trade)
+        assert result.sector == "Health Care"
+
+
 # =====================================================================
 # db_health_check cache (P145 alt-katman)
 # =====================================================================
