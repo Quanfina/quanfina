@@ -1578,6 +1578,80 @@ class OhlcvBar(BaseModel):
     volume: int
 
 
+# KARAR #733 alt-paket (Paket 140, 26 May 2026): yfinance gerçek OHLCV
+# entegrasyonu (AÇIK KONU #75 RESOLVED). Paper trading için gerçek piyasa
+# verisi şart — MOCK feed yetersiz (NVDA gerçek RS/Pivot/ATR hesabı için).
+#
+# Cache: in-memory dict + 5 dakika TTL (Mark canon helper sweep × 10 sembol
+# = 10 yfinance çağrısı → ardışık sayfa yüklemelerinde 0 çağrı).
+# Fallback: yfinance fail → _generate_ohlcv MOCK (UX kesintisiz).
+import time as _time_module
+
+_OHLCV_CACHE: dict[str, tuple[float, list]] = {}
+_OHLCV_CACHE_TTL_SEC = 300  # 5 dakika
+_YF_DISABLED = False  # yfinance import veya runtime fail -> True (tek seferlik)
+
+
+def _fetch_ohlcv_real(symbol: str, n_bars: int = 252) -> Optional[list[OhlcvBar]]:
+    """yfinance gerçek OHLCV verisi + cache + fail-safe.
+
+    Returns:
+        Bar list veya None (fail). None ise caller _generate_ohlcv MOCK
+        fallback'e düşer.
+    """
+    global _YF_DISABLED
+    if _YF_DISABLED:
+        return None
+
+    sym = symbol.upper()
+    now = _time_module.time()
+
+    # Cache hit?
+    if sym in _OHLCV_CACHE:
+        ts, bars = _OHLCV_CACHE[sym]
+        if now - ts < _OHLCV_CACHE_TTL_SEC:
+            return bars
+
+    # yfinance fetch
+    try:
+        import yfinance as yf
+        ticker = yf.Ticker(sym)
+        hist = ticker.history(period="1y")
+        if len(hist) < 10:
+            return None
+        bars: list[OhlcvBar] = []
+        for date_idx, row in hist.iterrows():
+            bars.append(OhlcvBar(
+                time=date_idx.strftime("%Y-%m-%d"),
+                open=float(row["Open"]),
+                high=float(row["High"]),
+                low=float(row["Low"]),
+                close=float(row["Close"]),
+                volume=int(row["Volume"]),
+            ))
+        _OHLCV_CACHE[sym] = (now, bars)
+        return bars
+    except ImportError:
+        _YF_DISABLED = True
+        return None
+    except Exception:
+        # Network / rate limit / symbol unknown — MOCK fallback
+        return None
+
+
+def _get_ohlcv(symbol: str, end_price: float, n_bars: int = 252) -> list[OhlcvBar]:
+    """yfinance öncelik, fail durumunda MOCK fallback.
+
+    Bu helper tüm endpoint'ler için tek giriş noktası — Mark canon helper'lar
+    gerçek piyasa verisi görür (paper trading şartı), kesinti olursa MOCK
+    kullanılır (UX kesintisiz).
+    """
+    real = _fetch_ohlcv_real(symbol, n_bars)
+    if real is not None and len(real) >= 10:
+        return real
+    return _generate_ohlcv(symbol, end_price, n_bars)
+
+
 def _generate_ohlcv(symbol: str, end_price: float, n_bars: int = 252) -> list[OhlcvBar]:
     """Deterministic OHLCV generation — seed per symbol, Minervini-appropriate uptrend."""
     rng = random.Random(sum(ord(c) for c in symbol) * 7919)
@@ -1757,7 +1831,7 @@ def get_overhead_supply(symbol: str) -> OverheadSupplyInfo:
         else:
             scan_data = _fetch_scan_symbol_data(sym)
             price = scan_data["price"] if scan_data else 100.0
-    bars = _generate_ohlcv(sym, price)
+    bars = _get_ohlcv(sym, price)
     closes = [b.close for b in bars]
     result = compute_overhead_supply(closes)
     return OverheadSupplyInfo(
@@ -1803,7 +1877,7 @@ def get_pivot_breakout(symbol: str) -> PivotBreakoutInfo:
         else:
             scan_data = _fetch_scan_symbol_data(sym)
             price = scan_data["price"] if scan_data else 100.0
-    bars = _generate_ohlcv(sym, price)
+    bars = _get_ohlcv(sym, price)
     closes = [b.close for b in bars]
     volumes = [b.volume for b in bars]
 
@@ -1851,7 +1925,7 @@ def get_climax_run(symbol: str) -> ClimaxRunInfo:
         else:
             scan_data = _fetch_scan_symbol_data(sym)
             price = scan_data["price"] if scan_data else 100.0
-    bars = _generate_ohlcv(sym, price)
+    bars = _get_ohlcv(sym, price)
     closes = [b.close for b in bars]
     opens = [b.open for b in bars]
     volumes = [b.volume for b in bars]
@@ -1909,8 +1983,8 @@ def get_rs_rating(symbol: str) -> RsRatingInfo:
             scan_data = _fetch_scan_symbol_data(sym)
             stock_price = scan_data["price"] if scan_data else 100.0
 
-    stock_bars = _generate_ohlcv(sym, stock_price)
-    bench_bars = _generate_ohlcv("SPY", 450.0)
+    stock_bars = _get_ohlcv(sym, stock_price)
+    bench_bars = _get_ohlcv("SPY", 450.0)
     stock_closes = [b.close for b in stock_bars]
     bench_closes = [b.close for b in bench_bars]
 
@@ -1959,7 +2033,7 @@ def get_atr_volatility(symbol: str) -> AtrVolatilityInfo:
             scan_data = _fetch_scan_symbol_data(sym)
             price = scan_data["price"] if scan_data else 100.0
 
-    bars = _generate_ohlcv(sym, price)
+    bars = _get_ohlcv(sym, price)
     highs = [b.high for b in bars]
     lows = [b.low for b in bars]
     closes = [b.close for b in bars]
@@ -2008,7 +2082,7 @@ def get_relative_volume(symbol: str) -> RelativeVolumeInfo:
             scan_data = _fetch_scan_symbol_data(sym)
             price = scan_data["price"] if scan_data else 100.0
 
-    bars = _generate_ohlcv(sym, price)
+    bars = _get_ohlcv(sym, price)
     volumes = [b.volume for b in bars]
 
     result = compute_relative_volume(volumes)
@@ -2052,7 +2126,7 @@ def get_breakout_quality(symbol: str) -> BreakoutQualityInfo:
             scan_data = _fetch_scan_symbol_data(sym)
             price = scan_data["price"] if scan_data else 100.0
 
-    bars = _generate_ohlcv(sym, price)
+    bars = _get_ohlcv(sym, price)
     volumes = [b.volume for b in bars]
 
     # rel_vol hesapla — volume_confirmed icin (>=1.5x = teyit)
@@ -2111,7 +2185,7 @@ def get_stage_transition(symbol: str) -> StageTransitionInfo:
             scan_data = _fetch_scan_symbol_data(sym)
             price = scan_data["price"] if scan_data else 100.0
 
-    bars = _generate_ohlcv(sym, price)
+    bars = _get_ohlcv(sym, price)
     closes = [b.close for b in bars]
     volumes = [b.volume for b in bars]
 
@@ -2144,7 +2218,7 @@ def get_stock_ohlcv(symbol: str) -> list[OhlcvBar]:
             # 24 May 2026 — Tarama sonucu fallback (KARAR ADAY #498)
             scan_data = _fetch_scan_symbol_data(sym)
             price = scan_data["price"] if scan_data else 100.0  # Generic MOCK son fallback
-    return _generate_ohlcv(sym, price)
+    return _get_ohlcv(sym, price)
 
 
 # ── Setup Types ───────────────────────────────────────────────────────────────
@@ -2692,7 +2766,7 @@ def _compute_signal_pivot_status(symbol: str, price: float) -> Optional[str]:
     (sembol+tarih seed) — aynı gün aynı sembol aynı status.
     """
     try:
-        bars = _generate_ohlcv(symbol, price)
+        bars = _get_ohlcv(symbol, price)
         closes = [b.close for b in bars]
         volumes = [b.volume for b in bars]
         result = compute_pivot_breakout(closes, volumes)
