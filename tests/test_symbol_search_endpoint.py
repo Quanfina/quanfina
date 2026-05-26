@@ -150,7 +150,7 @@ class TestCacheBehavior:
         # Eski timestamp (TTL geçmiş)
         api_main._YF_SYMBOL_CACHE["EXPSYM"] = (
             time.time() - api_main._YF_SYMBOL_CACHE_TTL_SEC - 10,
-            {"symbol": "EXPSYM", "name": "Old Cached", "sector": "Old"},
+            {"symbol": "EXPSYM", "name": "Old Cached", "sector": "Old", "source": "yfinance"},
         )
         # Bu çağrı cache miss olarak işlenir → gerçek yfinance dener (muhtemelen fail)
         # → negative cache yazar veya yine eski döner — burada sadece TTL kontrol
@@ -163,7 +163,7 @@ class TestCacheBehavior:
         import time
         api_main._YF_SYMBOL_CACHE["LOWERCASE"] = (
             time.time(),
-            {"symbol": "LOWERCASE", "name": "Lower Test", "sector": "Test"},
+            {"symbol": "LOWERCASE", "name": "Lower Test", "sector": "Test", "source": "yfinance"},
         )
         # Lowercase query — backend uppercase yapacak, cache hit
         r = client.get("/api/symbols/search?q=lowercase")
@@ -173,3 +173,73 @@ class TestCacheBehavior:
         # Cache LOWERCASE upper key'le hit eder
         symbols = [d["symbol"] for d in data]
         assert "LOWERCASE" in symbols or len(data) == 0
+
+
+class TestSourceFieldRegression:
+    """Paket 214 (27 May 2026): P211 source field regresyon koruma.
+
+    SymbolSearchResult.source field — Quanfina evren vs yfinance fallback ayrımı.
+    Kullanıcı UI dropdown rozet için kritik.
+    """
+
+    def test_universe_match_has_source_universe(self, client):
+        """_STOCK_META hit → source='universe'."""
+        r = client.get("/api/symbols/search?q=NVDA")
+        assert r.status_code == 200
+        data = r.json()
+        nvda = next((d for d in data if d["symbol"] == "NVDA"), None)
+        assert nvda is not None
+        assert nvda["source"] == "universe"
+
+    def test_yfinance_cache_hit_returns_yfinance_source(self, client):
+        """yfinance fallback cache'lenmiş → source='yfinance'.
+        NOT: Backend filter `isalpha()` — sembol harf-only olmalı (ZTEST2 ❌).
+        """
+        import time
+        api_main._YF_SYMBOL_CACHE["ZTEST"] = (
+            time.time(),
+            {
+                "symbol": "ZTEST",
+                "name": "Z Test Inc",
+                "sector": "Technology",
+                "source": "yfinance",
+            },
+        )
+        r = client.get("/api/symbols/search?q=ZTEST")
+        assert r.status_code == 200
+        data = r.json()
+        assert len(data) == 1
+        assert data[0]["source"] == "yfinance"
+        assert data[0]["symbol"] == "ZTEST"
+
+    def test_universe_field_default_when_missing(self, client):
+        """Backward compat: source field default 'universe' (eski API yanıtları)."""
+        # AAPL Quanfina evrende — direkt source="universe" döner
+        r = client.get("/api/symbols/search?q=AAPL")
+        assert r.status_code == 200
+        data = r.json()
+        aapl = next((d for d in data if d["symbol"] == "AAPL"), None)
+        assert aapl is not None
+        # source field her response'da var (Pydantic default)
+        assert "source" in aapl
+        assert aapl["source"] == "universe"
+
+    def test_multiple_results_all_have_source(self, client):
+        """Birden çok sonuç — hepsinde source field var."""
+        r = client.get("/api/symbols/search?q=A&limit=5")
+        assert r.status_code == 200
+        data = r.json()
+        for d in data:
+            assert "source" in d
+            assert d["source"] in ("universe", "yfinance")
+
+    def test_mixed_universe_then_yfinance_results(self, client):
+        """Quanfina evrende sonuç varsa yfinance fallback'e gitmemeli.
+        Sadece evren yok ise yfinance dener."""
+        # NV ile başlayan evrende NVDA var → yfinance fallback bypass
+        r = client.get("/api/symbols/search?q=NV")
+        assert r.status_code == 200
+        data = r.json()
+        # Hepsi universe source olmalı (yfinance fallback tetiklenmedi)
+        for d in data:
+            assert d["source"] == "universe", f"{d['symbol']} unexpected source {d['source']}"

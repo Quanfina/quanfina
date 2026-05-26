@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import type { Signal } from "@/types/signal";
 import { MarkBadgeStrip } from "@/components/mark/MarkBadgeStrip";
 import { MarkRegimeBanner } from "@/components/mark/MarkRegimeBanner";
+import { ModBadge } from "@/components/mark/ModBadge";
 import { fmtUsd } from "@/lib/format-currency";
 import { RsRatingBadge } from "@/components/shared/RsRatingBadge";
 import { SignalRREnrichedCell } from "@/components/signals/SignalRREnrichedCell";
@@ -407,10 +408,15 @@ export default function SignalsPage() {
             Tüm strateji sinyalleri — bugün ne var?
           </p>
         </div>
-        <Button size="sm" onClick={() => setManualOpen(true)} title="Manuel sinyal ekle (İzleme Listesi üzerinden)">
-          <Plus size={14} className="mr-1.5" />
-          Manuel Sinyal
-        </Button>
+        <div className="flex items-center gap-3">
+          {/* Paket 215 (27 May 2026): ModBadge compact — Sn. Ferit AL butonu basmadan
+              mod farkındalığı. Defansif modda yeni AL BLOK, Rehab'da %0.5 R uyarısı. */}
+          <ModBadge variant="compact" />
+          <Button size="sm" onClick={() => setManualOpen(true)} title="Manuel sinyal ekle (İzleme Listesi üzerinden)">
+            <Plus size={14} className="mr-1.5" />
+            Manuel Sinyal
+          </Button>
+        </div>
       </div>
 
       {/* KARAR #733 alt-paket (Paket 36): Mark Regime üst-uyarı banner */}
