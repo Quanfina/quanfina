@@ -29,6 +29,8 @@ import { useAtrVolatility } from "@/hooks/use-atr-volatility";
 import { useSymbolSearch } from "@/hooks/use-symbol-search";
 import { useStockQuote } from "@/hooks/use-stock-quote";
 import { useTradingMode } from "@/hooks/use-trading-mode";
+import { useTrades } from "@/hooks/use-trades";
+import { useStockQuotes } from "@/hooks/use-stock-quote";
 
 const SELECT = "h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring";
 const TEXTAREA = "w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm resize-none focus:outline-none focus:ring-1 focus:ring-ring";
@@ -90,6 +92,58 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
   // Paket 196 (26 May 2026): Trading Mode kontrolü — Mark TTLC s.187 disiplini
   // Rehab → uyarı + %0.5 R önerisi, Defansif → BLOK, Agresif → Conviction High notu
   const tradingMode = useTradingMode();
+
+  // Paket 202 (27 May 2026): Sektör konsantrasyon önizleme (Mark TTLC s.85).
+  // Sn. Ferit yeni trade kayıt ederken sembol + miktar girince hesapla:
+  // mevcut portfolio + bu trade → sektörün toplam % oranı. >30% kırmızı uyarı.
+  const tradesQuery = useTrades();
+  const openTradesAll = useMemo(
+    () => (tradesQuery.data ?? []).filter((t) => t.status === "open"),
+    [tradesQuery.data]
+  );
+  const openSymsAll = useMemo(
+    () => Array.from(new Set(openTradesAll.map((t) => t.symbol))),
+    [openTradesAll]
+  );
+  const openQuotesAll = useStockQuotes(openSymsAll);
+  const sectorPreview = useMemo(() => {
+    const newSector = symbolSuggestions?.find(
+      (s) => s.symbol === trimmedSym
+    )?.sector;
+    const ep = parseFloat(entryPrice);
+    const sh = parseInt(shares);
+    if (!newSector || !ep || ep <= 0 || !sh || sh <= 0) return null;
+    const newTradeValue = ep * sh;
+
+    // Mevcut portfolio sektör değerleri (canlı fiyat × shares)
+    const quoteMap = new Map<string, number>();
+    openQuotesAll.forEach((r) => {
+      if (r.data) quoteMap.set(r.data.symbol.toUpperCase(), r.data.price);
+    });
+
+    const sectorMap = new Map<string, number>();
+    let totalCurrentValue = 0;
+    openTradesAll.forEach((t) => {
+      const price = quoteMap.get(t.symbol.toUpperCase()) ?? t.entry_price;
+      const val = price * t.shares;
+      totalCurrentValue += val;
+      const sec = t.sector || "Bilinmiyor";
+      sectorMap.set(sec, (sectorMap.get(sec) ?? 0) + val);
+    });
+
+    // Yeni trade ile + sektör projeksiyonu
+    const newSectorTotal = (sectorMap.get(newSector) ?? 0) + newTradeValue;
+    const newPortfolioTotal = totalCurrentValue + newTradeValue;
+    const newSectorPct =
+      newPortfolioTotal > 0 ? (newSectorTotal / newPortfolioTotal) * 100 : 0;
+
+    return {
+      sector: newSector,
+      newSectorPct,
+      warning: newSectorPct > 30,    // Mark TTLC s.85
+      caution: newSectorPct > 20 && newSectorPct <= 30,
+    };
+  }, [symbolSuggestions, trimmedSym, entryPrice, shares, openTradesAll, openQuotesAll]);
 
   // KARAR #733 alt (Paket 33): Symbol Carr Stage pre-check (Stage 4 → uzak dur uyarısı)
   // Symbol ≥3 karakter olduğunda hook etkinleşir (gereksiz API gürültüsü engellenir)
@@ -556,6 +610,60 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
           {/* Mark Risk Advisor — Sprint 4-bis.7 Faz 1 B paket (KARAR #914+#969+#970)
               KARAR #727 (24 May 2026): RBA gerçek veri bağı — strategy prop ile filtre */}
           <MarkRiskAdvisor entryPrice={entryPrice} shares={shares} strategy={strategy} />
+
+          {/* Paket 202 (27 May 2026): Sektör konsantrasyon önizleme — Mark TTLC s.85
+              Sn. Ferit yeni trade kayıt ederken sembol + entry + shares girince
+              "Bu trade ile sektör %X olacak" — >30% kırmızı uyarı. */}
+          {sectorPreview && (
+            <div
+              className="rounded-md border px-3 py-2 flex items-start gap-2 text-xs"
+              style={{
+                background: sectorPreview.warning
+                  ? "color-mix(in srgb, var(--mtp-danger) 8%, transparent)"
+                  : sectorPreview.caution
+                  ? "color-mix(in srgb, #F59E0B 8%, transparent)"
+                  : "color-mix(in srgb, var(--mtp-excellent) 6%, transparent)",
+                borderColor: sectorPreview.warning
+                  ? "var(--mtp-danger)"
+                  : sectorPreview.caution
+                  ? "#F59E0B"
+                  : "var(--mtp-excellent)55",
+                color: sectorPreview.warning
+                  ? "var(--mtp-danger)"
+                  : sectorPreview.caution
+                  ? "#F59E0B"
+                  : "inherit",
+              }}
+            >
+              <span aria-hidden="true" className="text-base leading-none">
+                {sectorPreview.warning ? "🚨" : sectorPreview.caution ? "⚠️" : "✓"}
+              </span>
+              <div className="flex-1">
+                <span className="font-semibold">
+                  Sektör projeksiyonu: {sectorPreview.sector}{" "}
+                  <span className="font-mono tabular-nums ml-1">
+                    {sectorPreview.newSectorPct.toFixed(0)}%
+                  </span>
+                </span>
+                {sectorPreview.warning && (
+                  <span className="block mt-1 italic">
+                    Mark TTLC s.85 ihlali: max 25-30% tek sektör. Bu trade ile{" "}
+                    {sectorPreview.newSectorPct.toFixed(0)}% — pozisyon küçült veya farklı sektörü değerlendir.
+                  </span>
+                )}
+                {sectorPreview.caution && (
+                  <span className="block mt-1 italic">
+                    Sektör yoğunluğu artıyor (20-30%). Mark TTLC s.85 sınırına yaklaşıyorsun, plan büyütme dikkatli.
+                  </span>
+                )}
+                {!sectorPreview.warning && !sectorPreview.caution && (
+                  <span className="block mt-1 opacity-80">
+                    Sektör dağılımı sağlıklı (≤20%). Mark TTLC s.85 ile uyumlu.
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* KARAR ADAY #732 (24 May 2026): Mark Pyramid Calculator (KARAR #487 3-Tier) */}
           <MarkPyramidCard entryPrice={entryPrice} shares={shares} />
