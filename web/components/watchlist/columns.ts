@@ -106,6 +106,31 @@ export const COL_DEFS: ColDef<WatchlistRow>[] = [
     filter: false,
     cellRenderer: MarkBadgeCell,
   },
+  // KARAR #733 alt-paket (Paket 82): Pivot kolonu — Mark TLSMW Ch 10 (P81 Sinyaller paten)
+  {
+    headerName: "PIVOT",
+    field: "pivot_status",
+    width: 100,
+    sortable: false,
+    filter: false,
+    cellRenderer: (p: { data?: WatchlistRow }) => {
+      const status = p.data?.pivot_status;
+      if (!status) return null;
+      const meta =
+        status === "CONFIRMED"
+          ? { label: "AL ✓", color: "var(--mtp-excellent)", bg: "rgba(40,167,69,0.15)" }
+          : status === "WEAK"
+          ? { label: "Zayıf ⚠️", color: "#F59E0B", bg: "rgba(245,158,11,0.15)" }
+          : status === "NEAR_PIVOT"
+          ? { label: "Yakın ⏳", color: "var(--mtp-good, #4B9CD3)", bg: "rgba(75,156,211,0.15)" }
+          : { label: "Altı ○", color: "var(--mtp-danger)", bg: "rgba(220,53,69,0.10)" };
+      const el = document.createElement("span");
+      el.textContent = meta.label;
+      el.style.cssText = `font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;text-transform:uppercase;letter-spacing:0.05em;background:${meta.bg};color:${meta.color};border:1px solid ${status === "CONFIRMED" ? "var(--mtp-excellent)" : "currentColor"};`;
+      el.title = `Mark TLSMW Ch 10 — Pivot ${status}`;
+      return el;
+    },
+  },
   {
     field: "note",
     headerName: "NOT",

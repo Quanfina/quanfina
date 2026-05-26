@@ -1260,18 +1260,29 @@ class WatchlistRow(BaseModel):
     # MarkSignalsBlock asagida tanimli (forward ref) — dict olarak tutuluyor
     # JSON serialization sorunsuz, frontend MarkSignals interface ile parse.
     mark_signals: Optional[dict] = None
+    # KARAR #733 alt-paket (Paket 82, 26 May 2026): Pivot Breakout status
+    # P81 Sinyaller paten — Watchlist'te de AL/Zayıf/Yakın/Altı kolon görünür
+    pivot_status: Optional[Literal["CONFIRMED", "WEAK", "NEAR_PIVOT", "BELOW_PIVOT"]] = None
 
 
 def _enrich_with_mark_signals(row: WatchlistRow) -> WatchlistRow:
     """KARAR ADAY #724 — Watchlist satirina Mark Profili rozetlerini ekler.
 
+    KARAR #733 alt-paket (Paket 82): Aynı zamanda pivot_status enrichment
+    (P81 _compute_signal_pivot_status pateni). Tek helper'da iki alan.
+
     Production'da minervini_scans tablo join'i ile gelir; simdilik
     _STOCK_MARK_SIGNALS MOCK lookup (Migration 004-007 sonrasi degisecek).
     """
+    updates: dict = {}
     signals = _STOCK_MARK_SIGNALS.get(row.symbol)
     if signals:
-        # Pydantic immutability — model_copy ile yeni instance
-        return row.model_copy(update={"mark_signals": signals})
+        updates["mark_signals"] = signals
+    pivot_status = _compute_signal_pivot_status(row.symbol, row.price)
+    if pivot_status:
+        updates["pivot_status"] = pivot_status
+    if updates:
+        return row.model_copy(update=updates)
     return row
 
 
