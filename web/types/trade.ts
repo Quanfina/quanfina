@@ -42,6 +42,7 @@ export const TIME_HORIZON_DESCRIPTIONS: Record<TimeHorizon, string> = {
 };
 
 import type { MarkSignals } from "@/components/mark/MarkBadgeStrip";
+import type { PivotBreakoutStatus } from "@/hooks/use-pivot-breakout";
 
 export interface Trade {
   id: number;
@@ -71,6 +72,8 @@ export interface Trade {
   // KARAR #733 alt-paket (Paket 41): Mark Profili enrichment (Watchlist + Signals pateni)
   // Journal sayfasinda stage4Count gerçek hesaplama + gelecek MarkBadgeStrip kolonu.
   mark_signals?: MarkSignals;
+  // KARAR #733 alt-paket (Paket 84, 26 May 2026): Pivot status enrichment
+  pivot_status?: PivotBreakoutStatus | null;
 }
 
 export interface TradeCreate {

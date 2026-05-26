@@ -1889,6 +1889,9 @@ class Trade(BaseModel):
     # Journal sayfasinda stage4Count gerçek hesaplama icin. Production'da
     # minervini_scans tablo join'i ile gelir; simdilik _STOCK_MARK_SIGNALS MOCK.
     mark_signals: Optional[dict] = None
+    # KARAR #733 alt-paket (Paket 84, 26 May 2026): Pivot status
+    # P81-P83 paten — Journal'da trade'in mevcut pivot durumu (kapanmamış için)
+    pivot_status: Optional[Literal["CONFIRMED", "WEAK", "NEAR_PIVOT", "BELOW_PIVOT"]] = None
 
 
 class TradeCreate(BaseModel):
@@ -1955,12 +1958,21 @@ def _enrich_trade_with_mark_signals(trade: Trade) -> Trade:
     """KARAR #733 alt-paket (Paket 41, 24 May 2026) — Trade satirina Mark
     Profili rozetlerini ekler. Watchlist + Signals enrich pateni birebir.
 
+    KARAR #733 alt-paket (Paket 84, 26 May 2026): pivot_status enrichment
+    (P81-P83 paten). Açık trade'lerde anlamlı (kapanmış için referans).
+
     Production'da minervini_scans tablo join'i ile gelir; simdilik
     _STOCK_MARK_SIGNALS MOCK lookup (Migration 004-007 sonrasi degisecek).
     """
+    updates: dict = {}
     signals = _STOCK_MARK_SIGNALS.get(trade.symbol)
     if signals:
-        return trade.model_copy(update={"mark_signals": signals})
+        updates["mark_signals"] = signals
+    pivot_status = _compute_signal_pivot_status(trade.symbol, trade.entry_price)
+    if pivot_status:
+        updates["pivot_status"] = pivot_status
+    if updates:
+        return trade.model_copy(update=updates)
     return trade
 
 
