@@ -34,6 +34,8 @@ from quanfina_math import (
     compute_power_play_pass,
     # Sprint 4-bis.7 Faz 2 (Vizyon v22.03 + Migration 007)
     detect_tennis_ball, compute_volume_asymmetry,
+    # KARAR #733 (Paket 272 — 28 May 2026): Carr Stage 4-Stage detector
+    compute_carr_stage,
 )
 
 load_dotenv()
@@ -149,6 +151,12 @@ def init_db():
         # Sprint 4-bis.7 KARAR ADAY #882 — Volume Asymmetry Tracker (TLSMW s.234)
         "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS volume_asymmetry_ratio NUMERIC(8,3) DEFAULT NULL",
         "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS volume_asymmetry_tier TEXT DEFAULT NULL",
+        # KARAR #733 (Paket 272 — 28 May 2026): Carr Stage 4-Stage detector (Migration 009)
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS carr_stage SMALLINT",
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS carr_stage_label TEXT",
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS carr_slope_pct_per_year NUMERIC(8,2)",
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS carr_ma_value NUMERIC(12,4)",
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS carr_price_vs_ma_pct NUMERIC(8,2)",
     ]:
         c.execute(col_sql)
     c.execute("""
@@ -1196,6 +1204,27 @@ def save_results(df_finviz, slopes, scan_date):
             except Exception:
                 pass
 
+        # KARAR #733 (Paket 272 — 28 May 2026): Carr Stage 4-Stage detector
+        # 30W (~150 trade gun) MA + slope yillik. yfinance 420 takvim gunu (~300 trade gun)
+        # cektiginden close/volume yeterli; pvh tail(80) yetersiz oldugu icin Series'ten dogrudan.
+        carr_stage = None
+        carr_stage_label = None
+        carr_slope_pct_per_year = None
+        carr_ma_value = None
+        carr_price_vs_ma_pct = None
+        try:
+            closes_list = [float(x) for x in close.dropna().tolist()]
+            volumes_list = [float(x) for x in volume.dropna().tolist()]
+            if len(closes_list) >= 150 and len(closes_list) == len(volumes_list):
+                cs_result = compute_carr_stage(closes_list, volumes_list)
+                carr_stage = cs_result.get('stage')
+                carr_stage_label = cs_result.get('stage_label')
+                carr_slope_pct_per_year = cs_result.get('slope_pct_per_year')
+                carr_ma_value = cs_result.get('ma_value')
+                carr_price_vs_ma_pct = cs_result.get('price_vs_ma_pct')
+        except Exception:
+            pass
+
         # Kural 3: MA200 yükselişte (slope > 0)
         passed = 1 if slope is not None and slope > 0 else 0
 
@@ -1209,8 +1238,10 @@ def save_results(df_finviz, slopes, scan_date):
                  vcp_ready_score, power_play_pass,
                  tennis_ball_pattern, volume_asymmetry_ratio, volume_asymmetry_tier,
                  confirmations, violations,
-                 rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mansfield)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                 rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mansfield,
+                 carr_stage, carr_stage_label, carr_slope_pct_per_year,
+                 carr_ma_value, carr_price_vs_ma_pct)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 ON CONFLICT(scan_date, ticker) DO UPDATE SET
                     company               = EXCLUDED.company,
                     sector                = EXCLUDED.sector,
@@ -1240,7 +1271,12 @@ def save_results(df_finviz, slopes, scan_date):
                     rs_20d                = EXCLUDED.rs_20d,
                     rs_50d                = EXCLUDED.rs_50d,
                     rs_200d               = EXCLUDED.rs_200d,
-                    rs_mansfield          = EXCLUDED.rs_mansfield
+                    rs_mansfield          = EXCLUDED.rs_mansfield,
+                    carr_stage            = EXCLUDED.carr_stage,
+                    carr_stage_label      = EXCLUDED.carr_stage_label,
+                    carr_slope_pct_per_year = EXCLUDED.carr_slope_pct_per_year,
+                    carr_ma_value         = EXCLUDED.carr_ma_value,
+                    carr_price_vs_ma_pct  = EXCLUDED.carr_price_vs_ma_pct
             """, (
                 scan_date, ticker,
                 row.get("Company", ""), row.get("Sector", ""), row.get("Industry", ""),
@@ -1252,6 +1288,8 @@ def save_results(df_finviz, slopes, scan_date):
                 tennis_ball_pattern, volume_asymmetry_ratio, volume_asymmetry_tier,
                 confs, viols,
                 rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mf,
+                carr_stage, carr_stage_label, carr_slope_pct_per_year,
+                carr_ma_value, carr_price_vs_ma_pct,
             ))
             saved += 1
         except Exception as e:
@@ -1437,6 +1475,12 @@ def run_scan(scan_date_override: str = None, force: bool = False):
         "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS vcp_ready_score INTEGER DEFAULT NULL",
         # Sprint 4-bis.5 KARAR #467 — Power Play (HTF) Mark canon: POLE %100+ FLAG %10-25
         "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS power_play_pass BOOLEAN DEFAULT FALSE",
+        # KARAR #733 (Paket 272 — 28 May 2026): Carr Stage 4-Stage detector (Migration 009)
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS carr_stage SMALLINT",
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS carr_stage_label TEXT",
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS carr_slope_pct_per_year NUMERIC(8,2)",
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS carr_ma_value NUMERIC(12,4)",
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS carr_price_vs_ma_pct NUMERIC(8,2)",
     ]:
         c.execute(col_sql)
 
