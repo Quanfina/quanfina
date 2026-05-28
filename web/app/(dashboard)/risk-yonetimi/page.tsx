@@ -16,6 +16,7 @@ import { useStageTransition } from "@/hooks/use-stage-transition";
 import { fmtUsd } from "@/lib/format-currency";
 import { ModBadge } from "@/components/mark/ModBadge";
 import { useTradingMode } from "@/hooks/use-trading-mode";
+import { OpenPositionsRiskPanel } from "@/components/journal/OpenPositionsRiskPanel";
 
 /**
  * KARAR #733 alt-paket (Paket 38): Risk Yönetimi Pyramid Calculator sayfası.
@@ -509,6 +510,9 @@ export default function RiskYonetimiPage() {
           </div>
         </div>
       )}
+
+      {/* KARAR ADAY #455 — Açık Pozisyon Risk Dağılımı (Risk-Merkez UI) */}
+      <OpenPositionsRiskPanel portfolioValue={parseFloat(portfolioStr) || 100000} />
 
       {/* Mark felsefe açıklama paneli */}
       <details className="rounded-lg border bg-card p-4 group">
