@@ -756,21 +756,26 @@ def mark_signals_get_by_symbol(symbol: str) -> dict:
     if not row:
         return {}
     out: dict = {}
-    # vcp_quality_score: 'EXCELLENT'|'PASS' (NULL atla)
-    if row["vcp_quality_score"]:
+    # MarkSignalsBlock (main.py) + frontend MarkSignals (MarkBadgeStrip) semasi ile
+    # BIRE-BIR uyumlu (Kural #24). Sema disi deger/alan -> Pydantic validation error.
+    # vcp_quality_score: Literal['EXCELLENT','PASS'] (NULL/digerleri atla)
+    if row["vcp_quality_score"] in ("EXCELLENT", "PASS"):
         out["vcp_quality_score"] = row["vcp_quality_score"]
     if row["vcp_ready_score"] is not None:
         out["vcp_ready_score"] = int(row["vcp_ready_score"])
     # power_play_pass: sadece True ise rozet (False/NULL atla)
     if row["power_play_pass"]:
         out["power_play_pass"] = True
-    if row["tennis_ball_pattern"]:
-        out["tennis_ball_pattern"] = row["tennis_ball_pattern"]
-    if row["volume_asymmetry_ratio"] is not None:
-        out["volume_asymmetry_ratio"] = float(row["volume_asymmetry_ratio"])
-    if row["volume_asymmetry_tier"]:
+    # tennis_ball_pattern: SADECE 'TENNIS_BALL' (detect_tennis_ball ayrica
+    # EGG/STILL_RUNNING/INVALID donebilir — bunlar semada yok, MarkBadgeStrip
+    # sadece TENNIS_BALL icin rozet gosterir). Diger degerler atlanir.
+    if row["tennis_ball_pattern"] == "TENNIS_BALL":
+        out["tennis_ball_pattern"] = "TENNIS_BALL"
+    # volume_asymmetry_tier: Literal['healthy','neutral','distribution']
+    if row["volume_asymmetry_tier"] in ("healthy", "neutral", "distribution"):
         out["volume_asymmetry_tier"] = row["volume_asymmetry_tier"]
-    # carr_stage: 1|2|3|4 (NULL atla)
-    if row["carr_stage"] is not None:
+    # NOT: volume_asymmetry_ratio MarkSignalsBlock semasinda YOK — donmuyoruz.
+    # carr_stage: Literal[1,2,3,4] (NULL atla)
+    if row["carr_stage"] in (1, 2, 3, 4):
         out["carr_stage"] = int(row["carr_stage"])
     return out
