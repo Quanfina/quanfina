@@ -56,7 +56,9 @@ function fmtPct(value: number, decimals: number = 2): string {
 }
 
 function fmtRatio(value: number): string {
-  if (!isFinite(value)) return "∞";
+  // Backend tum-kazanan edge'inde adjusted_ratio'yu 99.0 ile cap'ler (float('inf')
+  // JSON serialize edilemez — Paket 348). 99+ = pratik sonsuz, "∞" goster.
+  if (!isFinite(value) || value >= 99) return "∞";
   return value.toFixed(2);
 }
 

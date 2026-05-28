@@ -128,4 +128,15 @@ describe("RbaSummaryCard — 4 severity + loading/error", () => {
     // 30 trade + 2.5 adjusted ratio render edilir (metin içinde)
     expect(container.textContent).toMatch(/30/);
   });
+
+  it("adjusted_ratio=99 (backend inf cap) → '∞' gösterilir, '99' değil", () => {
+    // Paket 348: tüm-kazanan edge backend'de float('inf')→99.0 cap'lenir.
+    // fmtRatio bunu "∞" olarak render etmeli (orijinal UX intent korunur).
+    const data = rbaData("OK");
+    data.metrics.adjusted_ratio = 99.0;
+    mockRba.mockReturnValue({ data, isLoading: false, isError: false });
+    const { container } = render(<RbaSummaryCard />);
+    expect(container.textContent).toContain("∞");
+    expect(container.textContent).not.toMatch(/99\.00/);
+  });
 });
