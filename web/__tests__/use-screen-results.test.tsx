@@ -9,7 +9,7 @@ import { useScreenResults } from "@/hooks/use-screen-results";
 import { withQueryClient } from "./_test-utils";
 import type { ScreenSlug } from "@/types/screens";
 
-const fetchMock = vi.fn<[RequestInfo | URL, RequestInit?], Promise<Response>>();
+const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>();
 
 beforeEach(() => {
   fetchMock.mockReset();

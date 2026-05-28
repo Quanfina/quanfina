@@ -8,7 +8,7 @@ import { render, screen } from "@testing-library/react";
 import { MarkRegimeBanner } from "@/components/mark/MarkRegimeBanner";
 import type { MarketStatus, MarkRegimeType } from "@/types/market";
 
-const mockMarketStatus = vi.fn<[], { data?: Partial<MarketStatus>; isLoading: boolean; isError: boolean }>();
+const mockMarketStatus = vi.fn<() => { data?: Partial<MarketStatus>; isLoading: boolean; isError: boolean }>();
 
 vi.mock("@/hooks/use-market-status", () => ({
   useMarketStatus: () => mockMarketStatus(),
@@ -152,6 +152,7 @@ describe("MarkRegimeBanner — özel uyarı bantları (P61/P68/P95)", () => {
     mockMarketStatus.mockReturnValue({
       data: makeData("HEALTHY", {
         breadth_divergence: {
+          divergence: "BEARISH_DIVERGENCE",
           severity: "critical",
           index_change_pct: 0.5,
           ad_trend_delta: -1500,

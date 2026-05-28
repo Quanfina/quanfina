@@ -15,7 +15,7 @@ import {
 } from "@/hooks/use-trades";
 import { withQueryClient, makeQueryClient } from "./_test-utils";
 
-const fetchMock = vi.fn<[RequestInfo | URL, RequestInit?], Promise<Response>>();
+const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>();
 
 beforeEach(() => {
   fetchMock.mockReset();
@@ -99,9 +99,16 @@ describe("useAddTrade — POST + invalidate", () => {
         symbol: "AAPL",
         strategy: "minervini",
         setup_type: "vcp",
+        signal_source: "strategy",
         entry_date: "2026-05-28",
         entry_price: 100,
         shares: 100,
+        plan_entry_trigger: "pivot $100 üstü",
+        plan_stop: 95,
+        plan_target: 120,
+        plan_size_pct: 5,
+        plan_exit_strategy: "trailing stop",
+        plan_time_horizon: "position",
       });
     });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
@@ -121,9 +128,16 @@ describe("useAddTrade — POST + invalidate", () => {
         symbol: "AAPL",
         strategy: "minervini",
         setup_type: "vcp",
+        signal_source: "strategy",
         entry_date: "2026-05-28",
         entry_price: 100,
         shares: 100,
+        plan_entry_trigger: "pivot $100 üstü",
+        plan_stop: 95,
+        plan_target: 120,
+        plan_size_pct: 5,
+        plan_exit_strategy: "trailing stop",
+        plan_time_horizon: "position",
       });
     });
     await waitFor(() => expect(result.current.isError).toBe(true));
@@ -142,9 +156,16 @@ describe("useAddTrade — POST + invalidate", () => {
         symbol: "X",
         strategy: "minervini",
         setup_type: "vcp",
+        signal_source: "strategy",
         entry_date: "2026-05-28",
         entry_price: 10,
         shares: 10,
+        plan_entry_trigger: "pivot $10 üstü",
+        plan_stop: 9,
+        plan_target: 12,
+        plan_size_pct: 5,
+        plan_exit_strategy: "trailing stop",
+        plan_time_horizon: "position",
       });
     });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));

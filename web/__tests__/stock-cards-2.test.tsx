@@ -12,9 +12,9 @@ import type { PivotBreakoutInfo } from "@/hooks/use-pivot-breakout";
 import type { OverheadSupplyInfo } from "@/hooks/use-overhead-supply";
 import type { ClimaxRunInfo } from "@/hooks/use-climax-run";
 
-const mockPivot = vi.fn<[], { data?: PivotBreakoutInfo; isLoading: boolean; isError: boolean }>();
-const mockOverhead = vi.fn<[], { data?: OverheadSupplyInfo; isLoading: boolean; isError: boolean }>();
-const mockClimax = vi.fn<[], { data?: ClimaxRunInfo; isLoading: boolean; isError: boolean }>();
+const mockPivot = vi.fn<() => { data?: PivotBreakoutInfo; isLoading: boolean; isError: boolean }>();
+const mockOverhead = vi.fn<() => { data?: OverheadSupplyInfo; isLoading: boolean; isError: boolean }>();
+const mockClimax = vi.fn<() => { data?: ClimaxRunInfo; isLoading: boolean; isError: boolean }>();
 
 vi.mock("@/hooks/use-pivot-breakout", () => ({ usePivotBreakout: () => mockPivot() }));
 vi.mock("@/hooks/use-overhead-supply", () => ({ useOverheadSupply: () => mockOverhead() }));

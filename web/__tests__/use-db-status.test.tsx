@@ -8,7 +8,7 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { useDbStatus, type DbStatus } from "@/hooks/use-db-status";
 import { withQueryClient } from "./_test-utils";
 
-const fetchMock = vi.fn<[RequestInfo | URL, RequestInit?], Promise<Response>>();
+const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>();
 
 beforeEach(() => {
   fetchMock.mockReset();

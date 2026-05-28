@@ -9,7 +9,7 @@ import { render, screen } from "@testing-library/react";
 import { OpenPositionsRiskPanel } from "@/components/journal/OpenPositionsRiskPanel";
 import type { Trade } from "@/types/trade";
 
-const mockTrades = vi.fn<[], { data?: Trade[]; isLoading: boolean; isError: boolean }>();
+const mockTrades = vi.fn<() => { data?: Trade[]; isLoading: boolean; isError: boolean }>();
 
 vi.mock("@/hooks/use-trades", () => ({
   useTrades: () => mockTrades(),

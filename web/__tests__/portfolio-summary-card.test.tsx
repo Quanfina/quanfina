@@ -19,13 +19,13 @@ vi.mock("next/link", () => ({
 }));
 
 // useTrades mock
-const mockTradesResult = vi.fn<[], { data?: Trade[]; isLoading: boolean }>();
+const mockTradesResult = vi.fn<() => { data?: Trade[]; isLoading: boolean }>();
 vi.mock("@/hooks/use-trades", () => ({
   useTrades: () => mockTradesResult(),
 }));
 
 // useStockQuotes mock
-const mockQuotes = vi.fn<[string[]], Array<{ data?: StockQuote }>>();
+const mockQuotes = vi.fn<(symbols: string[]) => Array<{ data?: StockQuote }>>();
 vi.mock("@/hooks/use-stock-quote", () => ({
   useStockQuotes: (symbols: string[]) => mockQuotes(symbols),
 }));

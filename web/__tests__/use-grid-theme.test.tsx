@@ -9,7 +9,7 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { useGridTheme } from "@/hooks/use-grid-theme";
 
 // next-themes mock — kontrollü resolvedTheme
-const mockResolvedTheme = vi.fn<[], string | undefined>();
+const mockResolvedTheme = vi.fn<() => string | undefined>();
 vi.mock("next-themes", () => ({
   useTheme: () => ({ resolvedTheme: mockResolvedTheme() }),
 }));

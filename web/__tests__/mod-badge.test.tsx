@@ -13,7 +13,7 @@ vi.mock("next/link", () => ({
 }));
 
 // useTradingMode mock — kontrollü mode geçişi
-const mockTradingMode = vi.fn<[], TradingModeInfo>();
+const mockTradingMode = vi.fn<() => TradingModeInfo>();
 
 vi.mock("@/hooks/use-trading-mode", async () => {
   const actual = await vi.importActual<

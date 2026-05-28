@@ -10,8 +10,8 @@ import { RbaSummaryCard } from "@/components/journal/RbaSummaryCard";
 import type { BrandonExpectancyInfo } from "@/hooks/use-trades-expectancy";
 import type { RbaResponse } from "@/hooks/use-rba-metrics";
 
-const mockExpectancy = vi.fn<[], { data?: BrandonExpectancyInfo; isLoading: boolean; isError: boolean }>();
-const mockRba = vi.fn<[], { data?: RbaResponse; isLoading: boolean; isError: boolean }>();
+const mockExpectancy = vi.fn<() => { data?: BrandonExpectancyInfo; isLoading: boolean; isError: boolean }>();
+const mockRba = vi.fn<() => { data?: RbaResponse; isLoading: boolean; isError: boolean }>();
 
 vi.mock("@/hooks/use-trades-expectancy", () => ({
   useTradesExpectancy: () => mockExpectancy(),

@@ -10,8 +10,8 @@ import { StageTransitionCard } from "@/components/stock/StageTransitionCard";
 import type { AtrVolatilityInfo, AtrCategory } from "@/hooks/use-atr-volatility";
 import type { StageTransitionInfo, StageCategory } from "@/hooks/use-stage-transition";
 
-const mockAtr = vi.fn<[], { data?: AtrVolatilityInfo; isLoading: boolean; isError: boolean }>();
-const mockStage = vi.fn<[], { data?: StageTransitionInfo; isLoading: boolean; isError: boolean }>();
+const mockAtr = vi.fn<() => { data?: AtrVolatilityInfo; isLoading: boolean; isError: boolean }>();
+const mockStage = vi.fn<() => { data?: StageTransitionInfo; isLoading: boolean; isError: boolean }>();
 
 vi.mock("@/hooks/use-atr-volatility", () => ({ useAtrVolatility: () => mockAtr() }));
 vi.mock("@/hooks/use-stage-transition", () => ({ useStageTransition: () => mockStage() }));

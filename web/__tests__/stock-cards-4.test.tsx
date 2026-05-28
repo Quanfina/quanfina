@@ -10,8 +10,8 @@ import { BreakoutQualityCard } from "@/components/stock/BreakoutQualityCard";
 import type { RelativeVolumeInfo, RelativeVolumeCategory } from "@/hooks/use-relative-volume";
 import type { BreakoutQualityInfo, BreakoutQualityCategory } from "@/hooks/use-breakout-quality";
 
-const mockRelVol = vi.fn<[], { data?: RelativeVolumeInfo; isLoading: boolean; isError: boolean }>();
-const mockBQ = vi.fn<[], { data?: BreakoutQualityInfo; isLoading: boolean; isError: boolean }>();
+const mockRelVol = vi.fn<() => { data?: RelativeVolumeInfo; isLoading: boolean; isError: boolean }>();
+const mockBQ = vi.fn<() => { data?: BreakoutQualityInfo; isLoading: boolean; isError: boolean }>();
 
 vi.mock("@/hooks/use-relative-volume", () => ({ useRelativeVolume: () => mockRelVol() }));
 vi.mock("@/hooks/use-breakout-quality", () => ({ useBreakoutQuality: () => mockBQ() }));

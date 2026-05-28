@@ -99,7 +99,7 @@ describe("ActiveStrategies — strateji listesi", () => {
 
   it("Bilinmeyen strateji → raw strategy adı fallback", () => {
     render(
-      <ActiveStrategies strategies={[makeRow({ strategy: "custom_xyz" })]} symbol="AAPL" />
+      <ActiveStrategies strategies={[makeRow({ strategy: "custom_xyz" as unknown as WatchlistRow["strategy"] })]} symbol="AAPL" />
     );
     expect(screen.getByText("custom_xyz")).toBeInTheDocument();
   });

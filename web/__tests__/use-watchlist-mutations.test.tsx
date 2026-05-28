@@ -14,7 +14,7 @@ import {
 } from "@/hooks/use-watchlist-mutations";
 import { withQueryClient, makeQueryClient } from "./_test-utils";
 
-const fetchMock = vi.fn<[RequestInfo | URL, RequestInit?], Promise<Response>>();
+const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>();
 
 beforeEach(() => {
   fetchMock.mockReset();

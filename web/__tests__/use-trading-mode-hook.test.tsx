@@ -10,8 +10,8 @@ import { renderHook } from "@testing-library/react";
 import { useTradingMode } from "@/hooks/use-trading-mode";
 import type { Trade } from "@/types/trade";
 
-const mockTrades = vi.fn<[], { data?: Trade[] }>();
-const mockMarket = vi.fn<[], {
+const mockTrades = vi.fn<() => { data?: Trade[] }>();
+const mockMarket = vi.fn<() => {
   data?: {
     market_health_score: number | null;
     suggested_mode?: string | null;

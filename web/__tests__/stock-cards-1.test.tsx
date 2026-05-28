@@ -10,8 +10,8 @@ import { RsRatingCard } from "@/components/stock/RsRatingCard";
 import type { CarrStageResponse } from "@/hooks/use-carr-stage";
 import type { RsRatingInfo } from "@/hooks/use-rs-rating";
 
-const mockCarr = vi.fn<[], { data?: CarrStageResponse; isLoading: boolean; isError: boolean }>();
-const mockRs = vi.fn<[], { data?: RsRatingInfo; isLoading: boolean; isError: boolean }>();
+const mockCarr = vi.fn<() => { data?: CarrStageResponse; isLoading: boolean; isError: boolean }>();
+const mockRs = vi.fn<() => { data?: RsRatingInfo; isLoading: boolean; isError: boolean }>();
 
 vi.mock("@/hooks/use-carr-stage", () => ({
   useCarrStage: () => mockCarr(),

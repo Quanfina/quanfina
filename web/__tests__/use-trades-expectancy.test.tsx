@@ -11,7 +11,7 @@ import {
 } from "@/hooks/use-trades-expectancy";
 import { withQueryClient } from "./_test-utils";
 
-const fetchMock = vi.fn<[RequestInfo | URL, RequestInit?], Promise<Response>>();
+const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>();
 
 beforeEach(() => {
   fetchMock.mockReset();

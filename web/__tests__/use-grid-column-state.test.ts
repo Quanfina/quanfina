@@ -22,7 +22,7 @@ const SAMPLE_STATE = [
   { colId: "rs_ibd", width: 90, hide: true },
 ];
 
-function makeApi(state = SAMPLE_STATE) {
+function makeApi(state: Array<{ colId: string; width?: number; hide?: boolean }> = SAMPLE_STATE) {
   return {
     getColumnState: vi.fn(() => state),
     applyColumnState: vi.fn(),

@@ -9,7 +9,7 @@ import { MarketStatusBadge } from "@/components/market/MarketStatusBadge";
 import type { MarkRegimeInfoBackend } from "@/types/market";
 import type { MarketCalendarStatus, MarketSession } from "@/hooks/use-market-calendar";
 
-const mockCalendar = vi.fn<[], { data?: MarketCalendarStatus; isLoading: boolean; isError: boolean }>();
+const mockCalendar = vi.fn<() => { data?: MarketCalendarStatus; isLoading: boolean; isError: boolean }>();
 
 vi.mock("@/hooks/use-market-calendar", async () => {
   const actual = await vi.importActual<typeof import("@/hooks/use-market-calendar")>(
