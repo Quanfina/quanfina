@@ -10,9 +10,10 @@ Endpoints:
 import os
 import threading
 import logging
-from datetime import date, timedelta
+from datetime import date
 from flask import Flask, jsonify, request
 from scanner import init_db
+from market_calendar import last_trading_day_before
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
@@ -43,12 +44,12 @@ def _ensure_db_initialized():
 
 
 def _today_scan_date():
-    today = date.today()
-    if today.weekday() == 5:
-        return str(today - timedelta(days=1))
-    if today.weekday() == 6:
-        return str(today - timedelta(days=2))
-    return str(today)
+    # Paket 363: market_calendar.last_trading_day_before kullanir (DRY + tatil-aware).
+    # Eski hali sadece hafta-sonu ayarliyordu (Cmt->Cum, Paz->Cum); TATIL gunlerinde
+    # tatilin kendi tarihini donduruyordu (yanlis — tatilde veri yok). Yeni hali
+    # hafta-sonu + ABD borsa tatillerini birlikte ele alir; en son islem gununu doner.
+    # Hafta-sonu davranisi AYNI (Cmt/Paz -> Cuma), sadece tatil durumu duzelir.
+    return str(last_trading_day_before(date.today()))
 
 
 def _existing_count(scan_date):
