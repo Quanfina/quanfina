@@ -15,12 +15,14 @@
 #   0 = senkron (envanter güncel)
 #   1 = senkronsuzluk var (rapor üretildi)
 #
-# Surum: 2.1 (20 May 2026) - worktree-aware repo root tespiti
-# - $PSScriptRoot pattern (saglik_kontrol.ps1 v0.5.1 ile uyumlu)
-# - notebook/ klasoru .gitignore'da, worktree'de bulunmaz; bu durumda
-#   git common-dir uzerinden ana repoya fallback yapilir
-# - Yetim bulunursa OZET bolumunde _INDEX.md icin satir onerisi uretilir
-# - Asama 5'te tam otomatik uretici (mevcut _INDEX.md overwrite) eklenebilir
+# Surum: 3.1 (29 May 2026) - STATIK orphan-listesi -> DINAMIK envanter redesign
+# - v2.1 (20 May): worktree-aware repo root ($PSScriptRoot + git common-dir fallback)
+# - v3.1 (29 May): Bolum 8 statik $beklenenScript/$beklenenNotebook orphan-check
+#   KALDIRILDI (proje buyudukce stale -> ~24 notebook + yeni script + market_calendar
+#   false orphan/kayip uretiyordu). Yerine dinamik kategori sayimi (liste bakimi YOK).
+#   Cekirdek dosya VARLIK kontrolu (Bolum 1-7) korundu; gone dosyalar (_INDEX,
+#   _KOD_ENVANTERI, _SAGLIK_KONTROL, _FELSEFE) cikarildi. Tam dinamik felsefe:
+#   "envanterin kendisi" (P117 notu) artik gercek - liste eskime problemi cozuldu.
 # Kural #15 (ASCII-only) + Kural #16 (native exe 2>&1 yasagi) uyumlu
 
 param(
@@ -82,8 +84,7 @@ $systemFiles = @(
     "notebook/_BASLAT.md",
     "notebook/_ROADMAP.md",
     "notebook/_LINKLER.md",
-    # notebook/_INDEX.md 22 May 2026 arsivlendi — build_index.ps1 envanterin kendisi
-    "notebook/_KOD_ENVANTERI.md",
+    # v3.1: _INDEX.md + _KOD_ENVANTERI.md 22 May konsolidasyonunda arsivlendi (CIKARILDI)
     "notebook/YAPILANLAR.md",
     "notebook/Notebook_A_Vizyon.md"
 )
@@ -98,6 +99,7 @@ $rootPython = @(
     "scanner.py",
     "scanner_server.py",
     "trade_journal.py",
+    "market_calendar.py",   # v3.1: ABD borsa takvimi (P362/P363 canli modul)
     "migrate_to_postgres.py"
 )
 $rootPython | ForEach-Object { Test-File $_ "Kok Python" | Out-Null }
@@ -140,103 +142,54 @@ Write-Host ""
 Write-Host "7. Git hooks" -ForegroundColor Yellow
 Test-File ".git/hooks/pre-push" "Git hooks" | Out-Null
 
-# --- Yetim dosya tarama (indekste olmayan) ---
+# --- Dinamik envanter (v3.1: statik "beklenen" orphan-check KALDIRILDI) ---
+# Eski 8a/8b/8c hardcoded $beklenenScript + $beklenenNotebook listelerine karsi
+# orphan ariyordu. Proje buyudukce listeler STALE oldu -> false orphan (22 May
+# konsolidasyon ~24 notebook dosyasi + yeni scriptler + market_calendar.py
+# listelerde yoktu; _INDEX.md zaten arsivlendi -> dogrulanacak referans da yok).
+# v3.1: orphan-check kaldirildi, dinamik KATEGORI SAYIMI geldi (liste bakimi YOK,
+# hicbir zaman eskimez). Cekirdek dosya VARLIK kontrolu (Bolum 1-7) kaliyor;
+# envanter artik "neyin var oldugunu" dinamik raporlar (Manifesto #3 self-update).
 Write-Host ""
-Write-Host "8. Yetim dosya taramasi" -ForegroundColor Yellow
+Write-Host "8. Dinamik envanter (kategori bazli sayim)" -ForegroundColor Yellow
 
-$yetimList = @()
+$yetimList = @()  # v3.1: orphan-check yok; OZET geriye-uyum referansi icin bos
 
-# 8a. Kok Python
-$gercekKok = Get-ChildItem -Path $repoRoot -File -Filter "*.py" | Select-Object -ExpandProperty Name
-$yetimKok = $gercekKok | Where-Object { $_ -notin $rootPython }
-if ($yetimKok) {
-    Write-Host "  [YETIM] Kok Python:" -ForegroundColor Red
-    $yetimKok | ForEach-Object {
-        Write-Host "    $_" -ForegroundColor Red
-        $script:findings += "yetim-kok-py: $_"
-        $yetimList += @{ Path = $_; Kategori = "Yasayan Python (kok)" }
-    }
-} else {
-    Write-Host "  [OK] Yetim kok Python yok" -ForegroundColor Green
-}
-
-# 8b. Scripts klasoru (PS1 + PY)
-$beklenenScript = @(
-    "sizma_kontrol.ps1", "notebook_yedekle.ps1", "build_index.ps1",
-    "hesap_tarama.ps1", "saglik_kontrol.ps1", "pattern_ogren.ps1",
-    "proaktif_oneri.ps1", "drive_sync.ps1", "yapilanlar_otomatik_guncelle.ps1",
-    "aciklama_konsolide.ps1",
-    # 19 May 2026 Otonom Hijyen Modu yeni scripts:
-    "drive_pull.ps1", "hijyen_paketi.ps1", "pasif_tara.ps1", "satir_sayim_otomatik.ps1",
-    "run_migration.py", "seed_initial_data.py", "seed_symbol_lists.py"
+$kategoriler = @(
+    @{ Etiket = "Kok Python (*.py)";      Dir = $repoRoot;                              Mode = "py" }
+    @{ Etiket = "Scripts (*.ps1 + *.py)"; Dir = (Join-Path $repoRoot "scripts");        Mode = "psorpy" }
+    @{ Etiket = "notebook/*.md";          Dir = (Join-Path $repoRoot "notebook");       Mode = "md" }
+    @{ Etiket = "tests/*.py";             Dir = (Join-Path $repoRoot "tests");          Mode = "py" }
+    @{ Etiket = "web Vitest (__tests__)"; Dir = (Join-Path $repoRoot "web\__tests__");  Mode = "test" }
 )
-$scriptsDir = Join-Path $repoRoot "scripts"
-if (Test-Path $scriptsDir) {
-    $gercekScript = Get-ChildItem -Path $scriptsDir -File | Where-Object {
-        $_.Extension -in ".ps1", ".py"
-    } | Select-Object -ExpandProperty Name
-    $yetimScript = $gercekScript | Where-Object { $_ -notin $beklenenScript }
-    if ($yetimScript) {
-        Write-Host "  [YETIM] scripts/:" -ForegroundColor Red
-        $yetimScript | ForEach-Object {
-            Write-Host "    scripts/$_" -ForegroundColor Red
-            $script:findings += "yetim-scripts: scripts/$_"
-            $yetimList += @{ Path = "scripts/$_"; Kategori = "Scripts" }
+foreach ($k in $kategoriler) {
+    if (Test-Path $k.Dir) {
+        $items = switch ($k.Mode) {
+            "py"     { Get-ChildItem -Path $k.Dir -File -Filter "*.py" }
+            "md"     { Get-ChildItem -Path $k.Dir -File -Filter "*.md" }
+            "test"   { Get-ChildItem -Path $k.Dir -File -Filter "*.test.*" }
+            "psorpy" { Get-ChildItem -Path $k.Dir -File | Where-Object { $_.Extension -in ".ps1", ".py" } }
         }
+        Write-Host ("  {0,-26} : {1} dosya" -f $k.Etiket, @($items).Count) -ForegroundColor Cyan
     } else {
-        Write-Host "  [OK] Yetim scripts dosyasi yok" -ForegroundColor Green
-    }
-}
-
-# 8c. notebook/*.md (sistem katmani markdown'lari)
-# NOT: *_backup.md pattern'i _INDEX.md "Backup" bolumunde belgelenir, yetim sayilmaz
-$beklenenNotebook = @(
-    "_BASLAT.md", "_ROADMAP.md", "_LINKLER.md", "_INDEX.md",
-    "_KOD_ENVANTERI.md", "_DEVIR.md", "_kisisel_okuma.md",
-    "_SAGLIK_KONTROL.md", "_HATALAR.md", "_FELSEFE.md",
-    "YAPILANLAR.md", "Notebook_A_Vizyon.md",
-    "Notebook_B6_AdimlarKarar.md", "Notebook_C1_Sprint_QuickStart.md",
-    "Notebook_C2_EK1-8.md", "Notebook_C3_EK9_DBSchema.md",
-    "EK10_TradeGrader_Sentezi.md",
-    "Asama_4_1_TradeGrader_Gem.md",
-    # 18 May 2026 Aşama 2.3 NotebookLM kurulumlari:
-    "Asama_2_3_a_Minervini_NotebookLM.md", "Asama_2_3_Vizyon_Bekcisi_NotebookLM.md",
-    # 18 May 2026 clean-room + 19 May Otonom Hijyen yeni dosyalar:
-    "_CLEAN_ROOM.md", "_OZET.md", "_SISTEM_SEMA.md", "_DEVIR_ARSIV.md"
-)
-$notebookDir = Join-Path $repoRoot "notebook"
-if (Test-Path $notebookDir) {
-    $gercekNotebook = Get-ChildItem -Path $notebookDir -File -Filter "*.md" | Select-Object -ExpandProperty Name
-    $yetimNotebook = $gercekNotebook | Where-Object {
-        $_ -notin $beklenenNotebook -and $_ -notlike "*_backup.md"
-    }
-    if ($yetimNotebook) {
-        Write-Host "  [YETIM] notebook/*.md:" -ForegroundColor Red
-        $yetimNotebook | ForEach-Object {
-            Write-Host "    notebook/$_" -ForegroundColor Red
-            $script:findings += "yetim-notebook: notebook/$_"
-            $yetimList += @{ Path = "notebook/$_"; Kategori = "Sistem katmani" }
-        }
-    } else {
-        Write-Host "  [OK] Yetim notebook/*.md yok" -ForegroundColor Green
+        Write-Host ("  {0,-26} : (klasor yok)" -f $k.Etiket) -ForegroundColor DarkGray
     }
 }
 
 # --- Belge satir sayim raporu (v3.0 — manuel hijyen yardimcisi) ---
 Write-Host ""
 Write-Host "9. Belge satir sayim raporu" -ForegroundColor Yellow
-Write-Host "   (Bu sayilar _INDEX.md ve _BASLAT.md'deki referanslarla manuel karsilastir)" -ForegroundColor DarkGray
+Write-Host "   (Bu sayilar _BASLAT.md'deki referanslarla manuel karsilastir)" -ForegroundColor DarkGray
+# v3.1: gone dosyalar (_INDEX/_KOD_ENVANTERI/_SAGLIK_KONTROL/_FELSEFE) CIKARILDI
+# (her biri "[BULUNAMADI]" + false kayip-belge -> exit 1 yapiyordu). _KOD_PATTERNLERI EKLENDI.
 $belgeDosyalari = @(
     @{ Path = "CLAUDE.md"; Etiket = "CLAUDE.md (anayasa)" },
     @{ Path = "notebook/_BASLAT.md"; Etiket = "_BASLAT.md" },
-    @{ Path = "notebook/_INDEX.md"; Etiket = "_INDEX.md" },
     @{ Path = "notebook/_DEVIR.md"; Etiket = "_DEVIR.md" },
     @{ Path = "notebook/_ROADMAP.md"; Etiket = "_ROADMAP.md" },
     @{ Path = "notebook/_LINKLER.md"; Etiket = "_LINKLER.md" },
-    @{ Path = "notebook/_KOD_ENVANTERI.md"; Etiket = "_KOD_ENVANTERI.md" },
-    @{ Path = "notebook/_SAGLIK_KONTROL.md"; Etiket = "_SAGLIK_KONTROL.md" },
     @{ Path = "notebook/_HATALAR.md"; Etiket = "_HATALAR.md" },
-    @{ Path = "notebook/_FELSEFE.md"; Etiket = "_FELSEFE.md" },
+    @{ Path = "notebook/_KOD_PATTERNLERI.md"; Etiket = "_KOD_PATTERNLERI.md" },
     @{ Path = "notebook/YAPILANLAR.md"; Etiket = "YAPILANLAR.md" },
     @{ Path = "notebook/Notebook_A_Vizyon.md"; Etiket = "Notebook_A_Vizyon.md" }
 )
@@ -272,7 +225,7 @@ if (Test-Path $arsiv) {
 Write-Host ""
 Write-Host "=== OZET ===" -ForegroundColor Cyan
 if ($findings.Count -eq 0) {
-    Write-Host "SENKRON - _INDEX.md ve dosya sistemi uyumlu" -ForegroundColor Green
+    Write-Host "SENKRON - cekirdek dosyalar mevcut, envanter dinamik" -ForegroundColor Green
     Write-Host ""
     exit 0
 } else {
