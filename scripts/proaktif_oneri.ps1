@@ -13,13 +13,15 @@
 #   .\scripts\proaktif_oneri.ps1 -ToFile
 #   .\scripts\proaktif_oneri.ps1 -DriveYazma  # Drive'a haftalik rapor
 #
-# Versiyon: v0.6 (21 May 2026, Sonraki kuyruk DINAMIK guncellendi)
+# Versiyon: v0.7 (28 May 2026, Section 6 statik liste -> DRY canli-kaynak pointer)
 # v0.5 (18 May 2026): Asama 5.6 ilk uretim
 # v0.6 (21 May 2026): "Sonraki kuyruk" statik listesi guncellendi.
-#   Asama 1-5 TUMU TAMAMLANDI. Eski script "Asama 2.3 + Asama 2 RESMI KAPANIS"
-#   diye eski tamamlanmis isleri oneriyordu (P#3 izlenen pattern). Yeni statik
-#   liste Sprint 4-bis.7+ kuyruk + Sn. Ferit stratejik eli + AI otonom rezerv.
-#   Tam dinamik _ROADMAP parse Asama 6'da (gelecek).
+# v0.7 (28 May 2026): P#3 pattern KALICI cozum. Statik liste yine eskidi
+#   (ACIK KONU #70 RESOLVED, #453/#455/#456 TAMAMLANDI, Sektor/Istatistikler
+#   port edildi ama liste "sirada" diyordu - yaniltici). Section 6 artik roadmap
+#   icerigini KOPYALAMIYOR; Vizyon EN GUNCEL + _ROADMAP + _DEVIR canli kaynaklarina
+#   yonlendiriyor (DRY Ilke #4). Statik liste eskime problemi kokten cozuldu.
+#   Tam dinamik parse Asama 6'da.
 # Kural uyumu: #15 (ASCII-only), #16 (native exe 2>&1 yok), #19 (UTF8 BOM-less)
 
 param(
@@ -62,7 +64,7 @@ $tarihKisa = Get-Date -Format "yyyyMMdd_HHmm"
 
 Write-Host ""
 Write-Host "=== Quanfina Proaktif Oneri Sistemi ===" -ForegroundColor Cyan
-Write-Host "Uretim: $tarihStr (proaktif_oneri.ps1 v0.5)" -ForegroundColor DarkGray
+Write-Host "Uretim: $tarihStr (proaktif_oneri.ps1 v0.7)" -ForegroundColor DarkGray
 Write-Host ""
 
 # Tek seferlik birlestirilmis rapor buffer
@@ -71,7 +73,7 @@ function Add-Line { param([string]$line) [void]$report.AppendLine($line) }
 
 Add-Line "# Quanfina Proaktif Oneri Raporu"
 Add-Line ""
-Add-Line "**Uretim:** $tarihStr (proaktif_oneri.ps1 v0.5)"
+Add-Line "**Uretim:** $tarihStr (proaktif_oneri.ps1 v0.7)"
 Add-Line ""
 Add-Line "Bu rapor Asama 5'in SON ciktisi - Manifesto Ozellik #8 (Ogrenen)"
 Add-Line "**tam canli** kanitin gunluk takibi. saglik_kontrol + pattern_ogren"
@@ -254,38 +256,25 @@ Add-Line ""
 Add-Line "## 6. Sonraki Adim Onerisi"
 Add-Line ""
 
-# Asama 5 durum kontrolu
-$saglikDosya = Join-Path $repoRoot "notebook\_SAGLIK_KONTROL.md"
-$hatalarDosya = Join-Path $repoRoot "notebook\_HATALAR.md"
-$felsefeDosya = Join-Path $repoRoot "notebook\_FELSEFE.md"
-$saglikScript = Join-Path $repoRoot "scripts\saglik_kontrol.ps1"
-$patternScript = Join-Path $repoRoot "scripts\pattern_ogren.ps1"
-
-$asama5Tamam = (Test-Path $saglikDosya) -and (Test-Path $hatalarDosya) -and (Test-Path $felsefeDosya) -and (Test-Path $saglikScript) -and (Test-Path $patternScript)
-
-if ($asama5Tamam) {
-    Add-Line "**Asama 1-5 TUMU TAMAMLANDI** (5.7 yaşayan sistem zirvesi 18 May, bu script 5.6'nin kendisi)."
-    Add-Line "**Sprint 4-bis.6 'Sistem otursun' stabilizasyon aktif** (20-21 May): 60+ paket boyunca anayasa 23 Kural sabit."
+# v0.7 NOT: Eski $asama5Tamam gate _SAGLIK_KONTROL.md + _FELSEFE.md dosyalarini
+# kontrol ediyordu; ikisi de 22 May konsolidasyonunda arsivlendi -> gate hep FALSE
+# -> Section 6 SESSIZCE BOS render ediliyordu (gizli bug, P#3 ile birlesik). Asama
+# 1-5 kalici tamam (Manifesto 9/9, geri donmez); Section 6 artik kosulsuz render.
+if ($true) {
+    Add-Line "**Asama 1-5 TUMU TAMAMLANDI** (Manifesto 9/9; bu script 5.6'nin kendisi)."
     Add-Line ""
-    Add-Line "**Sn. Ferit Stratejik Eli (oncelik sirasi):**"
-    Add-Line "1. ACIK KONU #70 Cloud SQL erisim stratejisi (Auth Proxy / Connector / IP Whitelist) - DB up site canli demek"
-    Add-Line "2. Risk Academy NotebookLM 8 PDF (Tharp/Basso/Vince/Elder) - KARAR ADAY #455 bagim"
-    Add-Line "3. ACIK KONU #72 React 19 ESLint 13 stratejik error (UI mimari sprint)"
-    Add-Line "4. ACIK KONU #74 Chrome MCP localhost permission (eklenti Site Erisimi)"
-    Add-Line "5. 6 PENDING soru (bildirim/evren/saat/risk%/heat%/Polygon)"
+    Add-Line "**P#3 duzeltme (v0.7):** Eski hardcoded 'Sonraki adim' listesi tamamlanmis"
+    Add-Line "isleri 'sirada' diye gosteriyordu (orn. ACIK KONU #70 RESOLVED, #453/#455/#456"
+    Add-Line "TAMAMLANDI, Sektor Rotasyonu/Istatistikler PORT EDILDI). Yaniltici -> bir sonraki"
+    Add-Line "session redundant ise yonlendirilirdi (#453-dersi tuzagi). Artik bu script"
+    Add-Line "roadmap icerigini KOPYALAMAZ (DRY Ilke #4); tek-dogru yasayan kaynaklara yonlendirir:"
     Add-Line ""
-    Add-Line "_Not: ACIK KONU #22 (Carr 1./2. baski) v20.43'te KAPANDI - KARAR #444 hibrit politika._"
+    Add-Line "- **Vizyon EN GUNCEL blok** -> notebook/Notebook_A_Vizyon.md ust '## GUNCEL DURUM' blogu 'Siradaki' satiri"
+    Add-Line "- **Yol haritasi** -> notebook/_ROADMAP.md '## AKTIF' + 'Bekleyen Sn. Ferit eli' tablolari"
+    Add-Line "- **Handoff anlik baglam** -> notebook/_DEVIR.md EN GUNCEL blok"
     Add-Line ""
-    Add-Line "**Sprint 4-bis.7+ Kuyruk (KARAR ADAY, Sn. Ferit yon gerek):**"
-    Add-Line "- #453 lightweight-charts (hisse detay TradingView yerine)"
-    Add-Line "- #455 Risk-Merkez UI (Risk Academy PDF gerekli)"
-    Add-Line "- #456 Filter Operator (Watchlist filtreleme)"
-    Add-Line "- #457 Superscreen ❌ IPTAL (tek kullanici)"
-    Add-Line ""
-    Add-Line "**AI Otonom Rezerve (talimat bekler):**"
-    Add-Line "- scanner.py refactor 1955 -> moduller (~2-3 saat)"
-    Add-Line "- Sektor Rotasyonu / Portfolio Risk / Istatistikler sayfasi (Streamlit'ten port)"
-    Add-Line "- Hisse detay TradingView timeout fix"
+    Add-Line "Her session bu kaynaklari gunceller; script daima guncel kalir (statik liste eskimez)."
+    Add-Line "Tam dinamik _ROADMAP/Vizyon parse Asama 6'da (gelecek)."
 }
 Add-Line ""
 
@@ -294,7 +283,7 @@ Add-Line ""
 # ============================================================
 Add-Line "---"
 Add-Line ""
-Add-Line "_Bu rapor proaktif_oneri.ps1 v0.6 tarafindan uretildi._"
+Add-Line "_Bu rapor proaktif_oneri.ps1 v0.7 tarafindan uretildi._"
 Add-Line "_Asama 5.6 ciktisi - Manifesto Ozellik #8 (Ogrenen) tam canli kanit._"
 Add-Line "_Girdi: scripts/saglik_kontrol.ps1 + scripts/pattern_ogren.ps1_"
 
