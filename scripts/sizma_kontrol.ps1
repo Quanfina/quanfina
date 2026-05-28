@@ -152,6 +152,53 @@ if ($commitList) {
 }
 Show-Result "Final liste Sn. Ferit'e gosterildi" $true "Onay sozlu/yazili alinmali"
 
+# --- Kontrol 7: Hardcoded sayisal esik kaynak atifsiz (Kural #26 / KALICI ILKE #4) ---
+# ADVISORY (uyari) - push BLOK ETMEZ. Staged .py eklenen satirlarda finansal-gorunumlu
+# esik (>=NN, <=NN, *N.NN) var ama kaynak atfi (Kitap/s./TTLC/TLSMW/KARAR/Bundle/
+# O'Neil/Weinstein/Tharp/@source/Mark/Stage/VCP) yoksa uyar. Matematik Uydurmama.
+Write-Host ""
+Write-Host "7. Hardcoded esik kaynak atfi taramasi (Kural #26 - ADVISORY)" -ForegroundColor Yellow
+$stagedPy = @(git diff --cached --name-only -- '*.py')
+# Sadece GERCEK kaynak atif belirtecleri (domain kelimesi degil — "Mark/RS/Stage"
+# gibi icerik sozcukleri HARIC; aksi halde "if rs >= 70" yanlislikla atifli sayilir).
+$sourceTokens = "Kitap|s\.\d|p\.\d|page \d|TTLC|TLSMW|KARAR|Bundle|O'Neil|Weinstein|Tharp|@source"
+$thresholdWarns = @()
+if ($stagedPy.Count -gt 0) {
+    $pyDiff = (git diff --cached -- '*.py') -split "`n"
+    foreach ($line in $pyDiff) {
+        if ($line -notmatch '^\+') { continue }       # sadece eklenen satirlar
+        if ($line -match '^\+\+\+') { continue }       # diff header'i atla
+        $code = $line.Substring(1)
+        # finansal-gorunumlu esik: 2+ haneli karsilastirma veya ondalik carpan
+        if (($code -match '(>=|<=|>|<)\s*\d{2,}') -or ($code -match '\*\s*\d+\.\d{1,3}\b')) {
+            if ($code -notmatch $sourceTokens) { $thresholdWarns += $code.Trim() }
+        }
+    }
+}
+if ($thresholdWarns.Count -gt 0) {
+    Write-Host "  [WARN] $($thresholdWarns.Count) satirda kaynak-atifsiz esik (yorumda 'Kitap s.X' ekle):" -ForegroundColor Yellow
+    $thresholdWarns | Select-Object -First 8 | ForEach-Object { Write-Host "         $_" -ForegroundColor DarkGray }
+} else {
+    Write-Host "  [PASS] Staged .py esikleri kaynak atifli (veya esik yok)" -ForegroundColor Green
+}
+# NOT: ADVISORY - failures'a EKLENMEZ, push BLOK etmez (Kural #26 uyari seviyesi).
+
+# --- Kontrol 8: Faith-neutral (KALICI ILKE #34) ---
+# ADVISORY - Carr 2. baski Hristiyan devotional/scripture icerik Quanfina koduna
+# sizmasin. NOT: "Christmas" (NYSE tatili) FALSE POSITIVE degil - \bChrist\b ile
+# Christmas haric tutulur (Christmas piyasa takvimi fonksiyonel, dini icerik degil).
+Write-Host ""
+Write-Host "8. Faith-neutral taramasi (KALICI ILKE #34 - ADVISORY)" -ForegroundColor Yellow
+$faithPat = "\bGod\b|\bChrist\b|\bJesus\b|\bBible\b|\bHristiyan\b|\bprayer\b|faith in God|kutsal kitap|\bgospel\b|scripture"
+$faithHits = git grep -nE "$faithPat" -- '*.py' '*.ts' '*.tsx' ':!scripts/sizma_kontrol.ps1' 2>$null
+if ($faithHits) {
+    Write-Host "  [WARN] Inanc-icerikli ifade bulundu (Quanfina inanc-notr mimari):" -ForegroundColor Yellow
+    $faithHits | Select-Object -First 5 | ForEach-Object { Write-Host "         $_" -ForegroundColor DarkGray }
+} else {
+    Write-Host "  [PASS] Inanc-icerikli ifade yok (faith-neutral)" -ForegroundColor Green
+}
+# NOT: ADVISORY - failures'a EKLENMEZ.
+
 # --- Özet ---
 Write-Host ""
 Write-Host "=== OZET ===" -ForegroundColor Cyan
