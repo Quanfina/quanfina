@@ -26,6 +26,7 @@ import { useGridTheme } from "@/hooks/use-grid-theme";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, CellClassParams } from "ag-grid-community";
 import { useScreenResults } from "@/hooks/use-screen-results";
+import { useGridColumnState } from "@/hooks/use-grid-column-state";
 import type { ScreenSlug, ScreenResultRow } from "@/types/screens";
 import { MarkBadgeStrip } from "@/components/mark/MarkBadgeStrip";
 import { ModBadge } from "@/components/mark/ModBadge";
@@ -62,6 +63,8 @@ const DEFAULT_SLUG: ScreenSlug | null = SCREEN_SLUGS[0] ?? null;
 export default function ScreensPage() {
   const { gridClass: themeGridClass } = useGridTheme();
   const gridRef = useRef<AgGridReact<ScreenResultRow>>(null);
+  // Sprint 4.8 — Column Preferences: sütun düzeni (sıra/görünür/genişlik/sort) persist
+  const gridColumnState = useGridColumnState("quanfina-screens-cols");
   const [selectedSlug, setSelectedSlug] = useState<ScreenSlug | null>(DEFAULT_SLUG);
   // Paket 253 (27 May 2026): Defansif mod farkındalığı (Mark TTLC s.187)
   const tradingMode = useTradingMode();
@@ -346,6 +349,7 @@ export default function ScreensPage() {
             <AgGridReact
               ref={gridRef}
               theme="legacy"
+              {...gridColumnState}
               columnDefs={columnDefs}
               defaultColDef={{
                 sortable: true,
