@@ -7,7 +7,6 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MarkBadgeStrip } from "@/components/mark/MarkBadgeStrip";
-import type { MarkSignals } from "@/components/mark/MarkBadgeStrip";
 
 describe("MarkBadgeStrip — boş durum", () => {
   it("Boş signals + showEmpty=false → null (hiçbir şey render etmez)", () => {

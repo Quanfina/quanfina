@@ -20,13 +20,12 @@
  * Disiplin = içsel, sistem = dışsal (Sn. Ferit'in haftalık check-in zinciri).
  */
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { CalendarDays, ArrowRight, CheckCircle2 } from "lucide-react";
 import { useTrades } from "@/hooks/use-trades";
 import { useWatchlist } from "@/hooks/use-watchlist";
 import { useMarketStatus } from "@/hooks/use-market-status";
-import { useTradingMode } from "@/hooks/use-trading-mode";
 import { ModBadge } from "@/components/mark/ModBadge";
 import { fmtPLDollar, fmtPLPct } from "@/lib/math";
 import { Button } from "@/components/ui/button";
@@ -36,12 +35,15 @@ export default function PazarHazirligiPage() {
   const tradesQuery = useTrades();
   const watchlistQuery = useWatchlist();
   const marketQuery = useMarketStatus();
-  const currentMode = useTradingMode();
+
+  // React 19 purity: Date.now() render/useMemo içinde impure (react-hooks/purity).
+  // useState lazy init mount'ta bir kez hesaplar (render-pure). Haftalık pencere
+  // sayfa açılış zamanına sabit — kabul edilebilir (Pazar ritüeli kısa oturum).
+  const [now] = useState(() => Date.now());
 
   // Bölüm 1 — Geçen 7 gün kapalı trade istatistik
   const lastWeekStats = useMemo(() => {
     const trades = tradesQuery.data ?? [];
-    const now = Date.now();
     const weekMs = 7 * 24 * 60 * 60 * 1000;
     const closed = trades.filter(
       (t) =>
@@ -63,7 +65,7 @@ export default function PazarHazirligiPage() {
       losses,
       winRate: (wins / closed.length) * 100,
     };
-  }, [tradesQuery.data]);
+  }, [tradesQuery.data, now]);
 
   // Bölüm 2 — Pazartesi'ye taşınan açık pozisyonlar
   const openPositions = useMemo(() => {

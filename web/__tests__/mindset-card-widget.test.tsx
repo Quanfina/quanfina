@@ -3,7 +3,7 @@
  *
  * getTodayMindsetCard (deterministik) + Okudum persistence + streak + rastgele yenile.
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MindsetCardWidget } from "@/components/dashboard/MindsetCard";
 import { getTodayMindsetCard } from "@/data/mindset-cards";
