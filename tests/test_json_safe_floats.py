@@ -17,8 +17,10 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 PROJECT_ROOT = HERE.parent
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+API_DIR = PROJECT_ROOT / "api"
+for _d in (str(PROJECT_ROOT), str(API_DIR)):
+    if _d not in sys.path:
+        sys.path.insert(0, _d)
 
 from quanfina_math import (
     compute_rba_metrics,
@@ -86,3 +88,34 @@ class TestMarketBreadthZeroDeclinesCapped:
         declines = [80, 0]
         result = compute_market_breadth(advances, declines, lookback_days=20)
         _assert_json_safe(result)
+
+
+class TestVolumeAsymmetryEndpointJsonSafe:
+    """Endpoint-seviye kanit: gercek FastAPI encoder inf edge'inde 200 doner (500 degil).
+
+    json.dumps simulasyonundan daha yuksek fidelity — /api/risk/volume-asymmetry'nin
+    asil HTTP cevabini test eder (bug bu siniri 500'lerdi)."""
+
+    def _client(self):
+        try:
+            from fastapi.testclient import TestClient
+            import main as api_main
+        except ImportError:
+            import pytest as _pt
+            _pt.skip("fastapi yok")
+        return TestClient(api_main.app)
+
+    def test_zero_down_volume_endpoint_200_not_500(self):
+        client = self._client()
+        # up gun hacim>0, down gun hacim 0 -> down_avg=0 -> ratio inf edge
+        payload = {
+            "daily_history": [
+                {"close": 100.0, "volume": 1000},
+                {"close": 105.0, "volume": 5000},
+                {"close": 100.0, "volume": 0},
+            ],
+            "lookback_days": 20,
+        }
+        r = client.post("/api/risk/volume-asymmetry", json=payload)
+        assert r.status_code == 200, f"500 landmine geri geldi: {r.text}"
+        assert r.json()["asymmetry_ratio"] == 99.0
