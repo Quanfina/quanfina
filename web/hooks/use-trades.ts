@@ -84,6 +84,7 @@ export function useSetupTypes() {
     queryKey: ["setup-types"],
     queryFn: fetchSetupTypes,
     staleTime: Infinity,
+    gcTime: Infinity, // setup-types sabit liste — cache GC edilmesin
   });
 }
 

@@ -12,7 +12,17 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
     () =>
       new QueryClient({
-        defaultOptions: { queries: { staleTime: 10_000, retry: 1 } },
+        defaultOptions: {
+          queries: {
+            staleTime: 10_000,
+            retry: 1,
+            // Kod kalitesi incelemesi (28 May 2026): pencere odağında TÜM aktif
+            // sorgular yeniden fetch ediliyordu (React Query default true) →
+            // gereksiz yfinance kota + Cloud SQL yükü. Veriler zaten staleTime +
+            // refetchInterval (canlı fiyat) ile yönetiliyor; odak-fetch gereksiz.
+            refetchOnWindowFocus: false,
+          },
+        },
       })
   );
 

@@ -32,5 +32,6 @@ export function usePatterns() {
     queryKey: ["patterns"],
     queryFn: fetchPatterns,
     staleTime: Infinity, // Pattern library nadiren değişir (canon parametre)
+    gcTime: Infinity,    // staleTime Infinity ile tutarlı — cache GC edilmesin
   });
 }
