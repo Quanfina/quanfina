@@ -28,6 +28,7 @@ from db_helpers import (  # noqa: E402
     trades_insert, trades_update, trades_delete,
     mark_signals_get_by_symbol,
     pattern_library_get_all,
+    sector_rotation_get_latest,
 )
 
 # Sprint 4-bis.7 Faz 1 B paket: Mark KARAR #914 + #969 + #970
@@ -2636,6 +2637,30 @@ def get_patterns() -> list[PatternLibraryEntry]:
     """Pattern Library — 7 Mark/O'Neil canon pattern (TLSMW Ch 10).
     DB bos/erisilmezse bos liste (graceful — UI pattern listesi gizler)."""
     return pattern_library_get_all()
+
+
+# ── Sektör Rotasyonu (11 SPDR ETF RS rank) ───────────────────────────────────
+
+class SectorRotationEntry(BaseModel):
+    """sector_rotation satırı — Mark/Minervini lider sektör disiplini.
+    perf_* yüzde getiri, rs_score relative strength, rs_rank 1=en güçlü."""
+    ticker: str
+    sector_name: str
+    perf_1w: Optional[float] = None
+    perf_1m: Optional[float] = None
+    perf_3m: Optional[float] = None
+    perf_6m: Optional[float] = None
+    perf_1y: Optional[float] = None
+    rs_score: Optional[float] = None
+    rs_rank: Optional[int] = None
+    scan_date: Optional[str] = None
+
+
+@app.get("/api/sector-rotation", response_model=list[SectorRotationEntry])
+def get_sector_rotation() -> list[SectorRotationEntry]:
+    """Sektör Rotasyonu — son tarama 11 SPDR sektör ETF, RS rank sıralı.
+    DB bos/erisilmezse bos liste (graceful)."""
+    return sector_rotation_get_latest()
 
 
 # ── Trade Journal ─────────────────────────────────────────────────────────────

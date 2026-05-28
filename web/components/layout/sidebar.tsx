@@ -6,7 +6,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Menu, Home, Activity, Globe,
   ListChecks, NotebookText, ScanLine, ChevronDown,
-  Quote, Calculator, CalendarDays, Layers,
+  Quote, Calculator, CalendarDays, Layers, TrendingUp,
 } from "lucide-react";
 // KARAR ADAY (22 May 2026): BarChart2, TrendingUp, Layers ikonlari kaldirildi -
 // Stratejiler grup sidebar'dan cikti (Secenek E). NavGroup tip ve rendering KORUNDU
@@ -45,6 +45,8 @@ const NAV_ITEMS: NavItem[] = [
   { kind: "leaf", href: "/pazar-hazirligi", label: "Pazar Hazırlığı", icon: CalendarDays },
   // KARAR ADAY #714 (28 May 2026) — Pattern Kütüphanesi (Migration 010 + /api/patterns)
   { kind: "leaf", href: "/pattern-kutuphanesi", label: "Pattern Kütüphanesi", icon: Layers },
+  // 28 May 2026 — Sektör Rotasyonu (Streamlit'ten taşındı, sector_rotation tablosu)
+  { kind: "leaf", href: "/sektor-rotasyonu", label: "Sektör Rotasyonu", icon: TrendingUp },
 ];
 // KARAR ADAY (22 May 2026): Stratejiler grup (Minervini + Carr) kaldirildi (Secenek E).
 // Sebep: Minervini akisi mevcut sayfalarda zaten coziluyor (Tarama -> Izleme Listesi

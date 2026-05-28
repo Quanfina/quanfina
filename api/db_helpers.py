@@ -802,3 +802,36 @@ def pattern_library_get_all() -> list[dict]:
             return [dict(row._mapping) for row in result]
     except Exception:
         return []
+
+
+def sector_rotation_get_latest() -> list[dict]:
+    """Sektör Rotasyonu — son scan_date 11 SPDR sektör ETF, RS rank sıralı.
+
+    scanner.py günlük doldurur (sector_rotation tablosu). Mark/Minervini "lider
+    sektör" disiplini: güçlü sektördeki güçlü hisse. perf_1w/1m/3m/6m/1y + rs_score.
+
+    Returns: liste (rs_rank artan sıra). Bos olabilir (tablo yok/erisilmez).
+    """
+    try:
+        with engine.connect() as conn:
+            last = conn.execute(
+                text("SELECT MAX(scan_date) FROM sector_rotation")
+            ).scalar()
+            if not last:
+                return []
+            result = conn.execute(text("""
+                SELECT ticker, sector_name, perf_1w, perf_1m, perf_3m,
+                       perf_6m, perf_1y, rs_score, rs_rank, scan_date
+                FROM sector_rotation
+                WHERE scan_date = :d
+                ORDER BY rs_rank ASC
+            """), {"d": last})
+            rows = []
+            for r in result:
+                d = dict(r._mapping)
+                if d.get("scan_date") is not None:
+                    d["scan_date"] = d["scan_date"].isoformat()
+                rows.append(d)
+            return rows
+    except Exception:
+        return []
