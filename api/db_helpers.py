@@ -779,3 +779,26 @@ def mark_signals_get_by_symbol(symbol: str) -> dict:
     if row["carr_stage"] in (1, 2, 3, 4):
         out["carr_stage"] = int(row["carr_stage"])
     return out
+
+
+def pattern_library_get_all() -> list[dict]:
+    """Migration 010: pattern_library 7 Mark/O'Neil canon pattern.
+
+    Detector'lar (compute_vcp_pass, detect_tennis_ball, compute_power_play_pass)
+    icin canon parametre kaynagi — hardcoded sayi YOK (KALICI ILKE #4 + Kural #26).
+    Her pattern Mark kitap referansli (mark_book_ref).
+
+    Returns: liste (bos olabilir — tablo yoksa/erisilmezse).
+    """
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT id, pattern_name, mark_book_ref,
+                       contraction_count_min, contraction_count_max,
+                       base_weeks_min, base_weeks_max, notes
+                FROM pattern_library
+                ORDER BY id
+            """))
+            return [dict(row._mapping) for row in result]
+    except Exception:
+        return []

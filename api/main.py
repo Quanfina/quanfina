@@ -27,6 +27,7 @@ from db_helpers import (  # noqa: E402
     trades_get_all, trades_get_by_id,
     trades_insert, trades_update, trades_delete,
     mark_signals_get_by_symbol,
+    pattern_library_get_all,
 )
 
 # Sprint 4-bis.7 Faz 1 B paket: Mark KARAR #914 + #969 + #970
@@ -2613,6 +2614,28 @@ SETUP_TYPES: list[SetupTypeModel] = [
 @app.get("/api/setup-types", response_model=list[SetupTypeModel])
 def get_setup_types() -> list[SetupTypeModel]:
     return SETUP_TYPES
+
+
+# ── Pattern Library (Migration 010 — KARAR ADAY #714) ─────────────────────────
+
+class PatternLibraryEntry(BaseModel):
+    """Migration 010 pattern_library satiri — Mark/O'Neil canon pattern parametre.
+    KALICI ILKE #4: her pattern kitap referansli (mark_book_ref), hardcoded sayi yok."""
+    id: int
+    pattern_name: str
+    mark_book_ref: Optional[str] = None
+    contraction_count_min: Optional[int] = None
+    contraction_count_max: Optional[int] = None
+    base_weeks_min: Optional[int] = None
+    base_weeks_max: Optional[int] = None
+    notes: Optional[str] = None
+
+
+@app.get("/api/patterns", response_model=list[PatternLibraryEntry])
+def get_patterns() -> list[PatternLibraryEntry]:
+    """Pattern Library — 7 Mark/O'Neil canon pattern (TLSMW Ch 10).
+    DB bos/erisilmezse bos liste (graceful — UI pattern listesi gizler)."""
+    return pattern_library_get_all()
 
 
 # ── Trade Journal ─────────────────────────────────────────────────────────────
