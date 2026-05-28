@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useGridTheme } from "@/hooks/use-grid-theme";
+import { useGridColumnState } from "@/hooks/use-grid-column-state";
 import { Plus } from "lucide-react";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef } from "ag-grid-community";
@@ -34,6 +35,7 @@ const SELECT = "h-8 rounded-md border border-input bg-background px-2 text-xs fo
 export default function JournalPage() {
   const { gridClass } = useGridTheme();
   const gridRef = useRef<AgGridReact<Trade>>(null);
+  const gridColumnState = useGridColumnState("quanfina-journal-cols");
 
   // Filters
   const [statusFilter, setStatusFilter]   = useState("all");
@@ -249,6 +251,7 @@ export default function JournalPage() {
           <div className={gridClass} style={{ height: 560, width: "100%" }}>
             <AgGridReact
               ref={gridRef}
+              {...gridColumnState}
               theme="legacy"
               columnDefs={columnDefs}
               defaultColDef={TRADE_DEFAULT_COL_DEF}

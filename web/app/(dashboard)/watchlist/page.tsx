@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useGridTheme } from "@/hooks/use-grid-theme";
+import { useGridColumnState } from "@/hooks/use-grid-column-state";
 import { Plus } from "lucide-react";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef } from "ag-grid-community";
@@ -47,6 +48,7 @@ export default function WatchlistPage() {
   const [stageConfirmedOnly, setStageConfirmedOnly] = useState(false);
   const { data, isLoading, isError, error, refetch, isFetching } = useWatchlist();
   const gridRef = useRef<AgGridReact<WatchlistRow>>(null);
+  const gridColumnState = useGridColumnState("quanfina-watchlist-cols");
   // Paket 252 (27 May 2026): Defansif modda RS<70 satırlar görsel solgun.
   // Mark canon TLSMW Leaders First — Defansif modda sadece Leaders öncelikli.
   const tradingMode = useTradingMode();
@@ -275,6 +277,7 @@ export default function WatchlistPage() {
           <div className={gridClass} style={{ height: 600, width: "100%" }}>
             <AgGridReact
               ref={gridRef}
+              {...gridColumnState}
               theme="legacy"
               columnDefs={columnDefs}
               defaultColDef={DEFAULT_COL_DEF}

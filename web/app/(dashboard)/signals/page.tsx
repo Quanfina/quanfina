@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useGridTheme } from "@/hooks/use-grid-theme";
+import { useGridColumnState } from "@/hooks/use-grid-column-state";
 import { Activity, Plus, X, RotateCcw } from "lucide-react";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, ICellRendererParams } from "ag-grid-community";
@@ -65,6 +66,7 @@ export default function SignalsPage() {
   const { gridClass } = useGridTheme();
   const { data, isLoading, isError, error, refetch, isFetching } = useSignals();
   const gridRef = useRef<AgGridReact<Signal>>(null);
+  const gridColumnState = useGridColumnState("quanfina-signals-cols");
   // Paket 235 (27 May 2026): Defansif modda AL butonu disabled (Mark TTLC s.187)
   const tradingMode = useTradingMode();
   const alBlocked = isNewAlBlocked(tradingMode.mode);
@@ -600,6 +602,7 @@ export default function SignalsPage() {
           <div className={gridClass} style={{ height: 600, width: "100%" }}>
             <AgGridReact<Signal>
               ref={gridRef}
+              {...gridColumnState}
               theme="legacy"
               columnDefs={columnDefs}
               defaultColDef={defaultColDef}
