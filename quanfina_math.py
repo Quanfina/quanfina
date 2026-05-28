@@ -544,67 +544,15 @@ def check_volatility_position_size(
 
 
 # =============================================================================
-# Konu 11 — Distribution Days (Mark Minervini Bölüm 5)
+# Konu 11 — Distribution Days
 # =============================================================================
-
-def count_distribution_days(
-    price_history: list[tuple[str, float, float]],
-    lookback_days: int = 20
-) -> StopRecommendation:
-    """Distribution Day = price down + volume up (vs prev day).
-
-    Esik: 4+ in 4 hafta (~20 trading days) → Under Pressure
-
-    Kaynak: Trade Like a Stock Market Wizard - Bolum 5
-
-    Args:
-        price_history: [(date_str, close, volume), ...] kronolojik sirali
-        lookback_days: Bakilacak gun sayisi (default 20 = ~4 hafta)
-
-    Returns:
-        StopRecommendation with suggested_value = distribution day sayisi
-    """
-    if len(price_history) < 2:
-        return StopRecommendation(
-            "OK",
-            "Yetersiz veri (en az 2 gun gerekli)",
-            suggested_value=0.0
-        )
-
-    recent = price_history[-lookback_days:] if len(price_history) > lookback_days else price_history
-
-    if len(recent) < 2:
-        return StopRecommendation("OK", "Yetersiz veri", suggested_value=0.0)
-
-    count = 0
-    for i in range(1, len(recent)):
-        prev_close, prev_volume = recent[i - 1][1], recent[i - 1][2]
-        curr_close, curr_volume = recent[i][1], recent[i][2]
-
-        if curr_close < prev_close and curr_volume > prev_volume:
-            count += 1
-
-    actual_lookback = len(recent)
-    weeks = actual_lookback / 5.0
-
-    if count >= 6:
-        severity = "CRITICAL"
-        msg = f"{count} Distribution Day in {weeks:.1f} hafta — AGIR baski!"
-    elif count >= 4:
-        severity = "WARNING"
-        msg = f"{count} Distribution Day in {weeks:.1f} hafta — UNDER PRESSURE"
-    elif count >= 2:
-        severity = "INFO"
-        msg = f"{count} Distribution Day in {weeks:.1f} hafta — yakin takip"
-    else:
-        severity = "OK"
-        msg = f"{count} Distribution Day in {weeks:.1f} hafta — saglikli"
-
-    return StopRecommendation(
-        severity=severity,
-        message=msg,
-        suggested_value=float(count)
-    )
+# NOT (Paket 360): Eski count_distribution_days (StopRecommendation donen, ~57
+# satir) KALDIRILDI. Python son tanimi kullandigi icin GOLGELENMIS OLU koddu —
+# asagidaki canonical surum (Mark KARAR #488, O'Neil mekanik, (closes, volumes,
+# lookback) -> dict imzasi) zaten production + tum testler tarafindan cagriliyordu.
+# api/main.py:1148 + scanner.py o surumu kullaniyor; eskiye yalniz _archive referans
+# verdi. Tek tanim birakildi (DRY Ilke #4 + Kural #18 negatif tescil). Sn. Ferit
+# "sen karar ver" onayi (28 May).
 
 
 # =============================================================================
