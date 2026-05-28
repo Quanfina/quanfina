@@ -26,6 +26,7 @@ from db_helpers import (  # noqa: E402
     watchlist_recompute_consensus,
     trades_get_all, trades_get_by_id,
     trades_insert, trades_update, trades_delete,
+    mark_signals_get_by_symbol,
 )
 
 # Sprint 4-bis.7 Faz 1 B paket: Mark KARAR #914 + #969 + #970
@@ -1319,10 +1320,18 @@ def _compute_live_mark_signals(symbol: str, price: float) -> dict:
             return dict(result)  # Defensive copy
 
     result: dict = {}
-    # 1. MOCK base (eğer varsa) — Carr Stage gibi henüz live olmayan alanlar
-    mock = _STOCK_MARK_SIGNALS.get(symbol, {})
-    if mock:
-        result.update(mock)
+    # 1. DB base (Migration 004-009 sonrasi gercek tarama verisi — scanner doldurur).
+    #    minervini_scans son scan_date Mark canon kolonlari. NULL ise bos dict.
+    db_signals = mark_signals_get_by_symbol(symbol)
+    if db_signals:
+        result.update(db_signals)
+    else:
+        # Gecis donemi fallback: DB henuz Mark kolonlarini doldurmadiysa MOCK.
+        # scanner.py sonraki run'da kolonlari doldurunca DB otomatik one gecer,
+        # MOCK gereksizlesir (KARAR ADAY #735 — MOCK->DB tam gecis).
+        mock = _STOCK_MARK_SIGNALS.get(symbol, {})
+        if mock:
+            result.update(mock)
 
     # 2. yfinance OHLCV çek (cache varsa 0s)
     bars = _fetch_ohlcv_real(symbol, 252)
@@ -2041,9 +2050,9 @@ def get_stock_info(symbol: str) -> StockInfo:
     sym = symbol.upper()
     stock = _STOCK_BY_SYM.get(sym)
     meta  = _STOCK_META.get(sym, {})
-    # KARAR ADAY #723 — Mark Profili rozetleri (MOCK feed; production'da
-    # minervini_scans tablo kolonlarindan okunacak)
-    raw_signals = _STOCK_MARK_SIGNALS.get(sym)
+    # KARAR ADAY #723 + #735 — Mark Profili rozetleri.
+    # Migration 004-009 sonrasi DB-oncelik (minervini_scans), DB bos ise MOCK fallback.
+    raw_signals = mark_signals_get_by_symbol(sym) or _STOCK_MARK_SIGNALS.get(sym)
     mark_signals = MarkSignalsBlock(**raw_signals) if raw_signals else None
 
     # DB down ortamda hisse detay sayfasi calismali — watchlist bos liste fallback

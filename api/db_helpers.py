@@ -728,3 +728,49 @@ def db_health_check() -> bool:
         result = False
     _DB_HEALTH_CACHE = (now, result)
     return result
+
+
+def mark_signals_get_by_symbol(symbol: str) -> dict:
+    """Migration 004-009 sonrasi: minervini_scans son scan_date satirindan
+    Mark canon kolonlarini oku (scanner.py dolduruyor).
+
+    NULL/False kolonlar atlanir (graceful — UI undefined ise rozet gostermez,
+    MarkBadgeStrip MarkSignals interface ile uyumlu). MOCK _STOCK_MARK_SIGNALS
+    yerine gercek tarama verisi — scanner doldurunca otomatik canli.
+
+    Returns: dict (bos olabilir — DB satir yoksa veya tum kolonlar NULL).
+    """
+    try:
+        with engine.connect() as conn:
+            row = conn.execute(text("""
+                SELECT vcp_quality_score, vcp_ready_score, power_play_pass,
+                       tennis_ball_pattern, volume_asymmetry_ratio,
+                       volume_asymmetry_tier, carr_stage, carr_stage_label
+                FROM minervini_scans
+                WHERE ticker = :sym
+                ORDER BY scan_date DESC
+                LIMIT 1
+            """), {"sym": symbol}).mappings().first()
+    except Exception:
+        return {}
+    if not row:
+        return {}
+    out: dict = {}
+    # vcp_quality_score: 'EXCELLENT'|'PASS' (NULL atla)
+    if row["vcp_quality_score"]:
+        out["vcp_quality_score"] = row["vcp_quality_score"]
+    if row["vcp_ready_score"] is not None:
+        out["vcp_ready_score"] = int(row["vcp_ready_score"])
+    # power_play_pass: sadece True ise rozet (False/NULL atla)
+    if row["power_play_pass"]:
+        out["power_play_pass"] = True
+    if row["tennis_ball_pattern"]:
+        out["tennis_ball_pattern"] = row["tennis_ball_pattern"]
+    if row["volume_asymmetry_ratio"] is not None:
+        out["volume_asymmetry_ratio"] = float(row["volume_asymmetry_ratio"])
+    if row["volume_asymmetry_tier"]:
+        out["volume_asymmetry_tier"] = row["volume_asymmetry_tier"]
+    # carr_stage: 1|2|3|4 (NULL atla)
+    if row["carr_stage"] is not None:
+        out["carr_stage"] = int(row["carr_stage"])
+    return out
