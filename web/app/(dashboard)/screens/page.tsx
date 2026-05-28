@@ -118,6 +118,8 @@ export default function ScreensPage() {
         headerName: "RS IBD",
         width: 90,
         minWidth: 80,
+        // KARAR ADAY #456 — sayısal filter (greater_than: RS≥80 Leader, vb.)
+        filter: "agNumberColumnFilter",
         cellStyle: (p: CellClassParams<ScreenResultRow, number>) => {
           const band = getRsBandStyle(p.value ?? null);
           return {
@@ -134,6 +136,8 @@ export default function ScreensPage() {
         headerName: "FİYAT",
         width: 100,
         minWidth: 90,
+        // KARAR ADAY #456 — sayısal filter (greater_than: fiyat≥$50, vb.)
+        filter: "agNumberColumnFilter",
         cellStyle: MONO_RIGHT,
         valueFormatter: (p) => fmtUsd(p.value as number | null),
       },
@@ -343,7 +347,17 @@ export default function ScreensPage() {
               ref={gridRef}
               theme="legacy"
               columnDefs={columnDefs}
-              defaultColDef={{ sortable: true, resizable: true, suppressMovable: false }}
+              defaultColDef={{
+                sortable: true,
+                resizable: true,
+                suppressMovable: false,
+                // KARAR ADAY #456 — Screener Filter Operator (Markets360 sentezi:
+                // greater_than 30K + equals 9.5K). AG Grid floating filter — tarama
+                // sonuçlarını RS/fiyat/sektör bazında filtrele (cellRenderer kolonları
+                // filter:false ile hariç). Text kolonlar agTextColumnFilter (default).
+                filter: true,
+                floatingFilter: true,
+              }}
               rowData={resultsQ.data ?? []}
               rowHeight={32}
               headerHeight={36}
