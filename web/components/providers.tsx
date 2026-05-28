@@ -4,9 +4,9 @@ import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "@/components/layout/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AllCommunityModule, ModuleRegistry } from "ag-grid-community";
-
-ModuleRegistry.registerModules([AllCommunityModule]);
+// NOT (Paket 355): AG Grid modül kaydı buradan kaldırıldı. Global provider
+// olduğu için ag-grid (~500KB) tüm route'ların paylaşılan chunk'ına giriyordu.
+// Kayıt artık grid kullanan sayfalarda: `import "@/lib/ag-grid-setup"`.
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(

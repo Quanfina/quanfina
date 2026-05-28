@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useGridTheme } from "@/hooks/use-grid-theme";
+import "@/lib/ag-grid-setup"; // AG Grid modül kaydı (Paket 355 — bundle split)
 import { AgGridReact } from "ag-grid-react";
 import type { CellValueChangedEvent } from "ag-grid-community";
 import { useMinerviniStocks } from "@/hooks/use-minervini-stocks";

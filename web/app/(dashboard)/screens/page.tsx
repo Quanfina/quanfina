@@ -23,6 +23,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useGridTheme } from "@/hooks/use-grid-theme";
+import "@/lib/ag-grid-setup"; // AG Grid modül kaydı (Paket 355 — bundle split)
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, CellClassParams } from "ag-grid-community";
 import { useScreenResults } from "@/hooks/use-screen-results";

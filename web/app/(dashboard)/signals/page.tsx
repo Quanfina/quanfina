@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useGridTheme } from "@/hooks/use-grid-theme";
 import { useGridColumnState } from "@/hooks/use-grid-column-state";
 import { Activity, Plus, X, RotateCcw } from "lucide-react";
+import "@/lib/ag-grid-setup"; // AG Grid modül kaydı (Paket 355 — bundle split)
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, ICellRendererParams } from "ag-grid-community";
 
