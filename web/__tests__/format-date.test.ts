@@ -5,7 +5,7 @@
  * DRY helper (Bilgi Mimarisi İlke #4 tek doğruluk kaynağı).
  */
 import { describe, it, expect } from "vitest";
-import { formatDateTR } from "@/lib/format-date";
+import { formatDateTR, todayLocalISO } from "@/lib/format-date";
 
 describe("formatDateTR — ISO → DD.MM.YYYY", () => {
   describe("Pure date (saat yok)", () => {
@@ -65,5 +65,29 @@ describe("formatDateTR — ISO → DD.MM.YYYY", () => {
     it("'2026-5-28' (zero-pad yok) → 'invalid' regex eşleşmez, ham döner", () => {
       expect(formatDateTR("2026-5-28")).toBe("2026-5-28");
     });
+  });
+});
+
+describe("todayLocalISO — yerel tarih (UTC off-by-one fix, Paket 356)", () => {
+  it("YYYY-MM-DD formatı döner (zero-padded)", () => {
+    expect(todayLocalISO(new Date(2026, 0, 5))).toBe("2026-01-05"); // Ocak = month 0
+    expect(todayLocalISO(new Date(2026, 11, 31))).toBe("2026-12-31");
+  });
+
+  it("YEREL tarihi kullanır — UTC'ye kaymaz (Türkiye UTC+3 senaryosu)", () => {
+    // 2026-05-28 01:30 yerel saat → yerel tarih HÂLÂ 28 olmalı.
+    // (new Date().toISOString() UTC verseydi 27 olabilirdi.)
+    const localEarlyMorning = new Date(2026, 4, 28, 1, 30, 0);
+    expect(todayLocalISO(localEarlyMorning)).toBe("2026-05-28");
+    // getDate (yerel) kullandığı için gün kaymaz
+    expect(todayLocalISO(localEarlyMorning)).toBe(
+      `${localEarlyMorning.getFullYear()}-${String(localEarlyMorning.getMonth() + 1).padStart(2, "0")}-${String(localEarlyMorning.getDate()).padStart(2, "0")}`
+    );
+  });
+
+  it("argümansız çağrı bugünün yerel tarihini döner", () => {
+    const now = new Date();
+    const expected = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    expect(todayLocalISO()).toBe(expected);
   });
 });

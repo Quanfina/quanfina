@@ -27,6 +27,7 @@ import { useCarrStage } from "@/hooks/use-carr-stage";
 import { useClimaxRun } from "@/hooks/use-climax-run";
 import { AddTradeDialog } from "@/components/journal/AddTradeDialog";
 import { Button } from "@/components/ui/button";
+import { todayLocalISO } from "@/lib/format-date";
 import { toast } from "sonner";
 
 const PriceChart = dynamic(
@@ -237,7 +238,7 @@ export default function HissePage({
         initialData={{
           symbol: sym,
           strategy: info.active_strategies?.[0]?.strategy ?? "minervini",
-          entry_date: new Date().toISOString().split("T")[0],
+          entry_date: todayLocalISO(), // Paket 356: yerel tarih (UTC off-by-one fix)
           entry_price: info.price,
         }}
       />

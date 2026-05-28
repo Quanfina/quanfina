@@ -20,3 +20,21 @@ export function formatDateTR(iso: string | null | undefined): string {
   const tail = rest.replace(/^T/, " ").replace(/Z$/, "").trim();
   return tail ? `${day}.${month}.${year} ${tail}` : `${day}.${month}.${year}`;
 }
+
+/**
+ * Bugünün tarihini YEREL saat dilimine göre "YYYY-MM-DD" döner (Paket 356).
+ *
+ * NEDEN: `new Date().toISOString().slice(0,10)` UTC tarih verir. Sn. Ferit
+ * Türkiye'de (UTC+3) ABD piyasası trade ederken, yerel 00:00–03:00 arası AL
+ * butonuna basarsa UTC hâlâ "dün" → entry_date yanlış ön-dolar (off-by-one).
+ * getFullYear/getMonth/getDate yerel saat dilimini kullanır → kayma yok.
+ *
+ * `<input type="date">` değeri zaten yerel YYYY-MM-DD bekler; bu helper ön-dolum
+ * için doğru kaynak.
+ */
+export function todayLocalISO(d: Date = new Date()): string {
+  const y = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${mo}-${day}`;
+}

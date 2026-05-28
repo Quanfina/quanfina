@@ -17,7 +17,7 @@ import { AddTradeDialog } from "@/components/journal/AddTradeDialog";
 import { AddRowDialog } from "@/components/watchlist/AddRowDialog";
 import { Button } from "@/components/ui/button";
 import { GridLoadingOverlay } from "@/components/ag-grid/LoadingOverlay";
-import { formatDateTR } from "@/lib/format-date";
+import { formatDateTR, todayLocalISO } from "@/lib/format-date";
 import { getPassedSignals, setPassedSignals, signalKey } from "@/lib/passed-signals";
 import { toast } from "sonner";
 import type { Signal } from "@/types/signal";
@@ -406,7 +406,7 @@ export default function SignalsPage() {
         symbol: tradeSignal.symbol,
         strategy: tradeSignal.strategy,
         setup_type: tradeSignal.setup_type ?? undefined,
-        entry_date: new Date().toISOString().split("T")[0],
+        entry_date: todayLocalISO(), // Paket 356: yerel tarih (UTC off-by-one fix)
         entry_price: tradeSignal.price,
       }
     : undefined;
