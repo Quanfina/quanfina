@@ -1937,13 +1937,17 @@ def _fetch_ohlcv_real(symbol: str, n_bars: int = 252) -> Optional[list[OhlcvBar]
             return None
         bars: list[OhlcvBar] = []
         for date_idx, row in hist.iterrows():
+            o = float(row["Open"]); h = float(row["High"]); lo = float(row["Low"])
+            c = float(row["Close"]); v = float(row["Volume"])
+            # yfinance NaN satirlari atla (settle olmamis gun / split-gap / partial day).
+            # float(nan) raise ETMEZ -> close=nan OhlcvBar JSON serialize 500'u
+            # (/api/stock/.../ohlcv + downstream compute helper NaN zehirlenmesi).
+            # NaN != NaN ozelligi ile tespit (pandas import gerekmez).
+            if o != o or h != h or lo != lo or c != c or v != v:
+                continue
             bars.append(OhlcvBar(
                 time=date_idx.strftime("%Y-%m-%d"),
-                open=float(row["Open"]),
-                high=float(row["High"]),
-                low=float(row["Low"]),
-                close=float(row["Close"]),
-                volume=int(row["Volume"]),
+                open=o, high=h, low=lo, close=c, volume=int(v),
             ))
         _OHLCV_CACHE[sym] = (now, bars)
         return bars
