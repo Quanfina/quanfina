@@ -447,53 +447,11 @@ class TestCheckVolatilityPositionSize:
 # ---------------------------------------------------------------------------
 # Konu 11 — Distribution Days
 # ---------------------------------------------------------------------------
-
-class TestCountDistributionDays:
-
-    def test_healthy_market(self):
-        from quanfina_math import count_distribution_days
-        history = [
-            ("2026-01-01", 100, 1000),
-            ("2026-01-02", 102, 1100),
-            ("2026-01-03", 104, 1200),
-            ("2026-01-04", 106, 1300),
-        ]
-        rec = count_distribution_days(history)
-        assert rec.severity == "OK"
-        assert rec.suggested_value == 0.0
-
-    def test_under_pressure(self):
-        from quanfina_math import count_distribution_days
-        history = [
-            ("2026-01-01", 100, 1000),
-            ("2026-01-02", 99, 1100),
-            ("2026-01-03", 98, 1200),
-            ("2026-01-04", 97, 1300),
-            ("2026-01-05", 96, 1400),
-        ]
-        rec = count_distribution_days(history)
-        assert rec.severity == "WARNING"
-        assert rec.suggested_value == 4.0
-
-    def test_critical_pressure(self):
-        from quanfina_math import count_distribution_days
-        history = [("2026-01-01", 100, 1000)] + [
-            (f"2026-01-{i+2:02d}", 100 - i, 1000 + i * 100) for i in range(1, 7)
-        ]
-        rec = count_distribution_days(history)
-        assert rec.severity == "CRITICAL"
-
-    def test_insufficient_data(self):
-        from quanfina_math import count_distribution_days
-        rec = count_distribution_days([("2026-01-01", 100, 1000)])
-        assert rec.severity == "OK"
-        assert rec.suggested_value == 0.0
-
-    def test_lookback_truncation(self):
-        from quanfina_math import count_distribution_days
-        history = [(f"2026-01-{i+1:02d}", 100, 1000) for i in range(30)]
-        rec = count_distribution_days(history, lookback_days=20)
-        assert rec.severity == "OK"
+# NOT: count_distribution_days canli testleri tests/test_distribution_days.py'de
+# (Mark KARAR #488, imza (closes, volumes, lookback) -> dict). Eski TestCountDistributionDays
+# sinifi quanfina_math.py:550'deki OLU/golge fonksiyonu (StopRecommendation donen)
+# test ediyordu; 2944 yeniden tanimi onu golgeledigi icin kaldirildi (DRY, Ilke #4).
+# DUPLICATE fonksiyon temizligi (550 vs 2944) yikici refactor -> Sn. Ferit onayi.
 
 
 # ---------------------------------------------------------------------------
@@ -549,11 +507,13 @@ class TestComputeRBAMetrics:
         # Expectancy = (0.5 * 10) - (0.5 * 5) = 2.5
         assert rba.expectancy_pct == pytest.approx(2.5)
 
-    def test_all_winners_returns_inf_ratio(self):
+    def test_all_winners_returns_capped_ratio(self):
+        # Tum trade'ler kazanc = sonsuz edge. float('inf') JSON serialize EDILEMEZ
+        # (FastAPI 500), 99.0 ile cap'lenir (pratik sonsuz). Bkz compute_rba_metrics.
         trades = [{'pnl_pct': 10.0}, {'pnl_pct': 15.0}]
         rba = compute_rba_metrics(trades)
         assert rba.win_rate == 1.0
-        assert rba.adjusted_ratio == float('inf')
+        assert rba.adjusted_ratio == 99.0
 
     def test_all_losers_returns_zero_ratio(self):
         trades = [{'pnl_pct': -5.0}, {'pnl_pct': -3.0}]

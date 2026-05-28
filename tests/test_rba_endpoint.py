@@ -47,14 +47,15 @@ class TestComputeRbaEdge:
         assert rba.is_statistically_significant is False
 
     def test_single_winner(self):
-        """Tek kazanan trade -> win_rate=100%, adjusted_ratio=inf."""
+        """Tek kazanan trade -> win_rate=100%, adjusted_ratio=99.0 (capped inf)."""
         rba = compute_rba_metrics([{"pnl_pct": 15.0}])
         assert rba.num_trades == 1
         assert rba.win_rate == 1.0
         assert rba.avg_gain_pct == 15.0
         assert rba.avg_loss_pct == 0.0
-        # No losers -> inf ratio
-        assert rba.adjusted_ratio == float("inf")
+        # No losers -> sonsuz edge. float('inf') JSON serialize edilemez (FastAPI
+        # 500), 99.0 ile cap'lenir (pratik sonsuz). Bkz quanfina_math compute_rba_metrics.
+        assert rba.adjusted_ratio == 99.0
         assert rba.is_statistically_significant is False  # <30 trade
 
     def test_single_loser(self):

@@ -1119,7 +1119,10 @@ def compute_rba_metrics(closed_trades: list[dict]) -> RBAMetrics:
     if losers and avg_loss != 0:
         adjusted_ratio = (win_rate * avg_gain) / ((1 - win_rate) * abs(avg_loss))
     elif winners and not losers:
-        adjusted_ratio = float('inf')
+        # Tüm trade'ler kazanç = sonsuz edge. ANCAK float('inf') JSON serialize
+        # EDILEMEZ (FastAPI 500 — "Out of range float not JSON compliant").
+        # JSON-safe capped değer: 99.0 = pratik sonsuz (UI'da "çok yüksek edge").
+        adjusted_ratio = 99.0
     else:
         adjusted_ratio = 0.0
 
