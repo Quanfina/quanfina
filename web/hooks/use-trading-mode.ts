@@ -42,6 +42,12 @@ export interface TradingModeInfo {
  * Trade verisi: useTrades zaten cache'li (60s).
  * Market: useMarketStatus zaten cache'li.
  */
+// Realized drawdown tetiği için notional portföy tabanı. OpenPositionsRiskPanel
+// ile aynı konvansiyon ($100k) — DRY. İleride gerçek portföy değerine bağlanabilir.
+const REALIZED_DD_BASE = 100_000;
+// Rehab tetik eşiği — Mark TTLC s.187 disiplini (CLAUDE.md Mod Geçişleri tablosu).
+const REHAB_DRAWDOWN_PCT = 10;
+
 export function useTradingMode(): TradingModeInfo {
   const trades = useTrades();
   const market = useMarketStatus();
@@ -69,6 +75,20 @@ export function useTradingMode(): TradingModeInfo {
     }
 
     const totalClosedTrades = closedTrades.length;
+
+    // Realized drawdown — kapalı trade kümülatif P&L equity eğrisinden (eskiden
+    // yeniye), $100k notional tabandan tepe-noktaya (high-water mark) göre.
+    // Açık pozisyon hariç (realized-only). Tepe-noktadan >%10 düşüş = Rehab tetiği.
+    let equity = REALIZED_DD_BASE;
+    let peakEquity = REALIZED_DD_BASE;
+    for (let i = closedTrades.length - 1; i >= 0; i--) {
+      // closedTrades en-yeni-önce sıralı → geriye it (i--) = kronolojik (eskiden yeniye)
+      equity += closedTrades[i].pl_dollar ?? 0;
+      if (equity > peakEquity) peakEquity = equity;
+    }
+    const currentDrawdownPct =
+      peakEquity > 0 ? ((peakEquity - equity) / peakEquity) * 100 : 0;
+
     const marketHealthScore = market.data?.market_health_score ?? null;
     // Piyasa Stage Mark canon — health_label / mode kullan
     const marketMode = market.data?.suggested_mode ?? null;  // LONG / SHORT / NEUTRAL
@@ -90,11 +110,15 @@ export function useTradingMode(): TradingModeInfo {
         totalClosedTrades,
       };
     }
-    // 2. Rehab (ardışık kayıp)
-    if (consecutiveLosses >= 3) {
+    // 2. Rehab (ardışık kayıp VEYA realized drawdown >%10 — CLAUDE.md Mod Geçişleri)
+    const drawdownTriggered = currentDrawdownPct > REHAB_DRAWDOWN_PCT;
+    if (consecutiveLosses >= 3 || drawdownTriggered) {
+      const reason = drawdownTriggered
+        ? `Realized drawdown %${currentDrawdownPct.toFixed(1)} (>%${REHAB_DRAWDOWN_PCT} eşik). Mark TTLC s.187: yeni trade'lerde pozisyon yarıya.`
+        : `${consecutiveLosses} ardışık kayıp. Mark TTLC s.187: yeni trade'lerde pozisyon yarıya.`;
       return {
         mode: "rehab",
-        reason: `${consecutiveLosses} ardışık kayıp. Mark TTLC s.187: yeni trade'lerde pozisyon yarıya.`,
+        reason,
         emoji: "⚠️",
         color: "#F59E0B",
         recommendedSizingPct: 0.5,

@@ -129,6 +129,47 @@ describe("useTradingMode — 4 mod tetik öncelik (Defansif > Rehab > Agresif > 
     });
   });
 
+  describe("Rehab tetik (realized drawdown >%10 — P357, ardışık kayıp OLMADAN)", () => {
+    it("Tepe +20k sonra -15k tek kayıp → drawdown %12.5 → Rehab (loss streak=1)", () => {
+      // $100k taban: id2 (eski) +20k → equity 120k (tepe), id1 (yeni) -15k → 105k.
+      // dd = 15k/120k = %12.5 > %10 → Rehab. consecutiveLosses=1 (3 değil!).
+      mockTrades.mockReturnValue({
+        data: [
+          makeTrade({ id: 1, pl_dollar: -15000, exit_date: "2026-05-15" }),
+          makeTrade({ id: 2, pl_dollar: 20000, exit_date: "2026-05-14" }),
+        ],
+      });
+      const { result } = renderHook(() => useTradingMode());
+      expect(result.current.mode).toBe("rehab");
+      expect(result.current.recommendedSizingPct).toBe(0.5);
+      expect(result.current.consecutiveLosses).toBe(1); // 3 değil — drawdown tetikledi
+      expect(result.current.reason.toLowerCase()).toContain("drawdown");
+    });
+
+    it("Tepe +20k sonra -10k → drawdown %8.3 (<%10) → Normal (tetik yok)", () => {
+      mockTrades.mockReturnValue({
+        data: [
+          makeTrade({ id: 1, pl_dollar: -10000, exit_date: "2026-05-15" }),
+          makeTrade({ id: 2, pl_dollar: 20000, exit_date: "2026-05-14" }),
+        ],
+      });
+      const { result } = renderHook(() => useTradingMode());
+      expect(result.current.mode).toBe("normal");
+    });
+
+    it("Defansif, drawdown >%10 olsa BİLE üstte → mode='defansif' (öncelik)", () => {
+      mockMarket.mockReturnValue({ data: { market_health_score: 20 } });
+      mockTrades.mockReturnValue({
+        data: [
+          makeTrade({ id: 1, pl_dollar: -15000, exit_date: "2026-05-15" }),
+          makeTrade({ id: 2, pl_dollar: 20000, exit_date: "2026-05-14" }),
+        ],
+      });
+      const { result } = renderHook(() => useTradingMode());
+      expect(result.current.mode).toBe("defansif"); // Drawdown rehab'tan önce Defansif
+    });
+  });
+
   describe("Agresif tetik (market > 70 + consecutiveWins ≥ 5)", () => {
     it("market=80 + 5 ardışık kazanç → Agresif, sizing=%1.5", () => {
       mockMarket.mockReturnValue({ data: { market_health_score: 80 } });
