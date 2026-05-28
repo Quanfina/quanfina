@@ -2172,7 +2172,10 @@ def compute_volume_asymmetry(daily_history: list[dict], lookback_days: int = 20)
     down_avg = sum(down_volumes) / down_count if down_count > 0 else 1.0  # avoid div/0
 
     if down_avg == 0:
-        ratio = float('inf') if up_avg > 0 else 0.0
+        # Tum down-gunler 0 hacim = sonsuz asimetri. float('inf') JSON serialize
+        # EDILEMEZ (FastAPI 500 — /api/risk/volume-asymmetry). 99.0 = pratik sonsuz
+        # (RBA adjusted_ratio ile ayni JSON-safe cap pateni).
+        ratio = 99.0 if up_avg > 0 else 0.0
     else:
         ratio = up_avg / down_avg
 
@@ -3234,7 +3237,10 @@ def compute_market_breadth(
     # Bugunku A/D ratio (son gun)
     today_adv = advances_daily[-1]
     today_dec = declines_daily[-1]
-    ad_ratio = round(today_adv / today_dec, 2) if today_dec > 0 else float('inf')
+    # today_dec == 0 (sifir declines, cok guclu gun) = sonsuz A/D ratio. float('inf')
+    # JSON serialize EDILEMEZ (FastAPI 500 — /api/market/status). 99.0 = pratik sonsuz
+    # (RBA adjusted_ratio + volume_asymmetry ile ayni JSON-safe cap pateni).
+    ad_ratio = round(today_adv / today_dec, 2) if today_dec > 0 else 99.0
 
     # 20-gun birikimli A/D Line (advance - decline toplamı)
     lookback = min(lookback_days, len(advances_daily))
