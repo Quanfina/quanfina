@@ -357,7 +357,7 @@ def check_initial_stop(
     if stop_pct > 10:
         return StopRecommendation(
             severity="CRITICAL",
-            message=f"Stop %{stop_pct:.1f} — Minervini MAX %10 siniri asildi!",
+            message=f"Stop %{stop_pct:.1f} — %10 mutlak kritik sinir asildi (Mark canon %4-5 ideal / %7 uyari)!",
             suggested_value=round(ideal_stop, 4)
         )
     if stop_pct > 7:
