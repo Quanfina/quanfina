@@ -1110,6 +1110,23 @@ def _mock_spy_closes_volumes(days: int = 25) -> tuple[list[float], list[int]]:
     return _mock_index_history("SPY", 400.0, days)
 
 
+def _index_closes_volumes(ticker: str, start_price: float, days: int) -> tuple[list[float], list[int]]:
+    """Paket 369: SPY/QQQ/IWM icin GERCEK yfinance OHLCV (son `days` bar);
+    fail/yetersiz veri ise MOCK fallback (deterministik, UX/test kesintisiz).
+
+    _fetch_ohlcv_real 5dk cache -> ayni request icinde ticker tekrar cagrilirsa 0s
+    + determinizm (test_idempotent gecer). Breadth (advance/decline) yfinance'te
+    yok -> ayri (MOCK kalir). market_health_score formulu yok -> mode hala MOCK
+    (Kural #26: uydurma yok); ama index STAGE + DD artik gercek piyasa verisi.
+    """
+    bars = _fetch_ohlcv_real(ticker, max(days, 252))
+    if bars and len(bars) >= max(60, days):
+        closes = [b.close for b in bars][-days:]
+        volumes = [b.volume for b in bars][-days:]
+        return closes, volumes
+    return _mock_index_history(ticker, start_price, days)
+
+
 def _mock_breadth_history(days: int = 25) -> tuple[list[int], list[int]]:
     """KARAR #733 alt-paket (Paket 52, 25 May 2026): MOCK A/D advance/decline.
 
@@ -1142,19 +1159,20 @@ def _mock_breadth_history(days: int = 25) -> tuple[list[int], list[int]]:
 def _index_stage(ticker: str, start_price: float) -> int:
     """KARAR #733 alt-paket (Paket 24): SPY/QQQ/IWM stage dinamik hesap.
 
-    180 gun MOCK history + compute_carr_stage helper.
+    180 gun GERCEK yfinance (fail->MOCK fallback) + compute_carr_stage helper.
     Stan Weinstein 4-Stage (1=Basing, 2=Advancing, 3=Topping, 4=Declining).
     Helper None donerse fallback Stage 2 (default).
     """
-    closes, volumes = _mock_index_history(ticker, start_price, days=180)
+    closes, volumes = _index_closes_volumes(ticker, start_price, 180)  # P369: gercek index
     result = compute_carr_stage(closes, volumes, ma_window=150)
     return result.get("stage") or 2
 
 
 @app.get("/api/market/status", response_model=MarketStatus)
 def get_market_status() -> MarketStatus:
-    # KARAR #731 + #488 alt (Paket 22): distribution_days MOCK SPY -> DD count
-    closes, volumes = _mock_spy_closes_volumes(days=25)
+    # KARAR #731 + #488 alt (Paket 22): distribution_days GERCEK SPY -> DD count
+    # (P369: yfinance gercek SPY OHLCV, fail->MOCK fallback)
+    closes, volumes = _index_closes_volumes("SPY", 400.0, 25)
     dd_result = count_distribution_days(closes, volumes, lookback_days=20)
     dd_count = dd_result["count"]
 
@@ -1179,8 +1197,8 @@ def get_market_status() -> MarketStatus:
 
     # KARAR #733 alt (Paket 57): Index vs A/D Divergence backend pre-compute
     # (Mark+O'Neil canon — P56 compute_breadth_divergence helper wire)
-    # SPY closes 25-gun MOCK + advances/declines aynı 25-gun feed
-    spy_closes, spy_volumes = _mock_index_history("SPY", 400.0, days=25)
+    # SPY closes 25-gun GERCEK (P369) + advances/declines MOCK (yfinance'te breadth yok)
+    spy_closes, spy_volumes = _index_closes_volumes("SPY", 400.0, 25)
     divergence_result = compute_breadth_divergence(
         spy_closes, advances, declines, lookback_days=10,
     )
