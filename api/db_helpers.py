@@ -636,6 +636,22 @@ def minervini_stocks_get_latest(limit: int = 100) -> list[dict]:
         return out
 
 
+def scan_latest_date() -> "str | None":
+    """En son minervini_scans tarama tarihi (veri tazeligi gostergesi — P375).
+
+    Staleness karari endpoint'te market_calendar ile (trading-day-aware) verilir;
+    bu helper sadece ham MAX(scan_date) doner. None = hic tarama yok / DB erisilemez.
+    """
+    try:
+        with engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT MAX(scan_date) AS d FROM minervini_scans")
+            ).fetchone()
+            return row[0] if row and row[0] else None
+    except Exception:
+        return None
+
+
 # =============================================================
 # Sprint 4-bis.3: 6 scan_diff Screen — onceki scan karsilastirma
 # Kaynak: notebook/Notebook_C1_Sprint_QuickStart.md SCREENS tuple

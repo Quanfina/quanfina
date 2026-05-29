@@ -30,6 +30,7 @@ from db_helpers import (  # noqa: E402
     pattern_library_get_all,
     sector_rotation_get_latest,
     minervini_stocks_get_latest,
+    scan_latest_date,
 )
 
 # Sprint 4-bis.7 Faz 1 B paket: Mark KARAR #914 + #969 + #970
@@ -1304,6 +1305,55 @@ def get_market_calendar_status() -> MarketCalendarStatus:
             next_open_tr=now_iso,
             last_trading_day=datetime.now(timezone.utc).date().isoformat(),
         )
+
+
+# ── Tarama Veri Tazeliği (P375) ──────────────────────────────────────────────
+# Sn. Ferit "14 gün eski veri" acisinin onlenmesi. Scanner Cloud Run'da durursa
+# kullanici bayat veriyle trade etmesin diye DataFreshnessBanner uyari gosterir.
+SCAN_STALE_THRESHOLD_DAYS = 4  # Cuma->Sali normal max 4 takvim gun; >4 = tarama atlandi
+
+
+class ScanFreshness(BaseModel):
+    latest_scan_date: Optional[str] = None   # "2026-05-29" veya None
+    is_stale: bool                            # True ise UI kirmizi banner gosterir
+    calendar_days_old: Optional[int] = None
+    threshold_days: int = SCAN_STALE_THRESHOLD_DAYS
+    message: str
+
+
+@app.get("/api/scan/freshness", response_model=ScanFreshness)
+def get_scan_freshness() -> ScanFreshness:
+    """Tarama verisi tazeligi: son minervini_scans tarihi kac gun eski.
+
+    is_stale = calendar_days > 4 (hafta sonu normal Cum->Sali 4 gunu ASMAZ;
+    >4 -> islem gunu taramasi atlandi). Basit + saglam (false-positive yok).
+    Frontend DataFreshnessBanner sadece is_stale=True iken kirmizi uyari gosterir.
+    """
+    from datetime import date as _date
+    latest = scan_latest_date()
+    if latest is None:
+        return ScanFreshness(
+            latest_scan_date=None, is_stale=True, calendar_days_old=None,
+            message="Tarama verisi yok (minervini_scans bos veya DB erisilemez).",
+        )
+    try:
+        scan_d = _date.fromisoformat(str(latest)[:10])
+    except ValueError:
+        return ScanFreshness(
+            latest_scan_date=latest, is_stale=False, calendar_days_old=None,
+            message=f"Son tarama: {latest} (tarih parse edilemedi).",
+        )
+    cal_days = (_date.today() - scan_d).days
+    stale = cal_days > SCAN_STALE_THRESHOLD_DAYS
+    if stale:
+        msg = (f"Tarama BAYAT: son tarama {latest}, {cal_days} gun once "
+               f"(esik {SCAN_STALE_THRESHOLD_DAYS} gun). Cloud Run scanner kontrol et.")
+    else:
+        msg = f"Tarama guncel: {latest} ({cal_days} gun once)."
+    return ScanFreshness(
+        latest_scan_date=latest, is_stale=stale,
+        calendar_days_old=cal_days, message=msg,
+    )
 
 
 # ── Watchlist ────────────────────────────────────────────────────────────────
