@@ -14,6 +14,7 @@ const mockTrades = vi.fn<() => { data?: Trade[] }>();
 const mockMarket = vi.fn<() => {
   data?: {
     market_health_score: number | null;
+    market_health_label?: string;  // P383: clean-room enum (HEALTHY/NEUTRAL/UNDER_PRESSURE)
     suggested_mode?: string | null;
   };
 }>();

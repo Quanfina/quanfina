@@ -91,7 +91,7 @@ from typing import Literal, Optional
 
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.exc import OperationalError
 
 logging.basicConfig(
@@ -2847,6 +2847,15 @@ from decimal import Decimal as _D, ROUND_HALF_UP as _RHU
 
 
 def _calc_pl(entry_price: float, exit_price: float, shares: int) -> tuple[float, float]:
+    """Trade P&L hesabı — Decimal precision (float arithmetic tuzağı yok).
+
+    Defensive (P385): entry_price=0 -> (0.0, 0.0) graceful (ZeroDivisionError
+    yerine). Caller path: add_trade endpoint Pydantic gt=0 ile entry=0 zaten
+    bloklamış olur (422), ama legacy DB satırlarinda (gecmiste validation
+    olmadan girilmis) entry=0 olabilir -> defense in depth.
+    """
+    if entry_price == 0:
+        return 0.0, 0.0
     entry = _D(str(entry_price))
     exit_ = _D(str(exit_price))
     qty   = _D(str(shares))
@@ -2907,20 +2916,25 @@ class TradeCreate(BaseModel):
     # DB'de eski trades NULL kalabilir (geriye uyum), yeni kayıtlar zorunlu doldurur.
     signal_source: Literal["strategy", "manual_self", "manual_external"]
     entry_date: str
-    entry_price: float
-    shares: int
+    # P385: gt=0 validation (entry=0 -> _calc_pl ZeroDivisionError 500 onlenmesi).
+    # Paper trading guvenligi: API dogrudan hit edilirse veya UI bug'sa veri girer.
+    entry_price: float = Field(gt=0, description="Giris fiyati > 0 zorunlu (P&L hesabi icin)")
+    shares: int = Field(gt=0, description="Hisse adedi > 0 zorunlu")
     status: Literal["open", "closed"] = "open"
     exit_date: Optional[str] = None
-    exit_price: Optional[float] = None
+    # exit_price ge=0 (delisting/total loss senaryosu icin 0 OK, ama negatif YASAK)
+    exit_price: Optional[float] = Field(default=None, ge=0)
     grade: Optional[str] = None
     exit_reason: Optional[str] = None
     lessons: Optional[str] = None
     # KARAR ADAY #717 — Mark TTLC Sec 1 disiplini: yeni trade plan'sız girilemez.
     # 6 alan ZORUNLU (default yok), Mark felsefesi: "Always go in with a plan".
+    # P385: plan alanlari da gt=0 (long pozisyon icin negatif/sifir fiyat anlamsiz).
     plan_entry_trigger: str
-    plan_stop: float
-    plan_target: float
-    plan_size_pct: float
+    plan_stop: float = Field(gt=0, description="Stop fiyati > 0 zorunlu (Mark Risk first)")
+    plan_target: float = Field(gt=0, description="Hedef fiyati > 0 zorunlu")
+    # plan_size_pct: Quanfina iç kontrat — portföy yüzdesi (0 < x ≤ 100).
+    plan_size_pct: float = Field(gt=0, le=100, description="Portfoy yuzdesi (0, 100] araliginda")
     plan_exit_strategy: str
     plan_time_horizon: TimeHorizon
 
