@@ -2,16 +2,22 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TermTooltip } from "@/components/terminology/TermTooltip";
+import {
+  MARKET_HEALTH_LABEL_TR,
+  type MarketHealthLabel,
+} from "@/types/market";
 
-const LABEL_COLORS: Record<string, string> = {
-  YEŞİL: "var(--mtp-excellent)",
-  SARI: "var(--mtp-neutral)",
-  KIRMIZI: "var(--mtp-danger)",
+// P382: clean-room (Markets360 Bundle "YESIL/SARI/KIRMIZI" sizma temizligi).
+// Renkler UI konvansiyonu — semantik anlam HEALTHY/NEUTRAL/UNDER_PRESSURE'da.
+const LABEL_COLORS: Record<MarketHealthLabel, string> = {
+  HEALTHY: "var(--mtp-excellent)",
+  NEUTRAL: "var(--mtp-neutral)",
+  UNDER_PRESSURE: "var(--mtp-danger)",
 };
 
 interface HealthScoreCardProps {
   score: number;
-  label: string;
+  label: MarketHealthLabel;
   vix: number;
   distributionDays: number;
 }
@@ -23,6 +29,7 @@ export function HealthScoreCard({
   distributionDays,
 }: HealthScoreCardProps) {
   const color = LABEL_COLORS[label] ?? "var(--mtp-neutral)";
+  const labelTr = MARKET_HEALTH_LABEL_TR[label] ?? label;
 
   return (
     <Card>
@@ -46,7 +53,7 @@ export function HealthScoreCard({
               color,
             }}
           >
-            {label}
+            {labelTr}
           </span>
         </div>
 

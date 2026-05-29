@@ -55,6 +55,19 @@ export interface FollowThroughDayInfo {
   mark_says: string;
 }
 
+// Paket 382: market_health_label clean-room enum (Cift Danisma Kural #20 + #26).
+// Eski "YESIL/SARI/KIRMIZI" yabanci platform Bundle CSS class sizmasiydi ->
+// jenerik HEALTHY/NEUTRAL + Mark TLSMW Bol. 5 birebir "Under Pressure".
+export type MarketHealthLabel = "HEALTHY" | "NEUTRAL" | "UNDER_PRESSURE";
+
+// TR display cevirisi (DRY — 3 ayri sayfada inline ceviri yerine tek kaynak).
+// "Baski Altinda" Mark Minervini kitap birebir "Under Pressure" terimi cevirisi.
+export const MARKET_HEALTH_LABEL_TR: Record<MarketHealthLabel, string> = {
+  HEALTHY: "Sağlıklı",
+  NEUTRAL: "Nötr",
+  UNDER_PRESSURE: "Baskı Altında",
+};
+
 export interface MarketStatus {
   spy_stage: number;
   qqq_stage: number;
@@ -62,7 +75,7 @@ export interface MarketStatus {
   vix: number;
   distribution_days: number;
   market_health_score: number;
-  market_health_label: string;
+  market_health_label: MarketHealthLabel;
   suggested_mode: string;
   top_sectors: SectorChange[];
   bottom_sectors: SectorChange[];

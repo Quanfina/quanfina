@@ -14,18 +14,33 @@ vi.mock("@/hooks/use-terms", () => ({
   useTerms: () => ({ data: [] }),
 }));
 
-describe("HealthScoreCard — skor + label renk", () => {
+describe("HealthScoreCard — skor + label renk (P382 clean-room enum)", () => {
   it("score=75 → '75' render", () => {
-    render(<HealthScoreCard score={75} label="YEŞİL" vix={14} distributionDays={1} />);
+    render(<HealthScoreCard score={75} label="HEALTHY" vix={14} distributionDays={1} />);
     expect(screen.getByText("75")).toBeInTheDocument();
   });
 
   it("'Market Health Score' başlık", () => {
-    render(<HealthScoreCard score={50} label="SARI" vix={20} distributionDays={3} />);
+    render(<HealthScoreCard score={50} label="NEUTRAL" vix={20} distributionDays={3} />);
     expect(screen.getByText("Market Health Score")).toBeInTheDocument();
   });
 
-  it.each<string>(["YEŞİL", "SARI", "KIRMIZI"])(
+  it("label='HEALTHY' → TR 'Sağlıklı' goster", () => {
+    render(<HealthScoreCard score={75} label="HEALTHY" vix={14} distributionDays={1} />);
+    expect(screen.getByText("Sağlıklı")).toBeInTheDocument();
+  });
+
+  it("label='NEUTRAL' → TR 'Nötr' goster", () => {
+    render(<HealthScoreCard score={50} label="NEUTRAL" vix={20} distributionDays={3} />);
+    expect(screen.getByText("Nötr")).toBeInTheDocument();
+  });
+
+  it("label='UNDER_PRESSURE' → TR 'Baskı Altında' goster (Mark TLSMW Bol. 5 kitap birebir)", () => {
+    render(<HealthScoreCard score={25} label="UNDER_PRESSURE" vix={30} distributionDays={5} />);
+    expect(screen.getByText("Baskı Altında")).toBeInTheDocument();
+  });
+
+  it.each<"HEALTHY" | "NEUTRAL" | "UNDER_PRESSURE">(["HEALTHY", "NEUTRAL", "UNDER_PRESSURE"])(
     "label='%s' → kart render eder (renk eşlemesi)",
     (label) => {
       render(<HealthScoreCard score={60} label={label} vix={18} distributionDays={2} />);

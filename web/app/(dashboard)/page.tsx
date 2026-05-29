@@ -16,6 +16,7 @@ import { MarkRegimeBanner } from "@/components/mark/MarkRegimeBanner";
 import { ModBadge } from "@/components/mark/ModBadge";
 import { useTradingMode, getModUiTheme } from "@/hooks/use-trading-mode";
 import { fmtUsd, fmtPctSigned } from "@/lib/format-currency";
+import { MARKET_HEALTH_LABEL_TR } from "@/types/market";
 
 // KARAR #474 (20 May 2026 ~08:15): Ana sayfa POC → Gerçek Dashboard.
 // UX Bölüm 3: "Sn. Ferit Quanfina'yı açtığında üstten alta: bakiye + piyasa + sinyaller"
@@ -28,10 +29,12 @@ const STATUS_COLORS: Record<string, string> = {
   watch: "var(--muted-foreground)",
 };
 
+// P382: clean-room (Markets360 Bundle "YESIL/SARI/KIRMIZI" sizma temizligi).
+// Enum + TR ceviri types/market.ts'de DRY tek kaynak (MARKET_HEALTH_LABEL_TR).
 const HEALTH_COLORS: Record<string, string> = {
-  YEŞİL: "var(--mtp-excellent)",
-  SARI: "var(--mtp-neutral)",
-  KIRMIZI: "var(--mtp-danger)",
+  HEALTHY: "var(--mtp-excellent)",
+  NEUTRAL: "var(--mtp-neutral)",
+  UNDER_PRESSURE: "var(--mtp-danger)",
 };
 
 function StatCard({
@@ -120,7 +123,11 @@ export default function Home() {
   // Son 3 açık trade
   const recentOpen = openTrades.slice(0, 3);
 
+  // P382: TR display (Mark birebir "Under Pressure" -> "Baski Altinda"). DRY: tek kaynak types/market.ts
   const marketHealth = market.data?.market_health_label ?? "—";
+  const marketHealthTr = market.data?.market_health_label
+    ? MARKET_HEALTH_LABEL_TR[market.data.market_health_label]
+    : "—";
   const marketHealthColor = HEALTH_COLORS[marketHealth] ?? "inherit";
   const marketScore = market.data?.market_health_score ?? null;
   const marketMode = market.data?.suggested_mode ?? "—";
@@ -410,7 +417,7 @@ export default function Home() {
                     color: marketHealthColor,
                   }}
                 >
-                  {marketHealth}
+                  {marketHealthTr}
                 </span>
               </div>
               <div className="flex justify-between text-xs text-muted-foreground">

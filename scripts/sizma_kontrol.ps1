@@ -101,6 +101,14 @@ $forbiddenPatterns = @{
     "MonAlert"    = 'MonAlert'
     "MAI"         = '\bMAI\b'
     "aB() M360"   = '\baB\('
+    # Paket 382 (30 May 2026, Kural #14 proaktif): Markets360 Bundle CSS class
+    # adlari — Cift Danisma (Quanfina Notebook + Quanfina Minervini, 30 May 2026)
+    # ile Görsel #1 sat. 731-737 birinci-agiz teyit edildi. M360 frontend
+    # JS Bundle'inda "bg-indicator-green/red/yellow/orange" tag sistemi var,
+    # Quanfina koduna doğrudan kopyalanmamali (CSS isim sizmasi). Eski Quanfina
+    # MOCK label "YESIL/SARI/KIRMIZI" bu sistemden TR cevirisiydi -> P382'de
+    # HEALTHY/NEUTRAL/UNDER_PRESSURE (Mark TLSMW Bol. 5 birebir) ile temizlendi.
+    "M360 bg-indicator" = 'bg-indicator-(green|red|yellow|orange|blue)'
     # NOT: valueGetter / valueFormatter / cellRenderer / cellEditor AG Grid std
     # props — yasakli listede YOK. Library normal kullanim, yabanci kod sizmasi
     # degil (Paket 48 Kural #14 tescil).

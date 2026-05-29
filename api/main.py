@@ -1069,7 +1069,7 @@ MOCK_MARKET_STATUS = MarketStatus(
     vix=14.2,
     distribution_days=3,
     market_health_score=75,
-    market_health_label="YEŞİL",
+    market_health_label="HEALTHY",  # P382: clean-room (Markets360 Bundle "YESIL/SARI/KIRMIZI" sizma temizligi)
     suggested_mode="LONG",
     top_sectors=[
         SectorChange(name="Technology", change_pct=2.3),
@@ -1176,6 +1176,73 @@ def _mock_breadth_history(days: int = 25) -> tuple[list[int], list[int]]:
     return advances, declines
 
 
+def _compute_market_health(
+    dd_count: int,
+    spy_stage: int,
+    qqq_stage: int,
+    iwm_stage: int,
+) -> tuple[int, str, str]:
+    """Paket 382: market_health_score + label MOCK->gercek (AÇIK KONU #58 cozumu).
+
+    Cift Danisma (Kural #20, 30 May 2026): Quanfina Notebook + Quanfina Minervini
+    + Görsel #1+#2 birinci-agiz tarama (sat. 685-727 GO/CAUTION/NO-GO Markets360
+    Bundle kanit, sat. 2785 ">=%70 esik yabanci platform mu Mark manuel mi" GELISTIRILMESI
+    LAZIM #58, sat. 1833-1866 SPY Strategy 25 proprietary kapali algoritma).
+
+    Mark CANON birlesik 0-100 SKOR YOKTUR (kitap teyit). Skor degerleri 25/50/75
+    Quanfina IC TASARIM KARARI — UI 0-100 kontrat zorunlulugu (frontend esik
+    >=70 yesil, >=40 sari, <40 kirmizi). Mark canon iddiasi yapilmaz; kategori
+    onceliklidir (Kural #26 + KALICI ILKE #4: ASLA UYDURMA SAYI/FORMUL).
+
+    Mantik:
+    - DD>=4 -> UNDER_PRESSURE override
+      Kaynak: Trade Like a Stock Market Wizard Bol. 5 (Mark birebir "Under
+      Pressure" kategorik terim, Quanfina Minervini teyit, kitap kanon)
+    - Probability Convergence (TLSMW Bol. 10 kitap kanon):
+      3 endeks Stan Weinstein Stage 2 hizalanma -> HEALTHY (tum faktor ayni anda)
+      2+ endeks Stage 4 -> UNDER_PRESSURE (Mark bear confirm)
+      Diger -> NEUTRAL (selective/rotational, alim kismi)
+
+    Clean-room: Markets360 GO/CAUTION/NO-GO mesajlari + "YESIL/SARI/KIRMIZI"
+    Bundle CSS sizma riski -> KULLANILMAZ. "Under Pressure" Mark kitap birebir
+    terim (sizma yok). HEALTHY/NEUTRAL jenerik finansal terim.
+
+    Args:
+        dd_count: count_distribution_days lookback 20 cikti (gercek SPY P369).
+        spy_stage / qqq_stage / iwm_stage: compute_carr_stage cikti (1-4).
+
+    Returns:
+        (score 0-100 int, label HEALTHY/NEUTRAL/UNDER_PRESSURE,
+         suggested_mode LONG/CAUTION/DEFENSIVE).
+    """
+    # 1. Mark kitap kanon override: DD>=4 -> "Under Pressure"
+    if dd_count >= 4:
+        return 25, "UNDER_PRESSURE", "DEFENSIVE"
+
+    # 2. Probability Convergence: 3 endeks hizalanmasi
+    indices_in_stage2 = sum(
+        1 for s in (spy_stage, qqq_stage, iwm_stage) if s == 2
+    )
+    indices_in_stage4 = sum(
+        1 for s in (spy_stage, qqq_stage, iwm_stage) if s == 4
+    )
+
+    # 2+ endeks Stage 4 (declining) -> ag^r bear baskisi
+    if indices_in_stage4 >= 2:
+        return 25, "UNDER_PRESSURE", "DEFENSIVE"
+
+    # 3/3 endeks Stage 2 (advancing) -> tam Probability Convergence
+    if indices_in_stage2 == 3:
+        return 75, "HEALTHY", "LONG"
+
+    # Karisik (1-2 endeks Stage 2, Stage 4 az) -> selective
+    if indices_in_stage2 >= 1 and indices_in_stage4 == 0:
+        return 50, "NEUTRAL", "CAUTION"
+
+    # Hicbir endeks Stage 2 yok + Stage 4 1 -> zayif piyasa
+    return 25, "UNDER_PRESSURE", "DEFENSIVE"
+
+
 def _index_stage(ticker: str, start_price: float) -> int:
     """KARAR #733 alt-paket (Paket 24): SPY/QQQ/IWM stage dinamik hesap.
 
@@ -1249,12 +1316,21 @@ def get_market_status() -> MarketStatus:
 
     dd_sev = compute_distribution_day_severity(dd_count)
 
+    # P382: market_health_score + label + suggested_mode MOCK->gercek
+    # (AÇIK KONU #58 cozumu, Cift Danisma kanit + helper docstring)
+    health_score, health_label, suggested_mode = _compute_market_health(
+        dd_count, spy_stage, qqq_stage, iwm_stage,
+    )
+
     status = MOCK_MARKET_STATUS.model_copy(
         update={
             "distribution_days": dd_count,
             "spy_stage": spy_stage,
             "qqq_stage": qqq_stage,
             "iwm_stage": iwm_stage,
+            "market_health_score": health_score,
+            "market_health_label": health_label,
+            "suggested_mode": suggested_mode,
             "mark_regime": _compute_mark_regime(dd_count),
             "market_breadth": market_breadth,
             "breadth_divergence": breadth_divergence,

@@ -34,7 +34,7 @@ const HEALTHY: MarketStatus = {
   vix: 14.5,
   distribution_days: 1,
   market_health_score: 75,
-  market_health_label: "Sağlıklı",
+  market_health_label: "HEALTHY",  // P382: clean-room enum
   suggested_mode: "LONG",
   top_sectors: [],
   bottom_sectors: [],
@@ -48,8 +48,8 @@ const BEAR: MarketStatus = {
   vix: 28,
   distribution_days: 6,
   market_health_score: 20,
-  market_health_label: "Ayı Baskısı",
-  suggested_mode: "CASH",
+  market_health_label: "UNDER_PRESSURE",  // P382: Mark TLSMW Bol. 5 birebir
+  suggested_mode: "DEFENSIVE",
   dd_severity: "EXTREME",
   dd_allocation_factor: 0.25,
 };
@@ -70,10 +70,10 @@ describe("useMarketStatus — fetch + parsing", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data?.market_health_score).toBe(75);
     expect(result.current.data?.spy_stage).toBe(2);
-    expect(result.current.data?.market_health_label).toBe("Sağlıklı");
+    expect(result.current.data?.market_health_label).toBe("HEALTHY");
   });
 
-  it("BEAR response → Stage 4, DD 6, CASH mode", async () => {
+  it("BEAR response → Stage 4, DD 6, DEFENSIVE mode (P382 enum)", async () => {
     fetchMock.mockResolvedValue(jsonResponse(BEAR));
     const { result } = renderHook(() => useMarketStatus(), {
       wrapper: withQueryClient(),
@@ -81,7 +81,7 @@ describe("useMarketStatus — fetch + parsing", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data?.spy_stage).toBe(4);
     expect(result.current.data?.distribution_days).toBe(6);
-    expect(result.current.data?.suggested_mode).toBe("CASH");
+    expect(result.current.data?.suggested_mode).toBe("DEFENSIVE");
     expect(result.current.data?.dd_severity).toBe("EXTREME");
     expect(result.current.data?.dd_allocation_factor).toBe(0.25);
   });
