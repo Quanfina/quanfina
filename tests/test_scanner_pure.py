@@ -23,6 +23,7 @@ try:
     import pandas as pd
     from scanner import (
         _parse_pct, _compute_grade, parse_earnings_date, calculate_rs_ratings,
+        detect_signals,
     )
 except ImportError as e:
     pytest.skip(f"scanner/pandas import edilemedi: {e}", allow_module_level=True)
@@ -160,3 +161,59 @@ class TestCalculateRsRatings:
 
     def test_empty_closes_empty_result(self):
         assert calculate_rs_ratings({}, None) == {}
+
+
+class TestDetectSignals:
+    """detect_signals — OHLCV DataFrame'den teknik confirmation/violation sinyalleri.
+    En az 55 satir gerekli. Son gun (ve dunku) sinyali belirler; onceki satirlar
+    baseline (vol_sma50, 5/10/30-gun pencereler).
+    """
+
+    @staticmethod
+    def _df(n=60, last=None, prev=None):
+        # Duz baseline: Open=Close=100, High=101, Low=99, Volume=1000
+        rows = [{"Open": 100.0, "High": 101.0, "Low": 99.0, "Close": 100.0, "Volume": 1000}
+                for _ in range(n)]
+        if prev:
+            rows[-2].update(prev)
+        if last:
+            rows[-1].update(last)
+        return pd.DataFrame(rows)
+
+    def test_insufficient_rows(self):
+        df = pd.DataFrame([{"Open": 1, "High": 1, "Low": 1, "Close": 1, "Volume": 1}] * 54)
+        assert detect_signals(df) == ([], [])
+
+    def test_bullish_confirmations(self):
+        # Guclu yukari gun: higher high + hacim patlamasi + up-on-volume
+        df = self._df(last={"Open": 100.0, "High": 115.0, "Low": 100.0,
+                            "Close": 110.0, "Volume": 5000})
+        conf, viol = detect_signals(df)
+        assert "Higher High" in conf
+        assert "Volume Surge" in conf
+        assert "Up on Volume" in conf
+        assert viol == []   # yukari gun -> ihlal yok
+
+    def test_bearish_violations(self):
+        # Dususlu gun: down-on-volume + below 10MA + lower low
+        df = self._df(last={"Open": 100.0, "High": 100.0, "Low": 85.0,
+                            "Close": 90.0, "Volume": 3000})
+        conf, viol = detect_signals(df)
+        assert "Down on Volume" in viol
+        assert "Below 10-MA" in viol
+        assert "Lower Low" in viol
+
+    def test_inside_day(self):
+        # Dun genis (H105/L95), bugun dar (H102/L98) -> Inside Day
+        df = self._df(prev={"High": 105.0, "Low": 95.0},
+                      last={"Open": 100.0, "High": 102.0, "Low": 98.0, "Close": 100.5,
+                            "Volume": 1000})
+        conf, _ = detect_signals(df)
+        assert "Inside Day" in conf
+
+    def test_gap_down(self):
+        # Bugun acilis dunku kapanisin %1+ altinda -> Gap Down
+        df = self._df(last={"Open": 98.0, "High": 99.0, "Low": 97.0,
+                            "Close": 98.5, "Volume": 1000})
+        _, viol = detect_signals(df)
+        assert "Gap Down" in viol
