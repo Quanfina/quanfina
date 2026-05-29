@@ -2182,10 +2182,18 @@ def detect_leader_fingerprint(
     Kaynak: TLSMW s.184 + Sprint_4_bis_7_Mark_HASSAS_Tarama.md KARAR ADAY #864
     """
     if not advance_segments or not pullback_segments:
+        # P376 fix: INVALID dali normal dal ile AYNI anahtarlari dondurmeli; aksi
+        # halde /api/risk/leader-fingerprint endpoint result['total_advances'] ->
+        # KeyError -> 500 (bos segment girdisinde). total_advances/total_pullbacks/
+        # advance_pct_in_range/pullback_pct_in_range eklendi (tutarli return kontrati).
         return {
             'pattern': 'INVALID',
             'advances_in_range': 0,
             'pullbacks_in_range': 0,
+            'total_advances': 0,
+            'total_pullbacks': 0,
+            'advance_pct_in_range': 0.0,
+            'pullback_pct_in_range': 0.0,
             'total_segments': 0,
             'tier': 'invalid',
             'mark_says': 'Yetersiz veri (advance + pullback gerekli)',
