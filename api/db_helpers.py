@@ -559,6 +559,83 @@ def screen_parse_get_results(slug: str, limit: int = 500) -> list[dict]:
         return rows
 
 
+def minervini_stocks_get_latest(limit: int = 100) -> list[dict]:
+    """En son scan_date'in minervini_scans satirlarini MinerviniStock'a uyumlu
+    dict olarak doner (Paket 368 — /api/minervini/stocks MOCK->DB wiring).
+
+    /minervini sayfasi onceden MOCK_STOCKS (sahte) gosteriyordu; bu helper gercek
+    gunluk Trend Template tarama sonuclarini (724 sembol scanner ciktisi) verir.
+    passed=1 (Trend Template gecen) + rs_ibd DESC sirali.
+
+    TEXT kolonlar (change_pct/eps_qoq/sales_qoq/confirmations/violations) defensif
+    parse edilir. minervini_scans'te olmayan alanlar: pct_from_high (price/high52'den
+    turetilir), pivot_price (None), list_type ("watch" default — tarama sonucu).
+    """
+    def _f(v, d=0.0):
+        if v is None:
+            return d
+        try:
+            return float(str(v).replace("%", "").replace(",", "").strip())
+        except (ValueError, AttributeError):
+            return d
+
+    def _count_or_int(v):
+        # confirmations/violations TEXT: ya sayi ("8") ya virgul-listesi ("Trend,RS")
+        if v is None:
+            return 0
+        s = str(v).strip()
+        if not s:
+            return 0
+        try:
+            return int(float(s))
+        except ValueError:
+            parts = [p for p in s.replace(";", ",").split(",") if p.strip()]
+            return len(parts)
+
+    query = """
+        SELECT ticker, company, sector, price, change_pct, volume, market_cap,
+               ma200_slope, high52, sma50, atr14, grade, rs_ibd, rs_12m,
+               eps_qoq, sales_qoq, confirmations, violations
+        FROM minervini_scans
+        WHERE scan_date = (SELECT MAX(scan_date) FROM minervini_scans)
+          AND passed = 1
+        ORDER BY rs_ibd DESC NULLS LAST, ticker ASC
+        LIMIT :limit
+    """
+    with engine.connect() as conn:
+        result = conn.execute(text(query), {"limit": limit})
+        out = []
+        for row in result:
+            d = dict(row._mapping)
+            price = _f(d.get("price"))
+            high52 = _f(d.get("high52"))
+            pct_from_high = ((price - high52) / high52 * 100.0) if high52 > 0 else 0.0
+            out.append({
+                "symbol": d.get("ticker") or "",
+                "company": d.get("company") or "",
+                "sector": d.get("sector") or "",
+                "price": price,
+                "change_pct": _f(d.get("change_pct")),
+                "grade": d.get("grade") or "C",
+                "rs_ibd": _f(d.get("rs_ibd")),
+                "rs_12m": _f(d.get("rs_12m")),
+                "ma200_slope": _f(d.get("ma200_slope")),
+                "high52": high52,
+                "pct_from_high": round(pct_from_high, 2),
+                "eps_qoq": _f(d.get("eps_qoq")),
+                "sales_qoq": _f(d.get("sales_qoq")),
+                "volume": int(_f(d.get("volume"))),
+                "market_cap": _f(d.get("market_cap")),
+                "confirmations": _count_or_int(d.get("confirmations")),
+                "violations": _count_or_int(d.get("violations")),
+                "sma50": _f(d.get("sma50")),
+                "atr14": _f(d.get("atr14")),
+                "pivot_price": None,
+                "list_type": "watch",
+            })
+        return out
+
+
 # =============================================================
 # Sprint 4-bis.3: 6 scan_diff Screen — onceki scan karsilastirma
 # Kaynak: notebook/Notebook_C1_Sprint_QuickStart.md SCREENS tuple

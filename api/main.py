@@ -29,6 +29,7 @@ from db_helpers import (  # noqa: E402
     mark_signals_get_by_symbol,
     pattern_library_get_all,
     sector_rotation_get_latest,
+    minervini_stocks_get_latest,
 )
 
 # Sprint 4-bis.7 Faz 1 B paket: Mark KARAR #914 + #969 + #970
@@ -269,6 +270,15 @@ MOCK_STOCKS: list[MinerviniStock] = [
 
 @app.get("/api/minervini/stocks", response_model=list[MinerviniStock])
 def get_minervini_stocks() -> list[MinerviniStock]:
+    # Paket 368: MOCK -> DB wiring. En son minervini_scans taramasinin gercek
+    # Trend Template sonuclarini doner; DB bos/erisilemez ise MOCK fallback (UX
+    # kesintisiz, /screens + diger DB endpoint'lerin pateni).
+    try:
+        rows = minervini_stocks_get_latest(limit=100)
+        if rows:
+            return [MinerviniStock(**r) for r in rows]
+    except Exception:
+        pass  # DB erisilemez / sema sorunu -> MOCK fallback
     return MOCK_STOCKS
 
 
