@@ -2940,18 +2940,22 @@ class TradeCreate(BaseModel):
 
 
 class TradeUpdate(BaseModel):
+    # P386: TradeUpdate validation gap (P385 paralel — TradeCreate gt=0 disiplini).
+    # PATCH endpoint negatif fiyat / yuzde >100 kabul etmemeli.
     exit_date: Optional[str] = None
-    exit_price: Optional[float] = None
+    # exit_price ge=0 (delisting/total loss 0 OK, negatif YASAK)
+    exit_price: Optional[float] = Field(default=None, ge=0)
     status: Optional[Literal["open", "closed"]] = None
     grade: Optional[str] = None
     exit_reason: Optional[str] = None
     lessons: Optional[str] = None
     setup_type: Optional[str] = None
     # KARAR ADAY #717 — Plan alanlari yazıldıktan sonra düzeltilebilir (Optional).
+    # P386: Field validation Optional + gt=0 (None = degisiklik yok; gönderilirse > 0).
     plan_entry_trigger: Optional[str] = None
-    plan_stop: Optional[float] = None
-    plan_target: Optional[float] = None
-    plan_size_pct: Optional[float] = None
+    plan_stop: Optional[float] = Field(default=None, gt=0, description="Stop fiyati > 0")
+    plan_target: Optional[float] = Field(default=None, gt=0, description="Hedef fiyati > 0")
+    plan_size_pct: Optional[float] = Field(default=None, gt=0, le=100, description="Portfoy yuzdesi (0, 100]")
     plan_exit_strategy: Optional[str] = None
     plan_time_horizon: Optional[TimeHorizon] = None
 

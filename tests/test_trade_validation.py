@@ -144,3 +144,62 @@ class TestValidBaselineStillAcceptable:
         assert r.status_code != 422, (
             f"Geçerli trade 422 OLMAMALI - validation hatasi: {r.text[:300]}"
         )
+
+
+# =============================================================================
+# Paket 386: TradeUpdate (PATCH endpoint) validation regresyon
+# =============================================================================
+
+class TestTradeUpdateValidation:
+    """PATCH /api/trades/{id} field validation (P386 TradeCreate paralel disiplin).
+
+    Endpoint var olan trade'i guncelliyor (404 yoksa). Validation gap'leri
+    direkt 422 dönmesini test eder (404'e bile gerek yok — Pydantic önce
+    cagrilir, geçersiz body 422 olur).
+    """
+
+    def test_patch_exit_price_negative_returns_422(self, client):
+        # Negatif exit_price -> 422 (ge=0)
+        r = client.patch("/api/trades/999999", json={"exit_price": -10.0})
+        assert r.status_code == 422, f"Negatif exit_price 422 olmali: {r.status_code}"
+
+    def test_patch_exit_price_zero_acceptable(self, client):
+        # exit_price=0 ge=0 -> 422 OLMAMALI (delisting/total loss senaryosu)
+        # 404 trade yok dönecek (legitimate validation geçti)
+        r = client.patch("/api/trades/999999", json={"exit_price": 0.0})
+        assert r.status_code != 422, f"exit_price=0 422 OLMAMALI (ge=0): {r.text[:200]}"
+
+    def test_patch_plan_stop_zero_returns_422(self, client):
+        r = client.patch("/api/trades/999999", json={"plan_stop": 0.0})
+        assert r.status_code == 422
+
+    def test_patch_plan_stop_negative_returns_422(self, client):
+        r = client.patch("/api/trades/999999", json={"plan_stop": -5.0})
+        assert r.status_code == 422
+
+    def test_patch_plan_target_zero_returns_422(self, client):
+        r = client.patch("/api/trades/999999", json={"plan_target": 0.0})
+        assert r.status_code == 422
+
+    def test_patch_plan_size_pct_zero_returns_422(self, client):
+        r = client.patch("/api/trades/999999", json={"plan_size_pct": 0.0})
+        assert r.status_code == 422
+
+    def test_patch_plan_size_pct_over_100_returns_422(self, client):
+        # Portfoy %150 riske etmek -> 422 (le=100)
+        r = client.patch("/api/trades/999999", json={"plan_size_pct": 150.0})
+        assert r.status_code == 422
+
+    def test_patch_plan_size_pct_negative_returns_422(self, client):
+        r = client.patch("/api/trades/999999", json={"plan_size_pct": -5.0})
+        assert r.status_code == 422
+
+    def test_patch_valid_empty_body_no_422(self, client):
+        # Bos body (degisiklik yok) -> 422 OLMAMALI (Pydantic geçer, sonra 404)
+        r = client.patch("/api/trades/999999", json={})
+        assert r.status_code != 422
+
+    def test_patch_valid_field_no_422(self, client):
+        # Legitimate update (sadece grade) -> Pydantic 422 OLMAMALI
+        r = client.patch("/api/trades/999999", json={"grade": "A", "lessons": "VCP perfect"})
+        assert r.status_code != 422
