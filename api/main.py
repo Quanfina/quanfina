@@ -2352,8 +2352,9 @@ class PivotBreakoutInfo(BaseModel):
 def get_pivot_breakout(symbol: str) -> PivotBreakoutInfo:
     """Mark TLSMW Ch 10 pivot kırılım hesabı (P70 helper wire).
 
-    OHLCV MOCK feed kullanılır — Production'da real yfinance/Cloud SQL
-    historical veri (AÇIK KONU #75).
+    OHLCV: _get_ohlcv (yfinance gerçek + MOCK fallback). yfinance erişimi
+    varsa gerçek piyasa verisi, network fail durumunda deterministik MOCK
+    (UX/test kesintisiz). AÇIK KONU #75 RESOLVED (P144 yfinance pipeline).
     """
     sym = symbol.upper()
     # OHLCV oluştur (mevcut helper'lar)
@@ -2402,7 +2403,7 @@ def get_climax_run(symbol: str) -> ClimaxRunInfo:
     """Mark TLSMW Ch 9 Climax Run hesabı (P86 helper wire).
 
     Parabolic / exhaustion / "last gasp" tepe tespiti — gap-up + hacim teyitli.
-    OHLCV MOCK feed kullanılır (AÇIK KONU #75 production yfinance).
+    OHLCV: _get_ohlcv (yfinance gerçek + MOCK fallback). AÇIK KONU #75 RESOLVED.
     """
     sym = symbol.upper()
     stock = _STOCK_BY_SYM.get(sym)
@@ -2661,7 +2662,7 @@ def get_stage_transition(symbol: str) -> StageTransitionInfo:
     """Mark TLSMW Ch 4 Stage 1->2 transition (P120 helper wire).
 
     30W MA (150 day SMA) bazli kirilim erken uyari + hacim teyit.
-    OHLCV MOCK feed kullanir.
+    OHLCV: _get_ohlcv (yfinance gercek + MOCK fallback). AÇIK KONU #75 RESOLVED.
     """
     sym = symbol.upper()
     stock = _STOCK_BY_SYM.get(sym)
@@ -3396,10 +3397,15 @@ _PIVOT_STATUS_CACHE_TTL_SEC = 300
 def _compute_signal_pivot_status(symbol: str, price: float) -> Optional[str]:
     """KARAR #733 alt-paket (Paket 81): Sinyal satırı için pivot status.
 
-    MOCK OHLCV üretip compute_pivot_breakout çağırır. Deterministik
-    (sembol+tarih seed) — aynı gün aynı sembol aynı status.
+    OHLCV: _get_ohlcv (yfinance gerçek + MOCK fallback). yfinance taze
+    olduğunda gerçek piyasa verisinden compute_pivot_breakout (Mark TLSMW
+    Ch 10 canon) hesabı; network fail durumunda deterministik MOCK
+    (sembol+tarih seed, UX kesintisiz). Paket 145 alt-katman: 5 dk cache
+    (yfinance fetch maliyetli). Helper Exception sızdırmaz -> None
+    döndürür (caller pivot_status alanını UI'da render etmez).
 
-    Paket 145 alt-katman: 5 dk cache (yfinance fetch maliyetli).
+    Eski docstring "MOCK OHLCV üretip" yanıltıcıydı (Paket 384 düzeltme,
+    30 May 2026) — gerçek wire P144 yfinance pipeline ile zaten canlıydı.
     """
     # Cache hit
     now = _time_module.time()
