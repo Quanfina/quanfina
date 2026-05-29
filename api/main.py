@@ -331,6 +331,61 @@ def list_screens() -> list[ScreenMeta]:
     return [ScreenMeta(**m) for m in screen_list_available()]
 
 
+def _screens_mock_results(slug: str, limit: int) -> list[ScreenResultRow]:
+    """Screens MOCK fallback satirlari (dev ortam VEYA transient DB hatasi).
+
+    KARAR #466+#465+#467 — VCP/Power Play slug'larinda kalite+ready+power_play sahte.
+    Paket 381: hem db_connected=false hem de gercek sorgu OperationalError'inda
+    ayni MOCK uretimi kullanilir (DRY — Kural #20 graceful degradation kontrati).
+    """
+    is_quality_slug = slug in (
+        "tight_low_volume", "tight_low_vol_excellent",
+        "vcp_ready_high", "power_play_ready"
+    )
+    mock_rows = [
+        ScreenResultRow(symbol="NVDA", grade="A", rs_ibd=99,
+                        price=145.20, passed=1, scan_date="2026-05-19",
+                        vcp_quality_score="EXCELLENT" if is_quality_slug else None,
+                        vcp_ready_score=85 if is_quality_slug else None,
+                        power_play_pass=True if is_quality_slug else None),
+        ScreenResultRow(symbol="AAPL", grade="A", rs_ibd=87,
+                        price=212.50, passed=1, scan_date="2026-05-19",
+                        vcp_quality_score="PASS" if is_quality_slug else None,
+                        vcp_ready_score=62 if is_quality_slug else None,
+                        power_play_pass=False if is_quality_slug else None),
+        ScreenResultRow(symbol="MSFT", grade="B", rs_ibd=91,
+                        price=425.30, passed=1, scan_date="2026-05-19",
+                        vcp_quality_score="EXCELLENT" if is_quality_slug else None,
+                        vcp_ready_score=78 if is_quality_slug else None,
+                        power_play_pass=True if is_quality_slug else None),
+        ScreenResultRow(symbol="GOOGL", grade="B", rs_ibd=88,
+                        price=178.40, passed=1, scan_date="2026-05-19",
+                        vcp_quality_score="PASS" if is_quality_slug else None,
+                        vcp_ready_score=55 if is_quality_slug else None,
+                        power_play_pass=False if is_quality_slug else None),
+        ScreenResultRow(symbol="AMD", grade="C", rs_ibd=85,
+                        price=158.20, passed=1, scan_date="2026-05-19",
+                        vcp_quality_score=None,
+                        vcp_ready_score=42 if is_quality_slug else None,
+                        power_play_pass=False if is_quality_slug else None),
+    ]
+    # Slug bazli filtre
+    if slug == "tight_low_vol_excellent":
+        mock_rows = [r for r in mock_rows if r.vcp_quality_score == "EXCELLENT"]
+    elif slug == "vcp_ready_high":
+        mock_rows = [r for r in mock_rows
+                     if r.vcp_ready_score is not None and r.vcp_ready_score >= 70]
+    elif slug == "power_play_ready":
+        mock_rows = [r for r in mock_rows if r.power_play_pass is True]
+    # KARAR #733 alt-paket (Paket 83): pivot_status enrichment
+    return [
+        r.model_copy(update={
+            "pivot_status": _compute_signal_pivot_status(r.symbol, r.price or 100.0),
+        })
+        for r in mock_rows[:limit]
+    ]
+
+
 @app.get("/api/screens/{slug}", response_model=list[ScreenResultRow])
 def get_screen_results(slug: str, limit: int = 500) -> list[ScreenResultRow]:
     """
@@ -366,55 +421,19 @@ def get_screen_results(slug: str, limit: int = 500) -> list[ScreenResultRow]:
     # MOCK fallback (dev ortam, db_connected=false)
     # KARAR #466+#465+#467 — VCP/Power Play slug'larinda kalite+ready+power_play sahte
     if not db_health_check():
-        is_quality_slug = slug in (
-            "tight_low_volume", "tight_low_vol_excellent",
-            "vcp_ready_high", "power_play_ready"
-        )
-        mock_rows = [
-            ScreenResultRow(symbol="NVDA", grade="A", rs_ibd=99,
-                            price=145.20, passed=1, scan_date="2026-05-19",
-                            vcp_quality_score="EXCELLENT" if is_quality_slug else None,
-                            vcp_ready_score=85 if is_quality_slug else None,
-                            power_play_pass=True if is_quality_slug else None),
-            ScreenResultRow(symbol="AAPL", grade="A", rs_ibd=87,
-                            price=212.50, passed=1, scan_date="2026-05-19",
-                            vcp_quality_score="PASS" if is_quality_slug else None,
-                            vcp_ready_score=62 if is_quality_slug else None,
-                            power_play_pass=False if is_quality_slug else None),
-            ScreenResultRow(symbol="MSFT", grade="B", rs_ibd=91,
-                            price=425.30, passed=1, scan_date="2026-05-19",
-                            vcp_quality_score="EXCELLENT" if is_quality_slug else None,
-                            vcp_ready_score=78 if is_quality_slug else None,
-                            power_play_pass=True if is_quality_slug else None),
-            ScreenResultRow(symbol="GOOGL", grade="B", rs_ibd=88,
-                            price=178.40, passed=1, scan_date="2026-05-19",
-                            vcp_quality_score="PASS" if is_quality_slug else None,
-                            vcp_ready_score=55 if is_quality_slug else None,
-                            power_play_pass=False if is_quality_slug else None),
-            ScreenResultRow(symbol="AMD", grade="C", rs_ibd=85,
-                            price=158.20, passed=1, scan_date="2026-05-19",
-                            vcp_quality_score=None,
-                            vcp_ready_score=42 if is_quality_slug else None,
-                            power_play_pass=False if is_quality_slug else None),
-        ]
-        # Slug bazli filtre
-        if slug == "tight_low_vol_excellent":
-            mock_rows = [r for r in mock_rows if r.vcp_quality_score == "EXCELLENT"]
-        elif slug == "vcp_ready_high":
-            mock_rows = [r for r in mock_rows
-                         if r.vcp_ready_score is not None and r.vcp_ready_score >= 70]
-        elif slug == "power_play_ready":
-            mock_rows = [r for r in mock_rows if r.power_play_pass is True]
-        # KARAR #733 alt-paket (Paket 83): pivot_status enrichment
-        return [
-            r.model_copy(update={
-                "pivot_status": _compute_signal_pivot_status(r.symbol, r.price or 100.0),
-            })
-            for r in mock_rows[:limit]
-        ]
+        return _screens_mock_results(slug, limit)
 
     # Gerçek DB sorgusu — ready VEYA parse VEYA diff (dispatch)
-    rows = screen_get_results_dispatch(slug, limit=limit)
+    # Paket 381: db_health_check 30s TTL cache (db_helpers) yaniltici "True"
+    # donderebilir (saglik check anindan sorgu anina kadar Cloud SQL baglantisi
+    # dusebilir/pool tukenebilir/timeout) -> ham OperationalError 500'e cikiyordu.
+    # Graceful degradation: sorgu patlarsa MOCK don (docstring kontrati + Kural #20 UX).
+    try:
+        rows = screen_get_results_dispatch(slug, limit=limit)
+    except ValueError:
+        raise  # bilinmeyen slug — 404 mantigi disinda (dispatch ValueError)
+    except Exception:
+        return _screens_mock_results(slug, limit)
     db_results = [ScreenResultRow(**{k: r.get(k) for k in
                                 ("symbol","grade","rs_ibd","price","passed","scan_date",
                                  "vcp_quality_score","vcp_ready_score","power_play_pass")})

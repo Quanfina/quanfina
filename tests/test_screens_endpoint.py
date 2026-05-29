@@ -72,3 +72,34 @@ class TestScreenResults:
         r = client.get("/api/screens/bu_slug_yok_12345")
         assert r.status_code == 404
         assert "bulunamadi" in r.json()["detail"].lower()
+
+
+class TestScreenResilience:
+    """Paket 381 — Transient DB hatasi (OperationalError) graceful MOCK fallback.
+
+    Bug: db_health_check 30s TTL cache yaniltici 'True' donderirse gercek sorgu
+    (screen_get_results_dispatch) patlardi -> ham 500. Cloud SQL flaky/pool/timeout
+    paper trading'i kirardi. Fix: try/except -> MOCK don (docstring kontrati).
+    """
+
+    def test_db_query_raises_returns_mock_not_500(self, client, monkeypatch):
+        # Saglik check 'True' (cache yaniltici) AMA gercek sorgu OperationalError atar
+        monkeypatch.setattr(api_main, "db_health_check", lambda: True)
+
+        def _boom(*a, **k):
+            raise RuntimeError("simulated Cloud SQL OperationalError")
+
+        monkeypatch.setattr(api_main, "screen_get_results_dispatch", _boom)
+
+        slug = client.get("/api/screens").json()[0]["slug"]
+        r = client.get(f"/api/screens/{slug}")
+        assert r.status_code == 200, f"DB patlayinca 500 degil MOCK olmali: {r.status_code}"
+        data = r.json()
+        assert isinstance(data, list) and len(data) > 0  # MOCK satirlari geldi
+        json.dumps(data, allow_nan=False)
+
+    def test_invalid_slug_still_404_when_db_healthy(self, client, monkeypatch):
+        # 404 yolu DB sorgusundan ONCE (valid_slugs kontrol) — fallback bunu yutmamali
+        monkeypatch.setattr(api_main, "db_health_check", lambda: True)
+        r = client.get("/api/screens/bu_slug_yok_12345")
+        assert r.status_code == 404
