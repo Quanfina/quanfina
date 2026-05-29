@@ -20,9 +20,12 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 try:
-    from scanner import _parse_pct, _compute_grade, parse_earnings_date
+    import pandas as pd
+    from scanner import (
+        _parse_pct, _compute_grade, parse_earnings_date, calculate_rs_ratings,
+    )
 except ImportError as e:
-    pytest.skip(f"scanner import edilemedi: {e}", allow_module_level=True)
+    pytest.skip(f"scanner/pandas import edilemedi: {e}", allow_module_level=True)
 
 
 class TestComputeGrade:
@@ -103,3 +106,57 @@ class TestParseEarningsDate:
         d = parse_earnings_date("Apr 30 BMO")
         assert isinstance(d, date)
         assert d.month == 4 and d.day == 30
+
+
+class TestCalculateRsRatings:
+    """calculate_rs_ratings — RS rank (1-99) hesabi (cekirdek Minervini kriteri).
+
+    closes {ticker: pd.Series} + spy Series -> {ticker: {rs_ibd, rs_12m, rs_20d,
+    rs_50d, rs_200d, rs_mansfield}}. Yuksek momentum -> yuksek rank. n<20 -> skip.
+    """
+
+    @staticmethod
+    def _series(values):
+        idx = pd.date_range("2025-01-01", periods=len(values), freq="B")
+        return pd.Series(values, index=idx)
+
+    def _make_inputs(self, n=260):
+        strong = self._series([100.0 + i for i in range(n)])       # guclu uptrend
+        weak = self._series([200.0 - i * 0.2 for i in range(n)])   # dusus
+        spy = self._series([400.0 + i * 0.05 for i in range(n)])   # hafif yukari
+        return strong, weak, spy
+
+    def test_strong_outranks_weak(self):
+        strong, weak, spy = self._make_inputs()
+        res = calculate_rs_ratings({"STRONG": strong, "WEAK": weak}, spy)
+        # Yuksek momentum -> yuksek rs_ibd rank
+        assert res["STRONG"]["rs_ibd"] > res["WEAK"]["rs_ibd"]
+
+    def test_ranks_within_1_99(self):
+        strong, weak, spy = self._make_inputs()
+        res = calculate_rs_ratings({"STRONG": strong, "WEAK": weak}, spy)
+        for t in res:
+            for k in ("rs_ibd", "rs_12m", "rs_20d", "rs_50d", "rs_200d"):
+                v = res[t][k]
+                if v is not None:
+                    assert 1 <= v <= 99, f"{t}.{k}={v} 1-99 disinda"
+
+    def test_short_series_skipped(self):
+        strong, _, spy = self._make_inputs()
+        tiny = self._series([100.0] * 10)  # n=10 < 20 -> skip
+        res = calculate_rs_ratings({"STRONG": strong, "TINY": tiny}, spy)
+        assert res["TINY"]["rs_ibd"] is None      # skip edildi
+        assert res["STRONG"]["rs_ibd"] is not None
+
+    def test_spy_none_disables_relative_rs(self):
+        strong, _, _ = self._make_inputs()
+        res = calculate_rs_ratings({"STRONG": strong}, None)
+        # SPY yok -> relative RS (20/50/200d) + mansfield None
+        assert res["STRONG"]["rs_20d"] is None
+        assert res["STRONG"]["rs_200d"] is None
+        assert res["STRONG"]["rs_mansfield"] is None
+        # ibd (SPY gerektirmez) hala hesaplanir
+        assert res["STRONG"]["rs_ibd"] is not None
+
+    def test_empty_closes_empty_result(self):
+        assert calculate_rs_ratings({}, None) == {}
