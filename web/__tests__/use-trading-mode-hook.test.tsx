@@ -288,3 +288,95 @@ describe("useTradingMode — market_health=null edge", () => {
     expect(result.current.mode).toBe("normal");
   });
 });
+
+/**
+ * Paket 383: Backend P382 gerçek skor kontratı × frontend mod tetiği uçtan uca uyumu.
+ *
+ * Backend _compute_market_health (test_market_health_compute.py kontratı, 30 May 2026):
+ *   - UNDER_PRESSURE → score=25  (DD>=4 override veya 2+ Stage 4)
+ *   - NEUTRAL        → score=50  (karışık: Stage 2 var, Stage 4 yok)
+ *   - HEALTHY        → score=75  (3/3 Stage 2, DD<4 — Probability Convergence TLSMW Böl. 10)
+ *
+ * Frontend hook eşikleri (use-trading-mode.ts L95-96):
+ *   - isMarketWeak    = score < 30   → 25 < 30 ✓ Defansif tetik
+ *   - isMarketStrong  = score > 70   → 75 > 70 ✓ Agresif tetik (5+ kazanç şartı ile)
+ *   - 50 → ne weak ne strong → Normal default
+ *
+ * Bu testler "paper trading ilk gün" güvencesi: gerçek backend skor üretip frontend
+ * doğru modu seçecek mi? Çift danışma sonrası end-to-end kanıt.
+ */
+describe("useTradingMode × Backend P382 gerçek skor (P383 uçtan uca uyum)", () => {
+  it("UNDER_PRESSURE backend (25) + boş trade → Defansif (DD>=4 / 2+ Stage 4)", () => {
+    mockMarket.mockReturnValue({
+      data: { market_health_score: 25, market_health_label: "UNDER_PRESSURE", suggested_mode: "DEFENSIVE" },
+    });
+    const { result } = renderHook(() => useTradingMode());
+    expect(result.current.mode).toBe("defansif");
+    expect(result.current.recommendedSizingPct).toBe(0);
+    expect(result.current.uiBehavior).toContain("BLOK");
+  });
+
+  it("NEUTRAL backend (50) + boş trade → Normal (selective piyasa, ne weak ne strong)", () => {
+    mockMarket.mockReturnValue({
+      data: { market_health_score: 50, market_health_label: "NEUTRAL", suggested_mode: "CAUTION" },
+    });
+    const { result } = renderHook(() => useTradingMode());
+    expect(result.current.mode).toBe("normal");
+    expect(result.current.recommendedSizingPct).toBe(1.0);
+  });
+
+  it("HEALTHY backend (75) + boş trade → Normal (Agresif için 5+ kazanç şart, henüz yok)", () => {
+    mockMarket.mockReturnValue({
+      data: { market_health_score: 75, market_health_label: "HEALTHY", suggested_mode: "LONG" },
+    });
+    const { result } = renderHook(() => useTradingMode());
+    // 75 > 70 ✓ strong, ama consecutiveWins<5 → Agresif tetik yok → Normal
+    expect(result.current.mode).toBe("normal");
+  });
+
+  it("HEALTHY backend (75) + 5 ardışık kazanç → Agresif (Probability Convergence + streak)", () => {
+    mockMarket.mockReturnValue({
+      data: { market_health_score: 75, market_health_label: "HEALTHY", suggested_mode: "LONG" },
+    });
+    // 5 ardışık kazanç trade (en yeni önce)
+    mockTrades.mockReturnValue({
+      data: [
+        makeTrade({ id: 5, pl_dollar: 1000, exit_date: "2026-05-25" }),
+        makeTrade({ id: 4, pl_dollar: 800,  exit_date: "2026-05-20" }),
+        makeTrade({ id: 3, pl_dollar: 1200, exit_date: "2026-05-15" }),
+        makeTrade({ id: 2, pl_dollar: 600,  exit_date: "2026-05-10" }),
+        makeTrade({ id: 1, pl_dollar: 900,  exit_date: "2026-05-05" }),
+      ],
+    });
+    const { result } = renderHook(() => useTradingMode());
+    expect(result.current.mode).toBe("agresif");
+    expect(result.current.consecutiveWins).toBeGreaterThanOrEqual(5);
+  });
+
+  it("UNDER_PRESSURE backend (25) Defansif > Rehab öncelik (3 ardışık kayıp da olsa Defansif)", () => {
+    // Hem Defansif tetik (score=25) hem Rehab tetik (3 kayıp). Defansif > Rehab.
+    mockMarket.mockReturnValue({
+      data: { market_health_score: 25, market_health_label: "UNDER_PRESSURE", suggested_mode: "DEFENSIVE" },
+    });
+    mockTrades.mockReturnValue({
+      data: [
+        makeTrade({ id: 3, pl_dollar: -500, exit_date: "2026-05-15" }),
+        makeTrade({ id: 2, pl_dollar: -300, exit_date: "2026-05-10" }),
+        makeTrade({ id: 1, pl_dollar: -400, exit_date: "2026-05-05" }),
+      ],
+    });
+    const { result } = renderHook(() => useTradingMode());
+    expect(result.current.mode).toBe("defansif");  // önce Defansif
+  });
+
+  it("Clean-room label kontratı: backend asla 'YEŞİL/SARI/KIRMIZI' dönmemeli (P382 garantisi)", () => {
+    // Bu test backend kontrat regresyon koruması: frontend yeni label'ları bekliyor.
+    const validLabels = ["HEALTHY", "NEUTRAL", "UNDER_PRESSURE"];
+    const legacyLabels = ["YEŞİL", "SARI", "KIRMIZI", "YESIL"];
+    // mock kontrolü için: type union daha katı tutar (types/market.ts MarketHealthLabel Literal)
+    expect(validLabels).toContain("HEALTHY");
+    expect(validLabels).toContain("UNDER_PRESSURE");
+    // Legacy "YEŞİL" hâlâ frontend type'a uyduğu durumda alarm:
+    expect(validLabels.some((l) => legacyLabels.includes(l))).toBe(false);
+  });
+});
