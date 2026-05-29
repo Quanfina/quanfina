@@ -4,8 +4,9 @@
 #
 # Amac: CLAUDE.md ve Vizyon'un GERCEK satir sayimlari ile dokuman
 # literal'leri arasinda H#9 pattern (manuel hijyen yorgunlugu) cozmek.
-# Hijyen scripti _BASLAT.md, _INDEX.md, _OZET.md, _SAGLIK_KONTROL.md
-# icindeki "X satir" literal'lerini auto-update eder.
+# Hijyen scripti _BASLAT.md icindeki "X satir" literal'lerini auto-update eder.
+# (v0.5.4: _INDEX.md + _OZET.md + _SAGLIK_KONTROL.md 22 May konsolidasyonunda
+#  arsivlendi -> hedeften cikarildi; sadece _BASLAT.md kaldi.)
 #
 # Versiyon: v0.5.3 (21 May 2026, READ tarafi UTF-8 fix - H#11 2. ortaya cikis)
 # v0.5  : Ilk surum, Out-File -Encoding UTF8 BOM ekliyordu
