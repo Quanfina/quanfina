@@ -143,15 +143,16 @@ Add-Line ""
 # ============================================================
 Add-Line "## Belge Katmani"
 Add-Line ""
+# v0.6 (29 May 2026): gone dosyalar (_INDEX/_KOD_ENVANTERI/_SAGLIK_KONTROL) CIKARILDI
+# (22 May konsolidasyon -> CLAUDE.md). _HATALAR + _KOD_PATTERNLERI EKLENDI.
 $belgeler = @(
     @{ Path = "CLAUDE.md"; Etiket = "CLAUDE.md" },
     @{ Path = "notebook\_BASLAT.md"; Etiket = "_BASLAT.md" },
-    @{ Path = "notebook\_INDEX.md"; Etiket = "_INDEX.md" },
     @{ Path = "notebook\_DEVIR.md"; Etiket = "_DEVIR.md" },
     @{ Path = "notebook\_ROADMAP.md"; Etiket = "_ROADMAP.md" },
     @{ Path = "notebook\_LINKLER.md"; Etiket = "_LINKLER.md" },
-    @{ Path = "notebook\_KOD_ENVANTERI.md"; Etiket = "_KOD_ENVANTERI.md" },
-    @{ Path = "notebook\_SAGLIK_KONTROL.md"; Etiket = "_SAGLIK_KONTROL.md" },
+    @{ Path = "notebook\_HATALAR.md"; Etiket = "_HATALAR.md" },
+    @{ Path = "notebook\_KOD_PATTERNLERI.md"; Etiket = "_KOD_PATTERNLERI.md" },
     @{ Path = "notebook\YAPILANLAR.md"; Etiket = "YAPILANLAR.md" },
     @{ Path = "notebook\Notebook_A_Vizyon.md"; Etiket = "Notebook_A_Vizyon.md" }
 )
@@ -264,8 +265,8 @@ Add-Line ""
 # ============================================================
 Add-Line "---"
 Add-Line ""
-Add-Line "_Bu rapor saglik_kontrol.ps1 v0.5 tarafindan uretildi._"
-Add-Line "_v1.0'da _SAGLIK_KONTROL.md auto-rewrite eklenecek (Asama 5.2 tamami)._"
+Add-Line "_Bu rapor saglik_kontrol.ps1 v0.6 tarafindan uretildi._"
+Add-Line "_NOT: _SAGLIK_KONTROL.md 22 May konsolidasyonunda CLAUDE.md'ye tasindi; -Uygula raporu TEMP'e yazar._"
 
 $ciktiMetni = $report.ToString()
 
@@ -274,8 +275,14 @@ if ($Uygula) {
     # Marker-based: manuel statik bolumler korunur, sadece otomatik kisim degisir
     $saglikMd = Join-Path $repoRoot "notebook\_SAGLIK_KONTROL.md"
     if (-not (Test-Path $saglikMd)) {
-        Write-Host "[hata] _SAGLIK_KONTROL.md bulunamadi" -ForegroundColor Red
-        exit 1
+        # v0.6 (29 May 2026): _SAGLIK_KONTROL.md 22 May konsolidasyonunda arsivlendi
+        # (icerik CLAUDE.md'ye tasindi). Auto-rewrite hedefi yok -> graceful degrade:
+        # raporu TEMP'e yaz (eski "exit 1 hata" yerine). Feature obsolete ama crash yok.
+        $outPath = Join-Path $env:TEMP "quanfina_saglik_son_rapor.md"
+        [System.IO.File]::WriteAllText($outPath, $ciktiMetni, [System.Text.UTF8Encoding]::new($false))
+        Write-Host "[bilgi] _SAGLIK_KONTROL.md konsolide edildi (22 May) -> auto-rewrite hedefi yok." -ForegroundColor Yellow
+        Write-Host "        Rapor TEMP'e yazildi: $outPath" -ForegroundColor DarkGray
+        exit 0
     }
 
     $mevcut = Get-Content -Path $saglikMd -Raw -Encoding UTF8

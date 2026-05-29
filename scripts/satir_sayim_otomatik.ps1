@@ -33,8 +33,8 @@ $repoRoot = Split-Path -Parent (Split-Path -Parent $scriptPath)
 $claudeMdSatir = (Get-Content (Join-Path $repoRoot "CLAUDE.md")).Count
 $vizyonSatir = (Get-Content (Join-Path $repoRoot "notebook\Notebook_A_Vizyon.md")).Count
 $basLatSatir = (Get-Content (Join-Path $repoRoot "notebook\_BASLAT.md")).Count
-$indexSatir = (Get-Content (Join-Path $repoRoot "notebook\_INDEX.md")).Count
-$ozetSatir = (Get-Content (Join-Path $repoRoot "notebook\_OZET.md")).Count
+# v0.5.4 (29 May 2026): _INDEX.md + _OZET.md 22 May konsolidasyonunda arsivlendi ->
+# read + hedef CIKARILDI (eski hali gone dosyada Get-Content hatasi uretiyordu).
 $devirSatir = (Get-Content (Join-Path $repoRoot "notebook\_DEVIR.md")).Count
 
 Write-Host ""
@@ -43,16 +43,14 @@ Write-Host "Gercek sayimlar:"
 Write-Host "  CLAUDE.md      : $claudeMdSatir satir"
 Write-Host "  Vizyon         : $vizyonSatir satir"
 Write-Host "  _BASLAT.md     : $basLatSatir satir"
-Write-Host "  _INDEX.md      : $indexSatir satir"
-Write-Host "  _OZET.md       : $ozetSatir satir"
 Write-Host "  _DEVIR.md      : $devirSatir satir"
 Write-Host ""
 
 # Hedef dosyalar + sayim pattern degisimleri
+# v0.5.4: _INDEX.md + _OZET.md arsivlendi -> hedeflerden CIKARILDI. _BASLAT.md
+# canonical "NNNN satir" literal kaynagi (CLAUDE.md sayim referansi).
 $hedefler = @(
-    (Join-Path $repoRoot "notebook\_BASLAT.md"),
-    (Join-Path $repoRoot "notebook\_INDEX.md"),
-    (Join-Path $repoRoot "notebook\_OZET.md")
+    (Join-Path $repoRoot "notebook\_BASLAT.md")
 )
 
 $toplamGuncellenenSatir = 0
