@@ -37,6 +37,9 @@ from quanfina_math import (
     # KARAR #733 (Paket 272 — 28 May 2026): Carr Stage 4-Stage detector
     compute_carr_stage,
 )
+# Paket 373: SAF yardimci fonksiyonlar scanner_helpers'a tasindi (test-first
+# guvenli refactor, tests/test_scanner_pure.py 24 test net). Cagrilar degismez.
+from scanner_helpers import parse_earnings_date, _parse_pct, _compute_grade
 
 load_dotenv()
 FINVIZ_KEY = os.getenv("FINVIZ_API_KEY")
@@ -76,22 +79,7 @@ class ScannerHealthError(Exception):
     pass
 
 
-def parse_earnings_date(raw: str):
-    """'Apr 30 AMC' gibi Finviz earnings stringini date nesnesine çevirir."""
-    if not raw or raw in ('-', 'N/A', ''):
-        return None
-    parts = raw.split()
-    if len(parts) < 2:
-        return None
-    today = date.today()
-    for year in [today.year, today.year + 1]:
-        try:
-            d = datetime.strptime(f"{parts[0]} {parts[1]} {year}", "%b %d %Y").date()
-            if d >= today - timedelta(days=180):
-                return d
-        except ValueError:
-            continue
-    return None
+# parse_earnings_date -> scanner_helpers.py (Paket 373 extraction, import yukarida)
 
 
 # --- VERİTABANI KURULUM ---
@@ -687,23 +675,7 @@ def get_finviz_extras(tickers: list) -> "pd.DataFrame":
     return df.set_index("ticker")
 
 
-def _parse_pct(val):
-    """
-    Finviz API'den gelen yüzde stringini float'a çevirir.
-    "96.65%" → 96.65
-    "-12.3%" → -12.3
-    "" / "-" / None → None
-    Hata durumunda None döner (NaN/None koruması).
-    """
-    if val is None:
-        return None
-    s = str(val).strip()
-    if s == "" or s == "-" or s.lower() == "nan":
-        return None
-    try:
-        return float(s.rstrip("%"))
-    except (ValueError, TypeError):
-        return None
+# _parse_pct -> scanner_helpers.py (Paket 373 extraction, import yukarida)
 
 
 # Sprint 4-bis.4 KARAR #461 — Yerel VCP fonksiyonu quanfina_math'e tasindi.
@@ -711,26 +683,7 @@ def _parse_pct(val):
 # Tek motor felsefesi: scanner.py import quanfina_math.compute_vcp_pass
 
 
-def _compute_grade(eps_qoq, sales_qoq):
-    """
-    EPS Q/Q ve Sales Q/Q yüzdelerine göre Grade hesaplar.
-    Eşikler değişmedi (önceki scraping mantığı ile aynı).
-    None değerler → 'D' (yetersiz veri).
-
-    A: EPS > 40 AND Sales > 25
-    B: EPS > 25 AND Sales > 15
-    C: EPS > 20 AND Sales > 10
-    D: aksi
-    """
-    if eps_qoq is None or sales_qoq is None:
-        return "D"
-    if eps_qoq > 40 and sales_qoq > 25:
-        return "A"
-    if eps_qoq > 25 and sales_qoq > 15:
-        return "B"
-    if eps_qoq > 20 and sales_qoq > 10:
-        return "C"
-    return "D"
+# _compute_grade -> scanner_helpers.py (Paket 373 extraction, import yukarida)
 
 
 SECTOR_ETFS = {
