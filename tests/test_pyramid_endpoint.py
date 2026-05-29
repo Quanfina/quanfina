@@ -114,15 +114,18 @@ class TestPyramidConstants:
 # =====================================================================
 
 class TestPyramidValidation:
-    def test_zero_position_handled(self, client):
-        """Zero pozisyon → BELOW_PILOT, exception YOK."""
-        data = _post(client, 0).json()
-        assert data["tier"] == "BELOW_PILOT"
+    def test_zero_position_returns_422(self, client):
+        """P387: position_value=0 -> Pydantic 422 (gt=0). Eski 200+BELOW_PILOT
+        graceful pattern -> Pydantic on kapi 422 (UI hata gosterir, kullanici
+        duzeltir, yaniltici 0 pozisyon kaydı önlenir)."""
+        r = _post(client, 0)
+        assert r.status_code == 422
 
-    def test_zero_portfolio_handled(self, client):
-        """Zero portfolio → BELOW_PILOT (helper graceful)."""
-        data = _post(client, 1000, portfolio_value=0).json()
-        assert data["tier"] == "BELOW_PILOT"
+    def test_zero_portfolio_returns_422(self, client):
+        """P387: portfolio_value=0 -> Pydantic 422. ZeroDivisionError (position_pct
+        hesabi) onlenir + UI hata gosterir."""
+        r = _post(client, 1000, portfolio_value=0)
+        assert r.status_code == 422
 
     def test_mark_says_present(self, client):
         """Her tier response mark_says non-empty."""
@@ -131,9 +134,8 @@ class TestPyramidValidation:
             assert data["mark_says"]
             assert len(data["mark_says"]) > 10
 
-    def test_negative_position_400_or_below(self, client):
-        """Negatif pozisyon — Pydantic float kabul eder, helper BELOW_PILOT."""
+    def test_negative_position_returns_422(self, client):
+        """P387: Negatif position_value -> Pydantic 422 (gt=0). Eski helper-graceful
+        pattern -> Pydantic on kapi 422 (negatif yatirim anlamsiz)."""
         r = _post(client, -100)
-        # FastAPI Pydantic float negatif kabul eder; helper graceful
-        assert r.status_code == 200
-        assert r.json()["tier"] == "BELOW_PILOT"
+        assert r.status_code == 422

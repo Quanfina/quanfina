@@ -1667,11 +1667,12 @@ def _promote_status(current: str) -> str:
 # ── Watchlist mutation models ─────────────────────────────────────────────────
 
 class WatchlistRowCreate(BaseModel):
-    symbol: str
+    # P387: validation kampanyasi — TradeCreate gt=0 disiplini paralel.
+    symbol: str = Field(min_length=1, max_length=10, description="US ticker (1-10 karakter)")
     strategy: Literal["minervini", "carr"]
     status: Literal["watch", "on_deck", "focus", "buy"]
     setup_type: Optional[str] = None
-    pivot_price: Optional[float] = None
+    pivot_price: Optional[float] = Field(default=None, gt=0, description="Pivot fiyati > 0")
     note: Optional[str] = None
 
 
@@ -3305,8 +3306,9 @@ def get_rba_metrics(
 # fallback + UI gosterim (MarkPyramidCard).
 
 class PyramidTierRequest(BaseModel):
-    position_value: float
-    portfolio_value: float
+    # P387: portfolio_value=0 -> ZeroDivisionError (position_pct hesabi). gt=0 zorunlu.
+    position_value: float = Field(gt=0, description="Pozisyon dolar tutari > 0")
+    portfolio_value: float = Field(gt=0, description="Portfoy dolar tutari > 0 (yuzde hesabi)")
     prev_tier_profitable: bool = False
 
 
@@ -3539,15 +3541,16 @@ def get_signals() -> list[Signal]:
 
 class RiskAdvisorRequest(BaseModel):
     """Mark Risk Advisor input — Trade form'dan gelir."""
-    portfolio_value: float
-    target_risk_pct: float = 2.0    # Mark default %2 (TTLC s.143 ortalama)
-    max_stop_pct: float = 7.0       # Mark default %7 (TLSMW Ch 12)
-    total_positions: int = 0        # Portfolio'da mevcut açık trade sayısı
-    is_best_name: bool = False      # Sn. Ferit "best name" işareti
-    # RBA optional — kullanıcı geçmiş trade istatistik bilgisi
+    # P387: validation kampanyasi — finansal hesaplar gt=0 zorunlu, sayim ge=0.
+    portfolio_value: float = Field(gt=0, description="Portfoy dolar tutari > 0")
+    target_risk_pct: float = Field(default=2.0, gt=0, le=100, description="Risk %2 default (TTLC s.143)")
+    max_stop_pct: float = Field(default=7.0, gt=0, le=100, description="Stop %7 default (TLSMW Ch 12)")
+    total_positions: int = Field(default=0, ge=0, description="Acik trade sayisi >= 0")
+    is_best_name: bool = False
+    # RBA optional — kullanici gecmis trade istatistik bilgisi
     avg_gain_pct: Optional[float] = None
     avg_loss_pct: Optional[float] = None
-    num_trades: Optional[int] = None
+    num_trades: Optional[int] = Field(default=None, ge=0)
 
 
 class RiskAdvisorRule(BaseModel):
@@ -3783,7 +3786,8 @@ class DailyBar(BaseModel):
 
 
 class TennisBallRequest(BaseModel):
-    breakout_date_idx: int
+    # P387: breakout_date_idx ge=0 (negatif index helper'da edge case)
+    breakout_date_idx: int = Field(ge=0, description="Breakout gun indeksi >= 0")
     daily_history: list[DailyBar]
 
 
@@ -3821,7 +3825,8 @@ def risk_tennis_ball(req: TennisBallRequest) -> TennisBallResponse:
 
 class VolumeAsymmetryRequest(BaseModel):
     daily_history: list[DailyBar]
-    lookback_days: int = 20
+    # P387: lookback gt=0 (negatif/sifir lookback hesabi anlamsiz)
+    lookback_days: int = Field(default=20, gt=0, description="Lookback gun sayisi > 0")
 
 
 class VolumeAsymmetryResponse(BaseModel):
