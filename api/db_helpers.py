@@ -636,11 +636,18 @@ def minervini_stocks_get_latest(limit: int = 100) -> list[dict]:
         return out
 
 
-def scan_latest_date() -> "str | None":
+def scan_latest_date():
     """En son minervini_scans tarama tarihi (veri tazeligi gostergesi — P375).
+
+    psycopg2 PostgreSQL DATE kolonu icin `datetime.date` objesi dondurur;
+    type hint eskiden 'str | None' diyordu (P395 fix: yaniltici, aslinda
+    `date | None`). Endpoint zaten str() ile safe parse yapiyor — bu fix
+    sadece annotation tutarsizligini gideriyor (kullanım kontrati bozulmadı).
 
     Staleness karari endpoint'te market_calendar ile (trading-day-aware) verilir;
     bu helper sadece ham MAX(scan_date) doner. None = hic tarama yok / DB erisilemez.
+
+    Returns: date | None (psycopg2 DATE -> datetime.date; veya bos DB None).
     """
     try:
         with engine.connect() as conn:

@@ -121,12 +121,13 @@ class TestTradeCreatePlanValidation:
 class TestTradeCreateExitPriceValidation:
     """exit_price ge=0 (delisting/total loss senaryosu icin 0 OK, negatif yasak)."""
 
-    def test_exit_price_zero_open_ok(self, client):
-        # Open trade exit_price=None default, 0 göndermek de OK (delisting hazirlik)
+    def test_exit_price_zero_open_ok(self):
+        # P395 refactor: HTTP yerine Pydantic model direkt (Cloud SQL flaky'den
+        # bagimsiz). Niyet: exit_price=0 ge=0 -> ValidationError raise OLMAMALI
+        # (delisting/total loss senaryosu).
         good = {**VALID_TRADE, "exit_price": 0.0}
-        r = client.post("/api/trades", json=good)
-        # 422 olmamali (0 ge=0 geçer) — DB hatasi olabilir ama validation OK
-        assert r.status_code != 422, f"exit=0 422 OLMAMALI (ge=0): {r.text[:200]}"
+        # Constructor raise etmezse Pydantic gectiği teyit edilir.
+        api_main.TradeCreate(**good)
 
     def test_exit_price_negative_returns_422(self, client):
         bad = {**VALID_TRADE, "exit_price": -10.0}
@@ -138,12 +139,15 @@ class TestValidBaselineStillAcceptable:
     """Baseline VALID_TRADE Pydantic validation'i gecmeli — refactor sonrasi
     legitimate trade kayit'in kirilmadigini garanti et (regresyon koruma)."""
 
-    def test_valid_trade_passes_pydantic(self, client):
-        r = client.post("/api/trades", json=VALID_TRADE)
-        # DB hatasi (Cloud SQL down) olabilir ama Pydantic 422 OLMAMALI
-        assert r.status_code != 422, (
-            f"Geçerli trade 422 OLMAMALI - validation hatasi: {r.text[:300]}"
-        )
+    def test_valid_trade_passes_pydantic(self):
+        # P395 refactor: HTTP yerine Pydantic model direkt (Cloud SQL bagimsiz).
+        # Niyet: VALID_TRADE baseline ValidationError raise OLMAMALI — refactor
+        # sonrasi legitimate kayit kirilmamasi garantisi.
+        obj = api_main.TradeCreate(**VALID_TRADE)
+        # Field kanit (P385 gt=0 disiplini regresyon korumasi)
+        assert obj.entry_price == 100.0
+        assert obj.shares == 100
+        assert obj.plan_size_pct == 5.0
 
 
 # =============================================================================
@@ -163,11 +167,11 @@ class TestTradeUpdateValidation:
         r = client.patch("/api/trades/999999", json={"exit_price": -10.0})
         assert r.status_code == 422, f"Negatif exit_price 422 olmali: {r.status_code}"
 
-    def test_patch_exit_price_zero_acceptable(self, client):
-        # exit_price=0 ge=0 -> 422 OLMAMALI (delisting/total loss senaryosu)
-        # 404 trade yok dönecek (legitimate validation geçti)
-        r = client.patch("/api/trades/999999", json={"exit_price": 0.0})
-        assert r.status_code != 422, f"exit_price=0 422 OLMAMALI (ge=0): {r.text[:200]}"
+    def test_patch_exit_price_zero_acceptable(self):
+        # P395 refactor: Pydantic model direkt (HTTP DB roundtrip yok, Cloud SQL
+        # flaky bagimsiz). Niyet: exit_price=0 ge=0 -> ValidationError raise
+        # OLMAMALI (delisting/total loss senaryosu).
+        api_main.TradeUpdate(exit_price=0.0)
 
     def test_patch_plan_stop_zero_returns_422(self, client):
         r = client.patch("/api/trades/999999", json={"plan_stop": 0.0})
@@ -194,12 +198,14 @@ class TestTradeUpdateValidation:
         r = client.patch("/api/trades/999999", json={"plan_size_pct": -5.0})
         assert r.status_code == 422
 
-    def test_patch_valid_empty_body_no_422(self, client):
-        # Bos body (degisiklik yok) -> 422 OLMAMALI (Pydantic geçer, sonra 404)
-        r = client.patch("/api/trades/999999", json={})
-        assert r.status_code != 422
+    def test_patch_valid_empty_body_no_422(self):
+        # P395 refactor: Pydantic direkt. Niyet: bos body -> ValidationError
+        # OLMAMALI (TradeUpdate tum alanlar Optional, hicbir alan zorunlu degil).
+        api_main.TradeUpdate()
 
-    def test_patch_valid_field_no_422(self, client):
-        # Legitimate update (sadece grade) -> Pydantic 422 OLMAMALI
-        r = client.patch("/api/trades/999999", json={"grade": "A", "lessons": "VCP perfect"})
-        assert r.status_code != 422
+    def test_patch_valid_field_no_422(self):
+        # P395 refactor: Pydantic direkt. Niyet: legitimate field (grade+lessons)
+        # ValidationError OLMAMALI.
+        obj = api_main.TradeUpdate(grade="A", lessons="VCP perfect")
+        assert obj.grade == "A"
+        assert obj.lessons == "VCP perfect"
