@@ -19,6 +19,11 @@ import type { Trade } from "@/types/trade";
  */
 
 interface PositionRisk {
+  // P399: id eklendi -> React duplicate key fix. Sn. Ferit pyramiding ile
+  // ayni sembol+strateji icin birden fazla acik trade acabilir (Mark Pilot/
+  // Standart/Full tier'lari) -> "symbol-strategy" key duplicate riski vardi.
+  // trade.id PRIMARY KEY (web_trades SERIAL) -> garanti unique.
+  id: number;
   symbol: string;
   strategy: string;
   dollarRisk: number | null;     // (entry - plan_stop) × shares
@@ -55,6 +60,7 @@ export function OpenPositionsRiskPanel({ portfolioValue = 100000 }: Props) {
         }
       }
       return {
+        id: t.id,  // P399: trade PRIMARY KEY -> React unique key garanti
         symbol: t.symbol,
         strategy: t.strategy,
         dollarRisk,
@@ -140,7 +146,7 @@ export function OpenPositionsRiskPanel({ portfolioValue = 100000 }: Props) {
         {positions.map((p) => {
           const color = riskColor(p.pctRisk, p.hasStop);
           return (
-            <li key={`${p.symbol}-${p.strategy}`} className="flex items-center gap-2 text-xs">
+            <li key={p.id} className="flex items-center gap-2 text-xs">
               <span className="font-mono font-semibold w-14 shrink-0">{p.symbol}</span>
               {/* Risk barı (görsel ısı) */}
               <div className="flex-1 h-2 rounded-full bg-muted/40 overflow-hidden">
