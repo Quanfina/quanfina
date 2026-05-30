@@ -54,6 +54,29 @@ export default function MinerviniPage() {
 
   return (
     <div className="flex flex-col h-full">
+      {/* P413 (31 May 2026 — Kural #28 audit otonom mod):
+          /api/minervini/stocks DB-first (P368 sonrası): scanner taze ise gerçek
+          minervini_scans, DB boş/erişilemez ise MOCK fallback (api/main.py:273-284).
+          UI hangisinin geldiği şu an net göstermez → ihtiyatlı uyarı.
+          AÇIK KONU adayı: backend response'a is_mock flag (P414 aday). */}
+      <div
+        className="px-6 py-2 border-b text-xs flex items-center gap-2"
+        style={{
+          background: "rgba(75,156,211,0.08)",
+          borderColor: "rgba(75,156,211,0.30)",
+          color: "var(--muted-foreground)",
+        }}
+        role="status"
+        data-testid="minervini-source-banner"
+      >
+        <span aria-hidden="true">ℹ️</span>
+        <span>
+          Bu sayfa <b>scanner DB</b>&apos;den çeker (P368). Scanner taze ise gerçek tarama,
+          DB boş ise <b>tasarım örneği</b> (fallback). Veri tazeliği için üst{" "}
+          <a href="/piyasa-durumu" className="underline">tarama durumu</a> rozeti ve{" "}
+          <a href="/screens" className="underline">/screens</a> (canlı SQL endpoint) öncelikli.
+        </span>
+      </div>
       <div className="px-6 py-3 border-b flex items-center gap-4">
         <h1 className="text-xl font-semibold tracking-tight">
           Minervini Tarama

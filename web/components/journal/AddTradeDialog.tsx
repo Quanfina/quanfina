@@ -311,7 +311,9 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
           </div>
         )}
 
-        {/* KARAR #733 alt (Paket 33): Stage 4 'UZAK DUR' Mark uyarısı */}
+        {/* KARAR #733 alt (Paket 33): Stage 4 'UZAK DUR' Mark uyarısı.
+            P413 (31 May 2026 — Kural #28 audit): is_mock=true ise MOCK rozet
+            ekle. Paper trading kararı MOCK veriyle alınmasın diye şeffaflık. */}
         {carrStage && carrStage.stage === 4 && (
           <div
             className="rounded-md border px-3 py-2 flex items-start gap-2 text-xs"
@@ -323,12 +325,31 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
           >
             <AlertTriangle size={14} className="mt-0.5 shrink-0" />
             <div className="flex-1">
-              <span className="font-semibold">
+              <span className="font-semibold flex items-center gap-2 flex-wrap">
                 ⛔ {trimmedSymbol} Carr Stage 4 (Declining)
+                {carrStage.is_mock && (
+                  <span
+                    className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider"
+                    style={{
+                      background: "rgba(245,158,11,0.18)",
+                      color: "#92400E",
+                      border: "1px solid rgba(245,158,11,0.40)",
+                    }}
+                    title="Stage hesabı MOCK 180-gün deterministik veriyle (AÇIK KONU #75 yfinance pipeline çözülünce gerçek olur)"
+                  >
+                    🟡 MOCK
+                  </span>
+                )}
               </span>
               <span className="block mt-1 italic">
                 Mark felsefesi: <b>UZAK DUR</b>. 30W MA altı + slope negatif.
-                Stage 2'ye dönene kadar yeni alım önerilmez (KARAR #733).
+                Stage 2&apos;ye dönene kadar yeni alım önerilmez (KARAR #733).
+                {carrStage.is_mock && (
+                  <span className="block mt-1 not-italic font-semibold" style={{ color: "#92400E" }}>
+                    ⚠ Stage hesabı şu an MOCK veri — paper trading kararı bu uyarıyla risk
+                    almadan önce manuel grafik doğrulama yap.
+                  </span>
+                )}
               </span>
             </div>
           </div>

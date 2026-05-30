@@ -3398,6 +3398,11 @@ class CarrStageResponse(BaseModel):
     slope_pct_per_year: Optional[float] = None
     mark_says: str
     ma_window: int = 150
+    # P413 (31 May 2026 - Kural #28 audit otonom mod):
+    # is_mock flag. _mock_index_history (180 gun deterministik) kullanildiginda
+    # True; AÇIK KONU #75 yfinance pipeline cozulunce False olur. Paper trading
+    # AddTradeDialog Stage 4 alert MOCK veriyle calismasin diye UI'a sinyal.
+    is_mock: bool = False
 
 
 @app.get("/api/carr/stage/{symbol}", response_model=CarrStageResponse)
@@ -3423,6 +3428,7 @@ def get_carr_stage(symbol: str) -> CarrStageResponse:
         slope_pct_per_year=result.get("slope_pct_per_year"),
         mark_says=result.get("mark_says", ""),
         ma_window=150,
+        is_mock=True,  # P413: _mock_index_history deterministik (ACIK KONU #75 cozulunce False)
     )
 
 

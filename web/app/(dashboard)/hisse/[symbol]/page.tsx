@@ -127,6 +127,30 @@ export default function HissePage({
         </Link>
       </div>
 
+      {/* P413 (31 May 2026 — Kural #28 audit): Carr Stage MOCK uyarısı.
+          /api/carr/stage/{symbol} _mock_index_history kullanıyor (AÇIK KONU #75
+          yfinance pipeline çözülünce gerçek olur). Stage 4 alert paper trading
+          kararı için MOCK veriyle çalışıyorsa açıkça bildir. */}
+      {carrStage?.is_mock && (
+        <div
+          className="px-6 py-2 border-b text-xs flex items-center gap-2"
+          style={{
+            background: "rgba(245,158,11,0.10)",
+            borderColor: "rgba(245,158,11,0.40)",
+            color: "#92400E",
+          }}
+          role="status"
+          data-testid="hisse-carr-stage-mock-banner"
+        >
+          <span aria-hidden="true">🟡</span>
+          <span>
+            <b>Carr Stage MOCK:</b> Stage hesabı şu an deterministik 180-gün MOCK
+            veriyle. AÇIK KONU #75 yfinance pipeline çözülünce gerçek olur.
+            Paper trading kararı verirken grafiği manuel doğrula.
+          </span>
+        </div>
+      )}
+
       {/* KARAR #733 alt-paket (Paket 39): Mark Regime banner + bu hissenin
           Stage 4 olup olmadığı sayım payı (isStage4 ? 1 : 0). hideOnHealthy
           default — HEALTHY iken sadece bu hisse Stage 4 olursa banner kalır. */}

@@ -18,6 +18,10 @@ export interface CarrStageResponse {
   slope_pct_per_year: number | null;
   mark_says: string;
   ma_window: number;
+  // P413 (31 May 2026 — Kural #28 audit): backend MOCK fallback işareti.
+  // _mock_index_history deterministik veri kullanıyorsa true; AÇIK KONU #75
+  // yfinance pipeline çözülünce false. UI Stage 4 alert + rozet için sinyal.
+  is_mock?: boolean;
 }
 
 async function fetchCarrStage(symbol: string): Promise<CarrStageResponse> {
