@@ -2,45 +2,9 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Trade, TradeCreate, TradeUpdate, SetupType } from "@/types/trade";
-
-/**
- * P388: Pydantic 422 ValidationError detail parse (kullanıcı dostu mesaj).
- *
- * FastAPI 422 response yapısı: { detail: [{loc, msg, type, ctx}] } — detail
- * STRING DEĞİL LİSTE. Eski `err.detail ?? "HTTP 422"` doğrudan render edilirse
- * "[object Object]" gösterirdi. Bu helper:
- * - 422 liste -> "entry_price: Input should be greater than 0; shares: ..."
- * - 503/diğer string -> dogrudan dondur
- * - Bos/error -> jenerik fallback
- *
- * Mark "Objective Mirror Language" disiplini: kullanıcıya somut alan + sebep
- * göster (yağcılık değil, ham gerçek).
- */
-function parsePydanticError(detail: unknown, status: number): string {
-  if (typeof detail === "string") return detail;
-  if (Array.isArray(detail)) {
-    return detail
-      .map((d) => {
-        const err = d as { loc?: unknown[]; msg?: string };
-        const field = Array.isArray(err.loc) ? err.loc[err.loc.length - 1] : "?";
-        return `${field}: ${err.msg ?? "geçersiz"}`;
-      })
-      .join("; ");
-  }
-  return `HTTP ${status}`;
-}
-
-async function _parseErrorBody(res: Response): Promise<string> {
-  try {
-    const body = await res.json();
-    return parsePydanticError(
-      (body as { detail?: unknown }).detail,
-      res.status,
-    );
-  } catch {
-    return `HTTP ${res.status}`;
-  }
-}
+// P390: parseErrorBody lib/api-error.ts'e tasindi (DRY tek kaynak — watchlist
+// mutation hook'u da kullanir). P388 doğdu, P390 lib'e cikarildi.
+import { parseErrorBody as _parseErrorBody } from "@/lib/api-error";
 
 async function fetchTrades(): Promise<Trade[]> {
   // 8sn timeout + 503 detail parse (Sinyaller/Watchlist pateni — Kural #20 UX)

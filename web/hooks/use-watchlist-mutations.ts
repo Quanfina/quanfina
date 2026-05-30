@@ -2,6 +2,9 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { WatchlistRow, WatchlistRowCreate, WatchlistRowUpdate } from "@/types/watchlist";
+// P390: ortak Pydantic 422 hata parse helper (kullanıcı dostu mesaj).
+// "[object Object]" yerine "pivot_price: Input should be greater than 0" gibi.
+import { parseErrorBody } from "@/lib/api-error";
 
 async function addRow(body: WatchlistRowCreate): Promise<WatchlistRow> {
   const res = await fetch("/api/watchlist", {
@@ -9,10 +12,7 @@ async function addRow(body: WatchlistRowCreate): Promise<WatchlistRow> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
-    throw new Error((err as { detail?: string }).detail ?? `HTTP ${res.status}`);
-  }
+  if (!res.ok) throw new Error(await parseErrorBody(res));
   return res.json() as Promise<WatchlistRow>;
 }
 
@@ -30,10 +30,7 @@ async function updateRow({
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(update),
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
-    throw new Error((err as { detail?: string }).detail ?? `HTTP ${res.status}`);
-  }
+  if (!res.ok) throw new Error(await parseErrorBody(res));
   return res.json() as Promise<WatchlistRow>;
 }
 
@@ -47,10 +44,7 @@ async function deleteRow({
   const res = await fetch(`/api/watchlist/${symbol}/${strategy}`, {
     method: "DELETE",
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
-    throw new Error((err as { detail?: string }).detail ?? `HTTP ${res.status}`);
-  }
+  if (!res.ok) throw new Error(await parseErrorBody(res));
 }
 
 async function promoteRow({
@@ -63,10 +57,7 @@ async function promoteRow({
   const res = await fetch(`/api/watchlist/${symbol}/${strategy}/promote`, {
     method: "POST",
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
-    throw new Error((err as { detail?: string }).detail ?? `HTTP ${res.status}`);
-  }
+  if (!res.ok) throw new Error(await parseErrorBody(res));
   return res.json() as Promise<WatchlistRow>;
 }
 
