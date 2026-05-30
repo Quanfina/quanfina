@@ -259,13 +259,29 @@ export function MarkRegimeCard({
         </div>
       </div>
 
-      {/* KARAR #733 alt-paket (Paket 53): Market Breadth A/D Line widget */}
+      {/* KARAR #733 alt-paket (Paket 53): Market Breadth A/D Line widget.
+          P408: MOCK rozet — yfinance NYSE/NASDAQ advance/decline bulk sağlamıyor,
+          backend `_mock_breadth_history()` deterministik MOCK üretir. Paper
+          trading'de Sn. Ferit'in görüldüğüne güveneceği veri net işaretlenir
+          (İLKE #11 Objektif Ayna Dil + Kural #26 sahte sayı uydurmama). */}
       {marketBreadth && (
         <div className="pt-2 border-t border-muted-foreground/15 flex flex-col gap-1.5">
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground flex items-center gap-1.5">
               <Activity size={12} />
               Market Breadth (A/D)
+              <span
+                className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider"
+                style={{
+                  background: "rgba(245,158,11,0.15)",
+                  color: "#F59E0B",
+                  border: "1px solid rgba(245,158,11,0.40)",
+                }}
+                title="A/D Line MOCK: yfinance NYSE/NASDAQ breadth bulk sağlamıyor — deterministik simüle veri (P408 şeffaflık rozeti). Paper trading kararında bu metriği gerçek olarak kullanma."
+                data-testid="market-breadth-mock-badge"
+              >
+                MOCK
+              </span>
             </span>
             <span
               className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"
@@ -336,6 +352,21 @@ export function MarkRegimeCard({
             <span className="text-muted-foreground flex items-center gap-1.5">
               {DIVERGENCE_META[breadthDivergence.divergence].icon}
               Index × A/D Divergence
+              {/* P408: Yarım MOCK rozet — Index closes gerçek (yfinance SPY)
+                  ama A/D Line MOCK (yfinance breadth yok). Divergence sonucu
+                  MOCK A/D tarafından etkileniyor → uyarı bağlayıcı değil. */}
+              <span
+                className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider"
+                style={{
+                  background: "rgba(245,158,11,0.15)",
+                  color: "#F59E0B",
+                  border: "1px solid rgba(245,158,11,0.40)",
+                }}
+                title="Yarım MOCK: Index closes (SPY) gerçek yfinance, AMA A/D Line MOCK. Divergence sonucu MOCK A/D'den etkileniyor — paper trading'de bu uyarıya bağlayıcı karar verme (P408 şeffaflık rozeti)."
+                data-testid="breadth-divergence-mock-badge"
+              >
+                YARIM MOCK
+              </span>
             </span>
             <span
               className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"
