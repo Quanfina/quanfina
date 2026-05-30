@@ -6,6 +6,8 @@ import { useTrades } from "@/hooks/use-trades";
 import { computeTradeStats, GRADE_ORDER } from "@/lib/trade-stats";
 import { BrandonExpectancyCard } from "@/components/journal/BrandonExpectancyCard";
 import { RbaSummaryCard } from "@/components/journal/RbaSummaryCard";
+import { MonthlyRbaTable } from "@/components/journal/MonthlyRbaTable";
+import { RbaMiniCharts } from "@/components/journal/RbaMiniCharts";
 
 /**
  * İstatistikler sayfası — trade performans dashboard (Streamlit'ten taşındı).
@@ -119,6 +121,12 @@ export default function IstatistiklerPage() {
               <BrandonExpectancyCard />
               <RbaSummaryCard variant="full" />
             </div>
+
+            {/* P401: Aylık RBA tablosu (Mark TTLC Sec 4 canon) — exit_date bazlı aggregate */}
+            <MonthlyRbaTable />
+
+            {/* P401: 4 mini chart galeri — Win Rate trend + Avg Gain/Loss + Equity Curve */}
+            <RbaMiniCharts />
           </>
         )}
       </div>
