@@ -215,8 +215,14 @@ export function AddRowDialog({ open, onOpenChange }: Props) {
             />
           </div>
 
+          {/* P394: role="alert" a11y + data-testid Vitest hook (AddTradeDialog P392 pateni) */}
           {error && (
-            <p className="text-sm" style={{ color: "var(--mtp-danger)" }}>
+            <p
+              role="alert"
+              data-testid="watchlist-add-row-error"
+              className="text-sm"
+              style={{ color: "var(--mtp-danger)" }}
+            >
               {error}
             </p>
           )}
