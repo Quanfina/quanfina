@@ -137,8 +137,34 @@ export default function JournalPage() {
         quote_source: q.source as "yfinance" | "mock",
       };
     });
-    return enriched.sort((a, b) => b.entry_date.localeCompare(a.entry_date));
+    // P402: Açık trade'ler önce (status='open'), Kapalı sonra — her grup
+    // içinde tarih DESC. Markets360 "FULL POSITIONS / HALF POSITIONS" grouping
+    // pattern'inin Quanfina uyarlaması (status bazlı sıralama, Mark "Risk
+    // first" disiplini — açık pozisyonlar her zaman göz önünde).
+    return enriched.sort((a, b) => {
+      if (a.status === b.status) return b.entry_date.localeCompare(a.entry_date);
+      return a.status === "open" ? -1 : 1;  // open önce
+    });
   }, [data, statusFilter, strategyFilter, gradeFilter, search, quoteMap]);
+
+  // P402: Status bazlı count badge'leri (Markets360 "(N) section header" pattern)
+  const statusCounts = useMemo(() => {
+    const all = data ?? [];
+    return {
+      open: all.filter((t) => t.status === "open").length,
+      closed: all.filter((t) => t.status === "closed").length,
+      topGrade: all.filter((t) => t.grade === "A+" || t.grade === "A").length,
+    };
+  }, [data]);
+
+  // P402: AG Grid row vurgusu — açık trade'ler hafif arkaplan
+  // (Markets360 "FULL POSITIONS" mavi-tint Quanfina uyarlaması, Mark "Risk first")
+  const rowClassRules = useMemo(
+    () => ({
+      "qf-row-open": (params: { data?: Trade }) => params.data?.status === "open",
+    }),
+    [],
+  );
 
   // KARAR #476: gridClass useGridTheme'den (SSR uyumu)
 
@@ -218,6 +244,38 @@ export default function JournalPage() {
         <span className="text-xs text-muted-foreground ml-1">
           {rowData.length} / {data?.length ?? 0} trade
         </span>
+        {/* P402: Status count badge'leri (Markets360 section header pattern uyarlaması).
+            Markets "Full/Half Positions (N)" görsel grouping → Quanfina Açık/Kapalı count. */}
+        {(data?.length ?? 0) > 0 && (
+          <div
+            className="flex items-center gap-2 ml-auto text-[11px]"
+            data-testid="journal-status-counts"
+          >
+            <span
+              className="px-2 py-0.5 rounded-full font-medium tabular-nums"
+              style={{ background: "rgba(40,167,69,0.12)", color: "var(--mtp-excellent)" }}
+              title="Açık trade'ler — Mark Risk first öncelik"
+            >
+              Açık: {statusCounts.open}
+            </span>
+            <span
+              className="px-2 py-0.5 rounded-full font-medium tabular-nums"
+              style={{ background: "rgba(150,150,150,0.12)", color: "var(--muted-foreground)" }}
+              title="Kapalı trade'ler — Mark RBA (TTLC Sec 4)"
+            >
+              Kapalı: {statusCounts.closed}
+            </span>
+            {statusCounts.topGrade > 0 && (
+              <span
+                className="px-2 py-0.5 rounded-full font-medium tabular-nums"
+                style={{ background: "rgba(75,156,211,0.12)", color: "#4B9CD3" }}
+                title="A+/A grade — Mark TradeGrader BP/SP (KARAR #445)"
+              >
+                A+/A: {statusCounts.topGrade}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Grid */}
@@ -260,6 +318,7 @@ export default function JournalPage() {
               rowHeight={36}
               headerHeight={36}
               suppressCellFocus={false}
+              rowClassRules={rowClassRules}
             />
           </div>
         )}
