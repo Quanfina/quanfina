@@ -17,6 +17,7 @@ import type { TradeCreate, TradeGrade, ExitReason, TradeStatus, SignalSource, Ti
 import { GRADE_OPTIONS, EXIT_REASON_LABELS, SIGNAL_SOURCE_LABELS, SIGNAL_SOURCE_DESCRIPTIONS, TIME_HORIZON_LABELS, TIME_HORIZON_DESCRIPTIONS } from "@/types/trade";
 import { MarkRiskAdvisor } from "./MarkRiskAdvisor";
 import { MarkPyramidCard } from "./MarkPyramidCard";
+import { PortfolioValueEditor } from "./PortfolioValueEditor";
 import { PreTradeChecklist } from "./PreTradeChecklist";
 import { isReadTodayAny } from "@/lib/mindset-read-state";
 import Link from "next/link";
@@ -715,7 +716,12 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
             </div>
           )}
 
-          {/* KARAR ADAY #732 (24 May 2026): Mark Pyramid Calculator (KARAR #487 3-Tier) */}
+          {/* KARAR ADAY #732 (24 May 2026): Mark Pyramid Calculator (KARAR #487 3-Tier).
+              P400: Portföy büyüklüğü inline editor — Sn. Ferit gerçek portföyünü girip
+              persist edebilir (localStorage). MarkPyramidCard hook'tan otomatik alır. */}
+          <div className="flex items-center justify-end -mb-2">
+            <PortfolioValueEditor />
+          </div>
           <MarkPyramidCard entryPrice={entryPrice} shares={shares} />
 
           {/* KARAR ADAY #717 — Mark Trade Plan (TTLC Sec 1, 6 zorunlu alan) */}

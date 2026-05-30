@@ -12,6 +12,7 @@ import {
 } from "@/lib/pyramid-calculator";
 import { usePyramidTier } from "@/hooks/use-pyramid-tier";
 import { useMarketStatus } from "@/hooks/use-market-status";
+import { usePortfolioValue } from "@/hooks/use-portfolio-value";
 
 /**
  * KARAR ADAY #732 (24 May 2026) — Mark Pyramid Calculator Karti.
@@ -27,13 +28,11 @@ import { useMarketStatus } from "@/hooks/use-market-status";
 interface Props {
   entryPrice: string;
   shares: string;
-  /** Toplam portföy $ — Sn. Ferit ayarı (placeholder $100K) */
+  /** Toplam portföy $ — opsiyonel override; verilmezse usePortfolioValue() hook'tan (P400). */
   portfolioValue?: number;
   /** Mark X kilit override: pilot/standart kâra geçti mi */
   initialPrevTierProfitable?: boolean;
 }
-
-const DEFAULT_PORTFOLIO_VALUE = 100000;
 
 const SEVERITY_ICONS = {
   ok: <CheckCircle2 size={14} />,
@@ -45,10 +44,13 @@ const SEVERITY_ICONS = {
 export function MarkPyramidCard({
   entryPrice,
   shares,
-  portfolioValue = DEFAULT_PORTFOLIO_VALUE,
+  portfolioValue: portfolioValueProp,
   initialPrevTierProfitable = false,
 }: Props) {
   const [prevTierProfitable, setPrevTierProfitable] = useState(initialPrevTierProfitable);
+  // P400: prop override öncelikli, yoksa localStorage hook'undan kullanıcı ayarı
+  const { value: storedPortfolioValue } = usePortfolioValue();
+  const portfolioValue = portfolioValueProp ?? storedPortfolioValue;
 
   // KARAR #733 alt-paket (Paket 49, 25 May 2026): Piyasa-aware tier kilit
   // (P47 Risk Yönetimi sayfa pateni). KARAR #488 4-Katman Mark Regime'e göre

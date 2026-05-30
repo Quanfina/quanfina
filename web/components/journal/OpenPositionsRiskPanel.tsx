@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { ShieldAlert, TrendingDown } from "lucide-react";
 import { useTrades } from "@/hooks/use-trades";
+import { usePortfolioValue } from "@/hooks/use-portfolio-value";
 import type { Trade } from "@/types/trade";
 
 /**
@@ -33,11 +34,14 @@ interface PositionRisk {
 }
 
 interface Props {
-  /** Portföy değeri — % risk hesabı için (default 100000). */
+  /** Portföy değeri — opsiyonel override; verilmezse usePortfolioValue() hook'tan (P400). */
   portfolioValue?: number;
 }
 
-export function OpenPositionsRiskPanel({ portfolioValue = 100000 }: Props) {
+export function OpenPositionsRiskPanel({ portfolioValue: portfolioValueProp }: Props) {
+  // P400: prop override öncelikli, yoksa localStorage hook'undan kullanıcı ayarı
+  const { value: storedPortfolioValue } = usePortfolioValue();
+  const portfolioValue = portfolioValueProp ?? storedPortfolioValue;
   const trades = useTrades();
 
   const { positions, totalDollarRisk, totalPctRisk, noStopCount } = useMemo(() => {
