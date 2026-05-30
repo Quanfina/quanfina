@@ -1758,6 +1758,93 @@ ile geçici muafiyet. Default davranış TEK prompt tek cevap.
 (Pattern Tescil — 2 ortaya çıkış eşiği), Kural #20 (Çift Danışma — ana
 uygulama alanı), `_HATALAR.md` H#A7+H#A8 (ortaya çıkış zinciri).
 
+### Kural 28 — Canlı Veri Önce, MOCK Sadece Acil Fallback (30 May 2026 ~20:00 yeni)
+
+> Sn. Ferit talimatı (Kural #14 doğrudan tescil — paper trading dürüstlük
+> dönemi): *"gerçek canlı veriye geçicez artık kural olarak ekle"*.
+
+**Tetikleyici (Paket P408-P409 zinciri, 30 May 2026):** Sn. Ferit
+`/piyasa-durumu` sayfası "bu sayfadaki verilerin hepsi gerçek mi?" diye
+sordu → P408 MOCK rozet şeffaflık → P409 minervini_scans gerçek wire.
+Canlı doğrulama: MOCK `divergence: BEARISH_DIVERGENCE` (yanıltıcı uyarı!)
+→ gerçek hesap `NEUTRAL`. Sn. Ferit'in haklılığı kanıtlandı: **MOCK paper
+trading kararı için tehlikeli.**
+
+Sonra `/watchlist` sayfasında benzer soru → `watchlist.price` field eski
+snapshot (stale). FİYAT $875.40 vs CANLI $211.14 (NVDA 17 gün) kafa
+karışıklığı.
+
+İki ortaya çıkış aynı oturumda → Kural #14 doğrudan tescil eşiği aşıldı.
+
+**Felsefe:**
+Paper trading **gerçek piyasa kararı** verir (kağıt üzerinde olsa bile).
+MOCK veri **yanıltıcı uyarı** üretir (P409 kanıt). Mark "Risk first"
+(TTLC Sec 1) + Van Tharp Probabilistic Expectancy disiplini gerçek
+piyasa verisi şart. "Sahte sayı ile karar alma" Kural #26 (Matematik
+Uydurmama) ile felsefi paralel.
+
+**Disiplin:**
+
+**1. Yeni endpoint/feature → gerçek veri kaynağı ÖNCE**
+- Yeni feature plan aşamasında "Bu verinin gerçek kaynağı ne?" sorulur
+  - ✅ yfinance (P144 pipeline canlı)
+  - ✅ Cloud SQL DB (minervini_scans / sector_rotation / web_trades / web_watchlist)
+  - ✅ Quanfina hesaplama (quanfina_math helper'lar)
+  - ⚠️ Üçüncü taraf API (FINNHUB / Polygon — sadece son çare, key + cost)
+- Kaynak yoksa → "GELİŞTİRİLMESİ LAZIM" notu (Kural #26 paralel), MOCK
+  hardcoded eklenmez
+
+**2. MOCK fallback SADECE acil/geçici**
+- Gerçek kaynak fail (yfinance rate limit, DB connection timeout, scan
+  job durdu) durumunda **UX kesintisiz kalsın** diye
+- MOCK kalıcı tasarım DEĞİL — geçici güvenlik ağı
+
+**3. UI'da MOCK gösterilirse NET işaretle (P408+P409 patterni)**
+- Backend response'a `is_mock: bool` flag eklenir (varsa)
+- Frontend conditional render: `is_mock=true` → görsel rozet ("MOCK" sarı/turuncu)
+- Tooltip: ne MOCK, neden, paper trading karar için ne demek
+- `is_mock=false` → rozet kalkar (gerçek veri akıyor)
+- Pattern: `MarketBreadthInfo.is_mock` + `BreadthDivergenceInfo.breadth_is_mock`
+
+**4. Mevcut MOCK kalıntılar — AUDIT + Sıralı Geçiş**
+
+Audit kategorisi (30 May 2026 itibarıyla):
+
+| MOCK noktası | Durum | Önerilen geçiş |
+|---|---|---|
+| `_mock_breadth_history` (A/D Line) | ✅ P409 GERÇEKLEŞTİ (minervini_scans) | Kalıyor fallback |
+| `MOCK_MARKET_STATUS.vix` | ✅ P398 yfinance ^VIX | Kalıyor fallback |
+| `MOCK_MARKET_STATUS.top/bottom_sectors` | ✅ P398 sector_rotation | Kalıyor fallback |
+| `_compute_market_health` defaults | ✅ P382 helper kategorik | Kalıyor fallback |
+| `watchlist.price` (stale snapshot) | 🔴 P411 aday — kaldır veya işaretle | UI'da CANLI $ yeterli |
+| `MOCK_STOCKS` / `_STOCK_MARK_SIGNALS` | 🟠 Scanner DB doluyorsa zaten gerçek | DB-first wire P368 yapıldı |
+| `MOCK_TRADES` (`/api/trades` fallback) | 🟠 DB doluysa gerçek | DB-first |
+| `MOCK_TERMS` | 🟢 Static-by-design (DB tablosu YOK, doğru tasarım) | Korunuyor |
+| `_generate_ohlcv` (yfinance fail) | 🟢 P144 sonrası nadir kullanım | Fallback kalıyor |
+| `_mock_price` / `_mock_rs` (watchlist fallback) | 🟠 P368 sonrası gerçek öncelikli | Fallback kalıyor |
+
+**5. Yeni MOCK eklenmez kuralı**
+- Yeni endpoint/component yazılırken MOCK hardcoded değer eklenmez
+- Gerçek bağlanamıyorsa: "GELİŞTİRİLMESİ LAZIM" notu (Kural #26) +
+  Sn. Ferit kararı bekle (NotebookLM çift danışma)
+- Bypass: Sadece test fixture / development bootstrap (production'a girmez)
+
+**Sn. Ferit'in dürüstlük disiplini:**
+*"Bu sayfa gerçek mi?"* sorusu paper trading öncesi her sayfa için
+varsayılan refleks. AI proaktif "tarama" yapar (P408 başlangıç) → MOCK
+işaretler → gerçeğe geçiş (P409 patterni) → rozet otomatik kalkar.
+
+**Kural #4 sınırı korunur:** Gerçek API kaynağı (FINNHUB key, Polygon
+abonelik) cost/security boyutu varsa Sn. Ferit kararı (yıkıcı eylem
+sınıfı). AI otonom üçüncü taraf API anlaşması yapmaz.
+
+**İlişkili:** Kural #14 (Pattern Tescil — bu kuralın doğum kanalı, 2
+ortaya çıkış eşiği), Kural #20 (Çift Danışma — kanon kaynak), Kural #24
+(Sağlam Gidelim — gerçek veri 6 aşama Aşama 1 ile uyumlu), Kural #26
+(Matematik Uydurmama — felsefi paralel), KARAR #488 + #733 (Mark Regime
++ A/D Line canon), `_HATALAR.md` H#A8+ (MOCK uyarı yanıltıcılığı kanıt
+zinciri P408+P409).
+
 ---
 
 ## 🤝 Çalışma Mantığı + AI Rol Dağılımı
