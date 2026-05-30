@@ -270,18 +270,22 @@ export function MarkRegimeCard({
             <span className="text-muted-foreground flex items-center gap-1.5">
               <Activity size={12} />
               Market Breadth (A/D)
-              <span
-                className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider"
-                style={{
-                  background: "rgba(245,158,11,0.15)",
-                  color: "#F59E0B",
-                  border: "1px solid rgba(245,158,11,0.40)",
-                }}
-                title="A/D Line MOCK: yfinance NYSE/NASDAQ breadth bulk sağlamıyor — deterministik simüle veri (P408 şeffaflık rozeti). Paper trading kararında bu metriği gerçek olarak kullanma."
-                data-testid="market-breadth-mock-badge"
-              >
-                MOCK
-              </span>
+              {/* P409: MOCK rozet sadece backend is_mock=true ise göster
+                  (DB scanner verisi yoksa fallback). DB doluysa rozet kalkar. */}
+              {marketBreadth.is_mock && (
+                <span
+                  className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider"
+                  style={{
+                    background: "rgba(245,158,11,0.15)",
+                    color: "#F59E0B",
+                    border: "1px solid rgba(245,158,11,0.40)",
+                  }}
+                  title="A/D Line MOCK fallback: minervini_scans DB erişilemez veya yetersiz veri — deterministik simüle. Paper trading'de bu metriği gerçek olarak kullanma."
+                  data-testid="market-breadth-mock-badge"
+                >
+                  MOCK
+                </span>
+              )}
             </span>
             <span
               className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"
@@ -352,21 +356,22 @@ export function MarkRegimeCard({
             <span className="text-muted-foreground flex items-center gap-1.5">
               {DIVERGENCE_META[breadthDivergence.divergence].icon}
               Index × A/D Divergence
-              {/* P408: Yarım MOCK rozet — Index closes gerçek (yfinance SPY)
-                  ama A/D Line MOCK (yfinance breadth yok). Divergence sonucu
-                  MOCK A/D tarafından etkileniyor → uyarı bağlayıcı değil. */}
-              <span
-                className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider"
-                style={{
-                  background: "rgba(245,158,11,0.15)",
-                  color: "#F59E0B",
-                  border: "1px solid rgba(245,158,11,0.40)",
-                }}
-                title="Yarım MOCK: Index closes (SPY) gerçek yfinance, AMA A/D Line MOCK. Divergence sonucu MOCK A/D'den etkileniyor — paper trading'de bu uyarıya bağlayıcı karar verme (P408 şeffaflık rozeti)."
-                data-testid="breadth-divergence-mock-badge"
-              >
-                YARIM MOCK
-              </span>
+              {/* P409: A/D MOCK fallback durumunda yarım MOCK rozet. DB veri
+                  varsa rozet kalkar (A/D gerçek scanner sayım). */}
+              {breadthDivergence.breadth_is_mock && (
+                <span
+                  className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider"
+                  style={{
+                    background: "rgba(245,158,11,0.15)",
+                    color: "#F59E0B",
+                    border: "1px solid rgba(245,158,11,0.40)",
+                  }}
+                  title="Yarım MOCK: Index closes (SPY) gerçek yfinance, AMA A/D Line MOCK fallback. Divergence sonucu MOCK A/D'den etkileniyor — paper trading'de uyarıya bağlayıcı karar verme."
+                  data-testid="breadth-divergence-mock-badge"
+                >
+                  YARIM MOCK
+                </span>
+              )}
             </span>
             <span
               className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"

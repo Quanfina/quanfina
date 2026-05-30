@@ -935,3 +935,76 @@ def sector_rotation_get_latest() -> list[dict]:
             return rows
     except Exception:
         return []
+
+
+def breadth_history_from_scans(days: int = 25) -> list[tuple[int, int]]:
+    """Paket 409: Quanfina kendi günlük tarama verisinden A/D (advance/decline) sayım.
+
+    yfinance NYSE/NASDAQ breadth bulk DATA sağlamıyor (P408 MOCK kanıt). Çözüm:
+    Quanfina'nın günlük scanner job'u (700+ sembol Finviz Elite çekiyor) her
+    sembolün `change_pct` kolonunu doldurur. Bunu A/D ratio'ya çeviriyoruz:
+    - advances = bir günde change_pct > 0 olan sembol sayısı
+    - declines = bir günde change_pct < 0 olan sembol sayısı
+
+    Bu rakamlar **gerçek piyasa** breadth göstergesi (Quanfina'nın tarama
+    evreni 700+ ABD hisse). NYSE+NASDAQ tüm hisse listesinden farklı (subset)
+    ama Mark canon "Lider hisseler A/D" felsefesine yakın — Sn. Ferit'in
+    aktif izlediği evren bu.
+
+    Returns:
+        Kronolojik (eski->yeni) liste; her eleman (advances, declines) tuple.
+        Bos liste = DB erisilemez veya hic tarama yok (caller MOCK fallback).
+
+    change_pct TEXT kolon: "+2.5%" / "-1.3%" / "0.0%" Finviz formatı. Defansif
+    parse — geçersiz değer 0 (skip).
+    """
+    # 2 incelik:
+    # 1) SQLAlchemy pyformat paramstyle: '%' literal '%%' escape gerek
+    # 2) scan_date kolonu TEXT (DATE değil) — Finviz formatlı string saklı,
+    #    karşılaştırma için ::DATE cast şart
+    # Raw string (r"...") regex backslash escape için.
+    buffer_days = int(days) + 5
+    sql = r"""
+        WITH parsed AS (
+            SELECT scan_date,
+                   CASE
+                       WHEN change_pct IS NULL OR change_pct = '' THEN NULL
+                       ELSE NULLIF(
+                           TRIM(LEADING '+' FROM TRIM(TRAILING '%%' FROM change_pct)),
+                           ''
+                       )
+                   END AS pct_str
+            FROM minervini_scans
+            WHERE scan_date::DATE >= CURRENT_DATE - INTERVAL '__DAYS__ days'
+        ),
+        casted AS (
+            SELECT scan_date,
+                   CASE
+                       WHEN pct_str ~ '^-?[0-9]+(\.[0-9]+)?$'
+                       THEN CAST(pct_str AS NUMERIC)
+                       ELSE NULL
+                   END AS pct_num
+            FROM parsed
+        )
+        SELECT scan_date,
+               SUM(CASE WHEN pct_num > 0 THEN 1 ELSE 0 END) AS advances,
+               SUM(CASE WHEN pct_num < 0 THEN 1 ELSE 0 END) AS declines
+        FROM casted
+        WHERE pct_num IS NOT NULL
+        GROUP BY scan_date
+        HAVING COUNT(*) >= 100
+        ORDER BY scan_date ASC
+    """.replace("__DAYS__", str(buffer_days))
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text(sql))
+            rows = []
+            for r in result:
+                d = dict(r._mapping)
+                adv = int(d.get("advances") or 0)
+                dec = int(d.get("declines") or 0)
+                if adv + dec > 0:
+                    rows.append((adv, dec))
+            return rows[-days:] if len(rows) > days else rows
+    except Exception:
+        return []

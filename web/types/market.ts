@@ -23,6 +23,7 @@ export interface MarketBreadthInfo {
   ad_line_cumulative: number;       // 20-gun birikimli (advance - decline)
   breadth_health: MarketBreadthHealth;
   mark_says: string;
+  is_mock?: boolean;                // P409: True = MOCK fallback, False = gercek scan
 }
 
 // KARAR #733 alt-paket (Paket 57, 25 May 2026): Mark+O'Neil divergence canon
@@ -42,6 +43,7 @@ export interface BreadthDivergenceInfo {
   ad_trend_delta: number;
   severity: BreadthDivergenceSeverity;
   mark_says: string;
+  breadth_is_mock?: boolean;        // P409: A/D MOCK ise True (SPY her zaman gercek)
 }
 
 // KARAR #733 alt-paket (Paket 65, 25 May 2026): Mark/O'Neil FTD canon

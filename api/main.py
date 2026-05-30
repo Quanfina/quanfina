@@ -29,6 +29,7 @@ from db_helpers import (  # noqa: E402
     mark_signals_get_by_symbol,
     pattern_library_get_all,
     sector_rotation_get_latest,
+    breadth_history_from_scans,
     minervini_stocks_get_latest,
     scan_latest_date,
 )
@@ -1002,16 +1003,19 @@ def _compute_mark_regime(distribution_days: int) -> MarkRegimeInfo:
 
 class MarketBreadthInfo(BaseModel):
     """KARAR #733 alt-paket (Paket 52, 25 May 2026): Mark+O'Neil A/D Line canon.
-    quanfina_math.compute_market_breadth backend pre-compute (P51 helper)."""
+    quanfina_math.compute_market_breadth backend pre-compute (P51 helper).
+    P409: is_mock flag — DB scanner verisi varsa False, MOCK fallback ise True."""
     ad_ratio: float                       # Bugun advance/decline orani
     ad_line_cumulative: int               # 20-gun birikimli (advance - decline)
     breadth_health: Literal["STRONG", "NEUTRAL", "WEAK"]
     mark_says: str                        # Mark felsefe yorumu
+    is_mock: bool = False                 # P409: True = MOCK fallback, False = gercek scan
 
 
 class BreadthDivergenceInfo(BaseModel):
     """KARAR #733 alt-paket (Paket 57, 25 May 2026): Mark+O'Neil divergence canon.
-    quanfina_math.compute_breadth_divergence backend pre-compute (P56 helper)."""
+    quanfina_math.compute_breadth_divergence backend pre-compute (P56 helper).
+    P409: breadth_is_mock — A/D Line MOCK fallback ise True (SPY closes hep gercek)."""
     divergence: Literal[
         "CONFIRMED_UP", "BEARISH_DIVERGENCE", "BULLISH_DIVERGENCE",
         "CONFIRMED_DOWN", "NEUTRAL",
@@ -1020,6 +1024,7 @@ class BreadthDivergenceInfo(BaseModel):
     ad_trend_delta: int                   # lookback A/D cumulative delta
     severity: Literal["ok", "info", "warn", "critical"]
     mark_says: str                        # Mark+O'Neil felsefe yorumu
+    breadth_is_mock: bool = False         # P409: A/D MOCK ise True (SPY her zaman gercek)
 
 
 class FollowThroughDayInfo(BaseModel):
@@ -1269,9 +1274,18 @@ def get_market_status() -> MarketStatus:
     qqq_stage = _index_stage("QQQ", 380.0)
     iwm_stage = _index_stage("IWM", 200.0)
 
-    # KARAR #733 alt (Paket 52): Market Breadth A/D Line backend pre-compute
-    # (Mark+O'Neil canon — P51 compute_market_breadth helper wire)
-    advances, declines = _mock_breadth_history(days=25)
+    # KARAR #733 alt (Paket 52): Market Breadth A/D Line backend pre-compute.
+    # P409: minervini_scans tablosundan GERÇEK A/D sayım (Quanfina'nın günlük
+    # 700+ sembol Finviz Elite taraması — change_pct kolonu pozitif/negatif
+    # sayımı). DB boş veya erişilemez ise MOCK fallback (UX kesintisiz).
+    real_breadth = breadth_history_from_scans(days=25)
+    if real_breadth:
+        advances = [a for a, _ in real_breadth]
+        declines = [d for _, d in real_breadth]
+        breadth_is_mock = False
+    else:
+        advances, declines = _mock_breadth_history(days=25)
+        breadth_is_mock = True
     breadth = compute_market_breadth(advances, declines, lookback_days=20)
     market_breadth = None
     if breadth.get("breadth_health"):  # None ise skip (edge)
@@ -1280,11 +1294,12 @@ def get_market_status() -> MarketStatus:
             ad_line_cumulative=breadth["ad_line_cumulative"],
             breadth_health=breadth["breadth_health"],
             mark_says=breadth["mark_says"],
+            is_mock=breadth_is_mock,
         )
 
     # KARAR #733 alt (Paket 57): Index vs A/D Divergence backend pre-compute
     # (Mark+O'Neil canon — P56 compute_breadth_divergence helper wire)
-    # SPY closes 25-gun GERCEK (P369) + advances/declines MOCK (yfinance'te breadth yok)
+    # SPY closes 25-gun GERCEK (P369) + A/D Line P409 ile gerçek (MOCK fallback)
     spy_closes, spy_volumes = _index_closes_volumes("SPY", 400.0, 25)
     divergence_result = compute_breadth_divergence(
         spy_closes, advances, declines, lookback_days=10,
@@ -1297,6 +1312,7 @@ def get_market_status() -> MarketStatus:
             ad_trend_delta=divergence_result["ad_trend_delta"],
             severity=divergence_result["severity"],
             mark_says=divergence_result["mark_says"],
+            breadth_is_mock=breadth_is_mock,  # P409: A/D MOCK fallback flag
         )
 
     # KARAR #733 alt (Paket 65): Follow-Through Day backend pre-compute
