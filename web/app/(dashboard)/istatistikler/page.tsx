@@ -8,6 +8,7 @@ import { BrandonExpectancyCard } from "@/components/journal/BrandonExpectancyCar
 import { RbaSummaryCard } from "@/components/journal/RbaSummaryCard";
 import { MonthlyRbaTable } from "@/components/journal/MonthlyRbaTable";
 import { RbaMiniCharts } from "@/components/journal/RbaMiniCharts";
+import { ReturnDistributionTable } from "@/components/journal/ReturnDistributionTable";
 
 /**
  * İstatistikler sayfası — trade performans dashboard (Streamlit'ten taşındı).
@@ -124,6 +125,10 @@ export default function IstatistiklerPage() {
 
             {/* P401: Aylık RBA tablosu (Mark TTLC Sec 4 canon) — exit_date bazlı aggregate */}
             <MonthlyRbaTable />
+
+            {/* P406: Return Aralıkları Dağılımı + Van Tharp Beklenti (E)
+                Markets360 "DRMA Distribution" pattern uyarlaması (clean-room) */}
+            <ReturnDistributionTable />
 
             {/* P401: 4 mini chart galeri — Win Rate trend + Avg Gain/Loss + Equity Curve */}
             <RbaMiniCharts />
