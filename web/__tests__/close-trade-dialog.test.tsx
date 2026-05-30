@@ -100,3 +100,57 @@ describe("CloseTradeDialog — başarılı kapama", () => {
     expect(screen.getByText(/1[.,]?000/)).toBeInTheDocument();
   });
 });
+
+describe("CloseTradeDialog — P393 422 hata uctan uca UI (AddTradeDialog P392 pateni)", () => {
+  function fillValidForm() {
+    fireEvent.change(screen.getByLabelText(/Çıkış Tarihi/), { target: { value: "2026-05-29" } });
+    fireEvent.change(screen.getByLabelText(/Çıkış Fiyatı/), { target: { value: "110" } });
+  }
+
+  it("Backend 422 -> 'exit_price: ...' field-bazli mesaj render eder", () => {
+    // P388 hook field-bazli mesaj atar, P393 role='alert' a11y gosterir.
+    mockMutate.mockImplementation((_payload, options) => {
+      options?.onError?.(new Error("exit_price: Input should be greater than or equal to 0"));
+    });
+    render(<CloseTradeDialog trade={makeTrade()} open onOpenChange={vi.fn()} />);
+    fillValidForm();
+    fireEvent.submit(document.querySelector("form")!);
+    const errEl = screen.getByTestId("close-trade-error");
+    expect(errEl.textContent).toContain("exit_price");
+    expect(errEl).toHaveAttribute("role", "alert");
+  });
+
+  it("Multi-field 422 -> semicolon join + '[object Object]' YOK (regresyon)", () => {
+    mockMutate.mockImplementation((_payload, options) => {
+      options?.onError?.(new Error("exit_price: must be >= 0; status: invalid value"));
+    });
+    render(<CloseTradeDialog trade={makeTrade()} open onOpenChange={vi.fn()} />);
+    fillValidForm();
+    fireEvent.submit(document.querySelector("form")!);
+    const errEl = screen.getByTestId("close-trade-error");
+    expect(errEl.textContent).toContain("exit_price");
+    expect(errEl.textContent).toContain("status");
+    expect(errEl.textContent).not.toContain("[object Object]");
+  });
+
+  it("Cloud SQL down 503 -> 'Cloud SQL' string mesaji render", () => {
+    mockMutate.mockImplementation((_payload, options) => {
+      options?.onError?.(new Error("Veritabanına ulaşılamıyor (Cloud SQL)."));
+    });
+    render(<CloseTradeDialog trade={makeTrade()} open onOpenChange={vi.fn()} />);
+    fillValidForm();
+    fireEvent.submit(document.querySelector("form")!);
+    expect(screen.getByTestId("close-trade-error").textContent).toContain("Cloud SQL");
+  });
+
+  it("404 Trade bulunamadı -> direkt mesaj", () => {
+    // PATCH yapilirken trade DB'den silinmis olabilir -> 404
+    mockMutate.mockImplementation((_payload, options) => {
+      options?.onError?.(new Error("Trade 1 bulunamadı"));
+    });
+    render(<CloseTradeDialog trade={makeTrade()} open onOpenChange={vi.fn()} />);
+    fillValidForm();
+    fireEvent.submit(document.querySelector("form")!);
+    expect(screen.getByTestId("close-trade-error").textContent).toContain("bulunamadı");
+  });
+});

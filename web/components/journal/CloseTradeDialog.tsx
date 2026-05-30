@@ -246,7 +246,17 @@ export function CloseTradeDialog({ trade, open, onOpenChange }: Props) {
             <textarea id="ct-lessons" value={lessons} onChange={(e) => setLessons(e.target.value)} rows={3} placeholder="Bu trade'den öğrendiklerim..." className={TEXTAREA} />
           </div>
 
-          {error && <p className="text-sm" style={{ color: "var(--mtp-danger)" }}>{error}</p>}
+          {/* P393: role="alert" a11y + data-testid Vitest hook (AddTradeDialog P392 pateni) */}
+          {error && (
+            <p
+              role="alert"
+              data-testid="close-trade-error"
+              className="text-sm"
+              style={{ color: "var(--mtp-danger)" }}
+            >
+              {error}
+            </p>
+          )}
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>İptal</Button>
