@@ -1322,12 +1322,42 @@ def get_market_status() -> MarketStatus:
         dd_count, spy_stage, qqq_stage, iwm_stage,
     )
 
+    # P398: VIX MOCK -> gercek yfinance ^VIX (CBOE Volatility Index son kapanış)
+    # Sn. Ferit Piyasa Durumu sayfasinda 14.2 hardcoded sahte görüyordu.
+    # Fail durumunda MOCK fallback (UX kesintisiz).
+    vix_bars = _fetch_ohlcv_real("^VIX", 2)
+    vix_value = round(vix_bars[-1].close, 2) if vix_bars else MOCK_MARKET_STATUS.vix
+
+    # P398: top/bottom_sectors MOCK hardcoded -> gercek sector_rotation tablosu.
+    # Cloud SQL sector_rotation gunluk 11 SPDR ETF taramasi (mevcut endpoint
+    # /api/sector-rotation kullanir). perf_1w sirali — top 3 + bottom 3.
+    # DB bos/erisilemez ise MOCK fallback (hardcoded 5 sabit sektor).
+    sectors_db = sector_rotation_get_latest()
+    if sectors_db:
+        sorted_by_perf = sorted(
+            sectors_db,
+            key=lambda s: (s.get("perf_1w") if isinstance(s, dict) else s.perf_1w) or 0,
+            reverse=True,
+        )
+        def _to_sc(s):
+            name = s.get("sector_name") if isinstance(s, dict) else s.sector_name
+            perf = (s.get("perf_1w") if isinstance(s, dict) else s.perf_1w) or 0.0
+            return SectorChange(name=name, change_pct=round(perf, 2))
+        top_sectors_live = [_to_sc(s) for s in sorted_by_perf[:3]]
+        bottom_sectors_live = [_to_sc(s) for s in sorted_by_perf[-3:]]
+    else:
+        top_sectors_live = MOCK_MARKET_STATUS.top_sectors
+        bottom_sectors_live = MOCK_MARKET_STATUS.bottom_sectors
+
     status = MOCK_MARKET_STATUS.model_copy(
         update={
             "distribution_days": dd_count,
             "spy_stage": spy_stage,
             "qqq_stage": qqq_stage,
             "iwm_stage": iwm_stage,
+            "vix": vix_value,
+            "top_sectors": top_sectors_live,
+            "bottom_sectors": bottom_sectors_live,
             "market_health_score": health_score,
             "market_health_label": health_label,
             "suggested_mode": suggested_mode,
