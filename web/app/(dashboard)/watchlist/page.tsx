@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, useCallback } from "react";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { LayoutList, Columns2 } from "lucide-react";
 import { useGridTheme } from "@/hooks/use-grid-theme";
 import { useGridColumnState } from "@/hooks/use-grid-column-state";
 import { Plus } from "lucide-react";
@@ -19,6 +21,7 @@ import { COL_DEFS, DEFAULT_COL_DEF } from "@/components/watchlist/columns";
 import { RowActionsRenderer } from "@/components/watchlist/RowActionsRenderer";
 import { AddRowDialog } from "@/components/watchlist/AddRowDialog";
 import { EditNoteDialog } from "@/components/watchlist/EditNoteDialog";
+import { WatchlistSplitView } from "@/components/watchlist/WatchlistSplitView";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -39,6 +42,33 @@ import { useTradingMode } from "@/hooks/use-trading-mode";
 
 export default function WatchlistPage() {
   const { gridClass } = useGridTheme();
+
+  // P407: URL query param ile view modu + sembol seçimi (deep-link)
+  // `?view=split&symbol=NVDA` → split-pane modu, NVDA aktif
+  // Default: tam liste (mevcut davranış korunur)
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const viewMode = searchParams.get("view") === "split" ? "split" : "table";
+  const selectedSymbol = searchParams.get("symbol");
+
+  const updateUrl = useCallback(
+    (patch: { view?: "table" | "split"; symbol?: string | null }) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (patch.view !== undefined) {
+        if (patch.view === "split") params.set("view", "split");
+        else params.delete("view");
+      }
+      if (patch.symbol !== undefined) {
+        if (patch.symbol) params.set("symbol", patch.symbol);
+        else params.delete("symbol");
+      }
+      const qs = params.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [pathname, router, searchParams],
+  );
+
   const [strategy, setStrategy] = useState("all");
   const [status, setStatus] = useState("all");
   const [search, setSearch] = useState("");
@@ -190,6 +220,43 @@ export default function WatchlistPage() {
         <div className="flex items-center gap-3">
           {/* Paket 221 (27 May 2026): Vizyon İLKE #10 — Watchlist'te mod farkındalığı */}
           <ModBadge variant="compact" />
+          {/* P407: View modu toggle — Tam Liste / Bölünmüş (URL deep-link) */}
+          <div
+            className="inline-flex rounded-md border bg-card p-0.5 text-xs"
+            role="group"
+            aria-label="Görünüm modu"
+            data-testid="watchlist-view-toggle"
+          >
+            <button
+              type="button"
+              onClick={() => updateUrl({ view: "table" })}
+              className="flex items-center gap-1 px-2 py-1 rounded transition-colors"
+              style={{
+                background: viewMode === "table" ? "var(--accent)" : "transparent",
+                color: viewMode === "table" ? "var(--foreground)" : "var(--muted-foreground)",
+              }}
+              data-testid="view-toggle-table"
+              aria-pressed={viewMode === "table"}
+            >
+              <LayoutList size={12} />
+              <span>Tam Liste</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => updateUrl({ view: "split" })}
+              className="flex items-center gap-1 px-2 py-1 rounded transition-colors"
+              style={{
+                background: viewMode === "split" ? "var(--accent)" : "transparent",
+                color: viewMode === "split" ? "var(--foreground)" : "var(--muted-foreground)",
+              }}
+              data-testid="view-toggle-split"
+              aria-pressed={viewMode === "split"}
+              title="Bölünmüş Görünüm — sol liste + sağ chart (P407)"
+            >
+              <Columns2 size={12} />
+              <span>Bölünmüş</span>
+            </button>
+          </div>
           <Button size="sm" onClick={() => setAddOpen(true)}>
             <Plus size={14} className="mr-1.5" />
             Hisse Ekle
@@ -274,7 +341,17 @@ export default function WatchlistPage() {
             </div>
           </div>
         )}
-        {!isLoading && !isError && rowData.length > 0 && (
+        {/* P407: Bölünmüş Görünüm — sol kompakt liste + sağ chart (deep-link URL) */}
+        {!isLoading && !isError && rowData.length > 0 && viewMode === "split" && (
+          <div style={{ height: 600 }}>
+            <WatchlistSplitView
+              rows={rowData}
+              selectedSymbol={selectedSymbol}
+              onSelectSymbol={(sym) => updateUrl({ symbol: sym })}
+            />
+          </div>
+        )}
+        {!isLoading && !isError && rowData.length > 0 && viewMode === "table" && (
           <div className={gridClass} style={{ height: 600, width: "100%" }}>
             <AgGridReact
               ref={gridRef}
