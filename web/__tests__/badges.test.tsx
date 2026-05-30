@@ -78,6 +78,46 @@ describe("GradeBadge — A+..F + boş", () => {
     const span = container.querySelector("span");
     expect(span?.getAttribute("style")).toContain("rgb(40, 167, 69)"); // #28A745
   });
+
+  // P405: Mark canon tooltip + a11y
+  it("A+ → tooltip Mark canon BP/SP referansı + KARAR #445", () => {
+    render(<GradeBadge value="A+" />);
+    const badge = screen.getByTestId("grade-badge-A+");
+    const tooltip = badge.getAttribute("title");
+    expect(tooltip).toContain("Mükemmel");
+    expect(tooltip).toContain("KARAR #445");
+    // a11y: aria-label da aynı içerik
+    expect(badge.getAttribute("aria-label")).toBe(tooltip);
+  });
+
+  it("F → 'Wall' + Mark TLSMW kritik referans tooltip", () => {
+    render(<GradeBadge value="F" />);
+    const badge = screen.getByTestId("grade-badge-F");
+    const tooltip = badge.getAttribute("title");
+    expect(tooltip).toContain("Wall");
+    expect(tooltip).toContain("TLSMW");
+  });
+
+  it("Her grade için cursor:help UX hint", () => {
+    render(<GradeBadge value="B" />);
+    const badge = screen.getByTestId("grade-badge-B");
+    expect(badge.getAttribute("style")).toContain("cursor: help");
+  });
+
+  it("Tüm 6 grade için tooltip non-empty + ASLA motivasyon dili (İLKE #11)", () => {
+    const grades = ["A+", "A", "B", "C", "D", "F"];
+    const yagcilikYasak = ["aferin", "tebrikler", "üzülme", "harika", "kutlama"];
+    for (const g of grades) {
+      const { unmount } = render(<GradeBadge value={g} />);
+      const badge = screen.getByTestId(`grade-badge-${g}`);
+      const tooltip = badge.getAttribute("title") ?? "";
+      expect(tooltip.length).toBeGreaterThan(10);
+      for (const yagci of yagcilikYasak) {
+        expect(tooltip.toLowerCase()).not.toContain(yagci);
+      }
+      unmount();
+    }
+  });
 });
 
 describe("ConsensusBadge — konsensus sayım", () => {
