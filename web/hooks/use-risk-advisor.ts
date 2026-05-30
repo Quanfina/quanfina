@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
+import { parseErrorBody } from "@/lib/api-error";
 
 /**
  * Sprint 4-bis.7 Faz 1 B paket — Mark Risk Advisor hook
@@ -64,7 +65,9 @@ async function postRiskAdvisor(req: RiskAdvisorRequest): Promise<RiskAdvisorResp
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(req),
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  // P391: Pydantic 422 field-bazli mesaj (P387 portfolio_value gt=0 vs.).
+  // Jenerik "HTTP 422" yerine "portfolio_value: Input should be greater than 0".
+  if (!res.ok) throw new Error(await parseErrorBody(res));
   return res.json();
 }
 

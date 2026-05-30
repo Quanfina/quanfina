@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { parseErrorBody } from "@/lib/api-error";
 
 /**
  * KARAR ADAY #732 (24 May 2026) — Mark Pyramid Tier backend hook.
@@ -48,9 +49,9 @@ async function fetchPyramidTier(
       prev_tier_profitable: prevTierProfitable,
     }),
   });
-  if (!res.ok) {
-    throw new Error(`Pyramid tier hesabı alınamadı: ${res.status}`);
-  }
+  // P391: Pydantic 422 field-bazli mesaj (P387 position+portfolio gt=0).
+  // Jenerik 'HTTP 422' yerine 'portfolio_value: Input should be greater than 0'.
+  if (!res.ok) throw new Error(await parseErrorBody(res));
   return res.json();
 }
 
