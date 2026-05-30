@@ -9,7 +9,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY scanner.py scanner_server.py db_connection.py ./
+COPY scanner.py scanner_server.py db_connection.py \
+     quanfina_math.py scanner_helpers.py market_calendar.py ./
+# P396 (30 May 2026): 3 modul eksikti -> her gun 22:00 UTC scanner crash
+# (ModuleNotFoundError: quanfina_math). Sn. Ferit 8 gun bayat veri kok sebebi.
+# - quanfina_math: db_connection.py L9 dollar_change/percent_change import
+# - scanner_helpers: P373/P374 5 saf fonksiyon extract (parse/grade/RS/signals)
+# - market_calendar: scanner_server.py last_trading_day_before holiday-aware (P363)
 
 ENV PYTHONUNBUFFERED=1
 
