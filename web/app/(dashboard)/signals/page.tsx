@@ -18,7 +18,7 @@ import { AddRowDialog } from "@/components/watchlist/AddRowDialog";
 import { Button } from "@/components/ui/button";
 import { GridLoadingOverlay } from "@/components/ag-grid/LoadingOverlay";
 import { formatDateTR, todayLocalISO } from "@/lib/format-date";
-import { getPassedSignals, setPassedSignals, signalKey } from "@/lib/passed-signals";
+import { getPassedSignals, setPassedSignals, clearPassedSignals, signalKey } from "@/lib/passed-signals";
 import { toast } from "sonner";
 import type { Signal } from "@/types/signal";
 import { MarkBadgeStrip } from "@/components/mark/MarkBadgeStrip";
@@ -591,12 +591,57 @@ export default function SignalsPage() {
           </div>
         )}
         {!isLoading && !isError && filtered.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-64 gap-3 text-center text-muted-foreground">
+          <div
+            className="flex flex-col items-center justify-center h-64 gap-3 text-center text-muted-foreground"
+            data-testid="signals-empty-state"
+          >
             <Activity size={32} strokeWidth={1.5} />
-            <p className="text-sm">Bu filtreyle sinyal yok.</p>
-            <p className="text-xs">
-              Filtre seçimini değiştirin veya İzleme Listesi üzerinden yeni sinyal ekleyin.
-            </p>
+            {/* P411: Akıllı empty state — backend doluyken UI boş gözüküyor mu?
+                passedKeys.size > 0 ve showPassed kapalı ise net açıklama + reset. */}
+            {totalSignals > 0 && passedKeys.size > 0 && !showPassed ? (
+              <>
+                <p className="text-sm" style={{ color: "var(--foreground)" }}>
+                  {passedKeys.size} sinyal &ldquo;geçilmiş&rdquo; olarak işaretli ve gizli
+                </p>
+                <p className="text-xs">
+                  Bunlar Sn. Ferit&apos;in &ldquo;GEÇ&rdquo; butonuna bastığı sinyaller (localStorage,
+                  KARAR #475). Aşağıdan seçin:
+                </p>
+                <div className="flex items-center gap-2 mt-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShowPassed(true)}
+                    data-testid="signals-empty-show-passed"
+                  >
+                    Geçilenleri Göster
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      if (window.confirm(`${passedKeys.size} geçilmiş sinyal sıfırlanacak. Emin misin?`)) {
+                        setPassedKeys(new Set());
+                        clearPassedSignals();
+                        toast.success(`${passedKeys.size} geçilmiş sinyal sıfırlandı`);
+                      }
+                    }}
+                    data-testid="signals-empty-reset-passed"
+                    style={{ color: "var(--mtp-danger)" }}
+                    title="Yıkıcı eylem (Kural #4) — confirm dialog"
+                  >
+                    Sıfırla ({passedKeys.size})
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-sm">Bu filtreyle sinyal yok.</p>
+                <p className="text-xs">
+                  Filtre seçimini değiştirin veya İzleme Listesi üzerinden yeni sinyal ekleyin.
+                </p>
+              </>
+            )}
           </div>
         )}
         {!isLoading && !isError && filtered.length > 0 && (

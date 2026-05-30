@@ -37,3 +37,20 @@ export function setPassedSignals(set: Set<string>): void {
 export function signalKey(symbol: string, strategy: string): string {
   return `${symbol}-${strategy}`;
 }
+
+/**
+ * P411: Tüm "geçilmiş" sinyalleri sıfırla (toplu reset).
+ *
+ * Sn. Ferit önceki testte çok sinyali geçtiyse /signals sayfası "0/0" boş
+ * gibi görünüyordu. Bu helper localStorage'ı temizler — yeni başlangıç.
+ * Kural #4 yıkıcı eylem onayı: caller UI'da "Sıfırla" butonuna basarak
+ * onay verir (programmatic auto-clear YAPILMAZ).
+ */
+export function clearPassedSignals(): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+}

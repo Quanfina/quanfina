@@ -188,19 +188,19 @@ function SplitChartPanel({ symbol }: { symbol: string }) {
         </div>
       )}
 
-      {/* Mark canon mini rozet şeridi (Stage + RS + Setup) */}
+      {/* Mark canon mini rozet şeridi (Stage + RS via mark_signals + active row) */}
       {info.data && (
         <div className="px-4 py-2 border-b flex items-center gap-3 text-[11px]">
-          {info.data.stage != null && (
+          {info.data.mark_signals?.carr_stage != null && (
             <span
               className="px-2 py-0.5 rounded-full font-semibold tabular-nums"
               style={{
-                background: info.data.stage === 2 ? "rgba(40,167,69,0.12)" : "rgba(150,150,150,0.12)",
-                color: info.data.stage === 2 ? "var(--mtp-excellent)" : "var(--muted-foreground)",
+                background: info.data.mark_signals.carr_stage === 2 ? "rgba(40,167,69,0.12)" : "rgba(150,150,150,0.12)",
+                color: info.data.mark_signals.carr_stage === 2 ? "var(--mtp-excellent)" : "var(--muted-foreground)",
               }}
               title="Carr Stage Analysis — Stage 2 = Advancing"
             >
-              Stage {info.data.stage}
+              Stage {info.data.mark_signals.carr_stage}
             </span>
           )}
           {info.data.rs_rating != null && (
@@ -213,11 +213,6 @@ function SplitChartPanel({ symbol }: { symbol: string }) {
               title="IBD Relative Strength rating (1-99)"
             >
               RS {info.data.rs_rating}
-            </span>
-          )}
-          {info.data.setup_type && (
-            <span className="px-2 py-0.5 rounded-full bg-muted/40 text-muted-foreground">
-              {info.data.setup_type}
             </span>
           )}
         </div>
