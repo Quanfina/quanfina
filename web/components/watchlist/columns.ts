@@ -61,14 +61,19 @@ export const COL_DEFS: ColDef<WatchlistRow>[] = [
     minWidth: 90,
     cellRenderer: StatusBadge,
   },
+  // Paket 412 (30 May 2026 — Kural #28 Canlı Veri Önce uygulama):
+  // FİYAT kolonu UI'dan kaldırıldı (stale snapshot — eklendiği anda kaydedilen
+  // fiyat, paper trading kararı için yanıltıcı). Backend `watchlist.price` field
+  // DB'de korundu (geriye uyum + denetim trail), sadece UI render'dan çıkarıldı.
+  // Sn. Ferit FİYAT $875.40 vs CANLI $211.14 (NVDA 17 gün stale) kafa
+  // karışıklığı yaşadı → tek doğru fiyat CANLI $ (aşağıda current_price).
   {
     field: "price",
-    headerName: "FİYAT",
-    width: 90,
-    minWidth: 80,
+    headerName: "FİYAT (kaldırıldı)",
+    hide: true,  // P412: UI'dan gizli, DB'de saklı (geriye uyum)
+    suppressColumnsToolPanel: true,
     valueFormatter: fmtPrice,
     cellStyle: MONO,
-    headerTooltip: "Eklendiği zamanki fiyat",
   },
   // Paket 154 (26 May 2026): Watchlist canlı fiyat — paper trading sabah bakışı
   // useStockQuotes 60s refetch, yfinance + 5dk backend cache. MOCK fiyat değil.

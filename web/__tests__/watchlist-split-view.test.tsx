@@ -11,7 +11,14 @@ import type { WatchlistRow } from "@/types/watchlist";
 vi.mock("@/hooks/use-stock", () => ({
   useOhlcv: () => ({ data: [], isLoading: false, isError: false }),
   useStockInfo: () => ({
-    data: { symbol: "NVDA", name: "NVIDIA Corp", stage: 2, rs_rating: 95, setup_type: "VCP" },
+    // P407 sonrası fix + P412: StockInfo gerçek şeması — mark_signals.carr_stage
+    // (Carr Stage Analysis kanonu). Eski `stage` field StockInfo'da yoktu.
+    data: {
+      symbol: "NVDA",
+      name: "NVIDIA Corp",
+      rs_rating: 95,
+      mark_signals: { carr_stage: 2 },
+    },
     isLoading: false,
     isError: false,
   }),
@@ -70,7 +77,7 @@ describe("WatchlistSplitView — render baseline", () => {
     expect(screen.getByTestId("watchlist-split-detail-link")).toBeInTheDocument();
   });
 
-  it("Sol liste 5 sütun (Sembol/Durum/Fiyat/RS/Pivot)", () => {
+  it("Sol liste 4 sütun (Sembol/Durum/RS/Pivot) — P412 sonrası Fiyat kolonu kaldırıldı", () => {
     render(
       <WatchlistSplitView
         rows={[makeRow()]}
@@ -80,7 +87,9 @@ describe("WatchlistSplitView — render baseline", () => {
     );
     expect(screen.getByText("Sembol")).toBeInTheDocument();
     expect(screen.getByText("Durum")).toBeInTheDocument();
-    expect(screen.getByText("Fiyat")).toBeInTheDocument();
+    // P412: "Fiyat" sol panel kolonu kaldırıldı (stale snapshot — Kural #28 audit).
+    // Sağ panelde lastBar.close canlı $ var, sol panel kompakt 4 sütun.
+    expect(screen.queryByText("Fiyat")).not.toBeInTheDocument();
     expect(screen.getByText("RS")).toBeInTheDocument();
     expect(screen.getByText("Pivot")).toBeInTheDocument();
   });

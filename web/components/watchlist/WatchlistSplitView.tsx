@@ -52,7 +52,8 @@ export function WatchlistSplitView({ rows, selectedSymbol, onSelectSymbol }: Pro
             <tr className="text-[10px] text-muted-foreground uppercase tracking-wider">
               <th className="text-left px-2 py-1.5 font-medium">Sembol</th>
               <th className="text-left px-1 py-1.5 font-medium">Durum</th>
-              <th className="text-right px-1 py-1.5 font-medium">Fiyat</th>
+              {/* P412: Fiyat kolonu kaldırıldı — row.price stale snapshot (Kural #28
+                  audit) + sağ panelde lastBar.close canlı zaten. Kompakt 4 sütun. */}
               <th className="text-right px-1 py-1.5 font-medium">RS</th>
               <th className="text-right px-2 py-1.5 font-medium">Pivot</th>
             </tr>
@@ -60,7 +61,7 @@ export function WatchlistSplitView({ rows, selectedSymbol, onSelectSymbol }: Pro
           <tbody>
             {rows.length === 0 && (
               <tr>
-                <td colSpan={5} className="text-center text-xs text-muted-foreground py-6">
+                <td colSpan={4} className="text-center text-xs text-muted-foreground py-6">
                   Sembol yok
                 </td>
               </tr>
@@ -93,9 +94,7 @@ export function WatchlistSplitView({ rows, selectedSymbol, onSelectSymbol }: Pro
                   <td className="px-1 py-1.5">
                     <StatusBadge value={row.status} />
                   </td>
-                  <td className="text-right px-1 py-1.5">
-                    {row.price != null ? `$${row.price.toFixed(2)}` : "—"}
-                  </td>
+                  {/* P412: row.price stale snapshot kaldırıldı — sağ panelde canlı $ var */}
                   <td className="text-right px-1 py-1.5">
                     {row.rs_rating ?? "—"}
                   </td>
