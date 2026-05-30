@@ -178,6 +178,50 @@ describe("AddTradeDialog — başarılı submit", () => {
   });
 });
 
+describe("AddTradeDialog — P388/P392 422 hata uctan uca UI", () => {
+  it("Backend 422 -> form 'pivot_price: Input should be...' tipli mesaj render eder", () => {
+    // P388 hook field-bazli mesaj atar, P392 role='alert' a11y gosterir.
+    // Mock mutate hata simulasyonu: onError callback'ini cagir.
+    h.mockMutate.mockImplementation((_body, options) => {
+      options?.onError?.(new Error("plan_stop: Input should be greater than 0"));
+    });
+    render(<AddTradeDialog open onOpenChange={vi.fn()} />);
+    fillRequired();
+    fireEvent.submit(document.querySelector("form")!);
+    // Spesifik field mesaji
+    const errEl = screen.getByTestId("add-trade-error");
+    expect(errEl.textContent).toContain("plan_stop");
+    expect(errEl.textContent).toContain("greater than 0");
+    // role='alert' a11y (screen reader fark eder)
+    expect(errEl).toHaveAttribute("role", "alert");
+  });
+
+  it("Multi-field 422 -> semicolon join goster", () => {
+    h.mockMutate.mockImplementation((_body, options) => {
+      options?.onError?.(new Error("entry_price: must be > 0; shares: must be > 0"));
+    });
+    render(<AddTradeDialog open onOpenChange={vi.fn()} />);
+    fillRequired();
+    fireEvent.submit(document.querySelector("form")!);
+    const errEl = screen.getByTestId("add-trade-error");
+    expect(errEl.textContent).toContain("entry_price");
+    expect(errEl.textContent).toContain("shares");
+    expect(errEl.textContent).toContain(";");
+    // ASLA "[object Object]" gosterme (P388 ana hedef)
+    expect(errEl.textContent).not.toContain("[object Object]");
+  });
+
+  it("Cloud SQL down 503 -> 'Cloud SQL' mesaji render", () => {
+    h.mockMutate.mockImplementation((_body, options) => {
+      options?.onError?.(new Error("Veritabanına ulaşılamıyor (Cloud SQL)."));
+    });
+    render(<AddTradeDialog open onOpenChange={vi.fn()} />);
+    fillRequired();
+    fireEvent.submit(document.querySelector("form")!);
+    expect(screen.getByTestId("add-trade-error").textContent).toContain("Cloud SQL");
+  });
+});
+
 describe("AddTradeDialog — Defansif mod BLOK (Vizyon İLKE #10)", () => {
   it("defansif + override yok → submit BLOK, mutate çağrılmaz", () => {
     h.tradingMode.mode = "defansif";

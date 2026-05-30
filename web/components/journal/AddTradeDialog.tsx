@@ -958,7 +958,17 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
             </>
           )}
 
-          {error && <p className="text-sm" style={{ color: "var(--mtp-danger)" }}>{error}</p>}
+          {/* P392: role="alert" a11y — screen reader hatayi farkeder; data-testid Vitest uctan uca */}
+          {error && (
+            <p
+              role="alert"
+              data-testid="add-trade-error"
+              className="text-sm"
+              style={{ color: "var(--mtp-danger)" }}
+            >
+              {error}
+            </p>
+          )}
 
           {/* Paket 227 (27 May 2026): Vizyon İLKE #10 — Defansif modda override
               checkbox. Mark TTLC s.187 disiplini AKSİYON kilidi. Sadece açık trade
