@@ -30,7 +30,11 @@ export function useScreenResults(slug: ScreenSlug | null, limit: number = 500) {
   return useQuery({
     queryKey: ["screens", "results", slug, limit],
     queryFn: () => fetchScreenResults(slug as ScreenSlug, limit),
-    staleTime: 60_000, // 1 dakika
+    // P415 (31 May 2026): Scanner gunde 1 kez (22:00 UTC) calisiyor — veri
+    // gun-ici degismez. 5 dakika staleTime ile Sn. Ferit /screens icindeki
+    // tarama dropdown gecislerinde refetch tetiklemez. Backend ayrica 30 dk
+    // TTL cache (api/main.py P415) — toplam UX hizli + DB yuku 95% azaldi.
+    staleTime: 5 * 60_000,  // 5 dakika (eski: 1 dk)
     retry: 1,
     enabled: !!slug,
   });

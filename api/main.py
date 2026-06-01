@@ -387,8 +387,22 @@ def _screens_mock_results(slug: str, limit: int) -> list[ScreenResultRow]:
     ]
 
 
+# P415 (31 May 2026 — Kural #28 hizalama): Scanner gunde 1 kez calisiyor (Cloud
+# Scheduler 22:00 UTC). Her sayfa acilisinda Cloud SQL'e gitmek bos is — veri o
+# gun degismiyor. Module-level TTL cache + manuel bust.
+#
+# TTL 30 dakika: gun-ici veri sabit, scan_date degisirse zaten yeni gun (sabah
+# ilk istek cache miss). Refresh icin ?nocache=1 parametresi (Sn. Ferit tarama
+# tetikleyince yeni cache).
+#
+# Bellek: 9 slug x ~50KB = ~500KB (kabul edilebilir, container 512MB).
+from time import time as _now
+_SCREENS_CACHE: dict[tuple[str, int], tuple[float, list]] = {}
+_SCREENS_CACHE_TTL = 30 * 60  # 30 dakika
+
+
 @app.get("/api/screens/{slug}", response_model=list[ScreenResultRow])
-def get_screen_results(slug: str, limit: int = 500) -> list[ScreenResultRow]:
+def get_screen_results(slug: str, limit: int = 500, nocache: bool = False) -> list[ScreenResultRow]:
     """
     Sprint 4-bis.1b (ready) + Sprint 4-bis.2 (parse) + Sprint 4-bis.3 (diff)
     + Sprint 4-bis.4 (tight_low_volume — pre-compute) — slug dispatch ile sonuc dondur.
@@ -419,6 +433,13 @@ def get_screen_results(slug: str, limit: int = 500) -> list[ScreenResultRow]:
                    f"diff: {list(SCREENS_DIFF_6.keys())}"
         )
 
+    # P415: Cache hit (TTL 30 dk, nocache=1 ile bust). Scanner gun-ici degismez.
+    cache_key = (slug, limit)
+    if not nocache:
+        hit = _SCREENS_CACHE.get(cache_key)
+        if hit is not None and (_now() - hit[0]) < _SCREENS_CACHE_TTL:
+            return hit[1]
+
     # MOCK fallback (dev ortam, db_connected=false)
     # KARAR #466+#465+#467 — VCP/Power Play slug'larinda kalite+ready+power_play sahte
     if not db_health_check():
@@ -440,12 +461,18 @@ def get_screen_results(slug: str, limit: int = 500) -> list[ScreenResultRow]:
                                  "vcp_quality_score","vcp_ready_score","power_play_pass")})
             for r in rows]
     # KARAR #733 alt-paket (Paket 83): pivot_status enrichment (DB yol)
-    return [
-        row.model_copy(update={
+    # P415 (31 May 2026): Sira-i enrichment 228 satir × ~150ms yfinance =
+    # 30s+ timeout. Paralel 20 worker = ~3s (pivot cache ilk sicakta).
+    from concurrent.futures import ThreadPoolExecutor
+    def _enrich_one(row):
+        return row.model_copy(update={
             "pivot_status": _compute_signal_pivot_status(row.symbol, row.price or 100.0),
         })
-        for row in db_results
-    ]
+    with ThreadPoolExecutor(max_workers=20) as pool:
+        enriched = list(pool.map(_enrich_one, db_results))
+    # P415: Cache yaz (enrichment dahil tam sonuc — pivot_status dahil)
+    _SCREENS_CACHE[cache_key] = (_now(), enriched)
+    return enriched
 
 
 @app.get("/api/health", response_model=HealthResponse)
