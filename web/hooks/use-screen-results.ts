@@ -7,9 +7,12 @@ async function fetchScreenResults(
   slug: ScreenSlug,
   limit: number = 500
 ): Promise<ScreenResultRow[]> {
-  // 12sn timeout: scan_diff CTE 6+ sn surebilir, watchlist'ten daha cömert
+  // 30sn timeout (P414, 31 May 2026): Next.js Turbopack dev mode ilk proxy istegi
+  // cold-start ile 12sn yetmiyordu (route compile + scan_diff CTE 6+ sn).
+  // Production'da bu sorun yok (build edilmis route). Cold-start sonrasi cache'li
+  // istekler 200ms-2s.
   const res = await fetch(`/api/screens/${slug}?limit=${limit}`, {
-    signal: AbortSignal.timeout(12000),
+    signal: AbortSignal.timeout(30000),
   });
   if (!res.ok) {
     let body = "";
