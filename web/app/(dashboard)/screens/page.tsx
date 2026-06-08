@@ -92,11 +92,18 @@ export default function ScreensPage() {
         cellRenderer: SymbolCellRenderer,
       },
       {
+        // P422 (31 May 2026 — Sn. Ferit "NOT satırı ney"): "NOT" başlığı yanıltıcıydı
+        // (İzleme Listesi'nde NOT = serbest metin notu; burada temel grade). Ayrıca eski
+        // tooltip yanlış "Mark TradeGrader KARAR #445" diyordu — bu TradeGrader DEĞİL,
+        // scanner_helpers._compute_grade (EPS Q/Q + Satış Q/Q). Başlık "TEMEL" + doğru
+        // tooltip. "D" hem zayıf hem veri-yok demek (Kural #28 — AÇIK KONU backend ayrımı).
         field: "grade",
-        headerName: "NOT",
-        headerTooltip: "Mark TradeGrader notu (A/B/C/D) — KARAR #445",
-        width: 65,
-        minWidth: 55,
+        headerName: "TEMEL",
+        headerTooltip:
+          "Temel Grade (Mark TLSMW EPS+Satış): A=EPS>%40&Satış>%25 / B=EPS>%25&Satış>%15 / " +
+          "C=EPS>%20&Satış>%10 / D=zayıf VEYA veri yok. Teknik tarama PASS + temel kalite.",
+        width: 75,
+        minWidth: 60,
         cellRenderer: (p: { value: string | null }) => {
           if (!p.value) return <span style={{ color: "#888" }}>—</span>;
           const s = GRADE_STYLE[p.value];
