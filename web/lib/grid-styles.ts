@@ -41,3 +41,22 @@ export const SYMBOL_CELL: CellStyle = {
   fontWeight: 600,
   fontSize: "13px",
 };
+
+/**
+ * RS Rating arka plan bandı — color-mix MTP renk sistemi (DRY tek kaynak).
+ *
+ * P420 (31 May 2026): Önceki kanon İzleme Listesi (watchlist/columns.ts) ve
+ * Tarama (screens/page.tsx) AYNI helper'ı ayrı ayrı kopyalıyordu — biri
+ * değişirse RS bandı sayfalar arası sessizce ayrışırdı. Workflow tasarım
+ * denetimi bu çiftlemeyi yakaladı → tek kaynağa taşındı.
+ *
+ * Eşikler IBD canon: ≥90 lider yoğun yeşil, ≥70 güçlü açık yeşil,
+ * ≥50 ortalama nötr, <50 zayıf kırmızı (Mark "Leaders First" disiplini).
+ */
+export function rsBackground(rs: number | null | undefined): string {
+  if (rs == null) return "transparent";
+  if (rs >= 90) return "color-mix(in srgb, var(--mtp-excellent) 35%, transparent)";
+  if (rs >= 70) return "color-mix(in srgb, var(--mtp-excellent) 18%, transparent)";
+  if (rs >= 50) return "color-mix(in srgb, var(--mtp-neutral)   18%, transparent)";
+  return              "color-mix(in srgb, var(--mtp-danger)    18%, transparent)";
+}

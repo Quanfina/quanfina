@@ -14,7 +14,7 @@ import { TermHeaderComponent } from "@/components/terminology/TermHeaderComponen
 // KARAR #492 (20 May 2026 ~16:45): DRY hijyen - yerel MONO -> @/lib/grid-styles
 // Sinyaller + Hisse Tarama paterniyle eşitleme. Davranış: fontSize 13px global ->
 // 12px MONO_RIGHT (Sinyaller exact). Tüm tablolarda fiyat 12px tutarlı.
-import { MONO_RIGHT as MONO } from "@/lib/grid-styles";
+import { MONO_RIGHT as MONO, rsBackground } from "@/lib/grid-styles";
 import { fmtUsd } from "@/lib/format-currency";
 import { formatDayLabel } from "@/lib/format-date";
 
@@ -29,13 +29,9 @@ function relativeDate(iso: string): string {
   return formatDayLabel(iso);
 }
 
-function rsBackground(rs: number | null): string {
-  if (rs == null) return "transparent";
-  if (rs >= 90) return "color-mix(in srgb, var(--mtp-excellent) 35%, transparent)";
-  if (rs >= 70) return "color-mix(in srgb, var(--mtp-excellent) 18%, transparent)";
-  if (rs >= 50) return "color-mix(in srgb, var(--mtp-neutral)   18%, transparent)";
-  return              "color-mix(in srgb, var(--mtp-danger)    18%, transparent)";
-}
+// P420 (31 May 2026): rsBackground lib/grid-styles.ts'e taşındı (DRY tek kaynak)
+// — Tarama (screens) sayfası da aynı helper'ı kullanıyordu, çiftleme riskini
+// workflow tasarım denetimi yakaladı. Yerel kopya kaldırıldı, import edildi.
 
 export const COL_DEFS: ColDef<WatchlistRow>[] = [
   {

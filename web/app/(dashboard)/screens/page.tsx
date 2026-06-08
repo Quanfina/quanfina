@@ -37,7 +37,9 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { GridLoadingOverlay } from "@/components/ag-grid/LoadingOverlay";
 import { SymbolCellRenderer } from "@/components/watchlist/SymbolCellRenderer";
 import { PivotBadgeCell } from "@/components/shared/PivotBadgeCell";
-import { MONO, MONO_RIGHT } from "@/lib/grid-styles";
+import { RsRatingBadge } from "@/components/shared/RsRatingBadge";
+import { TermHeaderComponent } from "@/components/terminology/TermHeaderComponent";
+import { MONO_RIGHT, rsBackground } from "@/lib/grid-styles";
 import { formatDateTR, formatDayLabel } from "@/lib/format-date";
 import { fmtUsd } from "@/lib/format-currency";
 
@@ -49,14 +51,10 @@ const GRADE_STYLE: Record<string, { bg: string; color: string }> = {
   D: { bg: "#ffc7c7", color: "#842029" },
 };
 
-// RS IBD renk bandı (TPR/RPR eşik — Mark Resmi Kural)
-function getRsBandStyle(rs: number | null): { bg: string; color: string } {
-  if (rs === null || rs === undefined) return { bg: "transparent", color: "inherit" };
-  if (rs >= 95) return { bg: "#58bd7d", color: "#fff" };
-  if (rs >= 89) return { bg: "#78ca96", color: "#fff" };
-  if (rs >= 70) return { bg: "#eab308", color: "#1a1a1a" };
-  return { bg: "#ff6a6a", color: "#fff" };
-}
+// P420 (31 May 2026 — Sn. Ferit "izleme listesindeki tasarıma uydur"):
+// RS arka plan bandı + RsRatingBadge İzleme Listesi ile BİREBİR aynı tasarım
+// dili. rsBackground helper'ı çiftleme önlemek için lib/grid-styles.ts'e taşındı
+// (workflow tasarım denetimi DRY çiftleme riskini yakaladı — iki sayfa tek kaynak).
 
 const SCREEN_SLUGS = Object.keys(SCREEN_CATEGORIES) as ScreenSlug[];
 const DEFAULT_SLUG: ScreenSlug | null = SCREEN_SLUGS[0] ?? null;
@@ -83,20 +81,20 @@ export default function ScreensPage() {
       // Sn. Ferit görsel hiyerarşi + bilgi yoğunluğu istedi (Markets360 Focus
       // List patenli kompakt görünüm — clean-room disiplini ile soyutlama).
       {
+        // P420: İzleme Listesi ile birebir — width 90/80, inline cellStyle
+        // kaldırıldı (SymbolCellRenderer zaten font-bold + mono uyguluyor,
+        // çiftlemeydi). Watchlist columns.ts symbol kolonu ile aynı.
         field: "symbol",
         headerName: "HİSSE",
         pinned: "left" as const,
-        width: 85,
-        minWidth: 75,
+        width: 90,
+        minWidth: 80,
         cellRenderer: SymbolCellRenderer,
-        cellStyle: {
-          fontWeight: 700,
-          fontFamily: "var(--font-jetbrains-mono, monospace)",
-        },
       },
       {
         field: "grade",
         headerName: "NOT",
+        headerTooltip: "Mark TradeGrader notu (A/B/C/D) — KARAR #445",
         width: 65,
         minWidth: 55,
         cellRenderer: (p: { value: string | null }) => {
@@ -123,23 +121,29 @@ export default function ScreensPage() {
         },
       },
       {
+        // P420: RS kolonu İzleme Listesi ile birebir aynı — RsRatingBadge
+        // component (sayı + L/S/A/↓ kategori rozeti) + color-mix soft arka plan +
+        // TermHeaderComponent tooltip (termKey "rs_ibd"). Watchlist columns.ts ile
+        // tek tasarım dili (DRY shared component, raw hex kaldırıldı).
         field: "rs_ibd",
         headerName: "RS",
-        width: 75,
-        minWidth: 65,
+        headerComponent: TermHeaderComponent,
+        headerComponentParams: { termKey: "rs_ibd" },
+        width: 100,
+        minWidth: 85,
         // KARAR ADAY #456 — sayısal filter (greater_than: RS≥80 Leader, vb.)
         filter: "agNumberColumnFilter",
-        cellStyle: (p: CellClassParams<ScreenResultRow, number>) => {
-          const band = getRsBandStyle(p.value ?? null);
-          return {
-            ...MONO,
-            background: band.bg,
-            color: band.color,
-            fontWeight: 600,
-          };
-        },
-        valueFormatter: (p) => (p.value != null ? String(p.value) : "—"),
-        headerTooltip: "IBD Relative Strength Rating (1-99)",
+        cellStyle: (p: CellClassParams<ScreenResultRow, number>) => ({
+          // P420: İzleme Listesi RS cellStyle ile birebir (MONO_RIGHT + color-mix
+          // band + flex space-between — RsRatingBadge sağ hizalı rozeti yerleştirir).
+          ...MONO_RIGHT,
+          background: rsBackground(p.value ?? null),
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          paddingRight: "4px",
+        }),
+        cellRenderer: RsRatingBadge,
       },
       {
         field: "price",
@@ -150,25 +154,29 @@ export default function ScreensPage() {
         filter: "agNumberColumnFilter",
         cellStyle: MONO_RIGHT,
         valueFormatter: (p) => fmtUsd(p.value as number | null),
+        headerTooltip: "Son tarama fiyatı (snapshot — canlı değil)",
       },
       // P419: CARR STAGE rozeti yeni kolon (ScreenResultRow.carr_stage zaten var,
       // sadece gösterilmiyordu). Mark Stage 4 "Avoid" Sn. Ferit'in göreceği yer.
       {
         field: "carr_stage",
         headerName: "STAGE",
+        headerTooltip: "Carr/Weinstein Stage (1=Base, 2=Advancing, 3=Distribution, 4=Decline)",
         width: 80,
         minWidth: 70,
         sortable: false,
         filter: false,
         cellRenderer: (p: { value: number | null | undefined }) => {
           if (p.value == null) return <span style={{ color: "#888" }}>—</span>;
-          // Stage renkleri: Stage 2 yeşil (advancing) / Stage 4 kırmızı (declining)
-          // Stage 1 mavi (basing) / Stage 3 sarı (distribution)
-          const meta: Record<number, { label: string; bg: string; color: string }> = {
-            1: { label: "Stage 1", bg: "rgba(75,156,211,0.18)", color: "var(--mtp-good, #4B9CD3)" },
-            2: { label: "Stage 2", bg: "rgba(40,167,69,0.18)", color: "var(--mtp-excellent)" },
-            3: { label: "Stage 3", bg: "rgba(245,158,11,0.18)", color: "#92400E" },
-            4: { label: "Stage 4", bg: "rgba(220,53,69,0.18)", color: "var(--mtp-danger)" },
+          // P420: Rozet şekli İzleme Listesi MarkBadgeCell tasarım diliyle hizalandı
+          // (borderRadius 9999→4 köşeli, opacity 0.18→0.10 yumuşak tint, 1px border
+          // color+'33'). Carr Stage zaten watchlist MARK PROFİLİ içinde bu şekilde
+          // görünüyor — Stage 4 "Avoid" iki sayfada aynı görsel dil.
+          const meta: Record<number, { label: string; tint: string; color: string }> = {
+            1: { label: "Stage 1", tint: "rgba(75,156,211,0.10)", color: "var(--mtp-good, #4B9CD3)" },
+            2: { label: "Stage 2", tint: "rgba(40,167,69,0.10)", color: "var(--mtp-excellent)" },
+            3: { label: "Stage 3", tint: "rgba(245,158,11,0.10)", color: "#92400E" },
+            4: { label: "Stage 4", tint: "rgba(220,53,69,0.10)", color: "var(--mtp-danger)" },
           };
           const m = meta[p.value];
           if (!m) return <span style={{ color: "#888" }}>—</span>;
@@ -177,9 +185,10 @@ export default function ScreensPage() {
               style={{
                 display: "inline-block",
                 padding: "2px 8px",
-                borderRadius: 9999,
-                background: m.bg,
+                borderRadius: 4,
+                background: m.tint,
                 color: m.color,
+                border: `1px solid color-mix(in srgb, ${m.color} 33%, transparent)`,
                 fontWeight: 600,
                 fontSize: 11,
                 fontFamily: "var(--font-jetbrains-mono, monospace)",
@@ -193,12 +202,11 @@ export default function ScreensPage() {
       },
       // KARAR #733 alt-paket (Paket 83): Pivot kolonu — Mark TLSMW Ch 10
       // (P81 Sinyaller + P82 Watchlist paten — Tarama'da da AL/Zayıf/Yakın/Altı)
-      // Paket 158 (26 May 2026): document.createElement -> PivotBadgeCell DRY (React 19 fix)
+      // P420: width 90→100 İzleme Listesi PIVOT footprint ile birebir.
       {
         headerName: "PIVOT",
         field: "pivot_status",
-        width: 90,
-        minWidth: 80,
+        width: 100,
         sortable: false,
         filter: false,
         cellRenderer: PivotBadgeCell,
@@ -422,9 +430,21 @@ export default function ScreensPage() {
                 floatingFilter: true,
               }}
               rowData={resultsQ.data ?? []}
-              rowHeight={32}
+              rowHeight={36}
               headerHeight={36}
               suppressCellFocus={false}
+              getRowStyle={(params) => {
+                // P420: İzleme Listesi paten — Defansif modda RS<70 satırlar solgun
+                // (Mark TLSMW "Leaders First" — zayıf RS dikkat dağıtmasın).
+                if (
+                  tradingMode.mode === "defansif" &&
+                  params.data &&
+                  (params.data.rs_ibd ?? 0) < 70
+                ) {
+                  return { opacity: 0.45 };
+                }
+                return undefined;
+              }}
             />
           </div>
         )}
