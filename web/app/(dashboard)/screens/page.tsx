@@ -38,7 +38,7 @@ import { GridLoadingOverlay } from "@/components/ag-grid/LoadingOverlay";
 import { SymbolCellRenderer } from "@/components/watchlist/SymbolCellRenderer";
 import { PivotBadgeCell } from "@/components/shared/PivotBadgeCell";
 import { MONO, MONO_RIGHT } from "@/lib/grid-styles";
-import { formatDateTR } from "@/lib/format-date";
+import { formatDateTR, formatDayLabel } from "@/lib/format-date";
 import { fmtUsd } from "@/lib/format-currency";
 
 // Grade chip renkleri (Sprint 4-bis.1b paten — KARAR ADAY #453)
@@ -77,12 +77,17 @@ export default function ScreensPage() {
 
   const columnDefs = useMemo<ColDef<ScreenResultRow>[]>(
     () => [
+      // P419 (31 May 2026 — Sn. Ferit "bu listenin tasarımını sevmedim"):
+      // KOMPAKT redesign. MARK PROFİLİ + TARİH gizlendi (Migration 004-007 boş +
+      // hep aynı gün), CARR STAGE rozeti eklendi, kolon genişlikleri sıkıştırıldı.
+      // Sn. Ferit görsel hiyerarşi + bilgi yoğunluğu istedi (Markets360 Focus
+      // List patenli kompakt görünüm — clean-room disiplini ile soyutlama).
       {
         field: "symbol",
         headerName: "HİSSE",
         pinned: "left" as const,
-        width: 90,
-        minWidth: 80,
+        width: 85,
+        minWidth: 75,
         cellRenderer: SymbolCellRenderer,
         cellStyle: {
           fontWeight: 700,
@@ -92,8 +97,8 @@ export default function ScreensPage() {
       {
         field: "grade",
         headerName: "NOT",
-        width: 70,
-        minWidth: 60,
+        width: 65,
+        minWidth: 55,
         cellRenderer: (p: { value: string | null }) => {
           if (!p.value) return <span style={{ color: "#888" }}>—</span>;
           const s = GRADE_STYLE[p.value];
@@ -119,9 +124,9 @@ export default function ScreensPage() {
       },
       {
         field: "rs_ibd",
-        headerName: "RS IBD",
-        width: 90,
-        minWidth: 80,
+        headerName: "RS",
+        width: 75,
+        minWidth: 65,
         // KARAR ADAY #456 — sayısal filter (greater_than: RS≥80 Leader, vb.)
         filter: "agNumberColumnFilter",
         cellStyle: (p: CellClassParams<ScreenResultRow, number>) => {
@@ -134,33 +139,86 @@ export default function ScreensPage() {
           };
         },
         valueFormatter: (p) => (p.value != null ? String(p.value) : "—"),
+        headerTooltip: "IBD Relative Strength Rating (1-99)",
       },
       {
         field: "price",
         headerName: "FİYAT",
-        width: 100,
-        minWidth: 90,
+        width: 90,
+        minWidth: 80,
         // KARAR ADAY #456 — sayısal filter (greater_than: fiyat≥$50, vb.)
         filter: "agNumberColumnFilter",
         cellStyle: MONO_RIGHT,
         valueFormatter: (p) => fmtUsd(p.value as number | null),
       },
+      // P419: CARR STAGE rozeti yeni kolon (ScreenResultRow.carr_stage zaten var,
+      // sadece gösterilmiyordu). Mark Stage 4 "Avoid" Sn. Ferit'in göreceği yer.
+      {
+        field: "carr_stage",
+        headerName: "STAGE",
+        width: 80,
+        minWidth: 70,
+        sortable: false,
+        filter: false,
+        cellRenderer: (p: { value: number | null | undefined }) => {
+          if (p.value == null) return <span style={{ color: "#888" }}>—</span>;
+          // Stage renkleri: Stage 2 yeşil (advancing) / Stage 4 kırmızı (declining)
+          // Stage 1 mavi (basing) / Stage 3 sarı (distribution)
+          const meta: Record<number, { label: string; bg: string; color: string }> = {
+            1: { label: "Stage 1", bg: "rgba(75,156,211,0.18)", color: "var(--mtp-good, #4B9CD3)" },
+            2: { label: "Stage 2", bg: "rgba(40,167,69,0.18)", color: "var(--mtp-excellent)" },
+            3: { label: "Stage 3", bg: "rgba(245,158,11,0.18)", color: "#92400E" },
+            4: { label: "Stage 4", bg: "rgba(220,53,69,0.18)", color: "var(--mtp-danger)" },
+          };
+          const m = meta[p.value];
+          if (!m) return <span style={{ color: "#888" }}>—</span>;
+          return (
+            <span
+              style={{
+                display: "inline-block",
+                padding: "2px 8px",
+                borderRadius: 9999,
+                background: m.bg,
+                color: m.color,
+                fontWeight: 600,
+                fontSize: 11,
+                fontFamily: "var(--font-jetbrains-mono, monospace)",
+              }}
+              title="Carr/Weinstein Stage Analysis — 1=Base, 2=Advancing, 3=Distribution, 4=Decline"
+            >
+              {m.label}
+            </span>
+          );
+        },
+      },
+      // KARAR #733 alt-paket (Paket 83): Pivot kolonu — Mark TLSMW Ch 10
+      // (P81 Sinyaller + P82 Watchlist paten — Tarama'da da AL/Zayıf/Yakın/Altı)
+      // Paket 158 (26 May 2026): document.createElement -> PivotBadgeCell DRY (React 19 fix)
+      {
+        headerName: "PIVOT",
+        field: "pivot_status",
+        width: 90,
+        minWidth: 80,
+        sortable: false,
+        filter: false,
+        cellRenderer: PivotBadgeCell,
+      },
+      // P419 (31 May 2026): TARİH ve MARK PROFİLİ gizlendi.
+      // - scan_date hep aynı gün (tek tarama, tüm satırlar aynı tarih) → sayfa
+      //   üstüne tek bilgi olarak yazılıyor (DataFreshnessBanner P375 zaten var)
+      // - MARK PROFİLİ Migration 004-007 uygulanmadığı için tüm satırlarda boş →
+      //   yer israfı. Migration tamamlanınca hide=false yapılır
       {
         field: "scan_date",
         headerName: "TARİH",
-        width: 110,
-        minWidth: 100,
-        cellStyle: MONO,
-        // KARAR #471 paten: ISO YYYY-MM-DD → DD.MM.YYYY (Sinyaller + Journal ile tutarlı)
+        hide: true,
+        suppressColumnsToolPanel: true,
         valueFormatter: (p) => formatDateTR(p.value as string | null | undefined),
       },
-      // KARAR ADAY #721 (24 May 2026): Mark Profile Badge Strip kolonu (DRY component).
-      // Backend Cloud SQL Migration 004-007 uygulandıkça otomatik canlanır (AÇIK KONU #70).
-      // Mevcut field undefined ise rozet gösterilmez (cell boş kalır).
       {
         headerName: "MARK PROFİLİ",
-        minWidth: 260,
-        flex: 1,
+        hide: true,
+        suppressColumnsToolPanel: true,
         sortable: false,
         filter: false,
         cellRenderer: (p: { data?: ScreenResultRow }) => {
@@ -181,29 +239,29 @@ export default function ScreensPage() {
           );
         },
       },
-      // KARAR #733 alt-paket (Paket 83): Pivot kolonu — Mark TLSMW Ch 10
-      // (P81 Sinyaller + P82 Watchlist paten — Tarama'da da AL/Zayıf/Yakın/Altı)
-      // Paket 158 (26 May 2026): document.createElement -> PivotBadgeCell DRY (React 19 fix)
-      {
-        headerName: "PIVOT",
-        field: "pivot_status",
-        width: 100,
-        minWidth: 90,
-        sortable: false,
-        filter: false,
-        cellRenderer: PivotBadgeCell,
-      },
     ],
     []
   );
 
   const totalCount = resultsQ.data?.length ?? 0;
+  // P419: TARİH kolonu gizlendi (hep aynı gün) — son tarama tarihi başlığa
+  const lastScanDate = resultsQ.data?.[0]?.scan_date ?? null;
+  const lastScanLabel = lastScanDate ? formatDayLabel(lastScanDate) : null;
 
   return (
     <div className="flex flex-col h-full">
       {/* Header — başlık + ModBadge (Vizyon İLKE #10 — 10. UI nokta P246) */}
-      <div className="px-6 py-3 border-b flex items-center justify-between">
-        <h1 className="text-xl font-semibold tracking-tight">Tarama</h1>
+      <div className="px-6 py-3 border-b flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-baseline gap-3">
+          <h1 className="text-xl font-semibold tracking-tight">Tarama</h1>
+          {/* P419: TARİH kolonu kaldırıldı → tek özet bilgi başlığa.
+              {sayım} satır • Son tarama: {Pzt/Salı/05.06.2026} */}
+          {totalCount > 0 && lastScanLabel && (
+            <span className="text-xs text-muted-foreground tabular-nums">
+              {totalCount} satır • Son tarama: <b className="text-foreground">{lastScanLabel}</b>
+            </span>
+          )}
+        </div>
         <ModBadge variant="compact" />
       </div>
 
