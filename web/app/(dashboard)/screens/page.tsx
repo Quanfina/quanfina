@@ -131,8 +131,8 @@ export default function ScreensPage() {
         headerComponentParams: { termKey: "rs_ibd" },
         width: 100,
         minWidth: 85,
-        // KARAR ADAY #456 — sayısal filter (greater_than: RS≥80 Leader, vb.)
-        filter: "agNumberColumnFilter",
+        // P421: agNumberColumnFilter kaldırıldı (floatingFilter ile birlikte —
+        // KARAR #456 negatif tescil). İzleme Listesi RS kolonu da filtresiz.
         cellStyle: (p: CellClassParams<ScreenResultRow, number>) => ({
           // P420: İzleme Listesi RS cellStyle ile birebir (MONO_RIGHT + color-mix
           // band + flex space-between — RsRatingBadge sağ hizalı rozeti yerleştirir).
@@ -150,8 +150,7 @@ export default function ScreensPage() {
         headerName: "FİYAT",
         width: 90,
         minWidth: 80,
-        // KARAR ADAY #456 — sayısal filter (greater_than: fiyat≥$50, vb.)
-        filter: "agNumberColumnFilter",
+        // P421: agNumberColumnFilter kaldırıldı (floatingFilter ile — KARAR #456 pasif)
         cellStyle: MONO_RIGHT,
         valueFormatter: (p) => fmtUsd(p.value as number | null),
         headerTooltip: "Son tarama fiyatı (snapshot — canlı değil)",
@@ -418,16 +417,19 @@ export default function ScreensPage() {
               theme="legacy"
               {...gridColumnState}
               columnDefs={columnDefs}
+              // P421 (31 May 2026 — Sn. Ferit "İzleme Listesi gibi temiz"):
+              // floatingFilter satırı KALDIRILDI. Sn. Ferit "bu boşluklar ne işe
+              // yarıyor" → her kolon altındaki boş filtre input'ları görsel kalabalık
+              // yaratıyordu, İzleme Listesi'nde yok. KARAR #456 (Screener Filter
+              // Operator) NEGATİF TESCİL (Kural #18) — pasif. Watchlist DEFAULT_COL_DEF
+              // ile birebir: filter:false + autoHeight:false. Filtreleme üstteki
+              // tarama dropdown'ı ile yapılır (her slug zaten ayrı filtrelenmiş liste).
               defaultColDef={{
                 sortable: true,
                 resizable: true,
+                filter: false,
                 suppressMovable: false,
-                // KARAR ADAY #456 — Screener Filter Operator (Markets360 sentezi:
-                // greater_than 30K + equals 9.5K). AG Grid floating filter — tarama
-                // sonuçlarını RS/fiyat/sektör bazında filtrele (cellRenderer kolonları
-                // filter:false ile hariç). Text kolonlar agTextColumnFilter (default).
-                filter: true,
-                floatingFilter: true,
+                autoHeight: false,
               }}
               rowData={resultsQ.data ?? []}
               rowHeight={36}
