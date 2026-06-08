@@ -16,16 +16,17 @@ import { TermHeaderComponent } from "@/components/terminology/TermHeaderComponen
 // 12px MONO_RIGHT (Sinyaller exact). Tüm tablolarda fiyat 12px tutarlı.
 import { MONO_RIGHT as MONO } from "@/lib/grid-styles";
 import { fmtUsd } from "@/lib/format-currency";
+import { formatDayLabel } from "@/lib/format-date";
 
 function fmtPrice(p: ValueFormatterParams<WatchlistRow>) {
   return fmtUsd(p.value as number | null);
 }
 
+// P416 (31 May 2026): relativeDate -> formatDayLabel DRY (lib/format-date)
+// Eski "3 gün önce" yerine "Pzt/Salı..." kısa format — Sn. Ferit Focus List
+// patenli hızlı okuma. lib/format-date.ts'de tek doğruluk kaynağı.
 function relativeDate(iso: string): string {
-  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
-  if (days === 0) return "Bugün";
-  if (days === 1) return "Dün";
-  return `${days} gün önce`;
+  return formatDayLabel(iso);
 }
 
 function rsBackground(rs: number | null): string {
@@ -138,15 +139,40 @@ export const COL_DEFS: ColDef<WatchlistRow>[] = [
     }),
     cellRenderer: RsRatingBadge,
   },
+  // P416 (31 May 2026): Bağıl Hacim — Mark TLSMW Bol. 6 "Hacim teyit" canon.
+  // Bugün / 50-gün ortalama hacim oranı. Eşikler kanon ⚠️ AÇIK KONU adayı —
+  // şu an Quanfina iç kararı (≥1.5 patlama / 0.7-1.0 sönük / aksi nötr).
+  // Sn. Ferit'in talimat referansı: Focus List "v/50" sütunu — yüksek ROI.
+  // Veri kaynağı: backend /api/watchlist enrichment (yfinance + 5dk cache).
+  {
+    field: "relative_volume",
+    headerName: "BAĞIL HCM",
+    width: 100,
+    minWidth: 85,
+    valueFormatter: (p: ValueFormatterParams<WatchlistRow, number>) =>
+      p.value == null ? "—" : `${p.value.toFixed(2)}×`,
+    cellStyle: (p: CellClassParams<WatchlistRow, number>) => {
+      const v = p.value;
+      let color = "var(--muted-foreground)";
+      if (v != null) {
+        if (v >= 1.5) color = "var(--mtp-excellent)";  // patlama (yeşil)
+        else if (v < 0.7) color = "var(--mtp-danger)";  // sönük (kırmızı)
+        else if (v >= 1.0) color = "var(--mtp-good, #4B9CD3)";  // normal üstü (mavi)
+      }
+      return { ...MONO, color, fontWeight: v != null && v >= 1.5 ? 600 : 400 };
+    },
+    headerTooltip: "Bağıl Hacim: bugün / 50-gün ortalama. ≥1.5 patlama, <0.7 sönük (Mark TLSMW Bol. 6).",
+  },
   // KONSENSUS kolonu kaldirildi (KARAR ADAY 21 May 2026): her strateji ayri satir
   // kanon, konsensus sayim noise.
   {
     field: "added_date",
     headerName: "EKLENME",
-    width: 110,
-    minWidth: 100,
+    width: 90,
+    minWidth: 70,
     valueFormatter: (p) => p.value ? relativeDate(p.value as string) : "—",
     cellStyle: { fontSize: 12, color: "var(--muted-foreground)" },
+    headerTooltip: "Eklenme zamanı — son 6 gün gün adı, eski tarihler DD.MM.YYYY",
   },
   // KARAR ADAY #724 (24 May 2026): Mark Profili rozetleri (DRY MarkBadgeStrip)
   // Backend Migration 004-007 sonrasi otomatik canli. MOCK feed (_STOCK_MARK_SIGNALS).

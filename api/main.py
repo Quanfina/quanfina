@@ -1545,6 +1545,12 @@ class WatchlistRow(BaseModel):
     # KARAR #733 alt-paket (Paket 82, 26 May 2026): Pivot Breakout status
     # P81 Sinyaller paten — Watchlist'te de AL/Zayıf/Yakın/Altı kolon görünür
     pivot_status: Optional[Literal["CONFIRMED", "WEAK", "NEAR_PIVOT", "BELOW_PIVOT"]] = None
+    # P416 (31 May 2026 — Sprint 4-bis Bağıl Hacim): Mark TLSMW Böl. 6
+    # "Hacim teyit" canon. Bugün / 50-gün ortalama oranı (1.0 = ortalama,
+    # 1.5+ = patlama, 0.7- = sönük). quanfina_math.compute_relative_volume
+    # hesabı, yfinance live volumes (5dk cache). UI rozet eşikleri:
+    # ≥1.5 yeşil "patlama" / 1.0-1.5 nötr / <0.7 kırmızı "sönük".
+    relative_volume: Optional[float] = None
 
 
 def _compute_live_mark_signals(symbol: str, price: float) -> dict:
@@ -1642,6 +1648,18 @@ def _enrich_with_mark_signals(row: WatchlistRow) -> WatchlistRow:
     pivot_status = _compute_signal_pivot_status(row.symbol, row.price)
     if pivot_status:
         updates["pivot_status"] = pivot_status
+    # P416 (31 May 2026): Relative Volume (Mark TLSMW Bol. 6 "Hacim teyit").
+    # yfinance volumes (5dk cache via _get_ohlcv) -> compute_relative_volume
+    # 50-gun ortalama. Yetersiz veri/exception -> None (UI render etmez).
+    try:
+        bars = _get_ohlcv(row.symbol, row.price)
+        if bars and len(bars) >= 52:  # 50 gun + bugun + buffer
+            volumes = [b.volume for b in bars]
+            rv = compute_relative_volume(volumes)
+            if rv.get("rel_vol") is not None:
+                updates["relative_volume"] = float(rv["rel_vol"])
+    except Exception:
+        pass
     if updates:
         return row.model_copy(update=updates)
     return row

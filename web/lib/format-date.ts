@@ -38,3 +38,45 @@ export function todayLocalISO(d: Date = new Date()): string {
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${mo}-${day}`;
 }
+
+/**
+ * Eklenme zamani kisa etiket (P416, 31 May 2026 — Sn. Ferit talimat: Focus
+ * List patenli "Monday/Tuesday" hizli okunur format).
+ *
+ * Mantık:
+ *   - Bugün → "Bugün"
+ *   - Dün → "Dün"
+ *   - Son 6 gün → "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"
+ *   - 7+ gün eski → formatDateTR (DD.MM.YYYY)
+ *
+ * Türkçe gün adları (Sn. Ferit Türkiye yerleşimi).
+ *
+ * Bilgi Mimarisi İlke #4: tek doğruluk kaynağı (3+ yerde kullanım hedefi —
+ * watchlist columns, signals, screens olası).
+ */
+const TR_DAY_NAMES = ["Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"];
+
+export function formatDayLabel(iso: string | null | undefined, now: Date = new Date()): string {
+  if (!iso) return "—";
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return iso;
+  const [, year, month, day] = m;
+  const target = new Date(Number(year), Number(month) - 1, Number(day));
+
+  // Sadece gün-bazlı karşılaştırma — saatten arındırılmış
+  const todayY = now.getFullYear();
+  const todayM = now.getMonth();
+  const todayD = now.getDate();
+  const todayStart = new Date(todayY, todayM, todayD);
+  const targetStart = new Date(target.getFullYear(), target.getMonth(), target.getDate());
+
+  const diffMs = todayStart.getTime() - targetStart.getTime();
+  const diffDays = Math.round(diffMs / (24 * 60 * 60 * 1000));
+
+  if (diffDays === 0) return "Bugün";
+  if (diffDays === 1) return "Dün";
+  if (diffDays > 1 && diffDays <= 6) {
+    return TR_DAY_NAMES[targetStart.getDay()];
+  }
+  return formatDateTR(iso);
+}

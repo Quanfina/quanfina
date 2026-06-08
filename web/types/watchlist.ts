@@ -28,6 +28,10 @@ export interface WatchlistRow {
   current_price?: number | null;
   change_pct_today?: number | null;
   quote_source?: "yfinance" | "mock" | null;
+  // P416 (31 May 2026): Bağıl Hacim (Mark TLSMW Bol. 6 "Hacim teyit")
+  // Bugün / 50-gün ortalama oranı. UI rozet: ≥1.5 yeşil "patlama" / 1.0-1.5
+  // nötr / <0.7 kırmızı "sönük". Backend yfinance + compute_relative_volume.
+  relative_volume?: number | null;
 }
 
 export interface WatchlistRowCreate {

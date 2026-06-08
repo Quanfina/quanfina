@@ -5,7 +5,7 @@
  * DRY helper (Bilgi Mimarisi İlke #4 tek doğruluk kaynağı).
  */
 import { describe, it, expect } from "vitest";
-import { formatDateTR, todayLocalISO } from "@/lib/format-date";
+import { formatDateTR, todayLocalISO, formatDayLabel } from "@/lib/format-date";
 
 describe("formatDateTR — ISO → DD.MM.YYYY", () => {
   describe("Pure date (saat yok)", () => {
@@ -89,5 +89,53 @@ describe("todayLocalISO — yerel tarih (UTC off-by-one fix, Paket 356)", () => 
     const now = new Date();
     const expected = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
     expect(todayLocalISO()).toBe(expected);
+  });
+});
+
+/**
+ * P416 (31 May 2026): formatDayLabel — Eklenme zamanı kısa etiket.
+ * Sn. Ferit Focus List patenli "Pzt/Salı..." hızlı okuma.
+ */
+describe("formatDayLabel — son 7 gün gün adı, sonrası tarih", () => {
+  // Sabit "now" referansı — Çarşamba 2026-05-27
+  const FIXED_NOW = new Date(2026, 4, 27, 12, 0, 0);  // ay 0-indexli (4 = Mayıs)
+
+  it("Bugün → 'Bugün'", () => {
+    expect(formatDayLabel("2026-05-27", FIXED_NOW)).toBe("Bugün");
+  });
+
+  it("Dün → 'Dün'", () => {
+    expect(formatDayLabel("2026-05-26", FIXED_NOW)).toBe("Dün");
+  });
+
+  it("2 gün önce (Pazartesi) → 'Pzt'", () => {
+    expect(formatDayLabel("2026-05-25", FIXED_NOW)).toBe("Pzt");
+  });
+
+  it("3 gün önce (Pazar) → 'Paz'", () => {
+    expect(formatDayLabel("2026-05-24", FIXED_NOW)).toBe("Paz");
+  });
+
+  it("6 gün önce (Perşembe) → 'Per' (sınır içinde)", () => {
+    expect(formatDayLabel("2026-05-21", FIXED_NOW)).toBe("Per");
+  });
+
+  it("7 gün önce → DD.MM.YYYY (sınır dışı)", () => {
+    expect(formatDayLabel("2026-05-20", FIXED_NOW)).toBe("20.05.2026");
+  });
+
+  it("Saat bilgisi yok say (gün-bazlı karşılaştırma)", () => {
+    expect(formatDayLabel("2026-05-26 23:59", FIXED_NOW)).toBe("Dün");
+    expect(formatDayLabel("2026-05-27 00:01", FIXED_NOW)).toBe("Bugün");
+  });
+
+  it("null/undefined/boş → '—'", () => {
+    expect(formatDayLabel(null, FIXED_NOW)).toBe("—");
+    expect(formatDayLabel(undefined, FIXED_NOW)).toBe("—");
+    expect(formatDayLabel("", FIXED_NOW)).toBe("—");
+  });
+
+  it("Parse edilemeyen ham değer geri döner (defensive)", () => {
+    expect(formatDayLabel("garbage", FIXED_NOW)).toBe("garbage");
   });
 });
