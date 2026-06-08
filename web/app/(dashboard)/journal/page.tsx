@@ -9,6 +9,7 @@ import { AgGridReact } from "ag-grid-react";
 import type { ColDef } from "ag-grid-community";
 import { useTrades, useDeleteTrade } from "@/hooks/use-trades";
 import { useTradesInfo } from "@/hooks/use-trades-info";
+import { MockDataBanner } from "@/components/shared/MockDataBanner";
 import { useStockQuotes } from "@/hooks/use-stock-quote";
 import { usePositionAlerts } from "@/hooks/use-position-alerts";
 import { TRADE_COL_DEFS, TRADE_DEFAULT_COL_DEF } from "@/components/journal/columns";
@@ -191,29 +192,9 @@ export default function JournalPage() {
         </div>
       </div>
 
-      {/* P417 (31 May 2026 — Kural #28 audit): MOCK_TRADES fallback şeffaflık
-          banner. DB unreachable durumunda /api/trades 8 hardcoded trade
-          döndürür. Sn. Ferit gerçek mi sahte mi anında görür (paper trading
-          kararı için kritik). */}
-      {tradesInfo?.is_mock && (
-        <div
-          className="px-6 py-2 border-b text-xs flex items-center gap-2"
-          style={{
-            background: "rgba(245,158,11,0.10)",
-            borderColor: "rgba(245,158,11,0.40)",
-            color: "#92400E",
-          }}
-          role="status"
-          data-testid="journal-mock-banner"
-        >
-          <span aria-hidden="true">🟡</span>
-          <span>
-            <b>MOCK VERİ:</b> Cloud SQL erişilemez — bu sayfadaki 8 trade{" "}
-            <b>tasarım örneği</b>. Paper trading kararı için DB bağlantısı
-            sağlanmadan trade kaydetme. (Kural #28 audit P417)
-          </span>
-        </div>
-      )}
+      {/* P418 (31 May 2026 DRY component): MockDataBanner — 4 sayfada paylaşılan
+          tek doğruluk kaynağı (P417 patterni inline -> shared component refactor). */}
+      <MockDataBanner isMock={tradesInfo?.is_mock} context="trade kayıt listesi" testId="journal-mock-banner" />
 
       {/* KARAR #733 alt-paket (Paket 39+41): Mark Regime banner — trade aç/kapa
           yaparken piyasa rejimi sürekli görünür. Stage 4 sayım Trade.mark_signals

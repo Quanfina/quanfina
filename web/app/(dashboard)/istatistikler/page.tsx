@@ -3,6 +3,8 @@
 import { useMemo } from "react";
 import { BarChart3 } from "lucide-react";
 import { useTrades } from "@/hooks/use-trades";
+import { useTradesInfo } from "@/hooks/use-trades-info";
+import { MockDataBanner } from "@/components/shared/MockDataBanner";
 import { computeTradeStats, GRADE_ORDER } from "@/lib/trade-stats";
 import { BrandonExpectancyCard } from "@/components/journal/BrandonExpectancyCard";
 import { RbaSummaryCard } from "@/components/journal/RbaSummaryCard";
@@ -36,12 +38,19 @@ function StatCard({ label, value, color }: { label: string; value: string; color
 
 export default function IstatistiklerPage() {
   const trades = useTrades();
+  // P418 (31 May 2026 — Kural #28 audit): DB unreachable -> MOCK 8 trade
+  // uzerinden istatistik **yaniltici** olur (Win Rate %62 sanki gercek).
+  // Sn. Ferit'in farkinda olmasi sart (paper trading karari icin).
+  const { data: tradesInfo } = useTradesInfo();
   const stats = useMemo(() => computeTradeStats(trades.data ?? []), [trades.data]);
 
   const maxGrade = Math.max(1, ...Object.values(stats.gradeDistribution));
 
   return (
     <div className="flex flex-col h-full">
+      {/* P418 DRY: shared MockDataBanner — "Know the truth" Mark TTLC Sec 4 disiplini */}
+      <MockDataBanner isMock={tradesInfo?.is_mock} context="Win Rate / Expectancy / RBA" testId="istatistikler-mock-banner" />
+
       {/* Header */}
       <div className="px-6 py-3 border-b">
         <h1 className="text-xl font-semibold tracking-tight flex items-center gap-2">

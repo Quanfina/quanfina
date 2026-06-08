@@ -5,6 +5,8 @@ import Link from "next/link";
 import { ArrowRight, Activity, ListChecks, NotebookText, Globe, TrendingUp, TrendingDown, CheckCircle2, Circle, Sunrise } from "lucide-react";
 import { useSignals } from "@/hooks/use-signals";
 import { useTrades } from "@/hooks/use-trades";
+import { useTradesInfo } from "@/hooks/use-trades-info";
+import { MockDataBanner } from "@/components/shared/MockDataBanner";
 import { useMarketStatus } from "@/hooks/use-market-status";
 import { useWatchlist } from "@/hooks/use-watchlist";
 import { formatDateTR } from "@/lib/format-date";
@@ -75,6 +77,9 @@ function StatCard({
 export default function Home() {
   const signals = useSignals();
   const trades = useTrades();
+  // P418 (31 May 2026 — Kural #28 audit): DB unreachable -> MOCK trade fallback
+  // Dashboard'da Açık Trade + Toplam P/L + Aksiyon Listesi MOCK üzerinden hesaplanır
+  const { data: tradesInfo } = useTradesInfo();
   const market = useMarketStatus();
   const watchlist = useWatchlist();
   // Paket 255 (27 May 2026): Dashboard Defansif uyarı banner (6. sayfa Defansif zinciri)
@@ -195,6 +200,11 @@ export default function Home() {
 
   return (
     <div className="p-6 flex flex-col gap-6">
+      {/* P418 DRY: shared MockDataBanner — Dashboard tüm trade-bağımlı sayım MOCK ile bozuk */}
+      <div className="-mx-6 -mt-6">
+        <MockDataBanner isMock={tradesInfo?.is_mock} context="Açık Trade + P/L + Aksiyon Listesi" testId="dashboard-mock-banner" />
+      </div>
+
       {/* KARAR #733 alt-paket (Paket 37): Mark Regime üst-uyarı — sn. Ferit
           Quanfina'yi açtığında piyasa rejimini ilk gören öğe (hideOnHealthy=false:
           Dashboard sabit göstersin, HEALTHY iken bile yeşil rozet pekiştirsin). */}
@@ -368,6 +378,27 @@ export default function Home() {
                       </span>
                     )}
                     <span className="text-muted-foreground">RS {Math.round(s.rs_rating)}</span>
+                    {/* P418 (31 May 2026): Bağıl Hacim mini rozet — P416/P417 DRY.
+                        Dashboard hızlı bakış için sadece sıra dışı durumlar gösterilir:
+                        ≥1.5 yeşil "patlama" / <0.7 kırmızı "sönük". Normal (0.7-1.5)
+                        Sn. Ferit'i yormamak için gizli. Mark TLSMW Bol. 6 "Hacim teyit". */}
+                    {s.relative_volume != null && (s.relative_volume >= 1.5 || s.relative_volume < 0.7) && (
+                      <span
+                        className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                        style={{
+                          background: s.relative_volume >= 1.5 ? "rgba(40,167,69,0.15)" : "rgba(220,53,69,0.15)",
+                          color: s.relative_volume >= 1.5 ? "var(--mtp-excellent)" : "var(--mtp-danger)",
+                          fontFamily: "var(--font-jetbrains-mono, monospace)",
+                        }}
+                        title={
+                          s.relative_volume >= 1.5
+                            ? `Hacim patlama: ${s.relative_volume.toFixed(2)}× ortalama (Mark TLSMW Bol. 6)`
+                            : `Sönük hacim: ${s.relative_volume.toFixed(2)}× ortalama — pivot kırılım teyit eksik`
+                        }
+                      >
+                        {s.relative_volume >= 1.5 ? "🔥" : "💤"} {s.relative_volume.toFixed(2)}×
+                      </span>
+                    )}
                     <span
                       className="font-semibold"
                       style={{ fontFamily: "var(--font-jetbrains-mono, monospace)" }}

@@ -24,6 +24,8 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { CalendarDays, ArrowRight, CheckCircle2 } from "lucide-react";
 import { useTrades } from "@/hooks/use-trades";
+import { useTradesInfo } from "@/hooks/use-trades-info";
+import { MockDataBanner } from "@/components/shared/MockDataBanner";
 import { useWatchlist } from "@/hooks/use-watchlist";
 import { useMarketStatus } from "@/hooks/use-market-status";
 import { ModBadge } from "@/components/mark/ModBadge";
@@ -33,6 +35,8 @@ import { Stat } from "@/components/ui/stat";
 
 export default function PazarHazirligiPage() {
   const tradesQuery = useTrades();
+  // P418: MOCK fallback şeffaflık (Kural #28 audit DRY paten)
+  const { data: tradesInfo } = useTradesInfo();
   const watchlistQuery = useWatchlist();
   const marketQuery = useMarketStatus();
 
@@ -83,6 +87,9 @@ export default function PazarHazirligiPage() {
 
   return (
     <div className="flex flex-col h-full">
+      {/* P418 DRY: shared MockDataBanner — Pazar Günü 30dk hazırlık MOCK ile yanıltıcı */}
+      <MockDataBanner isMock={tradesInfo?.is_mock} context="hafta önizleme + RBA" testId="pazar-hazirligi-mock-banner" />
+
       {/* Header */}
       <div className="px-6 py-3 border-b flex items-start justify-between gap-3 flex-wrap">
         <div>
