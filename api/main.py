@@ -3169,6 +3169,33 @@ class BrandonExpectancyInfo(BaseModel):
     win_rate: float
 
 
+# P417 (31 May 2026 — Kural #28 audit /journal seffaflik):
+# /journal sayfa MOCK_TRADES fallback kullanildigini Sn. Ferit'in gormesini sagla.
+# Trade response wrapper degisikligi (geriye uyum bozar) yerine ayri meta endpoint:
+# UI banner conditional render -> P408 patenli sari rozet.
+class TradesInfo(BaseModel):
+    source: Literal["db", "mock_fallback"]
+    count: int
+    is_mock: bool
+
+
+@app.get("/api/trades/info", response_model=TradesInfo)
+def get_trades_info() -> TradesInfo:
+    """Trade veri kaynagi meta — DB sağlam mi yoksa MOCK_TRADES fallback mi?
+
+    Kural #28 (Canlı Veri Önce) audit: /journal sayfa basinda UI banner
+    conditional render (is_mock=true ise sari "MOCK fallback" uyarisi).
+    """
+    if not db_health_check():
+        return TradesInfo(source="mock_fallback", count=8, is_mock=True)
+    try:
+        rows = trades_get_all()
+        return TradesInfo(source="db", count=len(rows), is_mock=False)
+    except Exception:
+        # DB query fail -> graceful, MOCK fallback aktif olacak
+        return TradesInfo(source="mock_fallback", count=8, is_mock=True)
+
+
 @app.get("/api/trades/expectancy", response_model=BrandonExpectancyInfo)
 def get_trades_expectancy(strategy: Optional[str] = None) -> BrandonExpectancyInfo:
     """Mark Brandon Video expectancy hesabı (P86 helper + P89 wire).
@@ -3505,6 +3532,10 @@ class Signal(BaseModel):
     # KARAR #733 alt-paket (Paket 81, 26 May 2026): Pivot breakout status
     # P70+P71 helper enrichment — sinyal listesinde AL/Zayıf/Yakın/Altı görünür
     pivot_status: Optional[Literal["CONFIRMED", "WEAK", "NEAR_PIVOT", "BELOW_PIVOT"]] = None
+    # P417 (31 May 2026): Bağıl Hacim (Watchlist P416 paten) — Mark TLSMW Bol. 6
+    # "Hacim teyit" canon. Bugün / 50-gün ortalama oranı. Watchlist'teki gibi
+    # paper trading karar verirken pivot kırılım hacim teyit görünürlüğü.
+    relative_volume: Optional[float] = None
 
 
 _PIVOT_STATUS_CACHE: dict[str, tuple[float, Optional[str]]] = {}
@@ -3567,6 +3598,16 @@ def get_signals() -> list[Signal]:
         # KARAR #726: mark_signals MOCK lookup (_STOCK_MARK_SIGNALS dict)
         # Paket 147 (26 May 2026): _compute_live_mark_signals yfinance overlay (Watchlist pateni)
         def s(symbol, strategy, status, setup, rs, price, stop, target, added, new=False):
+            # P417: relative_volume MOCK fallback — yfinance varsa gerçek hesap
+            rv_val: Optional[float] = None
+            try:
+                bars = _get_ohlcv(symbol, price)
+                if bars and len(bars) >= 52:
+                    rv_dict = compute_relative_volume([b.volume for b in bars])
+                    if rv_dict.get("rel_vol") is not None:
+                        rv_val = float(rv_dict["rel_vol"])
+            except Exception:
+                pass
             return Signal(
                 symbol=symbol, strategy=strategy, status=status, setup_type=setup,
                 rs_rating=rs, price=price, stop_loss=stop, target_price=target,
@@ -3574,6 +3615,7 @@ def get_signals() -> list[Signal]:
                 added_date=added, is_new_today=new,
                 mark_signals=_compute_live_mark_signals(symbol, price),
                 pivot_status=_compute_signal_pivot_status(symbol, price),
+                relative_volume=rv_val,
             )
         mock_signals = [
             s("NVDA",  "minervini", "buy",     "VCP",                 99.0, 145.20,  141.50,  157.00,  f"{today} 09:32",     True),
@@ -3605,11 +3647,25 @@ def get_signals() -> list[Signal]:
     #   — added_date "YYYY-MM-DD" veya "YYYY-MM-DD HH:MM" formatında olabilir
     # KARAR #473: stop_loss/target_price şu an web_watchlist'te yok (gelecek migration)
     #   → None döndürülür, R/R hesaplanmaz. MOCK fallback'te dolu.
-    # Paket 147 (26 May 2026): _compute_live_mark_signals yfinance overlay (Watchlist pateni)
-    signals: list[Signal] = []
-    for row in all_rows:
+    # P417 (31 May 2026): Paralel enrichment (P415 patenli) — 31 watchlist sıralı
+    # yfinance fetch ~5s yerine ThreadPoolExecutor 20 worker ~1s. Pivot status
+    # cache (5dk) zaten ısınmıştır watchlist isteğinden — burada hızlı.
+    # Relative volume eklendi (P416 watchlist paterni).
+    from concurrent.futures import ThreadPoolExecutor
+
+    def _build_signal(row: WatchlistRow) -> Signal:
         added_prefix = (row.added_date or "")[:10]
-        signals.append(Signal(
+        # Relative volume — yfinance + compute_relative_volume (Mark TLSMW Bol. 6)
+        rv_val: Optional[float] = None
+        try:
+            bars = _get_ohlcv(row.symbol, row.price)
+            if bars and len(bars) >= 52:
+                rv_dict = compute_relative_volume([b.volume for b in bars])
+                if rv_dict.get("rel_vol") is not None:
+                    rv_val = float(rv_dict["rel_vol"])
+        except Exception:
+            pass
+        return Signal(
             symbol=row.symbol,
             strategy=row.strategy,
             status=row.status,
@@ -3623,7 +3679,11 @@ def get_signals() -> list[Signal]:
             is_new_today=(added_prefix == today),
             mark_signals=_compute_live_mark_signals(row.symbol, row.price),
             pivot_status=_compute_signal_pivot_status(row.symbol, row.price),
-        ))
+            relative_volume=rv_val,
+        )
+
+    with ThreadPoolExecutor(max_workers=20) as pool:
+        signals = list(pool.map(_build_signal, all_rows))
 
     # Sıralama: RS rating descending (UX Bölüm 4 madde 6 ile uyumlu — sonra R/R sırası)
     signals.sort(key=lambda s: -s.rs_rating)

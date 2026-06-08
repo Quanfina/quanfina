@@ -25,4 +25,8 @@ export interface Signal {
   // KARAR #733 alt-paket (Paket 81, 26 May 2026): Pivot Breakout status
   // P70+P71 helper enrichment — sinyal listesinde AL/Zayıf/Yakın/Altı görünür
   pivot_status?: PivotBreakoutStatus | null;
+  // P417 (31 May 2026): Bağıl Hacim (P416 Watchlist paten) — Mark TLSMW Bol. 6
+  // "Hacim teyit" canon. Paper trading kararı pivot kırılım anında hacim
+  // doğrulaması için (yeşil ≥1.5 "patlama" / kırmızı <0.7 "sönük").
+  relative_volume?: number | null;
 }

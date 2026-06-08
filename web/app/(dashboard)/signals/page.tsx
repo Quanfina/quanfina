@@ -6,7 +6,7 @@ import { useGridColumnState } from "@/hooks/use-grid-column-state";
 import { Activity, Plus, X, RotateCcw } from "lucide-react";
 import "@/lib/ag-grid-setup"; // AG Grid modül kaydı (Paket 355 — bundle split)
 import { AgGridReact } from "ag-grid-react";
-import type { ColDef, ICellRendererParams } from "ag-grid-community";
+import type { ColDef, ICellRendererParams, ValueFormatterParams, CellClassParams } from "ag-grid-community";
 
 // KARAR #479 (20 May 2026): DRY MONO style — Watchlist/Journal pateni.
 // KARAR #484 (20 May 2026): lib/grid-styles ortak helper'a tasindi (Hisse Tarama
@@ -17,7 +17,7 @@ import { AddTradeDialog } from "@/components/journal/AddTradeDialog";
 import { AddRowDialog } from "@/components/watchlist/AddRowDialog";
 import { Button } from "@/components/ui/button";
 import { GridLoadingOverlay } from "@/components/ag-grid/LoadingOverlay";
-import { formatDateTR, todayLocalISO } from "@/lib/format-date";
+import { formatDateTR, formatDayLabel, todayLocalISO } from "@/lib/format-date";
 import { getPassedSignals, setPassedSignals, clearPassedSignals, signalKey } from "@/lib/passed-signals";
 import { toast } from "sonner";
 import type { Signal } from "@/types/signal";
@@ -227,12 +227,36 @@ export default function SignalsPage() {
     {
       field: "added_date",
       headerName: "Eklenme",
-      width: 150,
-      // KARAR #471 (20 May 2026): TR tarih formatı (DD.MM.YYYY HH:MM).
-      // Backend ISO "YYYY-MM-DD[ HH:MM]" tutar, frontend formatDateTR helper kullanır
-      // (web/lib/format-date.ts — DRY, Bilgi Mimarisi İlke #4 Tekrarsızlık).
-      valueFormatter: (p) => formatDateTR(p.value as string | null),
+      // P417 (31 May 2026): formatDayLabel DRY (P416 Watchlist paten — Sn. Ferit
+      // Focus List patenli "Pzt/Salı..." hızlı okuma). lib/format-date'de tek kaynak.
+      // Eski formatDateTR DD.MM.YYYY HH:MM detaylıydı — değer kaybı yok, son 6 gün
+      // gün adıyla görünür, 7+ gün eski tarih formatı (eskiyle uyumlu).
+      width: 110,
+      valueFormatter: (p) => formatDayLabel(p.value as string | null),
       cellStyle: MONO,
+      headerTooltip: "Eklenme — son 6 gün gün adı, eski tarihler DD.MM.YYYY",
+    },
+    // P417 (31 May 2026): Bağıl Hacim sütunu — Mark TLSMW Bol. 6 "Hacim teyit"
+    // canon. Pivot kırılım kararı için hacim doğrulaması (≥1.5 patlama / <0.7
+    // sönük). P416 Watchlist paten DRY paralel.
+    {
+      headerName: "Bağıl Hcm",
+      field: "relative_volume",
+      width: 100,
+      type: "rightAligned",
+      valueFormatter: (p: ValueFormatterParams<Signal, number>) =>
+        p.value == null ? "—" : `${p.value.toFixed(2)}×`,
+      cellStyle: (p: CellClassParams<Signal, number>) => {
+        const v = p.value;
+        let color = "var(--muted-foreground)";
+        if (v != null) {
+          if (v >= 1.5) color = "var(--mtp-excellent)";
+          else if (v < 0.7) color = "var(--mtp-danger)";
+          else if (v >= 1.0) color = "var(--mtp-good, #4B9CD3)";
+        }
+        return { ...MONO, color, fontWeight: v != null && v >= 1.5 ? 600 : 400, textAlign: "right" };
+      },
+      headerTooltip: "Bağıl Hacim: bugün / 50-gün ortalama (Mark TLSMW Bol. 6).",
     },
     // KARAR #726 (24 May 2026): Mark Profili kolonu (DRY MarkBadgeStrip 4. sayfa)
     {
