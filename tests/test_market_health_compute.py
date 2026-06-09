@@ -46,6 +46,43 @@ class TestDistributionDayOverride:
         assert _h(10, 2, 2, 2) == (25, "UNDER_PRESSURE", "DEFENSIVE")
 
 
+class TestFtdSymmetry:
+    """P424 (31 May 2026 — derin tarama F3): Follow-Through Day simetrisi.
+
+    IBD Market Pulse SIMETRIK — DD birikimi zayiflik, hacim-onayli FTD yeni
+    uptrend onayi. Hacim-onayli FTD, DD baskisini UNDER_PRESSURE -> NEUTRAL
+    yumusatir. AMA 2+ Stage 4 yapisal bear'a DOKUNMAZ.
+    """
+
+    def test_dd4_with_ftd_softens_to_neutral(self):
+        # DD>=4 ama hacim-onayli FTD -> NEUTRAL (toparlanma), DEFENSIVE degil
+        assert _h(4, 2, 2, 2, ftd_confirmed=True) == (50, "NEUTRAL", "CAUTION")
+
+    def test_dd4_without_ftd_stays_under_pressure(self):
+        # FTD yok -> eski davranis (UNDER_PRESSURE) korunur
+        assert _h(4, 2, 2, 2, ftd_confirmed=False) == (25, "UNDER_PRESSURE", "DEFENSIVE")
+
+    def test_dd_default_no_ftd_backward_compat(self):
+        # ftd_confirmed default False -> eski 4-arg cagrilarla geriye uyum
+        assert _h(5, 2, 2, 2) == (25, "UNDER_PRESSURE", "DEFENSIVE")
+
+    def test_ftd_does_not_rescue_structural_bear(self):
+        # 2+ Stage 4 (yapisal bear) + FTD bile -> UNDER_PRESSURE kalir
+        # (DD<4 oldugu icin DD-yumusatma devreye girmez; Stage 4 baskin)
+        assert _h(0, 4, 4, 2, ftd_confirmed=True) == (25, "UNDER_PRESSURE", "DEFENSIVE")
+        assert _h(0, 4, 4, 4, ftd_confirmed=True) == (25, "UNDER_PRESSURE", "DEFENSIVE")
+
+    def test_ftd_irrelevant_when_healthy(self):
+        # DD<4 + 3/3 Stage 2 zaten HEALTHY — FTD durumu degistirmez
+        assert _h(0, 2, 2, 2, ftd_confirmed=True) == (75, "HEALTHY", "LONG")
+
+    def test_dd4_and_2stage4_with_ftd_still_pressure(self):
+        # Hem DD>=4 hem 2+ Stage 4 + FTD: P424 reorder sonrasi YAPISAL BEAR dali
+        # (2+ Stage 4) ONCE gelir -> UNDER_PRESSURE. FTD yapisal bear'i KURTARMAZ.
+        # Bu, docstring niyetiyle tutarli (FTD sadece saf DD baskisini yumusatir).
+        assert _h(4, 4, 4, 2, ftd_confirmed=True) == (25, "UNDER_PRESSURE", "DEFENSIVE")
+
+
 class TestProbabilityConvergence:
     """Mark kitap kanon TLSMW Bol. 10: 3 endeks hizalanmasi (Stage 2)."""
 

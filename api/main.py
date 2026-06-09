@@ -1219,6 +1219,7 @@ def _compute_market_health(
     spy_stage: int,
     qqq_stage: int,
     iwm_stage: int,
+    ftd_confirmed: bool = False,
 ) -> tuple[int, str, str]:
     """Paket 382: market_health_score + label MOCK->gercek (AÇIK KONU #58 cozumu).
 
@@ -1253,11 +1254,7 @@ def _compute_market_health(
         (score 0-100 int, label HEALTHY/NEUTRAL/UNDER_PRESSURE,
          suggested_mode LONG/CAUTION/DEFENSIVE).
     """
-    # 1. Mark kitap kanon override: DD>=4 -> "Under Pressure"
-    if dd_count >= 4:
-        return 25, "UNDER_PRESSURE", "DEFENSIVE"
-
-    # 2. Probability Convergence: 3 endeks hizalanmasi
+    # Endeks Stage sayimlari (siralama icin once hesaplanir)
     indices_in_stage2 = sum(
         1 for s in (spy_stage, qqq_stage, iwm_stage) if s == 2
     )
@@ -1265,11 +1262,28 @@ def _compute_market_health(
         1 for s in (spy_stage, qqq_stage, iwm_stage) if s == 4
     )
 
-    # 2+ endeks Stage 4 (declining) -> ag^r bear baskisi
+    # 1. YAPISAL BEAR (en derin sinyal): 2+ endeks Stage 4 (declining, 30W MA alti)
+    #    -> UNDER_PRESSURE. P424: FTD bu durumu KURTARMAZ — Stage 4 dususu
+    #    distribution-day baskisindan daha derin; bear'da basarisiz FTD yaygindir.
+    #    Bu kontrol DD-dalindan ONCE gelir ki FTD yumusatmasi yapisal bear'a sizmasin.
     if indices_in_stage4 >= 2:
         return 25, "UNDER_PRESSURE", "DEFENSIVE"
 
-    # 3/3 endeks Stage 2 (advancing) -> tam Probability Convergence
+    # 2. Mark/O'Neil kitap kanon: DD>=4 -> "Under Pressure"
+    #    P424 (31 May 2026 — FTD simetri, derin tarama F3 bulgusu):
+    #    IBD Market Pulse SIMETRIK — DD birikimi zayiflik, Follow-Through Day
+    #    yeni uptrend ONAYI (rally 4-7. gun yuksek hacimli kayda deger kazanc).
+    #    Quanfina onceden asimetrikti (sadece DD baskisi). Yapisal bear YOKKEN
+    #    (yukaridaki kontrol gecildiyse) hacim-onayli FTD, DD baskisini
+    #    UNDER_PRESSURE -> NEUTRAL'a yumusatir (dagitim defterde olsa bile
+    #    toparlanma onayi). Kaynak: O'Neil "How to Make Money in Stocks" + IBD
+    #    Market Pulse (notebook/analizler/Market_Health_Metodoloji_Arastirma.md F3).
+    if dd_count >= 4:
+        if ftd_confirmed:
+            return 50, "NEUTRAL", "CAUTION"
+        return 25, "UNDER_PRESSURE", "DEFENSIVE"
+
+    # 3. 3/3 endeks Stage 2 (advancing) -> tam Probability Convergence (TLSMW Bol. 10)
     if indices_in_stage2 == 3:
         return 75, "HEALTHY", "LONG"
 
@@ -1367,8 +1381,13 @@ def get_market_status() -> MarketStatus:
 
     # P382: market_health_score + label + suggested_mode MOCK->gercek
     # (AÇIK KONU #58 cozumu, Cift Danisma kanit + helper docstring)
+    # P424: FTD simetri — hacim-onayli Follow-Through Day DD baskisini yumusatir
+    # (ftd_result yukarida zaten hesaplandi — compute_follow_through_day).
+    ftd_confirmed = bool(
+        ftd_result.get("ftd_detected") and ftd_result.get("volume_confirmed")
+    )
     health_score, health_label, suggested_mode = _compute_market_health(
-        dd_count, spy_stage, qqq_stage, iwm_stage,
+        dd_count, spy_stage, qqq_stage, iwm_stage, ftd_confirmed=ftd_confirmed,
     )
 
     # P398: VIX MOCK -> gercek yfinance ^VIX (CBOE Volatility Index son kapanış)
