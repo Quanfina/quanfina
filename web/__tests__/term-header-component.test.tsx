@@ -35,7 +35,7 @@ function makeProps(over: Partial<Record<string, unknown>> = {}) {
       sortVal = v;
       (listeners["sortChanged"] ?? []).forEach((cb) => cb());
     },
-  } as never;
+  } as unknown as Parameters<typeof TermHeaderComponent>[0];
 }
 
 describe("TermHeaderComponent — sıralama (P428 fix)", () => {

@@ -169,7 +169,7 @@ export default function PazarHazirligiPage() {
               ) : (
                 <div className="text-sm">
                   <p>
-                    <b>{openPositions.length}</b> açık pozisyon Pazartesi&apos;ye
+                    <b>{openPositions.length}</b>{" "}açık pozisyon Pazartesi&apos;ye
                     taşınıyor. Stop yakınlığı + plan disiplinini kontrol et.
                   </p>
                   <ul className="mt-2 space-y-1">

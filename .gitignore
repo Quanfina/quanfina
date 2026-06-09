@@ -226,6 +226,7 @@ test_pg.py
 test_*.py
 !tests/test_*.py
 _tmp_*.py
+web/_*.mjs
 notebook/
 
 # UX tarama dökümleri (notebook çıktısı, repo dışı)

@@ -233,7 +233,7 @@ export default function Home() {
           >
             <span aria-hidden="true">{theme.emoji}</span>
             <span>
-              <b>{theme.shortMessage}</b> Pazartesi açılış öncesi piyasa Stage 3-4 + MH&lt;30.
+              <b>{theme.shortMessage}</b>{" "}Pazartesi açılış öncesi piyasa Stage 3-4 + MH&lt;30.
               Açık pozisyon stop yönetimi öncelikli, yeni AL aramayı durdur.
             </span>
           </div>
