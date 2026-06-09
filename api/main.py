@@ -67,6 +67,7 @@ from quanfina_math import (  # noqa: E402
     compute_faber_timing,
     compute_mcclellan_oscillator,
     compute_zweig_breadth_thrust,
+    MCCLELLAN_SLOW_EMA,
     MARK_PYRAMID_PILOT_PCT_RANGE,
     MARK_PYRAMID_STANDARD_PCT_RANGE,
     MARK_PYRAMID_FULL_PCT_RANGE,
@@ -1453,30 +1454,99 @@ class ExtraIndicatorsInfo(BaseModel):
     faber: dict
     mcclellan: dict
     zweig: dict
+    breadth_source: str = "scans"  # "scans" | "backfill" | "none"
+
+
+# P426 (31 May 2026 — Sn. Ferit "eski verileri cekerek canlandiramaz miyiz"):
+# minervini_scans sadece ~15 gun var -> McClellan 39 gun gerekiyor. Cozum: scan
+# evreninin GERCEK yfinance fiyat gecmisinden gunluk advance/decline geriye-dolum.
+# Kural #28: gercek tarihsel fiyat -> gercek up/down sayim (MOCK degil). Universe =
+# son scan sembolleri (cap ile hiz/temsil dengesi). Module cache (6h) — gunluk veri.
+_BREADTH_BACKFILL_CACHE: dict = {}
+_BREADTH_BACKFILL_TTL = 6 * 3600  # 6 saat
+_BREADTH_BACKFILL_CAP = 120  # temsili evren (hiz: ~120 sembol ~18s, cache sonrasi 0s)
+
+
+def _breadth_backfill(cap: int = _BREADTH_BACKFILL_CAP) -> tuple[list[int], list[int]]:
+    """Scan evreninin gercek yfinance fiyat gecmisinden gunluk advance/decline.
+
+    McClellan/Zweig icin 39+ gun breadth uretir (DB scan gecmisi yetersizken).
+    cap sembol (son scan, ticker sirali — stabil) x 3-ay Close -> her gun
+    close>prev advance, close<prev decline. Module cache 6 saat.
+
+    Returns (advances, declines) kronolojik, veya ([],[]) fail.
+    """
+    key = ("breadth_backfill", cap)
+    hit = _BREADTH_BACKFILL_CACHE.get(key)
+    if hit is not None and (_now() - hit[0]) < _BREADTH_BACKFILL_TTL:
+        return hit[1]
+    try:
+        from sqlalchemy import text as _sql_text
+        from db_helpers import engine as _engine
+        with _engine.connect() as conn:
+            rows = conn.execute(_sql_text(
+                "SELECT DISTINCT ticker FROM minervini_scans "
+                "WHERE scan_date=(SELECT MAX(scan_date) FROM minervini_scans) "
+                "ORDER BY ticker LIMIT :cap"
+            ), {"cap": cap}).fetchall()
+        syms = [r[0] for r in rows]
+        if len(syms) < 20:
+            return [], []
+        import yfinance as yf
+        df = yf.download(syms, period="3mo", interval="1d",
+                         progress=False, auto_adjust=True)["Close"]
+        if df is None or df.empty:
+            return [], []
+        chg = df.diff()
+        advances = [int(x) for x in (chg > 0).sum(axis=1).tolist()][1:]  # ilk gun NaN
+        declines = [int(x) for x in (chg < 0).sum(axis=1).tolist()][1:]
+        result = (advances, declines)
+        _BREADTH_BACKFILL_CACHE[key] = (_now(), result)
+        return result
+    except Exception:
+        return [], []
 
 
 @app.get("/api/market/extra-indicators", response_model=ExtraIndicatorsInfo)
 def get_extra_indicators() -> ExtraIndicatorsInfo:
     """Faber 10-ay SMA + McClellan Oscillator + Zweig Breadth Thrust.
 
-    Kaynak veri: SPY 252-bar yfinance (Faber) + breadth_history_from_scans
-    (McClellan/Zweig). Yetersiz veri -> helper data_sufficient False döner.
+    Kaynak veri: SPY 252-bar yfinance (Faber) + breadth (McClellan/Zweig).
+    P426: breadth icin once scan gecmisi (breadth_history_from_scans); 39 gunden
+    az ise yfinance backfill (scan evreni gercek fiyat gecmisi). Yetersiz/fail ->
+    helper data_sufficient False (MOCK YOK).
     """
     # Faber: SPY 252 günlük kapanış (P369 gerçek yfinance + fallback)
     spy_closes, _spy_vol = _index_closes_volumes("SPY", 400.0, 252)
     faber = compute_faber_timing(spy_closes)
 
-    # McClellan + Zweig: advances/declines geçmişi (gerçek minervini_scans tarama)
+    # McClellan + Zweig: önce scan geçmişi; McClellan 39 gün gerek, scan yetersizse backfill
     real_breadth = breadth_history_from_scans(days=60)
-    if real_breadth:
+    breadth_source = "none"
+    if real_breadth and len(real_breadth) >= MCCLELLAN_SLOW_EMA:
         advances = [a for a, _ in real_breadth]
         declines = [d for _, d in real_breadth]
+        breadth_source = "scans"
     else:
-        advances, declines = [], []
+        # P426: yfinance backfill (scan evreni gerçek fiyat geçmişi)
+        bf_adv, bf_dec = _breadth_backfill()
+        if bf_adv and len(bf_adv) >= MCCLELLAN_SLOW_EMA:
+            advances, declines = bf_adv, bf_dec
+            breadth_source = "backfill"
+        elif real_breadth:
+            # backfill da olmadi -> en azindan scan geçmişi (Zweig 10 gün için yeter)
+            advances = [a for a, _ in real_breadth]
+            declines = [d for _, d in real_breadth]
+            breadth_source = "scans"
+        else:
+            advances, declines = [], []
+
     mcclellan = compute_mcclellan_oscillator(advances, declines)
     zweig = compute_zweig_breadth_thrust(advances, declines)
 
-    return ExtraIndicatorsInfo(faber=faber, mcclellan=mcclellan, zweig=zweig)
+    return ExtraIndicatorsInfo(
+        faber=faber, mcclellan=mcclellan, zweig=zweig, breadth_source=breadth_source,
+    )
 
 
 # ─── ABD Borsa Takvim Status (Sprint 4-bis.7, 22 May 2026) ───────────────────

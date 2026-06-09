@@ -22,6 +22,15 @@ const FULL: ExtraIndicators = {
   faber: { data_sufficient: true, signal: "INVESTED", price: 739.22, sma_10mo: 682.1, pct_vs_sma: 8.4, days_needed: 210, days_have: 251, says: "" },
   mcclellan: { data_sufficient: false, value: null, signal: null, days_needed: 39, days_have: 11, says: "" },
   zweig: { data_sufficient: true, ema_ratio: 0.536, thrust_active: false, zone: "NEUTRAL", days_needed: 10, days_have: 11, says: "" },
+  breadth_source: "scans",
+};
+
+// P426: backfill ile McClellan canlı senaryo
+const BACKFILL: ExtraIndicators = {
+  faber: FULL.faber,
+  mcclellan: { data_sufficient: true, value: -2.3, signal: "BEARISH", days_needed: 39, days_have: 64, says: "" },
+  zweig: { data_sufficient: true, ema_ratio: 0.546, thrust_active: false, zone: "NEUTRAL", days_needed: 10, days_have: 64, says: "" },
+  breadth_source: "backfill",
 };
 
 describe("MarketIndicatorsPanel", () => {
@@ -66,5 +75,15 @@ describe("MarketIndicatorsPanel", () => {
     setData(FULL);
     render(<MarketIndicatorsPanel />);
     expect(screen.getByText(/MOCK sayı gösterilmez/)).toBeInTheDocument();
+  });
+
+  it("P426 backfill → McClellan canlı (POZİTİF/NEGATİF chip) + backfill footnote", () => {
+    setData(BACKFILL);
+    render(<MarketIndicatorsPanel />);
+    // McClellan artık değer gösterir (gating yok)
+    expect(screen.getByText(/-2\.3 · NEGATİF/)).toBeInTheDocument();
+    expect(screen.queryByText(/veri birikiyor/)).not.toBeInTheDocument();
+    // Footnote backfill kaynağını açıklar
+    expect(screen.getByText(/backfill/)).toBeInTheDocument();
   });
 });

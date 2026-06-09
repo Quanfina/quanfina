@@ -44,6 +44,9 @@ export interface ExtraIndicators {
   faber: FaberIndicator;
   mcclellan: McClellanIndicator;
   zweig: ZweigIndicator;
+  // P426: breadth kaynağı — "scans" (DB scan geçmişi) | "backfill" (yfinance
+  // scan evreni fiyat geçmişi) | "none". UI'da küçük kaynak rozeti.
+  breadth_source?: "scans" | "backfill" | "none";
 }
 
 async function fetchExtraIndicators(): Promise<ExtraIndicators> {

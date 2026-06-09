@@ -22,7 +22,8 @@ const TIPS = {
   mcclellan:
     "McClellan Oscillator: (19-gün EMA − 39-gün EMA) of (yükselen − düşen hisse). " +
     "Pozitif = breadth momentum yukarı, negatif = aşağı; sıfır geçişi momentum dönüşü. " +
-    "Kaynak: mcoscillator.com. 39 günlük tarama geçmişi gerekir.",
+    "Kaynak: mcoscillator.com. Breadth = Quanfina tarama evreni (~120 sembol) gerçek " +
+    "fiyat geçmişinden günlük advance/decline (NYSE-geneli değil, evren-içi).",
   zweig:
     "Zweig Breadth Thrust: 10-günlük [yükselen/(yükselen+düşen)] EMA. Oran 10 gün içinde " +
     "0.40 altından 0.615 üstüne çıkarsa NADİR güçlü boğa başlangıcı sinyali. Kaynak: " +
@@ -150,11 +151,16 @@ export function MarketIndicatorsPanel() {
         </div>
       )}
 
-      {/* Kural #28 dürüstlük notu */}
+      {/* Kural #28 dürüstlük notu + breadth kaynağı şeffaflığı (P426) */}
       <p className="text-[10px] text-muted-foreground/70 leading-relaxed">
-        Gerçek veri: SPY fiyat (yfinance) + günlük tarama breadth. NAAIM/AAII/Put-Call
-        gibi harici sentiment göstergeleri ücretli feed gerektirdiği için eklenmedi
-        (MOCK sayı gösterilmez — Kural #28). McClellan 39 günlük tarama geçmişi biriktikçe canlanır.
+        Gerçek veri: SPY fiyat (yfinance) +{" "}
+        {data?.breadth_source === "backfill"
+          ? "breadth = tarama evreni ~120 sembol gerçek fiyat geçmişinden günlük advance/decline (P426 backfill)"
+          : data?.breadth_source === "scans"
+          ? "breadth = günlük tarama A/D sayımı"
+          : "breadth verisi"}
+        . NAAIM/AAII/Put-Call gibi harici sentiment göstergeleri ücretli feed
+        gerektirdiği için eklenmedi (MOCK sayı gösterilmez — Kural #28).
       </p>
     </div>
   );
