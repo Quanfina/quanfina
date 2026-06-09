@@ -4,6 +4,7 @@ import { use, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Plus } from "lucide-react";
 import { useStockInfo, useOhlcv } from "@/hooks/use-stock";
+import { useStockQuote } from "@/hooks/use-stock-quote";
 import dynamic from "next/dynamic";
 import { StockHeader } from "@/components/stock/StockHeader";
 import { ActiveStrategies } from "@/components/stock/ActiveStrategies";
@@ -56,6 +57,8 @@ export default function HissePage({
 
   const { data: info, isLoading: infoLoading, isError: infoError } = useStockInfo(sym);
   const { data: ohlcv, isLoading: ohlcvLoading } = useOhlcv(sym);
+  // P431: canlı quote (yfinance) — StockHeader bayat info.price yerine canlı göstersin
+  const { data: quote } = useStockQuote(sym);
   // KARAR #733 alt-paket (Paket 39): hisse Stage 4 ise banner'da somut uyarı
   const { data: carrStage } = useCarrStage(sym);
   const isStage4 = carrStage?.stage === 4;
@@ -176,7 +179,7 @@ export default function HissePage({
       {/* Stock header + Trade Aç buton (KARAR #733 alt-paket Paket 46) */}
       <div className="px-6 py-4 border-b flex items-start justify-between gap-3 flex-wrap">
         <div className="flex-1 min-w-0">
-          <StockHeader info={info} />
+          <StockHeader info={info} livePrice={quote?.price} liveChangePct={quote?.change_pct} />
         </div>
         <div className="flex items-center gap-3 shrink-0">
           {/* Paket 224 (27 May 2026): Vizyon İLKE #10 — Hisse detayında mod farkındalığı

@@ -17,8 +17,23 @@ function rsColor(rs: number): string {
 // KARAR ADAY (21 May 2026): Konsensus rozeti kaldirildi. Sn. Ferit talimat:
 // "konsesus kalksin nasil olsa her strateji tabloda farkli satirda gorukucek".
 // Aktif strateji bilgisi alt sekmelerde gosterilebilir (ActiveStrategies komponent).
-export function StockHeader({ info }: { info: StockInfo }) {
-  const isPositive = info.change_pct >= 0;
+// P431 (31 May 2026 — görsel denetim BUG FIX): info.price scan/MOCK BAYAT fiyat
+// (NVDA $875.40) — canlı quote ($206.10) varken yanıltıcıydı (P412 stale-price
+// /hisse karşılığı). livePrice/liveChangePct verilirse onlar gösterilir (yfinance
+// canlı), yoksa info.price fallback. Kural #28: paper trading kararı canlı fiyatla.
+export function StockHeader({
+  info,
+  livePrice,
+  liveChangePct,
+}: {
+  info: StockInfo;
+  livePrice?: number | null;
+  liveChangePct?: number | null;
+}) {
+  const price = livePrice ?? info.price;
+  const changePct = liveChangePct ?? info.change_pct;
+  const isLive = livePrice != null;
+  const isPositive = changePct >= 0;
 
   return (
     <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -48,13 +63,22 @@ export function StockHeader({ info }: { info: StockInfo }) {
       </div>
 
       <div className="flex items-center gap-3 shrink-0">
-        {/* Price + change */}
+        {/* Price + change (P431: canlı quote öncelikli) */}
         <div className="text-right">
           <div
-            className="text-2xl font-bold"
+            className="text-2xl font-bold flex items-baseline gap-1.5 justify-end"
             style={{ fontFamily: "var(--font-jetbrains-mono, monospace)" }}
           >
-            ${info.price.toFixed(2)}
+            ${price.toFixed(2)}
+            {isLive && (
+              <span
+                className="text-[9px] font-semibold uppercase tracking-wider px-1 py-0.5 rounded"
+                style={{ background: "color-mix(in srgb, var(--mtp-good, #4B9CD3) 18%, transparent)", color: "var(--mtp-good, #4B9CD3)" }}
+                title="Anlık piyasa fiyatı (yfinance, 60s yenileme)"
+              >
+                CANLI
+              </span>
+            )}
           </div>
           <div
             className="text-sm"
@@ -64,7 +88,7 @@ export function StockHeader({ info }: { info: StockInfo }) {
             }}
           >
             {isPositive ? "+" : ""}
-            {info.change_pct.toFixed(2)}%
+            {changePct.toFixed(2)}%
           </div>
         </div>
 
