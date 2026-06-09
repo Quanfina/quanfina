@@ -64,6 +64,9 @@ from quanfina_math import (  # noqa: E402
     compute_relative_volume,
     compute_breakout_quality,
     compute_stage_transition,
+    compute_faber_timing,
+    compute_mcclellan_oscillator,
+    compute_zweig_breadth_thrust,
     MARK_PYRAMID_PILOT_PCT_RANGE,
     MARK_PYRAMID_STANDARD_PCT_RANGE,
     MARK_PYRAMID_FULL_PCT_RANGE,
@@ -1439,6 +1442,41 @@ def get_market_status() -> MarketStatus:
         }
     )
     return status
+
+
+# ─── Ek Piyasa Göstergeleri (P425, 31 May 2026 — derin tarama F4/F5/F7) ──────
+# Ana Sayfa altında ayrı bölüm. Faber GTAA + McClellan + Zweig Breadth Thrust.
+# Kural #28: gerçek veri (SPY OHLCV + minervini_scans breadth). Yetersiz veri ->
+# data_sufficient False (MOCK sayı YOK). NAAIM/AAII/Put-Call: harici ücretli feed
+# olmadığı için KODLANMADI (MOCK olur). Tooltip açıklamaları frontend'de.
+class ExtraIndicatorsInfo(BaseModel):
+    faber: dict
+    mcclellan: dict
+    zweig: dict
+
+
+@app.get("/api/market/extra-indicators", response_model=ExtraIndicatorsInfo)
+def get_extra_indicators() -> ExtraIndicatorsInfo:
+    """Faber 10-ay SMA + McClellan Oscillator + Zweig Breadth Thrust.
+
+    Kaynak veri: SPY 252-bar yfinance (Faber) + breadth_history_from_scans
+    (McClellan/Zweig). Yetersiz veri -> helper data_sufficient False döner.
+    """
+    # Faber: SPY 252 günlük kapanış (P369 gerçek yfinance + fallback)
+    spy_closes, _spy_vol = _index_closes_volumes("SPY", 400.0, 252)
+    faber = compute_faber_timing(spy_closes)
+
+    # McClellan + Zweig: advances/declines geçmişi (gerçek minervini_scans tarama)
+    real_breadth = breadth_history_from_scans(days=60)
+    if real_breadth:
+        advances = [a for a, _ in real_breadth]
+        declines = [d for _, d in real_breadth]
+    else:
+        advances, declines = [], []
+    mcclellan = compute_mcclellan_oscillator(advances, declines)
+    zweig = compute_zweig_breadth_thrust(advances, declines)
+
+    return ExtraIndicatorsInfo(faber=faber, mcclellan=mcclellan, zweig=zweig)
 
 
 # ─── ABD Borsa Takvim Status (Sprint 4-bis.7, 22 May 2026) ───────────────────

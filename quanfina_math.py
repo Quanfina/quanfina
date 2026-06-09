@@ -4744,3 +4744,186 @@ def compute_stage_transition(
         'volume_trend': volume_trend,
         'mark_says': says,
     }
+
+
+# =============================================================================
+# P425 (31 May 2026) — Ek Piyasa Göstergeleri (derin tarama F4/F5/F7 sentezi)
+# Kaynak: notebook/analizler/Market_Health_Metodoloji_Arastirma.md
+# Kural #26: her formül kanon kaynaklı + sayısal eşik atıflı. Kural #28: yetersiz
+# veri durumunda MOCK sayı YOK — 'data_sufficient': False + gerekli/mevcut gün.
+# =============================================================================
+
+# Faber GTAA (SSRN 2007) — 10 aylık SMA timing kuralı. Aylık ~21 işlem günü.
+FABER_SMA_MONTHS = 10
+FABER_TRADING_DAYS_PER_MONTH = 21
+
+# McClellan Oscillator — 19/39 günlük EMA (Trend %10/%5 sabitlerine eşdeğer).
+MCCLELLAN_FAST_EMA = 19
+MCCLELLAN_SLOW_EMA = 39
+
+# Zweig Breadth Thrust — 10 günlük EMA, 0.40 -> 0.615 sıçraması (10 gün içinde).
+ZWEIG_EMA_DAYS = 10
+ZWEIG_LOW_THRESHOLD = 0.40
+ZWEIG_HIGH_THRESHOLD = 0.615
+
+
+def _ema(values: list[float], period: int) -> Optional[float]:
+    """Standart EMA (son değer). period+ veri gerek, yoksa None."""
+    if not values or len(values) < period:
+        return None
+    k = 2.0 / (period + 1)
+    ema = sum(values[:period]) / period  # ilk SMA seed
+    for v in values[period:]:
+        ema = v * k + ema * (1 - k)
+    return ema
+
+
+def compute_faber_timing(closes: list[float]) -> dict:
+    """Faber GTAA 10-aylık SMA timing (SSRN 2007, F4 kanon).
+
+    Kural birebir: "Buy when monthly price > 10-month SMA. Sell and move to
+    cash when monthly price < 10-month SMA." Tek girdi: fiyat.
+
+    Args:
+        closes: SPY günlük kapanış (kronolojik, en az 10 ay * 21 ~ 210 gün).
+
+    Returns:
+        dict {
+            'data_sufficient': bool,
+            'signal': 'INVESTED' | 'CASH' | None,   # fiyat > 10mo SMA -> INVESTED
+            'price': float | None,                    # son aylık kapanış
+            'sma_10mo': float | None,
+            'pct_vs_sma': float | None,               # (fiyat-SMA)/SMA * 100
+            'days_needed': int, 'days_have': int,
+            'says': str,
+        }
+    """
+    need = FABER_SMA_MONTHS * FABER_TRADING_DAYS_PER_MONTH  # ~210
+    have = len(closes) if closes else 0
+    if have < need:
+        return {
+            'data_sufficient': False, 'signal': None, 'price': None,
+            'sma_10mo': None, 'pct_vs_sma': None,
+            'days_needed': need, 'days_have': have,
+            'says': f'Yetersiz veri — Faber 10-ay SMA icin ~{need} gun gerek ({have} var).',
+        }
+    # Aylık kapanışlar: her ~21 günde bir (son 10 ay). closes[-1] = en güncel.
+    monthly = closes[-(FABER_SMA_MONTHS * FABER_TRADING_DAYS_PER_MONTH)::FABER_TRADING_DAYS_PER_MONTH]
+    if len(monthly) < FABER_SMA_MONTHS:
+        # ornekleme yetersiz -> son 10 ayi garanti et
+        monthly = [closes[-1 - i * FABER_TRADING_DAYS_PER_MONTH]
+                   for i in range(FABER_SMA_MONTHS)][::-1]
+    sma_10mo = sum(monthly) / len(monthly)
+    price = closes[-1]
+    pct_vs_sma = ((price - sma_10mo) / sma_10mo * 100) if sma_10mo else 0.0
+    invested = price > sma_10mo
+    return {
+        'data_sufficient': True,
+        'signal': 'INVESTED' if invested else 'CASH',
+        'price': round(price, 2),
+        'sma_10mo': round(sma_10mo, 2),
+        'pct_vs_sma': round(pct_vs_sma, 2),
+        'days_needed': need, 'days_have': have,
+        'says': ('Fiyat 10-ay SMA ustunde -> yatirimli (Faber GTAA AL).'
+                 if invested else
+                 'Fiyat 10-ay SMA altinda -> nakit (Faber GTAA SAT).'),
+    }
+
+
+def compute_mcclellan_oscillator(advances: list[int], declines: list[int]) -> dict:
+    """McClellan Oscillator (F7 kanon): (19g EMA - 39g EMA) of (adv - dec).
+
+    Pozitif = breadth momentum yukari, negatif = asagi. Sifir cizgisi gecisleri
+    momentum donusu. Kaynak: mcoscillator.com + StockCharts (19/39 EMA, %10/%5
+    Trend sabitlerine matematiksel esdegerdir).
+
+    Args:
+        advances/declines: günlük yükselen/düşen sayısı (kronolojik).
+
+    Returns:
+        dict {'data_sufficient': bool, 'value': float|None, 'signal': str|None,
+              'days_needed': int, 'days_have': int, 'says': str}
+    """
+    need = MCCLELLAN_SLOW_EMA  # 39
+    have = min(len(advances), len(declines)) if advances and declines else 0
+    if have < need:
+        return {
+            'data_sufficient': False, 'value': None, 'signal': None,
+            'days_needed': need, 'days_have': have,
+            'says': f'Yetersiz veri — McClellan icin {need} gun gerek ({have} var, birikiyor).',
+        }
+    net = [a - d for a, d in zip(advances, declines)]
+    fast = _ema(net, MCCLELLAN_FAST_EMA)
+    slow = _ema(net, MCCLELLAN_SLOW_EMA)
+    if fast is None or slow is None:
+        return {
+            'data_sufficient': False, 'value': None, 'signal': None,
+            'days_needed': need, 'days_have': have,
+            'says': 'EMA hesaplanamadi.',
+        }
+    value = fast - slow
+    signal = 'BULLISH' if value > 0 else 'BEARISH'
+    return {
+        'data_sufficient': True,
+        'value': round(value, 1),
+        'signal': signal,
+        'days_needed': need, 'days_have': have,
+        'says': (f'McClellan {round(value,1)} > 0 -> breadth momentum yukari.'
+                 if value > 0 else
+                 f'McClellan {round(value,1)} < 0 -> breadth momentum asagi.'),
+    }
+
+
+def compute_zweig_breadth_thrust(advances: list[int], declines: list[int]) -> dict:
+    """Zweig Breadth Thrust (F-research): 10 günlük EMA of adv/(adv+dec).
+
+    Thrust = EMA 10 gün içinde 0.40 altından 0.615 üstüne çıkarsa (nadir,
+    güçlü boğa başlangıcı sinyali). Kaynak: Martin Zweig "Winning on Wall
+    Street". Burada mevcut EMA + thrust durumu döner.
+
+    Args:
+        advances/declines: günlük yükselen/düşen (kronolojik, >=10 gün).
+
+    Returns:
+        dict {'data_sufficient': bool, 'ema_ratio': float|None,
+              'thrust_active': bool, 'zone': str|None, ...}
+    """
+    need = ZWEIG_EMA_DAYS  # 10
+    have = min(len(advances), len(declines)) if advances and declines else 0
+    if have < need:
+        return {
+            'data_sufficient': False, 'ema_ratio': None, 'thrust_active': False,
+            'zone': None, 'days_needed': need, 'days_have': have,
+            'says': f'Yetersiz veri — Zweig icin {need} gun gerek ({have} var).',
+        }
+    # adv/(adv+dec) oranlari -> 10 gunluk EMA
+    ratios = [a / (a + d) if (a + d) > 0 else 0.5 for a, d in zip(advances, declines)]
+    ema_ratio = _ema(ratios, ZWEIG_EMA_DAYS)
+    if ema_ratio is None:
+        return {
+            'data_sufficient': False, 'ema_ratio': None, 'thrust_active': False,
+            'zone': None, 'days_needed': need, 'days_have': have,
+            'says': 'EMA hesaplanamadi.',
+        }
+    # Thrust event tespiti icin EMA serisinin 10 gun once <0.40, simdi >0.615
+    # olmasi gerek. Tek-nokta EMA ile event tespiti sinirli -> zone bildir.
+    if ema_ratio >= ZWEIG_HIGH_THRESHOLD:
+        zone = 'THRUST_ZONE'
+    elif ema_ratio <= ZWEIG_LOW_THRESHOLD:
+        zone = 'OVERSOLD'
+    else:
+        zone = 'NEUTRAL'
+    return {
+        'data_sufficient': True,
+        'ema_ratio': round(ema_ratio, 3),
+        'thrust_active': ema_ratio >= ZWEIG_HIGH_THRESHOLD,
+        'zone': zone,
+        'low_threshold': ZWEIG_LOW_THRESHOLD,
+        'high_threshold': ZWEIG_HIGH_THRESHOLD,
+        'days_needed': need, 'days_have': have,
+        'says': {
+            'THRUST_ZONE': f'10g A/D EMA {round(ema_ratio,3)} >= 0.615 -> Breadth Thrust bolgesi (guclu boga).',
+            'OVERSOLD': f'10g A/D EMA {round(ema_ratio,3)} <= 0.40 -> asiri satim (thrust adayi).',
+            'NEUTRAL': f'10g A/D EMA {round(ema_ratio,3)} -> notr bolge (0.40-0.615 arasi).',
+        }[zone],
+    }

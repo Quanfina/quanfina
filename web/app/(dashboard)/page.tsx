@@ -12,6 +12,7 @@ import { useWatchlist } from "@/hooks/use-watchlist";
 import { formatDateTR } from "@/lib/format-date";
 import { getDoneItems, toggleItem } from "@/lib/daily-checklist";
 import { MindsetCardWidget } from "@/components/dashboard/MindsetCard";
+import { MarketIndicatorsPanel } from "@/components/market/MarketIndicatorsPanel";
 import { PortfolioSummaryCard } from "@/components/dashboard/PortfolioSummaryCard";
 import { AlertHistoryCard } from "@/components/dashboard/AlertHistoryCard";
 import { MarkRegimeBanner } from "@/components/mark/MarkRegimeBanner";
@@ -742,6 +743,11 @@ export default function Home() {
           </div>
         )}
       </div>
+
+      {/* P425 (31 May 2026): Ek Piyasa Göstergeleri — Ana Sayfa altı ayrı bölüm.
+          Derin araştırma sentezi (Faber GTAA + McClellan + Zweig Breadth Thrust),
+          her gösterge (?) tooltip açıklamalı. Kural #28: yetersiz veri MOCK değil. */}
+      <MarketIndicatorsPanel />
 
       {/* KARAR ADAY #720 (24 May 2026): Daily Mindset Cards — Mark birebir alıntılı zihinsel disiplin */}
       <MindsetCardWidget />
