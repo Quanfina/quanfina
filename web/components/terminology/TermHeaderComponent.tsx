@@ -42,13 +42,17 @@ export function TermHeaderComponent(props: TermHeaderParams) {
       <span
         onClick={handleSortClick}
         className={
+          // P429: truncate KALDIRILDI — P428'de eklenen "truncate" RS IBD (90px) +
+          // EPS Q/Q (100px) gibi dar kolonlarda başlığı "RS I..." kırpıyordu.
+          // flex-1 min-w-0 KORUNDU (tüm header tıklanabilir = sort alanı), sadece
+          // inner truncate gitti; kısa başlık tam görünür, uzun olanı cell clip eder.
           enableSorting
             ? "flex items-center gap-0.5 cursor-pointer flex-1 min-w-0"
             : "flex items-center gap-0.5 flex-1 min-w-0"
         }
         data-testid="term-header-sort"
       >
-        <span className="truncate">{displayName}</span>
+        <span className="whitespace-nowrap">{displayName}</span>
         {sort === "asc" && <span aria-hidden="true" className="text-[10px] opacity-70">▲</span>}
         {sort === "desc" && <span aria-hidden="true" className="text-[10px] opacity-70">▼</span>}
       </span>
