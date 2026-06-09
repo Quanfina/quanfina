@@ -351,6 +351,32 @@ SCREENS_READY_9 = {
 SCREENS_READY_8 = SCREENS_READY_9
 
 
+# P423 (31 May 2026 — Kural #28 TEMEL "D" belirsizligi cozumu):
+# scanner_helpers._compute_grade eps_qoq VEYA sales_qoq None oldugunda "D" doner
+# (yetersiz veri) — gercekten zayif temel (EPS<%20) de "D" doner. UI'da ikisi
+# ayni kirmizi pill = yaniltici (paper trading karari). Bu helper ayrimi yapar:
+# grade_no_data=True -> "D" sadece VERI YOK demek (zayif degil), UI gri gosterir.
+_EMPTY_PCT_TOKENS = {"", "-", "n/a", "na", "none", "nan", "—", "null"}
+
+
+def _is_empty_pct(v) -> bool:
+    """eps_qoq / sales_qoq TEXT degeri 'veri yok' mu? (None, bos, '-', 'N/A' vb.)"""
+    if v is None:
+        return True
+    return str(v).strip().lower() in _EMPTY_PCT_TOKENS
+
+
+def _grade_no_data(grade, eps_qoq, sales_qoq) -> bool:
+    """grade='D' SADECE veri eksikligiden mi? (zayif temel DEGIL).
+
+    _compute_grade: eps_qoq VEYA sales_qoq None -> 'D'. Yani D + (biri bos) =
+    veri yok. D + (ikisi de dolu sayi) = gercekten zayif. A/B/C zaten veri var.
+    """
+    if grade != "D":
+        return False
+    return _is_empty_pct(eps_qoq) or _is_empty_pct(sales_qoq)
+
+
 def screen_get_results(slug: str, limit: int = 500) -> list[dict]:
     """
     Sprint 4-bis.1b — Verilen ready screen slug'una göre minervini_scans tablosundan
@@ -387,6 +413,10 @@ def screen_get_results(slug: str, limit: int = 500) -> list[dict]:
     # (scanner.py ALTER TABLE ile ekler, ama Cloud SQL'e deploy edilmemis)
     # Defensive: NULL hard-coded, scanner deploy sonrasi grade SELECT edilir
     grade_expr = "NULL::TEXT AS grade" if table_name == "minervini_fundamental_scans" else "grade"
+    # P423: eps_qoq/sales_qoq kolonlari minervini_fundamental_scans'te YOK (scanner.py
+    # ALTER sadece minervini_scans + fundamental_only'e ekliyor). Defensif NULL.
+    eps_expr = "NULL::TEXT AS eps_qoq" if table_name == "minervini_fundamental_scans" else "eps_qoq"
+    sales_expr = "NULL::TEXT AS sales_qoq" if table_name == "minervini_fundamental_scans" else "sales_qoq"
 
     # Idempotent + parametre safety:
     # - filter SCREENS_READY_8 sabit dict'ten (SQL injection riski yok)
@@ -401,8 +431,12 @@ def screen_get_results(slug: str, limit: int = 500) -> list[dict]:
     # (ScreenResultRow tipinde optional). Migration uygulandiginda geri eklenecek.
     # Sn. Ferit talimat (22 May 2026): "Adim 1 + Cup-Handle + Pocket Pivot tumu calisir...
     # bunlarida yapicaz ama hemen degil" -> B patch.
+    # P423: eps_qoq + sales_qoq SELECT'e eklendi (grade_no_data ayrimi icin).
+    # Tum hedef tablolar (minervini_scans + fundamental_*) bu kolonlara sahip
+    # (scanner.py CREATE/ALTER). fundamental_scans'te NULL gelebilir -> _is_empty_pct True.
     query = f"""
-        SELECT ticker AS symbol, {grade_expr}, rs_ibd, price, {passed_expr}, scan_date
+        SELECT ticker AS symbol, {grade_expr}, rs_ibd, price, {passed_expr}, scan_date,
+               {eps_expr}, {sales_expr}
         FROM {table_name}
         WHERE scan_date = (SELECT MAX(scan_date) FROM {table_name})
           AND {sql_filter}
@@ -420,6 +454,8 @@ def screen_get_results(slug: str, limit: int = 500) -> list[dict]:
                 d["price"] = float(d["price"])
             if d.get("rs_ibd") is not None:
                 d["rs_ibd"] = int(round(float(d["rs_ibd"])))
+            # P423: grade_no_data ayrimi (D=veri yok vs D=zayif)
+            d["grade_no_data"] = _grade_no_data(d.get("grade"), d.get("eps_qoq"), d.get("sales_qoq"))
             rows.append(d)
         return rows
 
@@ -536,9 +572,10 @@ def screen_parse_get_results(slug: str, limit: int = 500) -> list[dict]:
 
     sql_filter = SCREENS_PARSE_7[slug]["sql"].strip()
 
+    # P423: eps_qoq + sales_qoq -> grade_no_data ayrimi (minervini_scans her ikisine sahip)
     query = f"""
         SELECT ticker AS symbol, grade, rs_ibd, price, passed, scan_date,
-               confirmations, violations
+               confirmations, violations, eps_qoq, sales_qoq
         FROM minervini_scans
         WHERE scan_date = (SELECT MAX(scan_date) FROM minervini_scans)
           AND {sql_filter}
@@ -555,6 +592,7 @@ def screen_parse_get_results(slug: str, limit: int = 500) -> list[dict]:
                 d["price"] = float(d["price"])
             if d.get("rs_ibd") is not None:
                 d["rs_ibd"] = int(round(float(d["rs_ibd"])))
+            d["grade_no_data"] = _grade_no_data(d.get("grade"), d.get("eps_qoq"), d.get("sales_qoq"))
             rows.append(d)
         return rows
 
@@ -736,6 +774,7 @@ def screen_diff_get_results(slug: str, limit: int = 500) -> list[dict]:
     query = f"""
         WITH current_scan AS (
             SELECT ticker, scan_date, grade, rs_ibd, price, passed,
+                   eps_qoq, sales_qoq,
                    ({grade_rank_expr}) AS grade_rank
             FROM minervini_scans
             WHERE scan_date = (SELECT MAX(scan_date) FROM minervini_scans)
@@ -763,7 +802,8 @@ def screen_diff_get_results(slug: str, limit: int = 500) -> list[dict]:
               AND ((SELECT MAX(scan_date)::date FROM minervini_scans) - INTERVAL '6 days')
             ORDER BY ticker, scan_date DESC
         )
-        SELECT g.ticker AS symbol, g.grade, g.rs_ibd, g.price, g.passed, g.scan_date
+        SELECT g.ticker AS symbol, g.grade, g.rs_ibd, g.price, g.passed, g.scan_date,
+               g.eps_qoq, g.sales_qoq
         FROM current_scan g
         LEFT JOIN previous_scan p ON g.ticker = p.ticker
         LEFT JOIN prev_7d p7 ON g.ticker = p7.ticker
@@ -781,6 +821,7 @@ def screen_diff_get_results(slug: str, limit: int = 500) -> list[dict]:
                 d["price"] = float(d["price"])
             if d.get("rs_ibd") is not None:
                 d["rs_ibd"] = int(round(float(d["rs_ibd"])))
+            d["grade_no_data"] = _grade_no_data(d.get("grade"), d.get("eps_qoq"), d.get("sales_qoq"))
             rows.append(d)
         return rows
 

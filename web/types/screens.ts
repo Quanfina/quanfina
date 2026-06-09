@@ -73,6 +73,10 @@ export interface ScreenResultRow {
   // KARAR #733 alt-paket (Paket 83, 26 May 2026): Pivot Breakout status
   // P81 Sinyaller + P82 Watchlist paten — Tarama'da AL/Zayıf/Yakın/Altı kolon
   pivot_status?: "CONFIRMED" | "WEAK" | "NEAR_PIVOT" | "BELOW_PIVOT" | null;
+  // P423 (31 May 2026 — Kural #28): grade='D' SADECE eps/sales verisi yok demekse
+  // true (gerçekten zayıf DEĞİL). UI gri "D" + "veri yok" tooltip; gerçek zayıf
+  // D kırmızı kalır. Backend db_helpers._grade_no_data hesabı.
+  grade_no_data?: boolean | null;
 }
 
 /**

@@ -324,6 +324,11 @@ class ScreenResultRow(BaseModel):
     # KARAR #733 alt-paket (Paket 83, 26 May 2026): Pivot Breakout status
     # P81+P82 paten — Tarama'da AL/Zayıf/Yakın/Altı kolon
     pivot_status: Optional[Literal["CONFIRMED", "WEAK", "NEAR_PIVOT", "BELOW_PIVOT"]] = None
+    # P423 (31 May 2026 — Kural #28 TEMEL "D" belirsizligi): grade='D' SADECE
+    # eps_qoq/sales_qoq verisi yok demekse True (gercekten zayif DEGIL). UI gri
+    # "D" + "veri yok" tooltip gosterir; gercek zayif D kirmizi kalir. db_helpers
+    # _grade_no_data hesabi (eps/sales bos -> True).
+    grade_no_data: Optional[bool] = None
 
 
 @app.get("/api/screens", response_model=list[ScreenMeta])
@@ -458,7 +463,8 @@ def get_screen_results(slug: str, limit: int = 500, nocache: bool = False) -> li
         return _screens_mock_results(slug, limit)
     db_results = [ScreenResultRow(**{k: r.get(k) for k in
                                 ("symbol","grade","rs_ibd","price","passed","scan_date",
-                                 "vcp_quality_score","vcp_ready_score","power_play_pass")})
+                                 "vcp_quality_score","vcp_ready_score","power_play_pass",
+                                 "grade_no_data")})  # P423: TEMEL "D" veri-yok ayrimi
             for r in rows]
     # KARAR #733 alt-paket (Paket 83): pivot_status enrichment (DB yol)
     # P415 (31 May 2026): Sira-i enrichment 228 satir × ~150ms yfinance =

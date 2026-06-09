@@ -25,7 +25,7 @@ import { useMemo, useRef, useState } from "react";
 import { useGridTheme } from "@/hooks/use-grid-theme";
 import "@/lib/ag-grid-setup"; // AG Grid modül kaydı (Paket 355 — bundle split)
 import { AgGridReact } from "ag-grid-react";
-import type { ColDef, CellClassParams } from "ag-grid-community";
+import type { ColDef, CellClassParams, ICellRendererParams } from "ag-grid-community";
 import { useScreenResults } from "@/hooks/use-screen-results";
 import { useGridColumnState } from "@/hooks/use-grid-column-state";
 import type { ScreenSlug, ScreenResultRow } from "@/types/screens";
@@ -104,8 +104,31 @@ export default function ScreensPage() {
           "C=EPS>%20&Satış>%10 / D=zayıf VEYA veri yok. Teknik tarama PASS + temel kalite.",
         width: 75,
         minWidth: 60,
-        cellRenderer: (p: { value: string | null }) => {
+        cellRenderer: (p: ICellRendererParams<ScreenResultRow, string>) => {
           if (!p.value) return <span style={{ color: "#888" }}>—</span>;
+          // P423 (Kural #28): grade='D' + grade_no_data → EPS/Satış verisi YOK
+          // (gerçekten zayıf değil). Kırmızı "D" yerine gri nötr "D?" + tooltip —
+          // paper trading kararı "zayıf hisse mi, veri mi eksik" karışmasın.
+          if (p.value === "D" && p.data?.grade_no_data) {
+            return (
+              <span
+                title="EPS/Satış Q/Q verisi yok — zayıf temel DEĞİL, sadece veri eksik (Kural #28)"
+                style={{
+                  display: "inline-block",
+                  padding: "2px 8px",
+                  borderRadius: 9999,
+                  background: "color-mix(in srgb, var(--muted-foreground) 15%, transparent)",
+                  color: "var(--muted-foreground)",
+                  fontWeight: 600,
+                  fontSize: 12,
+                  minWidth: 32,
+                  textAlign: "center",
+                }}
+              >
+                D?
+              </span>
+            );
+          }
           const s = GRADE_STYLE[p.value];
           if (!s) return <span>{p.value}</span>;
           return (
