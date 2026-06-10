@@ -341,7 +341,10 @@ export default function Home() {
                   className="flex items-center justify-between text-sm py-1.5 px-1 hover:bg-accent/50 rounded transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="font-semibold tracking-tight w-14">{s.symbol}</span>
+                    {/* P434: sembol /hisse detayına tıklanabilir (P433 Sinyaller paten) */}
+                    <Link href={`/hisse/${s.symbol}`} className="font-semibold tracking-tight w-14 hover:underline hover:text-foreground transition-colors">
+                      {s.symbol}
+                    </Link>
                     {s.is_new_today && (
                       <span
                         className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
@@ -632,7 +635,10 @@ export default function Home() {
                 className="flex items-center justify-between text-sm py-1.5 px-1 hover:bg-accent/50 rounded transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  <span className="font-semibold tracking-tight w-14">{t.symbol}</span>
+                  {/* P434: sembol /hisse detayına tıklanabilir (P433 paten) */}
+                  <Link href={`/hisse/${t.symbol}`} className="font-semibold tracking-tight w-14 hover:underline hover:text-foreground transition-colors">
+                    {t.symbol}
+                  </Link>
                   <span className="text-xs text-muted-foreground capitalize">{t.strategy}</span>
                   <span className="text-xs text-muted-foreground">{t.setup_type}</span>
                   <span className="text-xs text-muted-foreground">

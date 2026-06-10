@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import Link from "next/link";
 import { ShieldAlert, TrendingDown } from "lucide-react";
 import { useTrades } from "@/hooks/use-trades";
 import { usePortfolioValue } from "@/hooks/use-portfolio-value";
@@ -151,7 +152,10 @@ export function OpenPositionsRiskPanel({ portfolioValue: portfolioValueProp }: P
           const color = riskColor(p.pctRisk, p.hasStop);
           return (
             <li key={p.id} className="flex items-center gap-2 text-xs">
-              <span className="font-mono font-semibold w-14 shrink-0">{p.symbol}</span>
+              {/* P434: sembol /hisse detayına tıklanabilir (P433 paten) */}
+              <Link href={`/hisse/${p.symbol}`} className="font-mono font-semibold w-14 shrink-0 hover:underline hover:text-foreground transition-colors">
+                {p.symbol}
+              </Link>
               {/* Risk barı (görsel ısı) */}
               <div className="flex-1 h-2 rounded-full bg-muted/40 overflow-hidden">
                 <div
