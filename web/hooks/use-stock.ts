@@ -10,7 +10,9 @@ async function fetchStockInfo(symbol: string): Promise<StockInfo> {
 }
 
 async function fetchOhlcv(symbol: string): Promise<OhlcvBar[]> {
-  const res = await fetch(`/api/stock/${symbol}/ohlcv`);
+  // P435: bars=460 (200 MA warmup + ~252 görünür). MA200 grafiğin tüm görünür
+  // aralığında dolu olsun (PriceChart son ~252 bara zoom eder).
+  const res = await fetch(`/api/stock/${symbol}/ohlcv?bars=460`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }

@@ -2353,17 +2353,21 @@ def _fetch_ohlcv_real(symbol: str, n_bars: int = 252) -> Optional[list[OhlcvBar]
     sym = symbol.upper()
     now = _time_module.time()
 
-    # Cache hit?
+    # Cache hit? (P435: cache TAM 2y saklar, çağrana göre n_bars dilimlenir)
     if sym in _OHLCV_CACHE:
         ts, bars = _OHLCV_CACHE[sym]
         if now - ts < _OHLCV_CACHE_TTL_SEC:
-            return bars
+            return bars[-n_bars:] if n_bars and len(bars) > n_bars else bars
 
-    # yfinance fetch
+    # yfinance fetch — P435: MA200 warmup için 2y çek (n_bars>252 grafik isteği).
+    # MA200 = 200 bar warmup gerektirir; 1y (252) çekince grafik son ~52 günde
+    # MA200 başlıyordu. 2y fetch + n_bars dilim → grafik (n_bars=460) son 252'de
+    # MA200 tam dolu (200 warmup + 252 görünür). Compute helper'lar (n_bars=252)
+    # son 252'yi alır — davranış değişmez (recent data aynı).
     try:
         import yfinance as yf
         ticker = yf.Ticker(sym)
-        hist = ticker.history(period="1y")
+        hist = ticker.history(period="2y")
         if len(hist) < 10:
             return None
         bars: list[OhlcvBar] = []
@@ -2380,8 +2384,8 @@ def _fetch_ohlcv_real(symbol: str, n_bars: int = 252) -> Optional[list[OhlcvBar]
                 time=date_idx.strftime("%Y-%m-%d"),
                 open=o, high=h, low=lo, close=c, volume=int(v),
             ))
-        _OHLCV_CACHE[sym] = (now, bars)
-        return bars
+        _OHLCV_CACHE[sym] = (now, bars)  # P435: tam 2y sakla
+        return bars[-n_bars:] if n_bars and len(bars) > n_bars else bars
     except ImportError:
         _YF_DISABLED = True
         return None
@@ -2954,7 +2958,10 @@ def get_stage_transition(symbol: str) -> StageTransitionInfo:
 
 
 @app.get("/api/stock/{symbol}/ohlcv", response_model=list[OhlcvBar])
-def get_stock_ohlcv(symbol: str) -> list[OhlcvBar]:
+def get_stock_ohlcv(symbol: str, bars: int = 252) -> list[OhlcvBar]:
+    # P435: bars param (default 252 geriye uyum). Grafik MA200 warmup için 460
+    # ister (200 warmup + ~252 görünür) → MA200 tüm görünür aralıkta dolu.
+    bars = max(60, min(bars, 504))  # 60..504 (2y) sınır
     sym = symbol.upper()
     stock = _STOCK_BY_SYM.get(sym)
     if stock:
@@ -2970,7 +2977,7 @@ def get_stock_ohlcv(symbol: str) -> list[OhlcvBar]:
             # 24 May 2026 — Tarama sonucu fallback (KARAR ADAY #498)
             scan_data = _fetch_scan_symbol_data(sym)
             price = scan_data["price"] if scan_data else 100.0  # Generic MOCK son fallback
-    return _get_ohlcv(sym, price)
+    return _get_ohlcv(sym, price, bars)  # P435: bars (MA200 warmup)
 
 
 # =============================================================================

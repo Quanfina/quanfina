@@ -114,7 +114,14 @@ export function PriceChart({ data }: PriceChartProps) {
     const panes = chart.panes();
     if (panes[1]) panes[1].setHeight(VOLUME_HEIGHT);
 
-    chart.timeScale().fitContent();
+    // P435: MA200 warmup — backend 460 bar (200 warmup + ~252 görünür) verir.
+    // Tümünü fit etmek 18 ay gösterirdi; son ~252 bara (1 yıl) zoom → MA200
+    // görünür aralıkta tam dolu, sol scroll'da geçmiş + MA200 doğal başlangıcı.
+    if (data.length > 252) {
+      chart.timeScale().setVisibleLogicalRange({ from: data.length - 252, to: data.length - 1 });
+    } else {
+      chart.timeScale().fitContent();
+    }
 
     const handleResize = () => {
       if (containerRef.current) {
