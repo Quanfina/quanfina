@@ -128,9 +128,14 @@ export default function Home() {
   const topSignals = (signals.data ?? []).slice(0, 5);
   // P438 (Kural #28): canlı fiyat — s.price = web_watchlist.price bayat snapshot.
   const topQuotes = useStockQuotes(topSignals.map((s) => s.symbol));
+  // P445 (review Kural #28 fix): SADECE yfinance (source guard). Mock quote
+  // (yfinance erişilemiyor) haritaya girmez → değer s.price snapshot'a düşer +
+  // label "canlı yfinance" demez. Eski hali mock'u "Canlı yfinance" sanıyordu.
   const topQuoteMap = useMemo(() => {
     const m = new Map<string, number>();
-    topQuotes.forEach((r) => { if (r.data) m.set(r.data.symbol.toUpperCase(), r.data.price); });
+    topQuotes.forEach((r) => {
+      if (r.data && r.data.source === "yfinance") m.set(r.data.symbol.toUpperCase(), r.data.price);
+    });
     return m;
   }, [topQuotes]);
 
@@ -411,13 +416,29 @@ export default function Home() {
                         {s.relative_volume >= 1.5 ? "🔥" : "💤"} {s.relative_volume.toFixed(2)}×
                       </span>
                     )}
-                    <span
-                      className="font-semibold"
-                      style={{ fontFamily: "var(--font-jetbrains-mono, monospace)" }}
-                      title="Canlı yfinance fiyatı (P438 — snapshot değil)"
-                    >
-                      {fmtUsd(topQuoteMap.get(s.symbol.toUpperCase()) ?? s.price)}
-                    </span>
+                    {(() => {
+                      // P445: canlı yfinance varsa onu, yoksa s.price snapshot.
+                      // Label kaynağa göre dürüst (Kural #28 — mock'u "canlı" sanma).
+                      const live = topQuoteMap.get(s.symbol.toUpperCase());
+                      const isLive = live != null;
+                      return (
+                        <span
+                          className="font-semibold"
+                          style={{
+                            fontFamily: "var(--font-jetbrains-mono, monospace)",
+                            color: isLive ? undefined : "#F59E0B",
+                          }}
+                          title={
+                            isLive
+                              ? "Canlı yfinance fiyatı"
+                              : "Snapshot fiyat — canlı veri yok (yfinance erişilemiyor)"
+                          }
+                        >
+                          {fmtUsd(live ?? s.price)}
+                          {!isLive && <span className="ml-0.5 text-[9px]">~</span>}
+                        </span>
+                      );
+                    })()}
                   </div>
                 </div>
               ))}

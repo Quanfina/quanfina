@@ -204,13 +204,23 @@ export default function SignalsPage() {
       field: "price",
       headerName: "Fiyat",
       // P438 (Kural #28): canlı yfinance fiyatı (current_price enrich), bayat
-      // web_watchlist.price snapshot fallback. Önce bayat $ gösteriyordu.
-      headerTooltip: "Canlı yfinance fiyatı (snapshot değil)",
+      // web_watchlist.price snapshot fallback.
+      headerTooltip: "Canlı yfinance fiyatı (yfinance erişilemezse snapshot)",
       width: 100,
       type: "rightAligned",
       valueGetter: (p) => p.data?.current_price ?? p.data?.price,
       valueFormatter: (p) => fmtUsd(p.value as number),
-      cellStyle: MONO_RIGHT,
+      // P445 (review Kural #28 fix): quote_source tüketilir (eski dead field).
+      // Mock (yfinance erişilemiyor) → amber + tooltip "sentetik"; eski hali
+      // mock fiyatı sessizce "Canlı yfinance" gibi gösteriyordu.
+      cellStyle: (p: CellClassParams<Signal>) =>
+        p.data?.quote_source === "mock"
+          ? { ...MONO_RIGHT, color: "#F59E0B" }
+          : MONO_RIGHT,
+      tooltipValueGetter: (p) =>
+        p.data?.quote_source === "mock"
+          ? "Sentetik fiyat — yfinance erişilemiyor (paper trading için güvenilmez)"
+          : "Canlı yfinance fiyatı",
     },
     {
       field: "stop_loss",

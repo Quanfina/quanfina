@@ -188,8 +188,13 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
   useEffect(() => {
     const justOpened = open && !openPrevRef.current;
     openPrevRef.current = open;
+    // P445 (review regresyon fix): reset'i initialData kontrolünden ÖNCE yap.
+    // Journal dialog'u initialData OLMADAN açılır (journal/page.tsx); eski hali
+    // initialData yoksa erken dönüp ref'i sıfırlamıyordu → kullanıcı bir kez elle
+    // düzenleyince P437 canlı quote auto-prefill dialog ömrü boyunca sessizce
+    // kilitleniyordu. Her açılışta (initialData olsun olmasın) temiz başla.
+    if (justOpened) userEditedEntryRef.current = false;
     if (!justOpened || !initialData) return;
-    userEditedEntryRef.current = false;
     if (initialData.symbol !== undefined) setSymbol(initialData.symbol);
     if (initialData.strategy !== undefined) setStrategy(initialData.strategy);
     if (initialData.setup_type !== undefined) setSetupType(initialData.setup_type);
@@ -233,6 +238,8 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
     setPlanSizePct(""); setPlanExitStrategy(""); setPlanTimeHorizon("swing");
     // Paket 227: Defansif override checkbox reset
     setDefansifOverride(false);
+    // P445 (review fix): kapanış/success'te de canlı-quote prefill kilidini aç.
+    userEditedEntryRef.current = false;
   }
 
   function handleOpenChange(v: boolean) {
