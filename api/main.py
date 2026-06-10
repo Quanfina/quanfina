@@ -2895,6 +2895,13 @@ class BreakoutQualityInfo(BaseModel):
     category: Optional[Literal["EXCELLENT", "GOOD", "MARGINAL", "POOR"]] = None
     breakdown: dict = {}
     mark_says: str
+    # P443 (10 Haz 2026 — Kural #28): hangi breakdown bileşenleri GERÇEK hesaplanıyor.
+    # Şu an sadece "volume" (rel_vol'den). gap_up/breakout_strength/prior_contraction/
+    # overhead_clean HARDCODED MOCK (AÇIK KONU #75 — gerçek pivot tarihi yok) →
+    # kompozit skorun 4/5'i anlamsız. UI bunları "hesaplanmadı" işaretler, yanıltıcı
+    # tam-skor sunumu önlenir. Gerçek hesap (compute_breakout_quality'ye gerçek
+    # pivot/gap/VCP besle) AÇIK KONU #75 follow-up.
+    real_components: list[str] = []
 
 
 @app.get("/api/stock/{symbol}/breakout-quality", response_model=BreakoutQualityInfo)
@@ -2934,11 +2941,14 @@ def get_breakout_quality(symbol: str) -> BreakoutQualityInfo:
         prior_contraction=False,
         overhead_clean=False,
     )
+    # P443 (Kural #28): sadece volume gercek; digerleri hardcoded → UI isaretler.
     return BreakoutQualityInfo(
         score=result.get("score", 0),
         category=result.get("category"),
         breakdown=result.get("breakdown", {}),
-        mark_says=result.get("mark_says", ""),
+        real_components=["volume"],
+        mark_says="(Kısmi: yalnız Hacim gerçek hesaplanıyor — AÇIK KONU #75) "
+        + result.get("mark_says", ""),
     )
 
 

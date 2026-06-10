@@ -20,6 +20,9 @@ export interface BreakoutQualityInfo {
     overhead_clean?: number;
   };
   mark_says: string;
+  // P443 (Kural #28): GERÇEK hesaplanan breakdown bileşenleri (şu an ["volume"]).
+  // Diğerleri hardcoded MOCK (AÇIK KONU #75) → kart "hesaplanmadı" işaretler.
+  real_components?: string[];
 }
 
 async function fetchBQ(symbol: string): Promise<BreakoutQualityInfo> {

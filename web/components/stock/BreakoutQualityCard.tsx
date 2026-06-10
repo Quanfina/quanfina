@@ -115,7 +115,18 @@ export function BreakoutQualityCard({ symbol }: { symbol: string }) {
         >
           {data.score}
         </span>
-        <span className="text-[10px] text-muted-foreground italic">/ 100</span>
+        <span className="text-[10px] text-muted-foreground italic">
+          / 100
+          {(data.real_components?.length ?? 5) < 5 && (
+            <span
+              className="ml-1 font-semibold not-italic"
+              style={{ color: "#F59E0B" }}
+              title="Skorun bir kısmı hesaplanmadı (hardcoded MOCK — AÇIK KONU #75)"
+            >
+              kısmi
+            </span>
+          )}
+        </span>
       </div>
 
       {/* Mark felsefe */}
@@ -126,26 +137,47 @@ export function BreakoutQualityCard({ symbol }: { symbol: string }) {
         {data.mark_says}
       </p>
 
+      {/* P443 (Kural #28): kısmi veri uyarısı — sadece Hacim gerçek hesaplanıyor */}
+      {(data.real_components?.length ?? 5) < 5 && (
+        <div
+          className="text-[10px] px-2 py-1 rounded flex items-center gap-1.5"
+          style={{ background: "rgba(245,158,11,0.10)", color: "#F59E0B" }}
+          title="gap_up / Güç / VCP / Temiz production'da gerçek pivot tarihinden hesaplanacak (AÇIK KONU #75). Şu an yalnız Hacim gerçek — kompozit skor yaklaşık."
+        >
+          <span className="shrink-0">⚠️</span>
+          <span>Kısmi: yalnız Hacim gerçek hesaplanıyor (AÇIK KONU #75)</span>
+        </div>
+      )}
+
       {/* Breakdown 5 kriter */}
       <div className="grid grid-cols-3 sm:grid-cols-5 gap-1 text-xs pt-1 border-t border-muted-foreground/15">
         {(Object.keys(CRITERIA_LABELS) as Array<keyof typeof CRITERIA_LABELS>).map(
           (k) => {
+            // P443 (Kural #28): yalnız real_components GERÇEK; diğerleri hardcoded
+            // MOCK → "—" + gri çizgili (yanıltıcı puan gösterme).
+            const isReal = (data.real_components ?? ["volume"]).includes(k as string);
             const value = data.breakdown[k as keyof typeof data.breakdown] ?? 0;
             const max = CRITERIA_LABELS[k].max;
-            const passed = value === max;
-            const partial = value > 0 && value < max;
+            const passed = isReal && value === max;
+            const partial = isReal && value > 0 && value < max;
             return (
               <div
                 key={k}
                 className="flex flex-col items-center gap-0.5 rounded px-1 py-1"
                 style={{
-                  background: passed
+                  background: !isReal
+                    ? "repeating-linear-gradient(45deg, rgba(128,128,128,0.07), rgba(128,128,128,0.07) 4px, transparent 4px, transparent 8px)"
+                    : passed
                     ? "rgba(40,167,69,0.10)"
                     : partial
                     ? "rgba(245,158,11,0.10)"
                     : "rgba(220,53,69,0.06)",
                 }}
-                title={`${CRITERIA_LABELS[k].label} — ${value}/${max} puan`}
+                title={
+                  isReal
+                    ? `${CRITERIA_LABELS[k].label} — ${value}/${max} puan (gerçek)`
+                    : `${CRITERIA_LABELS[k].label} — hesaplanmadı (hardcoded MOCK, AÇIK KONU #75)`
+                }
               >
                 <span className="text-[9px] text-muted-foreground uppercase tracking-wider">
                   {CRITERIA_LABELS[k].label}
@@ -153,14 +185,16 @@ export function BreakoutQualityCard({ symbol }: { symbol: string }) {
                 <span
                   className="font-mono font-bold tabular-nums text-[11px]"
                   style={{
-                    color: passed
+                    color: !isReal
+                      ? "var(--muted-foreground)"
+                      : passed
                       ? "var(--mtp-excellent)"
                       : partial
                       ? "#F59E0B"
                       : "var(--mtp-danger)",
                   }}
                 >
-                  {value}
+                  {isReal ? value : "—"}
                 </span>
               </div>
             );

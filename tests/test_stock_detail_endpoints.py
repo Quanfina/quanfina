@@ -88,3 +88,14 @@ class TestStockDetailComputeEndpoints:
         d = client.get("/api/stock/AAPL/relative-volume").json()
         if d.get("category") is not None:
             assert d["category"] in {"DRYING", "QUIET", "NORMAL", "HIGH", "SURGE"}
+
+    def test_breakout_quality_real_components_partial(self, client):
+        """P443 (Kural #28): breakout-quality kompozitinin 4/5 bileseni hardcoded
+        MOCK (gap_up/breakout_pct/prior_contraction/overhead_clean). Sadece volume
+        gercek → real_components=['volume'], mark_says 'Kısmi' uyarisi. UI bunu
+        isaretleyip yaniltici tam-skor sunmamali."""
+        d = client.get("/api/stock/AAPL/breakout-quality").json()
+        assert "real_components" in d
+        assert d["real_components"] == ["volume"]
+        # Yaniltici "tam gercek skor" sunumu onlensin — mark_says kismi uyarisi
+        assert "Kısmi" in d["mark_says"] or "kısmi" in d["mark_says"]
