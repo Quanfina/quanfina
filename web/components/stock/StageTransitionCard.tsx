@@ -43,7 +43,7 @@ const CATEGORY_META: Record<StageCategory, CategoryMeta> = {
   },
   STAGE_2_MATURE: {
     label: "Olgun Trend",
-    color: "var(--mtp-good, #4B9CD3)",
+    color: "var(--mtp-neutral)",
     bg: "rgba(75,156,211,0.10)",
     icon: <Hourglass size={16} />,
   },
@@ -102,7 +102,7 @@ export function StageTransitionCard({ symbol }: { symbol: string }) {
       </p>
 
       {/* 4 metrik grid */}
-      <div className="grid grid-cols-4 gap-2 text-xs pt-1 border-t border-muted-foreground/15">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs pt-1 border-t border-muted-foreground/15">
         <div className="flex flex-col">
           <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
             30W MA
@@ -147,7 +147,7 @@ export function StageTransitionCard({ symbol }: { symbol: string }) {
                 data.days_above_ma == null
                   ? "var(--muted-foreground)"
                   : data.days_above_ma >= 60
-                  ? "var(--mtp-good, #4B9CD3)"
+                  ? "var(--mtp-neutral)"
                   : data.days_above_ma >= 10
                   ? "var(--mtp-excellent)"
                   : "#F59E0B",

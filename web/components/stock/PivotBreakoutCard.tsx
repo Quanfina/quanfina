@@ -41,7 +41,7 @@ const STATUS_META: Record<PivotBreakoutStatus, StatusMeta> = {
   NEAR_PIVOT: {
     emoji: "⏳",
     label: "Yakın İzleme",
-    color: "var(--mtp-good, #4B9CD3)",
+    color: "var(--mtp-neutral)",
     bg: "rgba(75,156,211,0.10)",
     icon: <Eye size={16} />,
   },

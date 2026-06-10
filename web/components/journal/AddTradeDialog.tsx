@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -177,8 +177,19 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
     }
   }, [open, planStop, atrData?.suggested_stop_normal]);
 
+  // P437: initialData prefill SADECE open false->true geçişinde uygulanır.
+  // Eski hali [open, initialData] idi; initialData her sayfa render'ında yeni obje
+  // → effect her render çalışıp setEntryPrice ile KULLANICI GİRİŞİNİ de eziyordu
+  // (latent bug). openPrevRef ile tek-sefer open anına sabitlendi.
+  const openPrevRef = useRef(false);
+  // Kullanıcı entry_price'ı elle değiştirdiyse canlı quote auto-prefill dokunmaz.
+  const userEditedEntryRef = useRef(false);
+
   useEffect(() => {
-    if (!open || !initialData) return;
+    const justOpened = open && !openPrevRef.current;
+    openPrevRef.current = open;
+    if (!justOpened || !initialData) return;
+    userEditedEntryRef.current = false;
     if (initialData.symbol !== undefined) setSymbol(initialData.symbol);
     if (initialData.strategy !== undefined) setStrategy(initialData.strategy);
     if (initialData.setup_type !== undefined) setSetupType(initialData.setup_type);
@@ -187,6 +198,18 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
     // KARAR #477: Sinyaller sayfasından AL ile geldiyse default "strategy" (sistem sinyali)
     setSignalSource("strategy");
   }, [open, initialData]);
+
+  // P437 (Kural #28): entry_price'ı dialog'un KENDİ canlı quote'undan doldur.
+  // initialData.entry_price (sayfa /info snapshot'ı) bayat olabilir (örn. NVDA
+  // $875 bölünme öncesi); dialog quoteData yfinance ise canlı fiyatla üst-yaz.
+  // Sayfa quote timing'inden bağımsız — paper trade doğru giriş/R/stop ile başlar.
+  // Kullanıcı elle değiştirdiyse (userEditedEntryRef) dokunma.
+  useEffect(() => {
+    if (!open || userEditedEntryRef.current) return;
+    if (quoteData?.source === "yfinance" && quoteData.price != null) {
+      setEntryPrice(quoteData.price.toFixed(2));
+    }
+  }, [open, quoteData?.price, quoteData?.source]);
 
   const isClosed = status === "closed";
 
@@ -659,11 +682,11 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
                 {quoteData?.price != null && quoteData.source === "yfinance" && (
                   <button
                     type="button"
-                    onClick={() => setEntryPrice(String(quoteData.price.toFixed(2)))}
+                    onClick={() => { userEditedEntryRef.current = true; setEntryPrice(String(quoteData.price.toFixed(2))); }}
                     className="text-[10px] font-semibold px-1.5 py-0.5 rounded hover:bg-accent transition-colors"
                     style={{
-                      color: "var(--mtp-good, #4B9CD3)",
-                      border: "1px solid var(--mtp-good, #4B9CD3)",
+                      color: "var(--mtp-neutral)",
+                      border: "1px solid var(--mtp-neutral)",
                     }}
                     title={`yfinance canlı: $${quoteData.price.toFixed(2)} — tek tık doldur`}
                   >
@@ -671,7 +694,7 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
                   </button>
                 )}
               </Label>
-              <Input id="at-eprice" type="number" value={entryPrice} onChange={(e) => setEntryPrice(e.target.value)} placeholder="700.00" step="0.01" min="0" />
+              <Input id="at-eprice" type="number" value={entryPrice} onChange={(e) => { userEditedEntryRef.current = true; setEntryPrice(e.target.value); }} placeholder="700.00" step="0.01" min="0" />
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="at-shares">Adet *</Label>

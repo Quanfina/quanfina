@@ -39,7 +39,17 @@ const META: Record<OverheadSupplyCategory, Meta> = {
 
 export function OverheadSupplyCard({ symbol }: { symbol: string }) {
   const { data, isLoading, isError } = useOverheadSupply(symbol);
-  if (isLoading || isError || !data || !data.category) return null;
+
+  // P437: loading state diğer kartlarla hizalı (eskiden null = görünmez pop-in/reflow)
+  if (isLoading) {
+    return (
+      <div className="rounded-lg border p-3 text-xs text-muted-foreground">
+        Overhead Supply yükleniyor...
+      </div>
+    );
+  }
+
+  if (isError || !data || !data.category) return null;
 
   const meta = META[data.category];
 

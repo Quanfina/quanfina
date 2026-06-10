@@ -30,7 +30,7 @@ const CATEGORY_META: Record<RsRatingCategory, CategoryMeta> = {
   },
   STRONG: {
     label: "STRONG",
-    color: "var(--mtp-good, #4B9CD3)",
+    color: "var(--mtp-neutral)",
     bg: "rgba(75,156,211,0.10)",
     icon: <TrendingUp size={16} />,
   },
@@ -163,7 +163,7 @@ export function RsRatingCard({ symbol }: { symbol: string }) {
                   : data.outperform_pct >= 20
                   ? "var(--mtp-excellent)"
                   : data.outperform_pct > 0
-                  ? "var(--mtp-good, #4B9CD3)"
+                  ? "var(--mtp-neutral)"
                   : "var(--mtp-danger)",
               fontFamily: "var(--font-jetbrains-mono, monospace)",
             }}

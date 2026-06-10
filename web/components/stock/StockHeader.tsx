@@ -73,7 +73,7 @@ export function StockHeader({
             {isLive && (
               <span
                 className="text-[9px] font-semibold uppercase tracking-wider px-1 py-0.5 rounded"
-                style={{ background: "color-mix(in srgb, var(--mtp-good, #4B9CD3) 18%, transparent)", color: "var(--mtp-good, #4B9CD3)" }}
+                style={{ background: "color-mix(in srgb, var(--mtp-neutral) 18%, transparent)", color: "var(--mtp-neutral)" }}
                 title="Anlık piyasa fiyatı (yfinance, 60s yenileme)"
               >
                 CANLI

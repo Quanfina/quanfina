@@ -2,6 +2,7 @@
 
 import { use, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, Plus } from "lucide-react";
 import { useStockInfo, useOhlcv } from "@/hooks/use-stock";
 import { useStockQuote } from "@/hooks/use-stock-quote";
@@ -54,6 +55,7 @@ export default function HissePage({
 }) {
   const { symbol } = use(params);
   const sym = symbol.toUpperCase();
+  const router = useRouter();
 
   const { data: info, isLoading: infoLoading, isError: infoError } = useStockInfo(sym);
   const { data: ohlcv, isLoading: ohlcvLoading } = useOhlcv(sym);
@@ -119,15 +121,24 @@ export default function HissePage({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Breadcrumb */}
+      {/* Breadcrumb — P437: router.back() (origin-agnostik). /hisse'ye 14 yerden
+          giriliyor (signals, dashboard, watchlist); sabit /watchlist geri linki
+          bağlam kaybediyordu. Geçmiş yoksa /watchlist fallback. */}
       <div className="px-6 py-2 border-b">
-        <Link
-          href="/watchlist"
+        <button
+          type="button"
+          onClick={() => {
+            if (typeof window !== "undefined" && window.history.length > 1) {
+              router.back();
+            } else {
+              router.push("/watchlist");
+            }
+          }}
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft size={14} />
-          İzleme Listesi
-        </Link>
+          Geri
+        </button>
       </div>
 
       {/* P413 (31 May 2026 — Kural #28 audit): Carr Stage MOCK uyarısı.
@@ -269,7 +280,12 @@ export default function HissePage({
           symbol: sym,
           strategy: info.active_strategies?.[0]?.strategy ?? "minervini",
           entry_date: todayLocalISO(), // Paket 356: yerel tarih (UTC off-by-one fix)
-          entry_price: info.price,
+          // P437 (Kural #28): canlı yfinance quote öncelik, bayat info.price fallback.
+          // Header CANLI $ gösterirken form bayat $ ile açılmasın — yanlış giriş/R/stop.
+          entry_price:
+            quote?.source === "yfinance" && quote?.price != null
+              ? quote.price
+              : info.price,
         }}
       />
     </div>

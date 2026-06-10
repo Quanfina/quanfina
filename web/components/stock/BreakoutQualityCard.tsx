@@ -37,7 +37,7 @@ const CATEGORY_META: Record<BreakoutQualityCategory, CategoryMeta> = {
   },
   GOOD: {
     label: "Standart",
-    color: "var(--mtp-good, #4B9CD3)",
+    color: "var(--mtp-neutral)",
     bg: "rgba(75,156,211,0.10)",
     icon: <ThumbsUp size={16} />,
   },
@@ -127,7 +127,7 @@ export function BreakoutQualityCard({ symbol }: { symbol: string }) {
       </p>
 
       {/* Breakdown 5 kriter */}
-      <div className="grid grid-cols-5 gap-1 text-xs pt-1 border-t border-muted-foreground/15">
+      <div className="grid grid-cols-3 sm:grid-cols-5 gap-1 text-xs pt-1 border-t border-muted-foreground/15">
         {(Object.keys(CRITERIA_LABELS) as Array<keyof typeof CRITERIA_LABELS>).map(
           (k) => {
             const value = data.breakdown[k as keyof typeof data.breakdown] ?? 0;

@@ -7,9 +7,10 @@ import { useStageTransition } from "@/hooks/use-stage-transition";
 
 /**
  * KARAR #733 alt-paket (Paket 125, 26 May 2026): Mark Profili kompakt rozet bar.
- * /hisse detay sayfası üst kısmında 8 sidebar kart yerine yatay özet — Sn. Ferit
+ * /hisse detay sayfası üst kısmında grid kartlarının yatay özeti — Sn. Ferit
  * hisse açtığında Mark canon profilini 1 bakışta görür. TanStack Query cache
- * sidebar kartlarıyla shared (yeniden network çağrı yok).
+ * aşağıdaki grid kartlarıyla shared (yeniden network çağrı yok). P436: layout
+ * sidebar'dan grafik-altı grid'e geçti.
  */
 
 export function MarkProfileBar({ symbol }: { symbol: string }) {
@@ -46,7 +47,7 @@ export function MarkProfileBar({ symbol }: { symbol: string }) {
                 : pivot.status === "WEAK"
                 ? "#F59E0B"
                 : pivot.status === "NEAR_PIVOT"
-                ? "var(--mtp-good, #4B9CD3)"
+                ? "var(--mtp-neutral)"
                 : "var(--mtp-danger)",
           }}
           title={`Pivot Breakout — ${pivot.mark_says}`}
@@ -79,7 +80,7 @@ export function MarkProfileBar({ symbol }: { symbol: string }) {
               rs.rs_rating >= 80
                 ? "var(--mtp-excellent)"
                 : rs.rs_rating >= 70
-                ? "var(--mtp-good, #4B9CD3)"
+                ? "var(--mtp-neutral)"
                 : rs.rs_rating >= 50
                 ? "#F59E0B"
                 : "var(--mtp-danger)",
@@ -125,7 +126,7 @@ export function MarkProfileBar({ symbol }: { symbol: string }) {
                 ? "var(--mtp-excellent)"
                 : stage.category === "EARLY_STAGE_2"
                 ? "#F59E0B"
-                : "var(--mtp-good, #4B9CD3)",
+                : "var(--mtp-neutral)",
           }}
           title={`Stage Transition — ${stage.mark_says}`}
         >
@@ -138,8 +139,8 @@ export function MarkProfileBar({ symbol }: { symbol: string }) {
         </span>
       )}
 
-      <span className="text-[9px] text-muted-foreground italic ml-auto">
-        Detay: sidebar kartları
+      <span className="text-[9px] text-muted-foreground italic ml-auto hidden sm:inline">
+        Detay: aşağıdaki kartlar
       </span>
     </div>
   );
