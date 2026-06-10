@@ -49,25 +49,27 @@ describe("HealthScoreCard — skor + label renk (P382 clean-room enum)", () => {
   );
 });
 
-describe("ModeSuggestionCard — LONG/SHORT/TÜMÜ", () => {
-  it("'Mod Önerisi' başlık", () => {
+// P447: backend suggested_mode ∈ {LONG, CAUTION, DEFENSIVE} (api/main.py:1308-1333).
+// Eski SHORT/TÜMÜ ölü koddu (P446 sildi); testler yeni kontrata hizalandı.
+describe("ModeSuggestionCard — LONG/CAUTION/DEFENSIVE", () => {
+  it("'Piyasa Modu Önerisi' başlık", () => {
     render(<ModeSuggestionCard mode="LONG" />);
-    expect(screen.getByText("Mod Önerisi")).toBeInTheDocument();
+    expect(screen.getByText("Piyasa Modu Önerisi")).toBeInTheDocument();
   });
 
-  it("mode='LONG' → bull açıklaması", () => {
+  it("mode='LONG' → yeni alım serbest açıklaması", () => {
     render(<ModeSuggestionCard mode="LONG" />);
-    expect(screen.getByText(/bull fazında/)).toBeInTheDocument();
+    expect(screen.getByText(/Yeni alım serbest/)).toBeInTheDocument();
   });
 
-  it("mode='SHORT' → bear açıklaması", () => {
-    render(<ModeSuggestionCard mode="SHORT" />);
-    expect(screen.getByText(/bear fazında/)).toBeInTheDocument();
+  it("mode='CAUTION' → sıkı kriter açıklaması", () => {
+    render(<ModeSuggestionCard mode="CAUTION" />);
+    expect(screen.getByText(/sıkı kriter/)).toBeInTheDocument();
   });
 
-  it("mode='TÜMÜ' → karma açıklaması", () => {
-    render(<ModeSuggestionCard mode="TÜMÜ" />);
-    expect(screen.getByText(/Karma piyasa/)).toBeInTheDocument();
+  it("mode='DEFENSIVE' → YASAK açıklaması", () => {
+    render(<ModeSuggestionCard mode="DEFENSIVE" />);
+    expect(screen.getByText(/YASAK/)).toBeInTheDocument();
   });
 
   it("Bilinmeyen mode → 'Mod belirleniyor...' fallback", () => {
@@ -92,9 +94,9 @@ describe("StageCard — 4 stage label", () => {
     expect(screen.getByText("QQQ")).toBeInTheDocument();
   });
 
-  it("stage=2 → 'Bull fazında — LONG mod destekleniyor'", () => {
+  it("stage=2 → 'Yükseliş trendi' (P446: nötr teşhis, aksiyon dili yok)", () => {
     render(<StageCard symbol="SPY" stage={2} />);
-    expect(screen.getByText(/Bull fazında/)).toBeInTheDocument();
+    expect(screen.getByText(/Yükseliş trendi/)).toBeInTheDocument();
   });
 
   it("Bilinmeyen stage → 'Stage N' fallback", () => {
