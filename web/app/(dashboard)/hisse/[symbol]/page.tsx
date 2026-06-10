@@ -19,6 +19,7 @@ import { StageTransitionCard } from "@/components/stock/StageTransitionCard";
 import { MarkProfileBar } from "@/components/stock/MarkProfileBar";
 import { RelativeVolumeCard } from "@/components/stock/RelativeVolumeCard";
 import { BreakoutQualityCard } from "@/components/stock/BreakoutQualityCard";
+import { RiskSummaryCard } from "@/components/stock/RiskSummaryCard";
 import { MarkRegimeBanner } from "@/components/mark/MarkRegimeBanner";
 import { ModBadge } from "@/components/mark/ModBadge";
 import { PreTradeChecklist } from "@/components/journal/PreTradeChecklist";
@@ -246,6 +247,9 @@ export default function HissePage({
             grid → ≈4 satır, yan yana tarama kolay, grafik takibi bozulmaz.
             items-start: değişken yükseklikli kartlar üstten hizalı. */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 items-start">
+          {/* P438-M2: Risk-Özeti ilk sırada — Mark "Risk first" (TTLC Sec 1).
+              Karar akışının başı: stop nerede, kaç R, pivota mesafe. */}
+          <RiskSummaryCard symbol={sym} />
           <ActiveStrategies strategies={info.active_strategies} symbol={sym} />
           <CarrStageCard symbol={sym} />
           {/* KARAR #733 alt-paket (Paket 72): Pivot Breakout Card */}
