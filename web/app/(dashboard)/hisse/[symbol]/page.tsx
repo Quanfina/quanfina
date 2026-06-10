@@ -25,6 +25,7 @@ import { ModBadge } from "@/components/mark/ModBadge";
 import { PreTradeChecklist } from "@/components/journal/PreTradeChecklist";
 import { useRsRating } from "@/hooks/use-rs-rating";
 import { usePivotBreakout } from "@/hooks/use-pivot-breakout";
+import { useAtrVolatility } from "@/hooks/use-atr-volatility";
 import { useTradingMode, isNewAlBlocked } from "@/hooks/use-trading-mode";
 import { useCarrStage } from "@/hooks/use-carr-stage";
 import { useClimaxRun } from "@/hooks/use-climax-run";
@@ -71,6 +72,8 @@ export default function HissePage({
   // Paket 241 (27 May 2026): Pre-flight Mark canon mini-versiyon (sembol seviyesi)
   const { data: rsData } = useRsRating(sym);
   const { data: pivotData } = usePivotBreakout(sym);
+  // P438-M3: grafik karar çizgileri (pivot/stop) için pivot + ATR stop
+  const { data: atrData } = useAtrVolatility(sym);
   // Paket 256 (27 May 2026): Defansif modda Trade Aç buton görsel disabled
   // (AddTradeDialog override mevcut — yine de tıklanırsa dialog açılır)
   const tradingMode = useTradingMode();
@@ -234,7 +237,11 @@ export default function HissePage({
             "takibi zor"du. Grafik üstte tam görünür, kartlar altta grid. */}
         <div className="w-full min-w-0">
           {ohlcv && ohlcv.length > 0 ? (
-            <PriceChart data={ohlcv} />
+            <PriceChart
+              data={ohlcv}
+              pivotPrice={pivotData?.pivot_price}
+              stopPrice={atrData?.suggested_stop_normal}
+            />
           ) : (
             <div className="flex items-center justify-center h-64 text-sm text-muted-foreground border rounded-lg">
               Grafik verisi yok
