@@ -48,14 +48,18 @@ export function StageCard({ symbol, stage }: StageCardProps) {
             className="h-2 w-2 rounded-full"
             style={{ backgroundColor: color }}
           />
+          {/* P446 (review çelişki fix): saf TEŞHİS (trend durumu) — aksiyon/mod
+              dili YOK. "LONG mod destekleniyor" regime "Ayı Baskısı" derken
+              çelişki algısı yaratıyordu. Karar otoritesi tek yerde (MarkRegimeCard
+              + Piyasa Modu Önerisi); stage sadece trendin nerede olduğunu söyler. */}
           <span className="text-xs text-muted-foreground">
             {stage === 2
-              ? "Bull fazında — LONG mod destekleniyor"
+              ? "Yükseliş trendi (Weinstein Stage 2)"
               : stage === 1
-              ? "Konsolidasyon — Bekleme modu"
+              ? "Taban / konsolidasyon — trend yok"
               : stage === 3
-              ? "Tepe bölgesi — Dikkatli ol"
-              : "Bear fazında — SHORT mod"}
+              ? "Tepe bölgesi — momentum zayıflıyor"
+              : "Düşüş trendi (Stage 4)"}
           </span>
         </div>
       </CardContent>

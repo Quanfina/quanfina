@@ -45,7 +45,7 @@ export function SectorSummaryCard({ topSectors, bottomSectors }: SectorSummaryCa
           ))}
         </div>
         <p className="text-xs text-muted-foreground italic">
-          Sektör Rotasyonu detayı — AÇIK KONU #49
+          Detaylı sektör analizi: Sektör Rotasyonu sayfası
         </p>
       </CardContent>
     </Card>

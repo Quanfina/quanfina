@@ -20,7 +20,9 @@ function SessionDot({ session, is_open }: { session: MarketSession; is_open: boo
   let color = "var(--mtp-danger)"; // closed
   if (is_open) color = "var(--mtp-excellent)"; // regular green
   else if (session === "pre_market" || session === "post_market")
-    color = "var(--mtp-neutral)"; // yellow neutral
+    // P446 (review): yorum "yellow" diyordu ama mtp-neutral MAVİ render ediyordu.
+    // Trafik lambası standardı (🟡 PRE/POST) için mtp-waiting (sarı).
+    color = "var(--mtp-waiting)"; // 🟡 pre/post
 
   return (
     <span

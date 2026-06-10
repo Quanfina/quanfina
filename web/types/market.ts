@@ -78,7 +78,9 @@ export interface MarketStatus {
   distribution_days: number;
   market_health_score: number;
   market_health_label: MarketHealthLabel;
-  suggested_mode: string;
+  // P446: backend _compute_market_health union'ı (api/main.py:1308-1333). Eski
+  // `string` tsc'nin MODE_CONFIG eşleşmezliğini kaçırmasına izin veriyordu.
+  suggested_mode: "LONG" | "CAUTION" | "DEFENSIVE";
   top_sectors: SectorChange[];
   bottom_sectors: SectorChange[];
   // KARAR ADAY #731: Mark Regime backend (frontend DRY computeMarketRegime fallback)

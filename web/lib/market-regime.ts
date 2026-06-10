@@ -44,7 +44,10 @@ const REGIME_MAP: Record<MarketRegime, MarkRegimeStaticData> = {
   CAUTION: {
     label: "Dikkat",
     emoji: "🟡",
-    color: "var(--mtp-neutral)",
+    // P446 (review renk bug): eski color mtp-neutral (MAVİ) idi ama emoji 🟡 +
+    // bgColor amber → metin mavi/zemin amber çelişkisi. mtp-waiting (sarı) ile
+    // hizalandı: HEALTHY yeşil → CAUTION sarı → UNDER_PRESSURE amber → BEAR kırmızı.
+    color: "var(--mtp-waiting)",
     bgColor: "rgba(245,158,11,0.10)",
     allocation: "Mevcut korunur, yeni alım sıkı kriter",
     markSays: "3 Distribution Day — kurumsal satış sinyali. Yeni alım sadece A+ setup'lar.",

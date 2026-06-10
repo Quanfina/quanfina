@@ -1,18 +1,24 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
+// P446 (review kontrat fix — Kural #24): backend _compute_market_health
+// suggested_mode ∈ {LONG, CAUTION, DEFENSIVE} döndürür (api/main.py:1308-1333).
+// Eski MODE_CONFIG LONG/SHORT/TÜMÜ idi → CAUTION/DEFENSIVE eksikti; piyasa baskı
+// altındayken (tam da kritik an) kart ölü "Mod belirleniyor..."e düşüyordu.
+// SHORT/TÜMÜ backend'de hiç üretilmiyor (ölü kod, Kural #18). Objektif-ayna dil
+// (İLKE #11): aksiyon direktifi.
 const MODE_CONFIG: Record<string, { color: string; desc: string }> = {
   LONG: {
     color: "var(--mtp-excellent)",
-    desc: "Piyasa bull fazında — Long setuplara odaklan",
+    desc: "Yeni alım serbest — A+ setuplara odaklan",
   },
-  SHORT: {
+  CAUTION: {
+    color: "#F59E0B",
+    desc: "Yeni alım sıkı kriter — sadece lider, mevcut pozisyonları koru",
+  },
+  DEFENSIVE: {
     color: "var(--mtp-danger)",
-    desc: "Piyasa bear fazında — Short setuplara odaklan",
-  },
-  TÜMÜ: {
-    color: "var(--mtp-neutral)",
-    desc: "Karma piyasa — Her iki yön dikkatli değerlendir",
+    desc: "Yeni AL YASAK — sadece SAT/STOP, nakit öncelik",
   },
 };
 
@@ -29,7 +35,7 @@ export function ModeSuggestionCard({ mode }: ModeSuggestionCardProps) {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-semibold">Mod Önerisi</CardTitle>
+        <CardTitle className="text-sm font-semibold">Piyasa Modu Önerisi</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-2">
         <div className="flex items-center gap-3">
@@ -47,9 +53,6 @@ export function ModeSuggestionCard({ mode }: ModeSuggestionCardProps) {
         </div>
         <p className="text-xs text-muted-foreground leading-relaxed">
           {config.desc}
-        </p>
-        <p className="text-xs text-muted-foreground">
-          <span className="font-medium">Not:</span> Manuel override mümkün — AÇIK KONU #47
         </p>
       </CardContent>
     </Card>

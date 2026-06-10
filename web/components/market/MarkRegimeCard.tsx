@@ -252,12 +252,38 @@ export function MarkRegimeCard({
           <span className="text-muted-foreground">Lider Override:</span>
           <span
             className="font-semibold"
-            style={{ color: info.pilotOverride ? "var(--mtp-good, #4B9CD3)" : "var(--muted-foreground)" }}
+            style={{ color: info.pilotOverride ? "var(--mtp-good, #90ee90)" : "var(--muted-foreground)" }}
           >
             {info.pilotOverride ? "%1-2 pilot OK" : "—"}
           </span>
         </div>
       </div>
+
+      {/* P446 (review — SİNYAL ÇELİŞKİSİ uzlaştırma): Endeksler Stage 2 (yükseliş)
+          AMA yeni alım YASAK ise "neden" yüzeye çıkar. KARAR #488: DD Hard Filter
+          (O'Neil) Endeks Stage'i override eder — trend sağlam ama kurumsal dağıtım
+          yeni alımı bloklar. Ekran "Ayı Baskısı vs Stage 2 LONG" çelişki algısını
+          kapatır. Yeni veri/eşik yok (mevcut prop'lar, İLKE #11 sayı+sebep). */}
+      {!info.newBuyAllowed &&
+        (spyStage === 2 || qqqStage === 2 || iwmStage === 2) && (
+          <div
+            className="text-[11px] leading-relaxed px-2 py-1.5 rounded flex items-start gap-1.5"
+            style={{ background: "rgba(245,158,11,0.10)", color: "#F59E0B" }}
+          >
+            <span aria-hidden="true" className="shrink-0">
+              ⚠️
+            </span>
+            <span>
+              <b>Endeksler Stage 2 ama yeni alım YASAK — neden?</b>{" "}
+              {distributionDays} Distribution Day baskısı O&apos;Neil Hard
+              Filter&apos;ı tetikledi. Trend sağlam, ama kurumsal satış (dağıtım)
+              ön planda → yeni pozisyon dur.{" "}
+              <span className="opacity-70">
+                Karar önceliği: DD Hard Filter &gt; Endeks Stage (KARAR #488).
+              </span>
+            </span>
+          </div>
+        )}
 
       {/* KARAR #733 alt-paket (Paket 53): Market Breadth A/D Line widget.
           P408: MOCK rozet — yfinance NYSE/NASDAQ advance/decline bulk sağlamıyor,
@@ -274,7 +300,7 @@ export function MarkRegimeCard({
                   (DB scanner verisi yoksa fallback). DB doluysa rozet kalkar. */}
               {marketBreadth.is_mock && (
                 <span
-                  className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider"
+                  className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"
                   style={{
                     background: "rgba(245,158,11,0.15)",
                     color: "#F59E0B",
@@ -360,7 +386,7 @@ export function MarkRegimeCard({
                   varsa rozet kalkar (A/D gerçek scanner sayım). */}
               {breadthDivergence.breadth_is_mock && (
                 <span
-                  className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider"
+                  className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"
                   style={{
                     background: "rgba(245,158,11,0.15)",
                     color: "#F59E0B",

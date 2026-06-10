@@ -95,11 +95,12 @@ export default function PiyasaDurumuPage() {
         />
       </div>
 
-      {/* Sektör Rotasyonu notu */}
+      {/* Sektör Rotasyonu notu — P446 (review): iç-geliştirme referansları
+          ("POC ADIM 5 / AÇIK KONU #49") kullanıcı UI'sinden çıkarıldı (İLKE #11). */}
       <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
         <p>
-          <span className="font-medium">Sektör Rotasyonu detayı</span> — bu sayfada özet
-          gösterilmekte. Ayrı sayfa kararı POC ADIM 5 sonunda alınacak (AÇIK KONU #49).
+          <span className="font-medium">Sektör Rotasyonu</span> — bu sayfada özet
+          gösterilmekte. Detaylı analiz için Sektör Rotasyonu sayfasına bakın.
         </p>
       </div>
     </div>

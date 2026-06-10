@@ -96,7 +96,7 @@ export function QuickSummaryBar() {
       role="status"
       aria-label="Quanfina özet — Trading Mode, Market Health, Açık Risk, Realized P&L"
       data-testid="quick-summary-bar"
-      className="sticky top-0 z-30 flex items-center gap-4 px-4 py-1.5 border-b bg-background/80 backdrop-blur-sm text-xs"
+      className="sticky top-0 z-30 flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-1.5 border-b bg-background/80 backdrop-blur-sm text-xs"
     >
       {/* Trading Mode */}
       <div className="flex items-center gap-1.5">
@@ -109,7 +109,7 @@ export function QuickSummaryBar() {
         </span>
       </div>
 
-      <span className="text-muted-foreground/40">·</span>
+      <span className="text-muted-foreground/40 hidden sm:inline">·</span>
 
       {/* Market Health */}
       <div className="flex items-center gap-1.5">
@@ -119,7 +119,7 @@ export function QuickSummaryBar() {
         </span>
       </div>
 
-      <span className="text-muted-foreground/40">·</span>
+      <span className="text-muted-foreground/40 hidden sm:inline">·</span>
 
       {/* Açık trade + risk (Mark "Risk first") */}
       <div className="flex items-center gap-1.5">
@@ -136,7 +136,7 @@ export function QuickSummaryBar() {
         )}
       </div>
 
-      <span className="text-muted-foreground/40">·</span>
+      <span className="text-muted-foreground/40 hidden sm:inline">·</span>
 
       {/* Realized P&L */}
       <div className="flex items-center gap-1.5">

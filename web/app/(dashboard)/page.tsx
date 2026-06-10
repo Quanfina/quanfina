@@ -187,9 +187,11 @@ export default function Home() {
       id: "market-mode-check",
       label: `Piyasa modu doğrulandı (${marketMode}, sağlık ${marketScore ?? "—"})`,
       detail: marketMode === "LONG"
-        ? "Long setupları öncelikli, short sinyaller bypass"
-        : marketMode === "SHORT"
-        ? "Short setupları öncelikli, long pozisyonlar dikkatli"
+        ? "Yeni alım serbest — A+ setuplara odaklan"
+        : marketMode === "DEFENSIVE"
+        ? "Yeni AL YASAK — sadece SAT/STOP, nakit öncelik"
+        : marketMode === "CAUTION"
+        ? "Yeni alım sıkı kriter — sadece lider, mevcut koru"
         : "Mod kararı belirsiz — manuel değerlendirme",
       href: "/piyasa-durumu",
       priority: "normal",
@@ -624,8 +626,10 @@ export default function Home() {
                     color:
                       marketMode === "LONG"
                         ? "var(--mtp-excellent)"
-                        : marketMode === "SHORT"
+                        : marketMode === "DEFENSIVE"
                         ? "var(--mtp-danger)"
+                        : marketMode === "CAUTION"
+                        ? "#F59E0B"
                         : "inherit",
                   }}
                 >
