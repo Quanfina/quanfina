@@ -42,7 +42,7 @@ export function TermTooltip({ termKey, children }: TermTooltipProps) {
                   e.stopPropagation();
                   setOpen(true);
                 }}
-                className="inline-flex items-center text-muted-foreground hover:text-foreground transition-colors focus:outline-none"
+                className="inline-flex items-center justify-center p-1 -m-1 min-h-[24px] min-w-[24px] text-muted-foreground hover:text-foreground transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-ring rounded"
                 aria-label={`${termKey} terimini açıkla`}
               />
             }
