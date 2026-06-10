@@ -513,16 +513,19 @@ MOCK_TERMS: list[Term] = [
     Term(
         key="spy_stage_2",
         short_name="SPY Stage 2",
-        tooltip="S&P 500 Stage 2 yükseliş trendi — piyasa bull fazında.",
+        # P432 (31 May 2026 — tooltip doğrulama workflow): "200 haftalık" HATA idi
+        # → 30 haftalık MA (Weinstein kanon + Quanfina CARR_STAGE_MA_WINDOW=150).
+        tooltip="30 haftalık MA üstünde yükseliş trendi — piyasa bull fazında sağlıklı.",
         definition=(
-            "Stan Weinstein'ın 4 aşama modelinde Stage 2, 200 haftalık hareketli "
-            "ortalama üzerinde yatay bazdan çıkışı ifade eden yükseliş trendinin "
-            "başlangıcı ve ana aşamasıdır. SPY Stage 2 = genel piyasa sağlıklı."
+            "Stan Weinstein 4 aşama modelinde Stage 2, fiyatın 30 haftalık hareketli "
+            "ortalama üstünde ve MA eğimi pozitif olduğu yükseliş trendinin ana "
+            "aşamasıdır. SPY Stage 2 = genel piyasa sağlıklı, LONG mod önerilir. "
+            "Mark Minervini ve Thomas Carr da Stage 2'yi aynı metriklere göre tanımlar."
         ),
         source_book="Secrets for Profiting in Bull and Bear Markets",
         source_author="Stan Weinstein",
         source_year=1988,
-        quanfina_context="Piyasa Durumu sayfasında SPY/QQQ/IWM için Stage tespiti. Stage 2 = LONG mod önerilir.",
+        quanfina_context="compute_carr_stage() (quanfina_math.py) — CARR_STAGE_MA_WINDOW=150 (30 hafta×5 gün). Stage 2: price > 30W MA + slope pozitif. Piyasa Durumu SPY/QQQ/IWM Stage tespiti → LONG mod.",
         category="technical",
     ),
     Term(
@@ -543,16 +546,18 @@ MOCK_TERMS: list[Term] = [
     Term(
         key="ma200_slope",
         short_name="MA200 Eğim",
-        tooltip="200 günlük hareketli ortalama eğimi. Pozitif = uzun vadeli yükseliş.",
+        # P432: "günlük değişim" HATA → 1 aylık (21 gün) eğim (scanner.py ma200_today - ma200_1m)
+        tooltip="200 günlük MA'nın 1 aylık eğimi. Pozitif = uzun vadeli yükseliş.",
         definition=(
-            "200 günlük basit hareketli ortalamanın eğimi (günlük değişim). "
-            "Pozitif eğim uzun vadeli yükseliş trendini gösterir. "
-            "Minervini Trend Template: MA200 eğimi pozitif olmalı."
+            "200 günlük basit hareketli ortalamanın son bir ay içindeki eğimi "
+            "(MA200 bugün − MA200 21 gün önce). Pozitif eğim MA200'ün yükselişte "
+            "olması = uzun vadeli trend sağlıklı. Minervini Trend Template koşulu: "
+            "MA200 eğimi en az 1 aydır pozitif olmalı (Wizard s.79)."
         ),
-        source_book=None,
-        source_author=None,
-        source_year=None,
-        quanfina_context="Minervini grid MA200 EĞİM sütunu. Pozitif = yeşil, negatif = kırmızı.",
+        source_book="Trade Like a Stock Market Wizard",
+        source_author="Mark Minervini",
+        source_year=2013,
+        quanfina_context="scanner.py (~satır 881): ma200_today − ma200_1m (21 gün). Pozitif slope Trend Template Kural 3'ü geçirir. Minervini grid MA200 EĞİM sütunu (yeşil/kırmızı).",
         category="technical",
     ),
     Term(
@@ -604,16 +609,18 @@ MOCK_TERMS: list[Term] = [
     Term(
         key="distribution_days",
         short_name="Distribution Days",
-        tooltip="Artan hacimle endeks düşüşü — kurumsal satış sinyali (IBD kavramı).",
+        # P432: eşik/birikim netleştirildi (kod: -0.2% + 20 gün + Mark 4 DD kuralı)
+        tooltip="Endeks ≤%-0.2 kapanırken hacim artışı — kurumsal satış günü; 4+ DD yeni alım yasak.",
         definition=(
-            "IBD (Investor's Business Daily) kavramı. S&P 500 veya Nasdaq'ın bir "
-            "önceki güne göre %0.2+ düşerken hacmin artması. 4–6 adet distribution "
-            "day birikimi piyasa topu ve satış baskısı sinyali verir."
+            "O'Neil tanımı: Endeks (S&P/Nasdaq) önceki güne göre %0.2 veya daha "
+            "fazla düşerken hacmin bir önceki günden yüksek olması. Quanfina 20 "
+            "günlük pencerede sayar; 3+ DD uyarı, 5+ DD satış baskısı. Mark kuralı: "
+            "4 DD = yeni alım yasak, 5+ DD = defansif mod (TLSMW Böl. 5)."
         ),
         source_book="How to Make Money in Stocks",
         source_author="William J. O'Neil",
         source_year=1988,
-        quanfina_context="Piyasa Durumu sayfasında sayaç olarak gösterilir. >4 ise sarı uyarı.",
+        quanfina_context="quanfina_math.py count_distribution_days() — eşik -0.2%, 20 gün pencere, hacim>önceki + 4-katman rejim (KARAR #488). Piyasa Durumu sayaç (>4 sarı/kırmızı uyarı).",
         category="technical",
     ),
     Term(
@@ -636,12 +643,19 @@ MOCK_TERMS: list[Term] = [
     Term(
         key="sepa",
         short_name="SEPA",
-        tooltip="Tooltip henüz tanımlanmadı. NotebookLM'den detay alınacak.",
-        definition="Tooltip henüz tanımlanmadı, NotebookLM'den detay alınacak.",
-        source_book=None,
+        # P432: placeholder dolduruldu (kavram öğretimi — Kural #17, "®" kullanılmadı sızma_kontrol)
+        tooltip="Specific Entry Point Analysis — Mark Minervini'nin 4 bileşenli hisse seçim framework'ü.",
+        definition=(
+            "SEPA (Specific Entry Point Analysis), Mark Minervini'nin hisse seçim ve "
+            "giriş framework'üdür. 4 bileşeni birleştirir: (1) Teknik setup (VCP/Pivot/"
+            "Power Play) + Trend Template, (2) Earnings — EPS Q/Q + Satış Q/Q ivmesi "
+            "(%25+), (3) Price Action — RS>70, konsolidasyon sonrası kırılım, (4) "
+            "Katalizör/haber. %95+ hisse elenir, 5-20 yüksek olasılıklı aday kalır."
+        ),
+        source_book="Trade Like a Stock Market Wizard",
         source_author="Mark Minervini",
-        source_year=None,
-        quanfina_context="Minervini metodolojisi kapsamında. Detay NotebookLM NB-1'den alınacak.",
+        source_year=2013,
+        quanfina_context="Minervini stratejisinin omurgası: scanner.py Trend Template + EPS/Satış ivme + VCP/Power Play setup tarama + watchlist katmanları (watch/on-deck/focus/buy) SEPA karar hiyerarşisini temsil eder.",
         category="strategy",
     ),
     Term(
@@ -667,16 +681,18 @@ MOCK_TERMS: list[Term] = [
     Term(
         key="pivot_price",
         short_name="Pivot Fiyatı",
-        tooltip="Konsolidasyon bazından kırılım seviyesi — bu fiyat üstünde alım yapılır.",
+        # P432: sayısal eşikler eklendi (kod: 20 gün, %0.5 buffer, 1.5x hacim)
+        tooltip="Son 20 günün en yüksek kapanışı; kırılım = %0.5 üstü + 1.5x hacim teyit (TLSMW Böl. 10).",
         definition=(
-            "Minervini ve IBD terminolojisinde pivot fiyat: Hissenin konsolidasyon "
-            "bazının (örn. VCP, cup-with-handle) en yüksek noktası. Pivot fiyat "
-            "üzerinde yüksek hacimle kapanış = kırılım onayı ve alım noktası."
+            "Minervini Pivot Fiyatı: son 20 günün (bugün hariç) en yüksek kapanış "
+            "seviyesi. Geçerli kırılım sinyali 3 koşul: (1) fiyat pivot'un %0.5 "
+            "üstüne çıkar, (2) hacim 50-gün ortalamasının ≥1.5 katı, (3) hacim teyidi "
+            "olmadan kırılım 'false breakout' riski taşır."
         ),
         source_book="Trade Like a Stock Market Wizard",
         source_author="Mark Minervini",
         source_year=2013,
-        quanfina_context="Minervini grid'inde opsiyonel sütun. Null ise henüz baz oluşmamış.",
+        quanfina_context="quanfina_math.py compute_pivot_breakout() — PIVOT_PRICE_LOOKBACK=20, PIVOT_BUFFER_PCT=0.5, PIVOT_VOLUME_CONFIRM_RATIO=1.5 (KARAR #733). Minervini grid opsiyonel sütun (null = baz yok).",
         category="technical",
     ),
     Term(
@@ -744,23 +760,37 @@ MOCK_TERMS: list[Term] = [
     Term(
         key="minervini_method",
         short_name="Minervini Stratejisi",
-        tooltip="Tooltip henüz tanımlanmadı. NotebookLM'den detay alınacak.",
-        definition="Tooltip henüz tanımlanmadı, NotebookLM'den detay alınacak.",
-        source_book=None,
+        # P432: placeholder dolduruldu (tooltip doğrulama workflow + kod referansı)
+        tooltip="Mark Minervini'nin Trend Template + temel analiz kombinasyonu hisse seçim ve trade sistemi.",
+        definition=(
+            "Mark Minervini'nin 'Trade Like a Stock Market Wizard' (2013) sistemi: "
+            "teknik + temel analizi birleştirir. Trend Template (8 koşul: MA150/200 "
+            "üstünde, MA50>MA150>MA200, MA200 pozitif eğim, 52W zirve sınırında, "
+            "RS>70) ile başlar, VCP/Cup-Handle konsolidasyonlarını izler, pivot "
+            "kırılımında girer, risk-first (Stop + R-Multiple) ile yönetir."
+        ),
+        source_book="Trade Like a Stock Market Wizard",
         source_author="Mark Minervini",
-        source_year=None,
-        quanfina_context="Watchlist sayfasında Minervini stratejisi satırlarına bağlı terim. Detay NB-1'den alınacak.",
+        source_year=2013,
+        quanfina_context="scanner.py Trend Template (Finviz Elite filtreleri) + minervini_scans tablosu (teknik MA200 slope/high52/RS + temel EPS/Satış Q/Q). /minervini grid + /watchlist strateji filtresi.",
         category="strategy",
     ),
     Term(
         key="carr_method",
         short_name="Carr Stratejisi",
-        tooltip="Tooltip henüz tanımlanmadı. NotebookLM'den detay alınacak.",
-        definition="Tooltip henüz tanımlanmadı, NotebookLM'den detay alınacak.",
+        # P432: placeholder dolduruldu (Carr Trend Trading + Weinstein 4-Stage)
+        tooltip="Thomas Carr Trend Trading — Stan Weinstein 4-Stage analizi (Basing/Advancing/Topping/Declining).",
+        definition=(
+            "Thomas Carr'ın 'Trend Trading for a Living' (2008) metodolojisi, Stan "
+            "Weinstein 4-aşama modelinin uyarlamasıdır: Stage 1 (Basing/baz), Stage 2 "
+            "(Advancing/yükseliş), Stage 3 (Topping/tepe), Stage 4 (Declining/düşüş). "
+            "Quanfina'da 150 günlük MA (30 hafta), ±%1 eğim flat eşiği, ±%5 proximity "
+            "kriterleri kullanılır."
+        ),
         source_book="Trend Trading for a Living",
         source_author="Thomas Carr",
         source_year=2008,
-        quanfina_context="Watchlist sayfasında Carr stratejisi satırlarına bağlı terim. Detay NB-2'den alınacak.",
+        quanfina_context="quanfina_math.py compute_carr_stage() — MA_WINDOW=150, SLOPE_FLAT_PCT=1.0, PROXIMITY_PCT=5.0. /api/carr/stage/{symbol} + CarrStageCard. /watchlist Carr stratejisi satırları.",
         category="strategy",
     ),
     Term(
@@ -866,17 +896,20 @@ MOCK_TERMS: list[Term] = [
     Term(
         key="rba",
         short_name="RBA",
-        tooltip="Rule-Based Analysis — Minervini'nin kural tabanlı trade değerlendirme sistemi.",
+        # P432: HATA FİX — "Rule-Based" YANLIŞ → "Result-Based Analysis" (Mark TTLC Böl. 4,
+        # uygulamadaki kullanım "Result-Based" ile tutarlı). Placeholder def de dolduruldu.
+        tooltip="Result-Based Analysis — kapanmış trade istatistikleriyle setup edge'i ölçer (min 30 trade).",
         definition=(
-            "Tooltip henüz tanımlanmadı, NotebookLM'den detay alınacak. "
-            "Mark Minervini'nin Rule-Based Analysis (RBA) sistemi, her trade'in kurallarını "
-            "ve bu kurallara uyumu analiz eder. Giriş, çıkış ve pozisyon yönetiminin "
-            "her adımı not edilir."
+            "Mark Minervini'nin Result-Based Analysis (RBA) metodu, geçmiş trade "
+            "sonuçlarını analiz ederek bir stratejinin istatistiksel edge'ini ölçer. "
+            "Adjusted Ratio (avg gain × win% / avg loss × loss%), expectancy ve win "
+            "rate gibi metriklerle min 30 trade sonrası setup'ın sürdürülüp "
+            "sürdürülmeyeceğine karar verir (TTLC Böl. 4: 'Know the truth')."
         ),
-        source_book="Trade Like a Stock Market Wizard",
+        source_book="Think and Trade Like a Champion",
         source_author="Mark Minervini",
-        source_year=2013,
-        quanfina_context="Trade Journal sayfasında grade ve ders notları RBA metodolojisine dayanır. POC ADIM 10'da detaylandırılacak.",
+        source_year=2017,
+        quanfina_context="quanfina_math.py compute_rba_metrics() (7 metrik, 30 trade eşiği) + should_drop_setup() (adjusted_ratio<1.0 → bırak). İstatistikler + İşlem Günlüğü sayfalarında Mark RBA kartı.",
         category="strategy",
     ),
     Term(
