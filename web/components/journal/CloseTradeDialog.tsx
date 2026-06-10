@@ -201,8 +201,8 @@ export function CloseTradeDialog({ trade, open, onOpenChange }: Props) {
             <div
               className="rounded-md border px-3 py-2 text-xs"
               style={{
-                background: "color-mix(in srgb, var(--mtp-good, #4B9CD3) 6%, transparent)",
-                borderColor: "color-mix(in srgb, var(--mtp-good, #4B9CD3) 40%, transparent)",
+                background: "color-mix(in srgb, var(--mtp-neutral) 6%, transparent)",
+                borderColor: "color-mix(in srgb, var(--mtp-neutral) 40%, transparent)",
               }}
             >
               <div className="font-semibold mb-1 flex items-center gap-1.5">

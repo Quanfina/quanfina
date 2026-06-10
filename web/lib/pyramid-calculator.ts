@@ -73,7 +73,7 @@ export interface TierEvaluation {
 
 const SEVERITY_COLORS: Record<TierEvaluation["severity"], string> = {
   ok: "var(--mtp-excellent)",
-  info: "var(--mtp-good, #4B9CD3)",
+  info: "var(--mtp-neutral)",
   warn: "#F59E0B",
   violation: "var(--mtp-danger)",
 };

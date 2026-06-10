@@ -235,7 +235,7 @@ export default function RiskYonetimiPage() {
                     color:
                       severity === "ok"
                         ? "var(--mtp-excellent)"
-                        : "var(--mtp-good, #4B9CD3)",
+                        : "var(--mtp-neutral)",
                   }}
                 />
               )}
@@ -273,7 +273,7 @@ export default function RiskYonetimiPage() {
                   severity === "ok"
                     ? "var(--mtp-excellent)"
                     : severity === "info"
-                    ? "var(--mtp-good, #4B9CD3)"
+                    ? "var(--mtp-neutral)"
                     : severity === "warn"
                     ? "#F59E0B"
                     : "var(--mtp-danger)",
@@ -367,7 +367,7 @@ export default function RiskYonetimiPage() {
                         ? "var(--mtp-danger)"
                         : divergence.severity === "ok"
                         ? "var(--mtp-excellent)"
-                        : "var(--mtp-good, #4B9CD3)",
+                        : "var(--mtp-neutral)",
                     border:
                       divergence.severity === "critical"
                         ? "1px solid var(--mtp-danger)"
@@ -566,7 +566,7 @@ function AtrStageSection({
     NO_TRANSITION: { label: "Kırılım Yok ○", color: "var(--muted-foreground)", bg: "rgba(128,128,128,0.10)" },
     EARLY_STAGE_2: { label: "Erken Stage 2 ⚡", color: "#F59E0B", bg: "rgba(245,158,11,0.15)" },
     CONFIRMED_STAGE_2: { label: "Stage 2 Onaylı ✓", color: "var(--mtp-excellent)", bg: "rgba(40,167,69,0.15)" },
-    STAGE_2_MATURE: { label: "Olgun Trend ⏳", color: "var(--mtp-good, #4B9CD3)", bg: "rgba(75,156,211,0.15)" },
+    STAGE_2_MATURE: { label: "Olgun Trend ⏳", color: "var(--mtp-neutral)", bg: "rgba(75,156,211,0.15)" },
   };
   const stage = stageData?.category;
   const meta = stage ? stageMeta[stage] : null;

@@ -59,7 +59,7 @@ const DIVERGENCE_META: Record<
     shortLabel: "BEARISH ⚠️",
   },
   BULLISH_DIVERGENCE: {
-    color: "var(--mtp-good, #4B9CD3)",
+    color: "var(--mtp-neutral)",
     bg: "rgba(75,156,211,0.10)",
     icon: <TrendingUp size={14} />,
     label: "Bullish Divergence",
@@ -100,7 +100,7 @@ const BREADTH_META: Record<"STRONG" | "NEUTRAL" | "WEAK", { color: string; icon:
 };
 
 const STAGE_META: Record<number, { emoji: string; label: string; color: string }> = {
-  1: { emoji: "⏳", label: "Basing", color: "var(--mtp-good, #4B9CD3)" },
+  1: { emoji: "⏳", label: "Basing", color: "var(--mtp-neutral)" },
   2: { emoji: "📈", label: "Advancing", color: "var(--mtp-excellent)" },
   3: { emoji: "⚠️", label: "Topping", color: "#F59E0B" },
   4: { emoji: "⛔", label: "Declining", color: "var(--mtp-danger)" },

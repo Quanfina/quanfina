@@ -26,7 +26,7 @@ export function PivotBadgeCell(p: PivotBadgeProps) {
       : status === "WEAK"
       ? { label: "Zayıf ⚠️", color: "#F59E0B", bg: "rgba(245,158,11,0.15)" }
       : status === "NEAR_PIVOT"
-      ? { label: "Yakın ⏳", color: "var(--mtp-good, #4B9CD3)", bg: "rgba(75,156,211,0.15)" }
+      ? { label: "Yakın ⏳", color: "var(--mtp-neutral)", bg: "rgba(75,156,211,0.15)" }
       : { label: "Altı ○", color: "var(--mtp-danger)", bg: "rgba(220,53,69,0.10)" };
   const borderColor = status === "CONFIRMED" ? "var(--mtp-excellent)" : "currentColor";
   return (

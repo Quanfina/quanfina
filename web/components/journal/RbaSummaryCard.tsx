@@ -22,8 +22,8 @@ const SEVERITY_COLORS: Record<RbaSeverity, { bg: string; text: string; border: s
   },
   INFO: {
     bg: "rgba(75,156,211,0.08)",
-    text: "var(--mtp-good, #4B9CD3)",
-    border: "var(--mtp-good, #4B9CD3)",
+    text: "var(--mtp-neutral)",
+    border: "var(--mtp-neutral)",
   },
   WARNING: {
     bg: "rgba(245,158,11,0.10)",
@@ -171,7 +171,7 @@ export function RbaSummaryCard({ strategy, setupType, variant = "full" }: Props)
             style={{
               color:
                 m.adjusted_ratio >= 1.5 ? "var(--mtp-excellent)" :
-                m.adjusted_ratio >= 1.0 ? "var(--mtp-good, #4B9CD3)" :
+                m.adjusted_ratio >= 1.0 ? "var(--mtp-neutral)" :
                 "var(--mtp-danger)",
             }}
           >

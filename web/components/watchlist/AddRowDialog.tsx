@@ -129,8 +129,8 @@ export function AddRowDialog({ open, onOpenChange }: Props) {
                             <span
                               className="text-[9px] font-bold px-1 py-0.5 rounded"
                               style={{
-                                background: "color-mix(in srgb, var(--mtp-good, #4B9CD3) 18%, transparent)",
-                                color: "var(--mtp-good, #4B9CD3)",
+                                background: "color-mix(in srgb, var(--mtp-neutral) 18%, transparent)",
+                                color: "var(--mtp-neutral)",
                               }}
                               title="Quanfina evren dışı — yfinance ile doğrulandı"
                             >

@@ -149,7 +149,7 @@ export function useTradingMode(): TradingModeInfo {
         marketHealthScore != null ? ` (sağlık ${marketHealthScore}/100)` : ""
       }${marketMode ? `, ${marketMode}` : ""}.`,
       emoji: "●",
-      color: "var(--mtp-good, #4B9CD3)",
+      color: "var(--mtp-neutral)",
       recommendedSizingPct: 1.0,
       uiBehavior: "Standart R (%1) sizing, tüm sinyaller değerlendir.",
       consecutiveWins,

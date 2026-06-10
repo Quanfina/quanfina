@@ -82,7 +82,7 @@ export const COL_DEFS: ColDef<WatchlistRow>[] = [
     valueFormatter: fmtPrice,
     cellStyle: (p: CellClassParams<WatchlistRow, number>) => ({
       ...MONO,
-      color: p.value == null ? "var(--muted-foreground)" : "var(--mtp-good, #4B9CD3)",
+      color: p.value == null ? "var(--muted-foreground)" : "var(--mtp-neutral)",
       fontWeight: 600,
     }),
     headerTooltip: "Anlık piyasa fiyatı (yfinance, 60s yenileme)",
@@ -153,7 +153,7 @@ export const COL_DEFS: ColDef<WatchlistRow>[] = [
       if (v != null) {
         if (v >= 1.5) color = "var(--mtp-excellent)";  // patlama (yeşil)
         else if (v < 0.7) color = "var(--mtp-danger)";  // sönük (kırmızı)
-        else if (v >= 1.0) color = "var(--mtp-good, #4B9CD3)";  // normal üstü (mavi)
+        else if (v >= 1.0) color = "var(--mtp-neutral)";  // normal üstü (mavi)
       }
       return { ...MONO, color, fontWeight: v != null && v >= 1.5 ? 600 : 400 };
     },

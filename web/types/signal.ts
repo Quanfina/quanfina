@@ -29,4 +29,9 @@ export interface Signal {
   // "Hacim teyit" canon. Paper trading kararı pivot kırılım anında hacim
   // doğrulaması için (yeşil ≥1.5 "patlama" / kırmızı <0.7 "sönük").
   relative_volume?: number | null;
+  // P438 (Kural #28): client-side enrich — canlı yfinance quote. `price` alanı
+  // web_watchlist.price snapshot'ı (insert anında set, UPDATE edilmiyor) → bayat.
+  // useStockQuotes ile doldurulur, Fiyat kolonu canlıyı gösterir (watchlist paten).
+  current_price?: number;
+  quote_source?: "yfinance" | "mock";
 }

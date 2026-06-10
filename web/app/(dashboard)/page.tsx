@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { ArrowRight, Activity, ListChecks, NotebookText, Globe, TrendingUp, TrendingDown, CheckCircle2, Circle, Sunrise } from "lucide-react";
 import { useSignals } from "@/hooks/use-signals";
+import { useStockQuotes } from "@/hooks/use-stock-quote";
 import { useTrades } from "@/hooks/use-trades";
 import { useTradesInfo } from "@/hooks/use-trades-info";
 import { MockDataBanner } from "@/components/shared/MockDataBanner";
@@ -125,6 +126,13 @@ export default function Home() {
 
   // En iyi 5 sinyal (R/R desc, sonra RS)
   const topSignals = (signals.data ?? []).slice(0, 5);
+  // P438 (Kural #28): canlı fiyat — s.price = web_watchlist.price bayat snapshot.
+  const topQuotes = useStockQuotes(topSignals.map((s) => s.symbol));
+  const topQuoteMap = useMemo(() => {
+    const m = new Map<string, number>();
+    topQuotes.forEach((r) => { if (r.data) m.set(r.data.symbol.toUpperCase(), r.data.price); });
+    return m;
+  }, [topQuotes]);
 
   // Son 3 açık trade
   const recentOpen = openTrades.slice(0, 3);
@@ -406,8 +414,9 @@ export default function Home() {
                     <span
                       className="font-semibold"
                       style={{ fontFamily: "var(--font-jetbrains-mono, monospace)" }}
+                      title="Canlı yfinance fiyatı (P438 — snapshot değil)"
                     >
-                      {fmtUsd(s.price)}
+                      {fmtUsd(topQuoteMap.get(s.symbol.toUpperCase()) ?? s.price)}
                     </span>
                   </div>
                 </div>
@@ -526,7 +535,7 @@ export default function Home() {
                           ? "var(--mtp-danger)"
                           : market.data.breadth_divergence.severity === "ok"
                           ? "var(--mtp-excellent)"
-                          : "var(--mtp-good, #4B9CD3)",
+                          : "var(--mtp-neutral)",
                       border:
                         market.data.breadth_divergence.severity === "critical"
                           ? "1px solid var(--mtp-danger)"

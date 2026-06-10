@@ -50,7 +50,7 @@ export default function PatternKutuphanesiPage() {
               <div
                 key={p.id}
                 className="rounded-lg border bg-card p-4 flex flex-col gap-2 hover:shadow-sm transition-shadow"
-                style={{ borderLeftWidth: "3px", borderLeftColor: "var(--mtp-good, #4B9CD3)" }}
+                style={{ borderLeftWidth: "3px", borderLeftColor: "var(--mtp-neutral)" }}
               >
                 <div className="flex items-start justify-between gap-2">
                   <h3 className="text-sm font-semibold">{p.pattern_name}</h3>

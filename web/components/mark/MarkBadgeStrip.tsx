@@ -94,7 +94,7 @@ export function MarkBadgeStrip({ signals, density = "compact", showEmpty = false
         emoji="📊"
         label="VCP Pass"
         color="rgba(75,156,211,0.08)"
-        textColor="var(--mtp-good, #4B9CD3)"
+        textColor="var(--mtp-neutral)"
         tooltip="VCP Pass — Brandon yarılanma kuralı (KARAR #461)"
       />
     );
@@ -123,7 +123,7 @@ export function MarkBadgeStrip({ signals, density = "compact", showEmpty = false
         emoji="🎯"
         label={`Ready ${score}`}
         color="rgba(75,156,211,0.10)"
-        textColor="var(--mtp-good, #4B9CD3)"
+        textColor="var(--mtp-neutral)"
         tooltip={`VCP Ready Score ${score}/100 — Minervini Uzmanı: Inside Day + V-Dry + Tight Range (KARAR #465)`}
       />
     );
@@ -199,7 +199,7 @@ export function MarkBadgeStrip({ signals, density = "compact", showEmpty = false
         emoji="⏳"
         label="Stage 1"
         color="rgba(75,156,211,0.08)"
-        textColor="var(--mtp-good, #4B9CD3)"
+        textColor="var(--mtp-neutral)"
         tooltip="Carr Stage 1 (Basing) — 30W MA flat, breakout izle (KARAR #733)"
       />
     );

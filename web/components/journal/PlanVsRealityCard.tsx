@@ -37,7 +37,7 @@ const SEV_COLORS = {
   ok:        { bg: "rgba(40,167,69,0.10)",  text: "var(--mtp-excellent)",        icon: <CheckCircle2 size={14} /> },
   warn:      { bg: "rgba(245,158,11,0.10)", text: "#F59E0B",                     icon: <AlertCircle size={14} /> },
   violation: { bg: "rgba(220,53,69,0.10)",  text: "var(--mtp-danger)",           icon: <XCircle size={14} /> },
-  info:      { bg: "rgba(75,156,211,0.08)", text: "var(--mtp-good, #4B9CD3)",    icon: <Target size={14} /> },
+  info:      { bg: "rgba(75,156,211,0.08)", text: "var(--mtp-neutral)",    icon: <Target size={14} /> },
 };
 
 function fmtPct(value: number, decimals: number = 1): string {

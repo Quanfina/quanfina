@@ -25,7 +25,7 @@ export function SignalRREnrichedCell(p: ICellRendererParams<Signal>) {
   if (rs != null) {
     const rsR = Math.round(rs);
     if (rsR >= 80) rsMeta = { label: "L", color: "var(--mtp-excellent)", tip: "IBD LEADER" };
-    else if (rsR >= 70) rsMeta = { label: "S", color: "var(--mtp-good, #4B9CD3)", tip: "STRONG" };
+    else if (rsR >= 70) rsMeta = { label: "S", color: "var(--mtp-neutral)", tip: "STRONG" };
     else if (rsR >= 50) rsMeta = { label: "A", color: "#F59E0B", tip: "AVERAGE" };
     else rsMeta = { label: "↓", color: "var(--mtp-danger)", tip: "LAGGARD" };
   }

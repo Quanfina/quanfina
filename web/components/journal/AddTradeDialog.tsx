@@ -434,7 +434,7 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
                         : pivotData.status === "WEAK"
                         ? "#F59E0B"
                         : pivotData.status === "NEAR_PIVOT"
-                        ? "var(--mtp-good, #4B9CD3)"
+                        ? "var(--mtp-neutral)"
                         : "var(--mtp-danger)",
                   }}
                   title={`Pivot — ${pivotData.mark_says}`}
@@ -466,7 +466,7 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
                       rsData.rs_rating >= 80
                         ? "var(--mtp-excellent)"
                         : rsData.rs_rating >= 70
-                        ? "var(--mtp-good, #4B9CD3)"
+                        ? "var(--mtp-neutral)"
                         : rsData.rs_rating >= 50
                         ? "#F59E0B"
                         : "var(--mtp-danger)",
@@ -512,7 +512,7 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
                         ? "var(--mtp-excellent)"
                         : stageData.category === "EARLY_STAGE_2"
                         ? "#F59E0B"
-                        : "var(--mtp-good, #4B9CD3)",
+                        : "var(--mtp-neutral)",
                   }}
                   title={`Stage — ${stageData.mark_says}`}
                 >
@@ -599,8 +599,8 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
                             <span
                               className="text-[9px] font-bold px-1 py-0.5 rounded"
                               style={{
-                                background: "color-mix(in srgb, var(--mtp-good, #4B9CD3) 18%, transparent)",
-                                color: "var(--mtp-good, #4B9CD3)",
+                                background: "color-mix(in srgb, var(--mtp-neutral) 18%, transparent)",
+                                color: "var(--mtp-neutral)",
                               }}
                               title="Quanfina evren dışı — yfinance ile doğrulandı"
                             >
@@ -839,7 +839,7 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
                 style={{
                   background: "rgba(75,156,211,0.08)",
                   borderColor: "rgba(75,156,211,0.4)",
-                  color: "var(--mtp-good, #4B9CD3)",
+                  color: "var(--mtp-neutral)",
                 }}
                 title="Mark canon: stop = entry × 0.94 (%6 — TTLC s.131 %7 marjı), target = entry + 2R"
               >

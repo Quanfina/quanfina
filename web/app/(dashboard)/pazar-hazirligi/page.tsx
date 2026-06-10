@@ -141,7 +141,7 @@ export default function PazarHazirligiPage() {
                       lastWeekStats.winRate >= 50
                         ? "var(--mtp-excellent)"
                         : lastWeekStats.winRate >= 35
-                        ? "var(--mtp-good, #4B9CD3)"
+                        ? "var(--mtp-neutral)"
                         : "var(--mtp-danger)"
                     }
                   />
@@ -207,7 +207,7 @@ export default function PazarHazirligiPage() {
                       (marketQuery.data.market_health_score ?? 0) >= 70
                         ? "var(--mtp-excellent)"
                         : (marketQuery.data.market_health_score ?? 0) >= 40
-                        ? "var(--mtp-good, #4B9CD3)"
+                        ? "var(--mtp-neutral)"
                         : "var(--mtp-danger)"
                     }
                   />

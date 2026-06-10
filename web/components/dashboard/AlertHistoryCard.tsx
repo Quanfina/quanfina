@@ -34,7 +34,7 @@ function SeverityIcon({ severity }: { severity: AlertHistoryEntry["severity"] })
     return <AlertCircle size={14} style={{ color: "var(--mtp-danger)" }} />;
   if (severity === "warning")
     return <AlertTriangle size={14} style={{ color: "#F59E0B" }} />;
-  return <Info size={14} style={{ color: "var(--mtp-good, #4B9CD3)" }} />;
+  return <Info size={14} style={{ color: "var(--mtp-neutral)" }} />;
 }
 
 export function AlertHistoryCard() {
@@ -57,8 +57,22 @@ export function AlertHistoryCard() {
   }
 
   if (entries === null) {
-    // Hydration öncesi (skeleton yerine null — flash önleme)
-    return null;
+    // P437 pateni: hydration öncesi null = görünmez → Dashboard grid'inde
+    // (PortfolioSummaryCard | ModBadge | AlertHistoryCard) pop-in/reflow.
+    // Kardeşlerle hizalı placeholder kart kutusu göster.
+    return (
+      <div className="rounded-lg border bg-card p-4 flex flex-col gap-3">
+        <div className="flex items-center gap-2">
+          <Bell size={14} className="text-muted-foreground" />
+          <h3 className="text-xs font-semibold tracking-wider uppercase text-muted-foreground">
+            Uyarı Geçmişi (24h)
+          </h3>
+        </div>
+        <div className="py-4 text-sm text-muted-foreground text-center">
+          Uyarı geçmişi yükleniyor...
+        </div>
+      </div>
+    );
   }
 
   return (

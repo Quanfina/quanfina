@@ -25,7 +25,7 @@ export function RsRatingBadge(p: RsRatingBadgeProps) {
   const rsRounded = Math.round(rs);
   let meta: { label: string; color: string; tip: string };
   if (rsRounded >= 80) meta = { label: "L", color: "var(--mtp-excellent)", tip: "IBD LEADER (Top 20%)" };
-  else if (rsRounded >= 70) meta = { label: "S", color: "var(--mtp-good, #4B9CD3)", tip: "STRONG" };
+  else if (rsRounded >= 70) meta = { label: "S", color: "var(--mtp-neutral)", tip: "STRONG" };
   else if (rsRounded >= 50) meta = { label: "A", color: "#F59E0B", tip: "AVERAGE" };
   else meta = { label: "↓", color: "var(--mtp-danger)", tip: "LAGGARD — Mark: uzak dur" };
 

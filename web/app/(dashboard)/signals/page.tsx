@@ -14,6 +14,7 @@ import type { ColDef, ICellRendererParams, ValueFormatterParams, CellClassParams
 // ile birlikte DRY birlestirme — sayfa-ici kopyalama yasak).
 import { MONO, MONO_RIGHT } from "@/lib/grid-styles";
 import { useSignals } from "@/hooks/use-signals";
+import { useStockQuotes } from "@/hooks/use-stock-quote";
 import { AddTradeDialog } from "@/components/journal/AddTradeDialog";
 import { AddRowDialog } from "@/components/watchlist/AddRowDialog";
 import { Button } from "@/components/ui/button";
@@ -202,8 +203,12 @@ export default function SignalsPage() {
     {
       field: "price",
       headerName: "Fiyat",
+      // P438 (Kural #28): canlı yfinance fiyatı (current_price enrich), bayat
+      // web_watchlist.price snapshot fallback. Önce bayat $ gösteriyordu.
+      headerTooltip: "Canlı yfinance fiyatı (snapshot değil)",
       width: 100,
       type: "rightAligned",
+      valueGetter: (p) => p.data?.current_price ?? p.data?.price,
       valueFormatter: (p) => fmtUsd(p.value as number),
       cellStyle: MONO_RIGHT,
     },
@@ -262,7 +267,7 @@ export default function SignalsPage() {
         if (v != null) {
           if (v >= 1.5) color = "var(--mtp-excellent)";
           else if (v < 0.7) color = "var(--mtp-danger)";
-          else if (v >= 1.0) color = "var(--mtp-good, #4B9CD3)";
+          else if (v >= 1.0) color = "var(--mtp-neutral)";
         }
         return { ...MONO, color, fontWeight: v != null && v >= 1.5 ? 600 : 400, textAlign: "right" };
       },
@@ -298,7 +303,7 @@ export default function SignalsPage() {
             : status === "WEAK"
             ? { label: "Zayıf ⚠️", color: "#F59E0B", bg: "rgba(245,158,11,0.15)" }
             : status === "NEAR_PIVOT"
-            ? { label: "Yakın ⏳", color: "var(--mtp-good, #4B9CD3)", bg: "rgba(75,156,211,0.15)" }
+            ? { label: "Yakın ⏳", color: "var(--mtp-neutral)", bg: "rgba(75,156,211,0.15)" }
             : { label: "Altı ○", color: "var(--mtp-danger)", bg: "rgba(220,53,69,0.10)" };
         return (
           <span
@@ -336,7 +341,7 @@ export default function SignalsPage() {
             : cat === "EARLY_STAGE_2"
             ? { label: "Erken ⚡", color: "#F59E0B", bg: "rgba(245,158,11,0.15)" }
             : cat === "STAGE_2_MATURE"
-            ? { label: "Olgun ⏳", color: "var(--mtp-good, #4B9CD3)", bg: "rgba(75,156,211,0.15)" }
+            ? { label: "Olgun ⏳", color: "var(--mtp-neutral)", bg: "rgba(75,156,211,0.15)" }
             : { label: "Yok ○", color: "var(--muted-foreground)", bg: "rgba(128,128,128,0.10)" };
         return (
           <span
@@ -406,6 +411,22 @@ export default function SignalsPage() {
     filter: false,
   }), []);
 
+  // P438 (Kural #28): canlı fiyat enrich (Watchlist paten). Signal.price =
+  // web_watchlist.price snapshot (insert anında set, UPDATE yok) → bayat
+  // (NVDA $875 bölünme öncesi senaryosu). useStockQuotes ile canlı yfinance.
+  const allSymbols = useMemo(
+    () => Array.from(new Set((data ?? []).map((s) => s.symbol))),
+    [data]
+  );
+  const quoteResults = useStockQuotes(allSymbols);
+  const quoteMap = useMemo(() => {
+    const map = new Map<string, { price: number; source: string }>();
+    quoteResults.forEach((r) => {
+      if (r.data) map.set(r.data.symbol.toUpperCase(), { price: r.data.price, source: r.data.source });
+    });
+    return map;
+  }, [quoteResults]);
+
   const filtered = useMemo(() => {
     let rows = data ?? [];
     // KARAR #475 — Geçilen sinyaller default gizli (showPassed true ise göster)
@@ -425,8 +446,12 @@ export default function SignalsPage() {
           s.mark_signals?.climax_category === "POTENTIAL_CLIMAX"
       );
     }
-    return rows;
-  }, [data, statusFilter, strategyFilter, newTodayOnly, passedKeys, showPassed, climaxWarnOnly]);
+    // P438: canlı quote enrich — Fiyat kolonu current_price gösterir (bayat fallback)
+    return rows.map((s) => {
+      const q = quoteMap.get(s.symbol.toUpperCase());
+      return q ? { ...s, current_price: q.price, quote_source: q.source as "yfinance" | "mock" } : s;
+    });
+  }, [data, statusFilter, strategyFilter, newTodayOnly, passedKeys, showPassed, climaxWarnOnly, quoteMap]);
 
   const totalSignals = data?.length ?? 0;
   const newTodayCount = data?.filter((s) => s.is_new_today).length ?? 0;

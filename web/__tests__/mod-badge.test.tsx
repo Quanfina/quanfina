@@ -47,7 +47,7 @@ function makeMode(
         ? "#F59E0B"
         : mode === "agresif"
         ? "var(--mtp-excellent)"
-        : "var(--mtp-good, #4B9CD3)",
+        : "var(--mtp-neutral)",
     recommendedSizingPct:
       mode === "rehab" ? 0.5 : mode === "agresif" ? 1.5 : mode === "defansif" ? 0 : 1.0,
     uiBehavior: `${mode} ux behavior`,

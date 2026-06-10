@@ -202,7 +202,7 @@ export default function ScreensPage() {
           // color+'33'). Carr Stage zaten watchlist MARK PROFİLİ içinde bu şekilde
           // görünüyor — Stage 4 "Avoid" iki sayfada aynı görsel dil.
           const meta: Record<number, { label: string; tint: string; color: string }> = {
-            1: { label: "Stage 1", tint: "rgba(75,156,211,0.10)", color: "var(--mtp-good, #4B9CD3)" },
+            1: { label: "Stage 1", tint: "rgba(75,156,211,0.10)", color: "var(--mtp-neutral)" },
             2: { label: "Stage 2", tint: "rgba(40,167,69,0.10)", color: "var(--mtp-excellent)" },
             3: { label: "Stage 3", tint: "rgba(245,158,11,0.10)", color: "#92400E" },
             4: { label: "Stage 4", tint: "rgba(220,53,69,0.10)", color: "var(--mtp-danger)" },

@@ -139,7 +139,7 @@ export function BrandonExpectancyCard({ strategy }: { strategy?: string } = {}) 
       </p>
 
       {/* Metrik grid: 4 alan */}
-      <div className="grid grid-cols-4 gap-2 text-xs pt-1 border-t border-muted-foreground/15">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs pt-1 border-t border-muted-foreground/15">
         <Metric
           label="Avg Gain"
           value={`+${data.avg_gain_pct.toFixed(1)}%`}
