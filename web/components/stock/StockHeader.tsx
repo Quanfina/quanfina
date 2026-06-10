@@ -30,14 +30,20 @@ export function StockHeader({
   info,
   livePrice,
   liveChangePct,
+  liveSource,
 }: {
   info: StockInfo;
   livePrice?: number | null;
   liveChangePct?: number | null;
+  liveSource?: string | null;
 }) {
   const price = livePrice ?? info.price;
   const changePct = liveChangePct ?? info.change_pct;
-  const isLive = livePrice != null;
+  // P443-L1 (Kural #28): "CANLI" rozeti YALNIZ yfinance kaynağı için. quote
+  // source="mock" (yfinance erişilemiyor) → fiyat sentetik, "SENTETİK" rozeti.
+  // Eski isLive=livePrice!=null mock fiyatı da "CANLI" gösterip yanıltıyordu.
+  const isLive = livePrice != null && liveSource === "yfinance";
+  const isSynthetic = livePrice != null && liveSource === "mock";
   const isPositive = changePct >= 0;
 
   return (
@@ -82,6 +88,15 @@ export function StockHeader({
                 title="Anlık piyasa fiyatı (yfinance, 60s yenileme)"
               >
                 CANLI
+              </span>
+            )}
+            {isSynthetic && (
+              <span
+                className="text-[9px] font-semibold uppercase tracking-wider px-1 py-0.5 rounded"
+                style={{ background: "rgba(245,158,11,0.18)", color: "#F59E0B" }}
+                title="yfinance erişilemiyor — fiyat geçici sentetik (paper trading kararı için güvenilmez, AÇIK KONU #75)"
+              >
+                SENTETİK
               </span>
             )}
           </div>

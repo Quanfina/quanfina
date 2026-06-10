@@ -198,6 +198,31 @@ export default function HissePage({
         </div>
       )}
 
+      {/* P443-L1 (Kural #28): yfinance erişilemiyor → _get_ohlcv sessizce sentetik
+          (_generate_ohlcv) döndürür; grafik + TÜM OHLCV-türevli kartlar (Pivot/ATR/
+          Climax/Hacim/Kırılım/Stage Transition) sentetik olur. quote.source="mock"
+          bu degradasyonu doğru raporlar → tek sayfa banner (per-card değil; hepsi
+          aynı _get_ohlcv'i paylaşır). Paper trading kararı için güvenilmez. */}
+      {quote?.source === "mock" && (
+        <div
+          className="px-6 py-2 border-b text-xs flex items-center gap-2"
+          style={{
+            background: "rgba(245,158,11,0.10)",
+            borderColor: "rgba(245,158,11,0.40)",
+            color: "#92400E",
+          }}
+          role="status"
+          data-testid="hisse-ohlcv-mock-banner"
+        >
+          <span aria-hidden="true">🟡</span>
+          <span>
+            <b>Canlı veri yok:</b> yfinance şu an erişilemiyor — fiyat, grafik ve
+            teknik göstergeler (Pivot/ATR/Hacim/Kırılım/Stage) geçici SENTETİK.
+            Paper trading kararı için güvenilmez (AÇIK KONU #75).
+          </span>
+        </div>
+      )}
+
       {/* KARAR #733 alt-paket (Paket 39): Mark Regime banner + bu hissenin
           Stage 4 olup olmadığı sayım payı (isStage4 ? 1 : 0). hideOnHealthy
           default — HEALTHY iken sadece bu hisse Stage 4 olursa banner kalır. */}
@@ -223,7 +248,7 @@ export default function HissePage({
       {/* Stock header + Trade Aç buton (KARAR #733 alt-paket Paket 46) */}
       <div className="px-6 py-4 border-b flex items-start justify-between gap-3 flex-wrap">
         <div className="flex-1 min-w-0">
-          <StockHeader info={info} livePrice={quote?.price} liveChangePct={quote?.change_pct} />
+          <StockHeader info={info} livePrice={quote?.price} liveChangePct={quote?.change_pct} liveSource={quote?.source} />
         </div>
         <div className="flex items-center gap-3 shrink-0">
           {/* Paket 224 (27 May 2026): Vizyon İLKE #10 — Hisse detayında mod farkındalığı
