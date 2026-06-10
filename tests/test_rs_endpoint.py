@@ -67,3 +67,35 @@ class TestRsEndpointValues:
     def test_uppercase_normalize(self, client):
         data = client.get("/api/stock/nvda/rs").json()
         assert "category" in data
+
+
+class TestRsConsistency:
+    """P441 (10 Haz 2026): /hisse RS tutarsizligi fix. Eski: StockHeader
+    info.rs_rating=97 (cross-sectional IBD) vs /rs=55 (compute hardcoded bant).
+    Fix: /rs DB-FIRST → ayni rs_ibd kaynagi → header (info) = kart (/rs)."""
+
+    def test_info_rs_matches_rs_endpoint(self, client):
+        info = client.get("/api/stock/NVDA/info").json()
+        rs = client.get("/api/stock/NVDA/rs").json()
+        # Header (info.rs_rating) ile kart (/rs rs_rating) BIREBIR ayni olmali
+        assert rs["rs_rating"] == info["rs_rating"]
+        assert rs["source"] == "scan"
+
+    def test_category_matches_threshold(self, client):
+        """rs_rating_category eşiği (LEADER>=80 / STRONG>=70 / AVERAGE>=50 / LAGGARD)."""
+        rs = client.get("/api/stock/NVDA/rs").json()
+        v = rs["rs_rating"]
+        cat = rs["category"]
+        if v >= 80:
+            assert cat == "LEADER"
+        elif v >= 70:
+            assert cat == "STRONG"
+        elif v >= 50:
+            assert cat == "AVERAGE"
+        else:
+            assert cat == "LAGGARD"
+
+    def test_source_field_present(self, client):
+        """P441: source alani ('scan'|'computed') her yanitta var (Kural #28)."""
+        rs = client.get("/api/stock/NVDA/rs").json()
+        assert rs["source"] in ("scan", "computed")

@@ -59,6 +59,7 @@ from quanfina_math import (  # noqa: E402
     compute_climax_run,
     compute_brandon_expectancy,
     compute_relative_strength_rating,
+    rs_rating_category,
     compute_atr_volatility,
     compute_distribution_day_severity,
     compute_relative_volume,
@@ -2705,14 +2706,44 @@ class RsRatingInfo(BaseModel):
     benchmark_return_pct: Optional[float] = None
     outperform_pct: Optional[float] = None
     mark_says: str
+    # P441 (10 Haz 2026): RS kaynak şeffaflığı. "scan" = cross-sectional IBD RS
+    # (minervini_scans rs_ibd / MOCK, /info ile birebir tutarlı). "computed" =
+    # yerel compute_relative_strength_rating yaklaşığı (taranmamış sembol, evren
+    # yok → hardcoded bant; Kural #28 UI'da işaretlenir, Kural #26 follow-up).
+    source: Optional[Literal["scan", "computed"]] = None
+
+
+def _resolve_rs_ibd(sym: str) -> Optional[int]:
+    """get_stock_info ile AYNI öncelikten cross-sectional IBD RS (rs_ibd) çöz.
+    Amaç: /hisse RS kartı (RsRatingCard/MarkProfileBar) header (info.rs_rating)
+    ile BİREBİR tutarlı olsun (P441 — RS 97 scan vs 55 compute tutarsızlığı fix).
+    Öncelik get_stock_info ile aynı: MOCK_STOCKS > watchlist > scan DB. Bulunamazsa
+    None → yerel compute yaklaşığı fallback (source=computed)."""
+    stock = _STOCK_BY_SYM.get(sym)
+    if stock is not None:
+        return int(round(stock.rs_ibd))
+    try:
+        wl = [r for r in watchlist_get_all() if r["symbol"] == sym]
+    except OperationalError:
+        wl = []
+    if wl and wl[0].get("rs_rating") is not None:
+        return int(round(float(wl[0]["rs_rating"])))
+    scan_data = _fetch_scan_symbol_data(sym)
+    if scan_data and scan_data.get("rs_ibd") is not None:
+        return int(scan_data["rs_ibd"])
+    return None
 
 
 @app.get("/api/stock/{symbol}/rs", response_model=RsRatingInfo)
 def get_rs_rating(symbol: str) -> RsRatingInfo:
-    """Mark TLSMW Ch 3-5 / IBD canon RS Rating (P91 helper wire).
+    """Mark TLSMW Ch 3-5 / IBD canon RS Rating (1-99 cross-sectional persentil).
 
-    Hisse vs SPY benchmark 12 ay agirlikli getiri -> 1-99 yuzdelik skoru.
-    OHLCV MOCK feed (AÇIK KONU #75 production yfinance).
+    P441 (10 Haz 2026 — derin araştırma fix): IBD RS = tüm evrene göre persentil
+    rank (mutlak/vs-SPY getiri DEĞİL). Eski /rs endpoint compute_relative_strength_
+    rating'in hardcoded bandını (vs-SPY outperform → uydurma 1-99) kullanıyordu →
+    NVDA scan 97 (cross-sectional, doğru) vs /rs 55 (uydurma bant) tutarsızlığı.
+    Fix: DB-FIRST scan rs_ibd (get_stock_info ile aynı kaynak) → header=kartlar.
+    Taranmamış sembol → yerel yaklaşık (source=computed, Kural #28 UI işaret).
     """
     sym = symbol.upper()
     if sym == "SPY":
@@ -2723,35 +2754,41 @@ def get_rs_rating(symbol: str) -> RsRatingInfo:
             stock_return_pct=0.0,
             benchmark_return_pct=0.0,
             outperform_pct=0.0,
+            source="scan",
             mark_says="SPY benchmark — RS Rating tanım gereği AVERAGE (50).",
         )
-    stock = _STOCK_BY_SYM.get(sym)
-    if stock:
-        stock_price = stock.price
-    else:
-        try:
-            wl = [r for r in watchlist_get_all() if r["symbol"] == sym]
-        except OperationalError:
-            wl = []
-        if wl:
-            stock_price = float(wl[0]["price"])
-        else:
-            scan_data = _fetch_scan_symbol_data(sym)
-            stock_price = scan_data["price"] if scan_data else 100.0
 
-    stock_bars = _get_ohlcv(sym, stock_price)
+    # P441: DB-FIRST cross-sectional IBD RS (info.rs_rating ile birebir tutarlı).
+    rs_ibd = _resolve_rs_ibd(sym)
+    if rs_ibd is not None:
+        rs_ibd = max(1, min(99, rs_ibd))
+        cat = rs_rating_category(rs_ibd)
+        cat_say = {
+            "LEADER": f'✓ LEADER RS {rs_ibd} — IBD canon "Top 20%" (evrenin ~%{rs_ibd}\'ini geçti). Mark: alım adayı.',
+            "STRONG": f'STRONG RS {rs_ibd} — üst orta dilim. Mark: izleme, breakout için bekle.',
+            "AVERAGE": f'AVERAGE RS {rs_ibd} — vasat performans. Mark: leadership eksik, başka aday bul.',
+            "LAGGARD": f'⚠️ LAGGARD RS {rs_ibd} — alt dilim. Mark TLSMW Ch 4: leader olmadan kazanç zor.',
+        }[cat]
+        return RsRatingInfo(rs_rating=rs_ibd, category=cat, source="scan", mark_says=cat_say)
+
+    # Fallback: taranmamış sembol — yerel compute yaklaşığı. compute_relative_
+    # strength_rating cross-sectional DEĞİL (vs-SPY hardcoded bant) → source=
+    # "computed" ile UI'da işaretlenir (Kural #28). Tam cross-sectional persentil
+    # (evren batch percentileofscore) follow-up (Kural #26 GELİŞTİRİLMESİ LAZIM).
+    stock_bars = _get_ohlcv(sym, 100.0)
     bench_bars = _get_ohlcv("SPY", 450.0)
-    stock_closes = [b.close for b in stock_bars]
-    bench_closes = [b.close for b in bench_bars]
-
-    result = compute_relative_strength_rating(stock_closes, bench_closes)
+    result = compute_relative_strength_rating(
+        [b.close for b in stock_bars], [b.close for b in bench_bars]
+    )
     return RsRatingInfo(
         rs_rating=result.get("rs_rating"),
         category=result.get("category"),
         stock_return_pct=result.get("stock_return_pct"),
         benchmark_return_pct=result.get("benchmark_return_pct"),
         outperform_pct=result.get("outperform_pct"),
-        mark_says=result.get("mark_says", ""),
+        source="computed",
+        mark_says="(Taranmamış — yerel yaklaşık, cross-sectional değil) "
+        + result.get("mark_says", ""),
     )
 
 

@@ -1,16 +1,21 @@
 import type { StockInfo } from "@/types/stock";
 import { MarkBadgeStrip } from "@/components/mark/MarkBadgeStrip";
 
+// P441: IBD canon kategori eşiği (LEADER>=80 / STRONG 70-80 / AVERAGE 50-70 /
+// LAGGARD <50) — RsRatingBadge + MarkProfileBar + rs_rating_category birebir.
+// Eski 90/70/50 (70-80 yeşil) tutarsızdı: header yeşil, kart mavi (STRONG) idi.
 function rsBackground(rs: number): string {
   if (rs >= 90) return "color-mix(in srgb, var(--mtp-excellent) 35%, transparent)";
-  if (rs >= 70) return "color-mix(in srgb, var(--mtp-excellent) 18%, transparent)";
-  if (rs >= 50) return "color-mix(in srgb, var(--mtp-neutral)   18%, transparent)";
+  if (rs >= 80) return "color-mix(in srgb, var(--mtp-excellent) 18%, transparent)";
+  if (rs >= 70) return "color-mix(in srgb, var(--mtp-neutral)   18%, transparent)";
+  if (rs >= 50) return "color-mix(in srgb, #F59E0B 18%, transparent)";
   return              "color-mix(in srgb, var(--mtp-danger)    18%, transparent)";
 }
 
 function rsColor(rs: number): string {
-  if (rs >= 70) return "var(--mtp-excellent)";
-  if (rs >= 50) return "var(--mtp-neutral)";
+  if (rs >= 80) return "var(--mtp-excellent)";
+  if (rs >= 70) return "var(--mtp-neutral)";
+  if (rs >= 50) return "#F59E0B";
   return "var(--mtp-danger)";
 }
 

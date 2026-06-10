@@ -76,6 +76,16 @@ export function RsRatingCard({ symbol }: { symbol: string }) {
           <span className="ml-1.5 text-[10px] font-normal text-muted-foreground italic">
             (Mark TLSMW Ch 3-5 / IBD)
           </span>
+          {/* P441: taranmamış sembol → yerel yaklaşık (cross-sectional değil) */}
+          {data.source === "computed" && (
+            <span
+              className="ml-1.5 text-[9px] font-semibold px-1 py-0.5 rounded uppercase"
+              style={{ background: "rgba(245,158,11,0.15)", color: "#F59E0B" }}
+              title="Taranmamış sembol — yerel yaklaşık RS (cross-sectional persentil değil). Tam IBD RS için günlük taramada olmalı."
+            >
+              ~yaklaşık
+            </span>
+          )}
         </h3>
         <span
           className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider"

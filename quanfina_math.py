@@ -4077,6 +4077,19 @@ RS_THRESHOLD_STRONG: int = 70
 RS_THRESHOLD_AVERAGE: int = 50
 
 
+def rs_rating_category(rs: int) -> str:
+    """RS Rating (1-99) -> IBD canon kategori. Tek kaynak eşik (LEADER/STRONG/
+    AVERAGE/LAGGARD). DB-first scan rs_ibd ve compute path birebir aynı eşiği
+    kullansın diye paylaşımlı helper (P441 — /hisse RS tutarsızlığı fix)."""
+    if rs >= RS_THRESHOLD_LEADER:
+        return "LEADER"
+    if rs >= RS_THRESHOLD_STRONG:
+        return "STRONG"
+    if rs >= RS_THRESHOLD_AVERAGE:
+        return "AVERAGE"
+    return "LAGGARD"
+
+
 def compute_relative_strength_rating(
     stock_closes: list[float],
     benchmark_closes: list[float],

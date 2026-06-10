@@ -16,6 +16,9 @@ export interface RsRatingInfo {
   benchmark_return_pct: number | null;
   outperform_pct: number | null;
   mark_says: string;
+  // P441: "scan" = cross-sectional IBD RS (info.rs_rating ile tutarlı). "computed"
+  // = taranmamış sembol yerel yaklaşığı (cross-sectional değil — Kural #28 işaret).
+  source?: "scan" | "computed";
 }
 
 async function fetchRsRating(symbol: string): Promise<RsRatingInfo> {
