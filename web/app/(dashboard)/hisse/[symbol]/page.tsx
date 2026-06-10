@@ -217,39 +217,42 @@ export default function HissePage({
 
       {/* Main content */}
       <div className="flex-1 px-6 py-4 flex flex-col gap-4 overflow-auto">
-        <div className="flex gap-4 items-start">
-          {/* Chart — takes remaining space */}
-          <div className="flex-1 min-w-0">
-            {ohlcv && ohlcv.length > 0 ? (
-              <PriceChart data={ohlcv} />
-            ) : (
-              <div className="flex items-center justify-center h-64 text-sm text-muted-foreground border rounded-lg">
-                Grafik verisi yok
-              </div>
-            )}
-          </div>
+        {/* P436: Grafik tam genişlik (üstte) — eski dar sağ-sütun layout'unda
+            grafik flex-1 ile daralıyordu + 10 kart dikey yığılı uzun scroll
+            "takibi zor"du. Grafik üstte tam görünür, kartlar altta grid. */}
+        <div className="w-full min-w-0">
+          {ohlcv && ohlcv.length > 0 ? (
+            <PriceChart data={ohlcv} />
+          ) : (
+            <div className="flex items-center justify-center h-64 text-sm text-muted-foreground border rounded-lg">
+              Grafik verisi yok
+            </div>
+          )}
+        </div>
 
-          {/* Active strategies sidebar + Carr Stage (KARAR #733 P32) */}
-          <div className="w-64 shrink-0 flex flex-col gap-3">
-            <ActiveStrategies strategies={info.active_strategies} symbol={sym} />
-            <CarrStageCard symbol={sym} />
-            {/* KARAR #733 alt-paket (Paket 72): Pivot Breakout Card */}
-            <PivotBreakoutCard symbol={sym} />
-            {/* KARAR #733 alt-paket (Paket 78): Overhead Supply Card */}
-            <OverheadSupplyCard symbol={sym} />
-            {/* KARAR #733 alt-paket (Paket 88): Climax Run Card — Mark TLSMW Ch 9 */}
-            <ClimaxRunCard symbol={sym} />
-            {/* KARAR #733 alt-paket (Paket 94): RS Rating Card — Mark TLSMW Ch 3-5 / IBD */}
-            <RsRatingCard symbol={sym} />
-            {/* KARAR #733 alt-paket (Paket 103): ATR Volatility Card — Mark TLSMW Ch 11 / Wilder */}
-            <AtrVolatilityCard symbol={sym} />
-            {/* KARAR #733 alt-paket (Paket 122): Stage Transition — Mark TLSMW Ch 4 / Weinstein */}
-            <StageTransitionCard symbol={sym} />
-            {/* KARAR #733 alt-paket (Paket 133): Relative Volume — Mark TLSMW Ch 6 */}
-            <RelativeVolumeCard symbol={sym} />
-            {/* KARAR #733 alt-paket (Paket 134): Breakout Quality — Mark TLSMW Ch 10 */}
-            <BreakoutQualityCard symbol={sym} />
-          </div>
+        {/* Mark canon profili — responsive grid (P436): 256px dar sütunda 10
+            dikey kart (≈10 satır scroll) yerine 2 kolon (md) / 3 kolon (xl)
+            grid → ≈4 satır, yan yana tarama kolay, grafik takibi bozulmaz.
+            items-start: değişken yükseklikli kartlar üstten hizalı. */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 items-start">
+          <ActiveStrategies strategies={info.active_strategies} symbol={sym} />
+          <CarrStageCard symbol={sym} />
+          {/* KARAR #733 alt-paket (Paket 72): Pivot Breakout Card */}
+          <PivotBreakoutCard symbol={sym} />
+          {/* KARAR #733 alt-paket (Paket 78): Overhead Supply Card */}
+          <OverheadSupplyCard symbol={sym} />
+          {/* KARAR #733 alt-paket (Paket 88): Climax Run Card — Mark TLSMW Ch 9 */}
+          <ClimaxRunCard symbol={sym} />
+          {/* KARAR #733 alt-paket (Paket 94): RS Rating Card — Mark TLSMW Ch 3-5 / IBD */}
+          <RsRatingCard symbol={sym} />
+          {/* KARAR #733 alt-paket (Paket 103): ATR Volatility Card — Mark TLSMW Ch 11 / Wilder */}
+          <AtrVolatilityCard symbol={sym} />
+          {/* KARAR #733 alt-paket (Paket 122): Stage Transition — Mark TLSMW Ch 4 / Weinstein */}
+          <StageTransitionCard symbol={sym} />
+          {/* KARAR #733 alt-paket (Paket 133): Relative Volume — Mark TLSMW Ch 6 */}
+          <RelativeVolumeCard symbol={sym} />
+          {/* KARAR #733 alt-paket (Paket 134): Breakout Quality — Mark TLSMW Ch 10 */}
+          <BreakoutQualityCard symbol={sym} />
         </div>
 
         {/* Setup notes (only when notes exist) */}

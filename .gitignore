@@ -227,6 +227,10 @@ test_*.py
 !tests/test_*.py
 _tmp_*.py
 web/_*.mjs
+# Kök + web/ scratch dosyaları (gecici test/tooltip dump'lari — repo disi)
+/_*.mjs
+web/_*.json
+web/_*.txt
 notebook/
 
 # UX tarama dökümleri (notebook çıktısı, repo dışı)
