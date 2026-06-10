@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useGridTheme } from "@/hooks/use-grid-theme";
 import { useGridColumnState } from "@/hooks/use-grid-column-state";
 import { Activity, Plus, X, RotateCcw } from "lucide-react";
@@ -136,7 +137,16 @@ export default function SignalsPage() {
         if (!s) return null;
         return (
           <div className="flex items-center gap-2 h-full">
-            <span className="font-semibold tracking-tight">{s.symbol}</span>
+            {/* P433 (31 May 2026 — BUG FIX): sembol artık /hisse detay sayfasına
+                tıklanabilir Link (İzleme Listesi SymbolCellRenderer pateni). Önce
+                düz <span> idi — Sn. Ferit "hisseye tıklayınca grafiğe gidemiyorum". */}
+            <Link
+              href={`/hisse/${s.symbol}`}
+              className="font-semibold tracking-tight hover:underline hover:text-foreground transition-colors"
+              style={{ fontFamily: "var(--font-jetbrains-mono, monospace)" }}
+            >
+              {s.symbol}
+            </Link>
             {s.is_new_today && (
               <span
                 className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
