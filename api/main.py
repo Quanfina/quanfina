@@ -1066,9 +1066,11 @@ def _compute_mark_regime(distribution_days: int) -> MarkRegimeInfo:
         # YASAK (Market in Correction) canon 5-6 DD. Eski 4DD→new_buy_allowed=False
         # dd_severity (4DD=CAUTION/yavaşla) ile aynı dd_count'ta ÇELİŞİYORDU (3-katman
         # bug, P446 çelişkisinin kökü). 4DD artık kısıtlı-açık; YASAK 5+'a taşındı.
-        # Kaynak: O'Neil HTMMIS + IBD Market Pulse (nasdaq.com 2014: "cut to 50%...
-        # leaving the door open"). NOT: %50/%25 exposure yüzdeleri Quanfina iç tasarım
-        # (kitap DD-count→% haritası vermez — Kural #26).
+        # Kaynak (11 Haz uc-kaynak danisma teyit): O'Neil HTMMIS s.45,50 = "indexes
+        # reverse -> raise 25%+ cash" (KITAP NITEL; 4/5 DD COUNT'u kitapta YOK) +
+        # 4/5 DD esigi = IBD Market Pulse kitap-sonrasi konvansiyon (nasdaq.com 2014:
+        # "cut to 50%... leaving the door open"). NOT: %50/%25 exposure yuzdeleri
+        # Quanfina ic tasarim — ne O'Neil ne Minervini kitabi DD-count->% verir (Kural #26).
         return MarkRegimeInfo(
             regime="UNDER_PRESSURE", label="Baskı Altında",
             allocation="%50 pozisyon — yeni alım sadece A+ setup + lider pilot (kapı aralık)",
