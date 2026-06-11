@@ -3810,6 +3810,211 @@ def compute_brandon_expectancy(
 
 
 # ======================================================================
+# Paket 455 (11 Haz 2026) — Cup-with-Handle Base Detection
+#
+# William O'Neil "How to Make Money in Stocks" (CAN SLIM) Bol.15 birebir.
+# Uc-kaynak danisma (NotebookLM O'Neil CAN SLIM + Minervini x2) ile TUM esikler
+# kitap-sayfa atifli (Kural #26 — uydurma yok):
+#   - Onceki trend : min +%30 advance + RS iyilesme        (s.165)
+#   - Kupa derinligi: %12-33                                 (s.162-163)
+#   - Kupa suresi  : 7-65 hafta = 35-325 islem gunu          (s.162)
+#   - Kupa sekli   : U (yuvarlak), dar V REDDEDILIR           (s.163)
+#   - Kulp derinligi: <=%15; >%15 (bogada) gevsek/kusurlu     (s.164,178)
+#   - Kulp konumu  : tabanin UST YARISI + 200-gun MA ustu     (s.163-164)
+#   - Kulp suresi  : >1-2 hafta (>~5 islem gunu)              (s.163)
+#   - Shakeout     : kulp sonunda onceki dusuk altina sarkma  (s.163-164)
+#   - Pivot        : kulp zirvesi/direnc; +%50 hacim kirilim  (s.164-165)
+#                    NOT: "kulp zirvesi +10 cent" KITAPTA YOK (IBD konvansiyonu).
+#   - Kulp hacmi   : "extreme/dramatic dry-up" NITEL          (s.163-164)
+#                    KITAPTA % YOK -> Quanfina heuristic (kulp ort < taban ort *0.8).
+#   - Kusurlu      : alt yari / 200MA alti / yukari-kama / >%15 (s.164,178)
+#
+# v1 not: tek pre-breakout taban tarar (rim = pencere max high; ilk olusum = sol
+# kenar). Kirilim sonrasi (rim asilmis) taban tespit edilmez — forming base hedefi.
+# ======================================================================
+
+CUP_PRIOR_UPTREND_MIN_PCT: float = 30.0    # O'Neil s.165 — base oncesi min advance
+CUP_DEPTH_MIN_PCT: float = 12.0            # O'Neil s.162-163 — kupa min derinlik
+CUP_DEPTH_MAX_PCT: float = 33.0            # O'Neil s.162-163 — kupa max (saglikli)
+CUP_DURATION_MIN_DAYS: int = 35            # 7 hafta (s.162)
+CUP_DURATION_MAX_DAYS: int = 325           # 65 hafta (s.162)
+HANDLE_DEPTH_MAX_PCT: float = 15.0         # O'Neil s.164,178 — >%15 gevsek/kusurlu
+HANDLE_MIN_DAYS: int = 5                   # >1 hafta (s.163)
+HANDLE_VOLUME_DRYUP_RATIO: float = 0.8     # Quanfina heuristic (kitapta % yok, s.163-164 nitel)
+CUP_HANDLE_MIN_HISTORY: int = 60           # min veri (gercek kullanim 250+ ideal)
+
+
+def compute_cup_with_handle(
+    highs: list[float],
+    lows: list[float],
+    closes: list[float],
+    volumes: list[float] | None = None,
+    ma200: float | None = None,
+) -> dict:
+    """O'Neil CAN SLIM cup-with-handle base tespiti (HTMMIS Bol.15, kitap-birebir esikler).
+
+    Args:
+        highs/lows/closes: gunluk OHLC (kronolojik, esit uzunluk)
+        volumes: gunluk hacim (opsiyonel — kulp dry-up degerlendirmesi)
+        ma200: 200-gun SMA (opsiyonel; yoksa mevcut close ort)
+
+    Returns:
+        dict {detected, quality, pivot_price, prior_uptrend_pct, cup_depth_pct,
+              cup_duration_days, handle_depth_pct, handle_in_upper_half, shakeout,
+              faults, mark_says}
+
+    Kaynak: O'Neil HTMMIS Bol.15 s.162-165,178 (her esik modul-ust yorumunda atifli).
+    """
+    def _none(msg: str) -> dict:
+        return {
+            'detected': False, 'quality': 'NONE', 'pivot_price': None,
+            'prior_uptrend_pct': None, 'cup_depth_pct': None, 'cup_duration_days': None,
+            'handle_depth_pct': None, 'handle_in_upper_half': False, 'shakeout': False,
+            'faults': [], 'mark_says': msg,
+        }
+
+    if not highs or not lows or not closes:
+        return _none('Yetersiz veri — cup-with-handle hesaplanamiyor.')
+    n = len(closes)
+    if not (len(highs) == len(lows) == n):
+        return _none('Cup-handle: highs/lows/closes uzunluk farkli.')
+    if n < CUP_HANDLE_MIN_HISTORY:
+        return _none(f'Yetersiz veri — en az {CUP_HANDLE_MIN_HISTORY} gun gerek.')
+
+    # 1) Taban penceresi: son <=325 gun. Rim = bu pencerede ilk en yuksek high (sol kenar).
+    window = min(n, CUP_DURATION_MAX_DAYS)
+    seg_h = highs[-window:]
+    seg_l = lows[-window:]
+    rim_rel = seg_h.index(max(seg_h))
+    rim_price = seg_h[rim_rel]
+    rim_global = n - window + rim_rel
+    if rim_price <= 0:
+        return _none('Rim fiyati gecersiz.')
+    if window - rim_rel < CUP_DURATION_MIN_DAYS:
+        return _none('Rim cok yakin (kirilim sonrasi?) — forming taban yok.')
+
+    # 2) Kupa dibi = rim'den SONRA en dusuk low
+    after_rim_l = seg_l[rim_rel:]
+    cup_low_rel = after_rim_l.index(min(after_rim_l))
+    cup_low_idx = rim_rel + cup_low_rel
+    cup_low_price = after_rim_l[cup_low_rel]
+    cup_depth_pct = round((rim_price - cup_low_price) / rim_price * 100, 2)
+
+    # 3) Kulp = kupa dibinden sonra toparlanma tepesi (handle_high) + sonraki geri cekilme
+    after_low_h = seg_h[cup_low_idx:]
+    if len(after_low_h) < HANDLE_MIN_DAYS + 1:
+        return _none('Kupa sag tarafi/kulp icin yetersiz veri.')
+    handle_high_rel = after_low_h.index(max(after_low_h))
+    handle_high_idx = cup_low_idx + handle_high_rel
+    handle_high_price = after_low_h[handle_high_rel]
+    if handle_high_price <= 0:
+        return _none('Kulp zirvesi gecersiz.')
+
+    after_hh_l = seg_l[handle_high_idx:]
+    handle_len = len(after_hh_l) - 1
+    if handle_len < HANDLE_MIN_DAYS:
+        return _none(f'Kulp cok kisa (<{HANDLE_MIN_DAYS} gun) — O\'Neil s.163 >1 hafta.')
+    handle_low_price = min(after_hh_l)
+    handle_depth_pct = round((handle_high_price - handle_low_price) / handle_high_price * 100, 2)
+    cup_duration_days = handle_high_idx - rim_rel  # rim -> kulp zirvesi = taban uzunlugu
+
+    # 4) Onceki trend: rim oncesi advance (rim'den geriye 252 gun dip)
+    prior_window = lows[max(0, rim_global - 252):rim_global + 1]
+    prior_low = min(prior_window) if prior_window else cup_low_price
+    prior_uptrend_pct = round((rim_price - prior_low) / prior_low * 100, 2) if prior_low > 0 else 0.0
+
+    # 5) MA200 (yoksa mevcut close ort)
+    if ma200 is None:
+        ma200 = sum(closes[-200:]) / min(200, n)
+
+    # 6) Kulp konum: tabanin UST YARISI (s.163-164)
+    cup_mid = cup_low_price + 0.5 * (rim_price - cup_low_price)
+    handle_in_upper_half = handle_low_price > cup_mid
+
+    # 7) Shakeout (s.163-164): kulp dibi, kulp oncesi 10-bar dusugun altina sarkti mi
+    pre_handle_lows = seg_l[max(0, handle_high_idx - 10):handle_high_idx]
+    prior_minor_low = min(pre_handle_lows) if pre_handle_lows else handle_low_price
+    shakeout = handle_low_price < prior_minor_low
+
+    # 8) U vs V (s.163): dip etrafinda zaman (kupa dibinin +%5 icinde >=5 bar = genis U)
+    near_bottom = [lo for lo in after_rim_l if lo <= cup_low_price * 1.05]
+    is_u_shaped = len(near_bottom) >= 5
+
+    # 9) Kulp hacim dry-up (s.163-164 NITEL — Quanfina heuristic, kitapta % yok)
+    handle_volume_dryup = None
+    if volumes and len(volumes) == n:
+        seg_v = volumes[-window:]
+        base_vol = seg_v[rim_rel:handle_high_idx]
+        handle_vol = seg_v[handle_high_idx:]
+        if base_vol and handle_vol:
+            base_avg = sum(base_vol) / len(base_vol)
+            handle_avg = sum(handle_vol) / len(handle_vol)
+            handle_volume_dryup = base_avg > 0 and handle_avg <= base_avg * HANDLE_VOLUME_DRYUP_RATIO
+
+    # --- Cekirdek yapi var mi? ---
+    if not (cup_depth_pct >= CUP_DEPTH_MIN_PCT and cup_duration_days >= CUP_DURATION_MIN_DAYS
+            and handle_len >= HANDLE_MIN_DAYS and handle_depth_pct > 0):
+        return _none('Cup-with-handle yapisi yok (kupa/kulp olcumleri tutmuyor).')
+
+    # --- Kusur (fault) tespiti (s.164,178) ---
+    faults: list[str] = []
+    if cup_depth_pct > CUP_DEPTH_MAX_PCT:
+        faults.append(f'kupa %{cup_depth_pct} derin (>%{CUP_DEPTH_MAX_PCT:.0f}, s.162-163)')
+    if cup_duration_days > CUP_DURATION_MAX_DAYS:
+        faults.append(f'kupa {cup_duration_days}g (>65 hafta, s.162)')
+    if prior_uptrend_pct < CUP_PRIOR_UPTREND_MIN_PCT:
+        faults.append(f'onceki trend %{prior_uptrend_pct} (<%30, s.165)')
+    if handle_depth_pct > HANDLE_DEPTH_MAX_PCT:
+        faults.append(f'kulp %{handle_depth_pct} (>%15 gevsek/kusurlu, s.164,178)')
+    if not handle_in_upper_half:
+        faults.append('kulp tabanin ALT yarisinda (zayif, s.164)')
+    if handle_high_price < ma200:
+        faults.append('kulp 200-gun MA altinda (zayif, s.164)')
+    if not is_u_shaped:
+        faults.append('kupa dibi dar V — U sekli degil (s.163)')
+    if not shakeout:
+        faults.append('kulp sonunda shakeout yok (s.163-164)')
+
+    detected = len(faults) == 0
+    if detected:
+        quality = 'EXCELLENT' if handle_volume_dryup else 'GOOD'
+    elif len(faults) <= 2:
+        quality = 'MARGINAL'
+    else:
+        quality = 'NONE'
+        detected = False
+
+    pivot_price = round(handle_high_price, 2)
+    fault_str = '; '.join(faults)
+    if quality == 'EXCELLENT':
+        says = (f'✓ EXCELLENT Cup-with-Handle — pivot ${pivot_price}. Kupa %{cup_depth_pct} '
+                f'({cup_duration_days}g, U) + kulp %{handle_depth_pct} ust yari + shakeout + '
+                f'hacim dry-up. O\'Neil canon tam; +%50 hacim kirilimda AL adayi.')
+    elif quality == 'GOOD':
+        says = (f'GOOD Cup-with-Handle — pivot ${pivot_price}. Kupa %{cup_depth_pct}, kulp '
+                f'%{handle_depth_pct}. O\'Neil yapi tutuyor; hacim kirilim teyidi bekle.')
+    elif quality == 'MARGINAL':
+        says = (f'⚠️ MARGINAL Cup-with-Handle — pivot ${pivot_price}. Kusur: {fault_str}. '
+                f'O\'Neil: zayif yapi, dikkatli.')
+    else:
+        says = f'Cup-with-Handle kusurlu — {fault_str}.'
+
+    return {
+        'detected': detected,
+        'quality': quality,
+        'pivot_price': pivot_price,
+        'prior_uptrend_pct': prior_uptrend_pct,
+        'cup_depth_pct': cup_depth_pct,
+        'cup_duration_days': cup_duration_days,
+        'handle_depth_pct': handle_depth_pct,
+        'handle_in_upper_half': handle_in_upper_half,
+        'shakeout': shakeout,
+        'faults': faults,
+        'mark_says': says,
+    }
+
+
+# ======================================================================
 # KARAR #733 alt-paket (Paket 76, 25 May 2026) — Overhead Supply Detection
 #
 # Mark TLSMW Ch 10 canon: "Overhead supply" = bir hissenin geçmişte
