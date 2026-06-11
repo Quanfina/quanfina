@@ -1168,6 +1168,8 @@ def suggest_entry_grade(
             confidence="MEDIUM",
             reason=f"Pivot'a {deviation_pct:+.1f}% — pivot'tan geç alım",
         )
+    # O'Neil HTMMIS Bol.3 s.26-27 + Bol.15 s.164: "extended >5-10% past buy point = late".
+    # Quanfina muhafazakar uc: >%5 -> CE (chase). (Kitap araligi %5-10; biz %5'te kesiyoruz.)
     elif deviation_pct > 5.0:
         return GradeSuggestion(
             code="CE",
@@ -3394,14 +3396,18 @@ def compute_breadth_divergence(
 # 3. FTD gun sayisi (dip'ten sonraki gun sayisi)
 # 4. Hacim teyidi (volume_today > volume_yesterday)
 #
-# Mark birebir kaynak:
-# - O'Neil HowToMakeMoney: "%1.7-2% FTD gerek, hacim onceki >1x"
-# - TLSMW Ch 4: "FTD 4. gunden onceki FTD yanıltıcıdır"
-# - Mark+CANSLIM 4-7 gun ideal pencere (Best stocks make lows first)
+# Birebir kaynak (3-kaynak triangule, 11 Haz 2026):
+# - O'Neil "How to Make Money in Stocks" Bol.7 s.59-60: rally'nin 3.-10. gunu
+#   (genelde 4-7. gun), endeks gun icinde "+1% or more", hacim onceki gunden
+#   ARTIS. KITAP ESIGI = %1 (%1.7 DEGIL).
+# - FTD_MIN_GAIN_PCT=1.7 ise IBD'nin KITAP-SONRASI modern revizesidir (%1.0
+#   cok fazla yanlis FTD uretince ~%1.5-1.7'e cekildi) — kitap degil guncel IBD.
+# - TLSMW Ch 4: 4. gunden onceki FTD daha az guvenilir (Mark teyit).
+# - 4-7 gun ideal pencere (O'Neil CANSLIM "Best stocks make lows first").
 # ======================================================================
 
 # FTD esikleri (Mark/O'Neil canon)
-FTD_MIN_GAIN_PCT: float = 1.7        # Major index gun icinde >+1.7%
+FTD_MIN_GAIN_PCT: float = 1.7        # IBD-modern esik; KITAP (O'Neil s.59) = %1
 FTD_VOLUME_MULTIPLIER: float = 1.0   # Hacim onceki >=1.0x (Mark: yuksek hacim)
 FTD_WINDOW_MIN_DAYS: int = 4         # Dip'ten sonra 4. gun veya sonrasi
 FTD_WINDOW_MAX_DAYS: int = 10        # 10. gunu gecince FTD gecerligi azalir
@@ -3941,7 +3947,7 @@ def compute_overhead_supply(
 CLIMAX_RUN_LOOKBACK_DAYS: int = 15           # Son 15 gün climax penceresi
 CLIMAX_RUN_GAIN_TOP_PCT: float = 25.0        # %25+ kısa sürede = climax
 CLIMAX_RUN_GAIN_POTENTIAL_PCT: float = 15.0  # %15-25 = potansiyel
-CLIMAX_GAP_UP_PCT: float = 3.0               # Tek günde %3+ gap = exhaustion adayı
+CLIMAX_GAP_UP_PCT: float = 3.0               # Quanfina heuristic — kitapta (O'Neil/Mark) gap % esigi YOK
 CLIMAX_MIN_GAP_DAYS: int = 2                 # En az 2 gap-up gerek = climax kanıt
 
 
@@ -4053,10 +4059,12 @@ def compute_climax_run(
 # Mark Minervini ve O'Neil IBD RS Rating: Hisseyi son 12 ay getirisinde
 # tüm evrene göre yüzdelik dilime (1-99) yerleştirir.
 #
-# Mark birebir:
-# - "I only buy stocks with RS Rating 80+" (IBD threshold)
-# - "Top 25% momentum stocks lead market" (CANSLIM 'C' kriteri)
-# - TLSMW Ch 4: "Strength leading strength" — leader hisse trend takibi
+# Birebir kaynak (3-kaynak triangule, 11 Haz 2026):
+# - O'Neil "How to Make Money in Stocks" Bol.5 s.35-37: "RS rank 80 or higher";
+#   "super leaders ... 90 or higher just before breaking out"; <70 = laggard.
+# - Minervini Trend Template Kural 8 (TLSMW s.94): "RS no less than 70,
+#   preferably in the 80s or 90s". -> LEADER>=80 / STRONG>=70 birebir kitap.
+# - CANSLIM 'L' = Leader (RS 80+).
 #
 # Quanfina basitleştirilmiş hesap (canon yorumu):
 # - 12 aylık getiri AĞIRLIKLI: son çeyrek %40, önceki 3 çeyrek %20 her biri
@@ -4072,7 +4080,7 @@ RS_LOOKBACK_DAYS: int = 252                    # 12 ay yaklaşık
 RS_QUARTER_DAYS: int = 63                       # 3 ay yaklaşık
 RS_WEIGHT_RECENT_Q: float = 0.40                # Son çeyrek %40
 RS_WEIGHT_PRIOR_Q: float = 0.20                 # Diğer 3 çeyrek %20 her
-RS_THRESHOLD_LEADER: int = 80                   # IBD canon Mark
+RS_THRESHOLD_LEADER: int = 80                   # O'Neil s.35-37 + Minervini R8 (super lider 90+)
 RS_THRESHOLD_STRONG: int = 70
 RS_THRESHOLD_AVERAGE: int = 50
 
@@ -4538,7 +4546,7 @@ def compute_relative_volume(
 # Pivot kırılım kalitesi 0-100 puan. Mark canon birleşik:
 # - Hacim teyit (50g >=1.5x) -> 30 puan
 # - Gap-up open (kırılım günü) -> 20 puan
-# - %1.7+ kazanç -> 25 puan (FTD eşiği paralel)
+# - breakout_pct ideal +%1.7..%5 -> 25; %5-10 uzamis -> 15; >%10 chase -> 5 (O'Neil s.26-27)
 # - Önceki kontraksiyon (VCP daralma) -> 15 puan
 # - Overhead temiz -> 10 puan
 #
@@ -4564,11 +4572,14 @@ def compute_breakout_quality(
     """Mark TLSMW Ch 10 pivot kırılım kalite kompoziti.
 
     Args:
-        volume_confirmed: Hacim >=1.5x 50g ort
-        gap_up: Kırılım günü open > prev close +%3
-        breakout_pct: Pivot üstü % (Mark FTD paralel %1.7+)
-        prior_contraction: Önceki VCP daralma (volatilite düşmüş)
-        overhead_clean: Overhead %3 altı (temiz tarla)
+        volume_confirmed: Hacim >=1.5x 50g ort (O'Neil HTMMIS s.33,164: breakout
+            "at least 50% above normal" = 1.5x — KITAP BIREBIR)
+        gap_up: Kırılım günü open > prev close +%3 (Quanfina heuristic — kitapta
+            gap-up % esigi YOK; O'Neil s.45 & Mark s.219 sadece niteliksel/devasa hacim)
+        breakout_pct: Pivot üstü %. O'Neil s.26-27,164: ideal +%0.5..%5; %5-10
+            uzamis; >%10 chase/gec — yuksek breakout_pct artik tam puan ALMAZ
+        prior_contraction: Önceki VCP daralma (Minervini TLSMW s.199, volatilite düşmüş)
+        overhead_clean: Overhead temiz (Minervini — temiz tarla)
 
     Returns:
         dict {
@@ -4578,10 +4589,25 @@ def compute_breakout_quality(
             'mark_says': str,
         }
     """
+    # O'Neil HTMMIS s.26-27,164: pivot'tan %5-10 uzasa "gec kaldin", >%10 chase.
+    # Taze kirilim ideal +%1.7..%5 -> tam puan; %5-10 yari; >%10 dusuk; <%0.5 -> 0.
+    # (Eski mantik: breakout_pct ne kadar buyukse o kadar puan -> chase'i de 25
+    #  puanla odullendiriyordu. 11 Haz 2026 uc-kaynak triangule ile duzeltildi.)
+    bo = breakout_pct
+    if bo < 0.5:
+        bo_score = 0          # pivot henuz kirilmadi
+    elif bo < 1.7:
+        bo_score = 15         # zayif/marjinal kirilim
+    elif bo <= 5.0:
+        bo_score = 25         # ideal taze kirilim (O'Neil alim bolgesi)
+    elif bo <= 10.0:
+        bo_score = 15         # uzamaya basladi (O'Neil %5-10 = gec)
+    else:
+        bo_score = 5          # chase >%10 — cok gec
     breakdown = {
         'volume': 30 if volume_confirmed else 0,
         'gap_up': 20 if gap_up else 0,
-        'breakout_strength': 25 if breakout_pct >= 1.7 else (15 if breakout_pct >= 0.5 else 0),
+        'breakout_strength': bo_score,
         'prior_contraction': 15 if prior_contraction else 0,
         'overhead_clean': 10 if overhead_clean else 0,
     }

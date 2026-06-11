@@ -53,15 +53,28 @@ def test_breakdown_returned():
 
 
 def test_breakout_strength_tiers():
-    # Strong (>=1.7)
+    # Ideal taze (%1.7-5)
     r1 = compute_breakout_quality(False, False, 2.0)
     assert r1['breakdown']['breakout_strength'] == 25
-    # Mid (>=0.5)
+    # Mid (%0.5-1.7)
     r2 = compute_breakout_quality(False, False, 0.8)
     assert r2['breakdown']['breakout_strength'] == 15
-    # Weak
+    # Weak (<%0.5 — pivot kirilmadi)
     r3 = compute_breakout_quality(False, False, 0.1)
     assert r3['breakdown']['breakout_strength'] == 0
+
+
+def test_breakout_strength_extended_chase_cap():
+    """11 Haz 2026 uc-kaynak triangule (O'Neil CANSLIM + Minervini x2): O'Neil HTMMIS
+    s.26-27,164 — pivot'tan %5-10 uzasa 'gec kaldin', >%10 chase. Yuksek breakout_pct
+    artik tam puan ALMAZ (eski mantik chase'i de 25 ile odullendiriyordu — bug fix)."""
+    # Ideal ust sinir tam %5 -> hala 25
+    assert compute_breakout_quality(False, False, 5.0)['breakdown']['breakout_strength'] == 25
+    # Uzamis (%5-10) -> 15
+    assert compute_breakout_quality(False, False, 7.0)['breakdown']['breakout_strength'] == 15
+    assert compute_breakout_quality(False, False, 10.0)['breakdown']['breakout_strength'] == 15
+    # Chase (>%10) -> 5 (cok gec)
+    assert compute_breakout_quality(False, False, 15.0)['breakdown']['breakout_strength'] == 5
 
 
 def test_mark_says_present():

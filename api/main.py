@@ -2905,11 +2905,13 @@ class BreakoutQualityInfo(BaseModel):
     breakdown: dict = {}
     mark_says: str
     # P443 (10 Haz 2026 — Kural #28): hangi breakdown bileşenleri GERÇEK hesaplanıyor.
-    # Şu an sadece "volume" (rel_vol'den). gap_up/breakout_strength/prior_contraction/
-    # overhead_clean HARDCODED MOCK (AÇIK KONU #75 — gerçek pivot tarihi yok) →
-    # kompozit skorun 4/5'i anlamsız. UI bunları "hesaplanmadı" işaretler, yanıltıcı
-    # tam-skor sunumu önlenir. Gerçek hesap (compute_breakout_quality'ye gerçek
-    # pivot/gap/VCP besle) AÇIK KONU #75 follow-up.
+    # P450 (10 Haz) sonrasi 5/5 GERCEK OHLCV'den (volume + gap_up + breakout_strength
+    # + prior_contraction + overhead_clean). UI tam-skoru guvenle gosterir.
+    # Esik kaynak durumu (11 Haz uc-kaynak triangule — O'Neil CANSLIM + Minervini x2):
+    #   volume 1.5x = O'Neil HTMMIS s.33,164 (kitap birebir);
+    #   breakout_strength %5-10 chase cap = O'Neil s.26-27 (kitap);
+    #   gap_up %3 = Quanfina heuristic (KITAPTA gap-up % YOK — uydurma degil bilincli);
+    #   prior_contraction = Minervini VCP TLSMW s.199.
     real_components: list[str] = []
 
 
@@ -2948,9 +2950,10 @@ def get_breakout_quality(symbol: str) -> BreakoutQualityInfo:
     # hesaplandi — mevcut CANLI helper'lar (yeni helper YOK). P443 "kismi MOCK"
     # uyarisi kapaniyor. Kaynaklar:
     #   - gap_up: inline (open[-1]-close[-2])/close[-2]*100 >= 3.0 — compute_climax_run
-    #     CLIMAX_GAP_UP_PCT=3.0 ile birebir tutarli. NOT: %3 esigi helper-ici sabit,
-    #     Mark kitap-sayfa atfi eksik → GELISTIRILMESI LAZIM (Kural #26 — NotebookLM
-    #     "Quanfina Minervini" cift danisma adayi).
+    #     CLIMAX_GAP_UP_PCT=3.0 ile birebir tutarli. NOT (11 Haz 2026 uc-kaynak danisma
+    #     COZULDU): O'Neil HTMMIS s.45 + Minervini TLSMW s.219 — buyable gap-up icin
+    #     KITAPTA % ESIGI YOK (sadece niteliksel + devasa hacim). %3 = Quanfina bilincli
+    #     operasyonel heuristic (Kural #28), uydurma DEGIL. GELISTIRILMESI LAZIM kalkti.
     #   - breakout_pct: compute_pivot_breakout (20-bar pivot, AÇIK KONU #75 calisan cozum)
     #   - overhead_clean: compute_overhead_supply category == NONE
     #   - prior_contraction: compute_vcp_pass (Brandon V-Dry VCP, KARAR #464 gercek hesap)
