@@ -23,6 +23,7 @@ import { BreakoutQualityCard } from "@/components/stock/BreakoutQualityCard";
 import { CupHandleCard } from "@/components/stock/CupHandleCard";
 import { FlatBaseCard } from "@/components/stock/FlatBaseCard";
 import { DoubleBottomCard } from "@/components/stock/DoubleBottomCard";
+import { HighTightFlagCard } from "@/components/stock/HighTightFlagCard";
 import { RiskSummaryCard } from "@/components/stock/RiskSummaryCard";
 import { MarkRegimeBanner } from "@/components/mark/MarkRegimeBanner";
 import { ModBadge } from "@/components/mark/ModBadge";
@@ -338,6 +339,8 @@ export default function HissePage({
           <FlatBaseCard symbol={sym} />
           {/* Paket 460 (11 Haz 2026): Double Bottom (W) — O'Neil/IBD */}
           <DoubleBottomCard symbol={sym} />
+          {/* Paket 462 (11 Haz 2026): High Tight Flag (= Minervini Power Play) */}
+          <HighTightFlagCard symbol={sym} />
         </div>
 
         {/* Setup notes (only when notes exist) */}
