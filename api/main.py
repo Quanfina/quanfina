@@ -67,6 +67,7 @@ from quanfina_math import (  # noqa: E402
     compute_breakout_quality,
     compute_cup_with_handle,
     compute_flat_base,
+    compute_double_bottom,
     compute_stage_transition,
     compute_faber_timing,
     compute_mcclellan_oscillator,
@@ -3116,6 +3117,69 @@ def get_flat_base(symbol: str) -> FlatBaseInfo:
         base_duration_days=r.get("base_duration_days"),
         is_sideways=r.get("is_sideways", False),
         volume_dryup=r.get("volume_dryup"),
+        faults=r.get("faults", []),
+        mark_says=r.get("mark_says", ""),
+    )
+
+
+# Paket 460 (11 Haz 2026): Double Bottom (W) endpoint
+# O'Neil/IBD Double Bottom — compute_double_bottom wire (base detector ailesi 3. uye).
+# Derin internet arastirma (MarketSmith/IBD/TraderLion) ile esikler kaynak-atifli (Kural #26).
+class DoubleBottomInfo(BaseModel):
+    detected: bool = False
+    quality: Optional[Literal["EXCELLENT", "GOOD", "MARGINAL", "NONE"]] = None
+    pivot_price: Optional[float] = None
+    prior_advance_pct: Optional[float] = None
+    base_depth_pct: Optional[float] = None
+    base_duration_days: Optional[int] = None
+    undercut: bool = False
+    first_low: Optional[float] = None
+    second_low: Optional[float] = None
+    middle_peak: Optional[float] = None
+    faults: list[str] = []
+    mark_says: str
+
+
+@app.get("/api/stock/{symbol}/double-bottom", response_model=DoubleBottomInfo)
+def get_double_bottom(symbol: str) -> DoubleBottomInfo:
+    """O'Neil/IBD double bottom (W) tespiti (2. dip undercut + orta tepe pivot, P460 wire).
+
+    compute_double_bottom — GERCEK OHLCV. Esikler kaynak-atifli (min 7 hafta / undercut
+    zorunlu / pivot = orta tepe / onceki advance >=%30 / derinlik <=%35, red >%50).
+    """
+    sym = symbol.upper()
+    stock = _STOCK_BY_SYM.get(sym)
+    if stock:
+        price = stock.price
+    else:
+        try:
+            wl = [r for r in watchlist_get_all() if r["symbol"] == sym]
+        except OperationalError:
+            wl = []
+        if wl:
+            price = float(wl[0]["price"])
+        else:
+            scan_data = _fetch_scan_symbol_data(sym)
+            price = scan_data["price"] if scan_data else 100.0
+
+    bars = _get_ohlcv(sym, price)
+    highs = [b.high for b in bars]
+    lows = [b.low for b in bars]
+    closes = [b.close for b in bars]
+    volumes = [b.volume for b in bars]
+
+    r = compute_double_bottom(highs, lows, closes, volumes)
+    return DoubleBottomInfo(
+        detected=r.get("detected", False),
+        quality=r.get("quality"),
+        pivot_price=r.get("pivot_price"),
+        prior_advance_pct=r.get("prior_advance_pct"),
+        base_depth_pct=r.get("base_depth_pct"),
+        base_duration_days=r.get("base_duration_days"),
+        undercut=r.get("undercut", False),
+        first_low=r.get("first_low"),
+        second_low=r.get("second_low"),
+        middle_peak=r.get("middle_peak"),
         faults=r.get("faults", []),
         mark_says=r.get("mark_says", ""),
     )

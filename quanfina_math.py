@@ -4189,6 +4189,186 @@ def compute_flat_base(
 
 
 # ======================================================================
+# Paket 460 (11 Haz 2026) — Double Bottom (W) Detection
+#
+# William O'Neil "How to Make Money in Stocks" (CAN SLIM) + IBD/MarketSmith Double
+# Bottom. Derin internet arastirma (workflow, MarketSmith resmi + IBD + TraderLion
+# HIGH guven) ile esikler kaynak-atifli (Kural #26 — uydurma yok):
+#   - Yapi      : "W" = iki dip + arada orta tepe (middle peak)
+#   - UNDERCUT  : 2. dip 1. dibin ALTINA iner (shakeout) — TANIMLAYICI/ZORUNLU.
+#                 Inmezse "double bottom DEGIL, basarisizliga acik" (TraderLion).
+#                 Undercut DERINLIGI icin kaynakta sayisal esik YOK (sadece "slightly lower").
+#   - Pivot     : orta tepenin (W ortasi) yuksekligi (+10 cent IBD). NOT: sag-ust tepe DEGIL.
+#   - Min sure  : >=7 hafta = 35 islem gunu (IBD/MarketSmith); 7-65 hafta (MarketSmith)
+#   - Onceki advance: >=%30 (O'Neil GENEL baz kurali — cup/flat/double hepsi). Kaynak:
+#                 IBD/MarketSmith metodolojisi (kitap sayfa atfi turda dogrulanamadi).
+#   - Derinlik  : IBD "no more than 30% or 35%" (normal ~30, zayif piyasa ~35);
+#                 tipik %20-30; sert ayida %40-50; MarketSmith aralik %10-50. >%50 red.
+#   - Hacim     : 2. dipte dry-up; kirilim ort. +%40-50 (IBD).
+#   - Kusurlu   : 2. dip undercut yok (=double bottom degil), orta tepe alt yarida,
+#                 cok derin/genis, gec-asama.
+#
+# v1 not: W-finder rim=pencere max high; orta tepe=post-rim max (son 5 bar haric);
+# 1. dip=orta tepe oncesi min, 2. dip=orta tepe sonrasi min. Base-stage sayimi YOK
+# (gec-asama kusuru tespit edilmez, GELISTIRILMESI LAZIM).
+# ======================================================================
+
+DB_MIN_DAYS: int = 35                      # IBD/MarketSmith >=7 hafta
+DB_MAX_DAYS: int = 325                     # MarketSmith 7-65 hafta
+DB_DEPTH_MAX_PCT: float = 35.0             # IBD "no more than 30% or 35%"
+DB_DEPTH_REJECT_PCT: float = 50.0          # MarketSmith max %50 (sert ayi)
+DB_PRIOR_ADVANCE_MIN_PCT: float = 30.0     # O'Neil genel baz kurali (IBD/MarketSmith)
+DB_BREAKOUT_VOL_RATIO: float = 1.40        # IBD kirilim "+40% above average"
+
+
+def compute_double_bottom(
+    highs: list[float],
+    lows: list[float],
+    closes: list[float],
+    volumes: list[float] | None = None,
+) -> dict:
+    """O'Neil/IBD double bottom (W) tespiti (kaynak-atifli esikler + Kural #26).
+
+    Args:
+        highs/lows/closes: gunluk OHLC (kronolojik, esit uzunluk)
+        volumes: gunluk hacim (opsiyonel — 2. dip dry-up degerlendirmesi)
+
+    Returns:
+        dict {detected, quality, pivot_price, prior_advance_pct, base_depth_pct,
+              base_duration_days, undercut, first_low, second_low, middle_peak,
+              faults, mark_says}
+    """
+    def _none(msg: str) -> dict:
+        return {
+            'detected': False, 'quality': 'NONE', 'pivot_price': None,
+            'prior_advance_pct': None, 'base_depth_pct': None, 'base_duration_days': None,
+            'undercut': False, 'first_low': None, 'second_low': None, 'middle_peak': None,
+            'faults': [], 'mark_says': msg,
+        }
+
+    if not highs or not lows or not closes:
+        return _none('Yetersiz veri — double bottom hesaplanamiyor.')
+    n = len(closes)
+    if not (len(highs) == len(lows) == n):
+        return _none('Double bottom: highs/lows/closes uzunluk farkli.')
+    if n < DB_MIN_DAYS + 20:
+        return _none(f'Yetersiz veri — en az {DB_MIN_DAYS + 20} gun gerek.')
+
+    # 1) Rim (sol kenar = baz oncesi tepe) = pencere max high
+    window = min(n, DB_MAX_DAYS)
+    seg_h = highs[-window:]
+    seg_l = lows[-window:]
+    rim_rel = seg_h.index(max(seg_h))
+    rim_high = seg_h[rim_rel]
+    if rim_high <= 0:
+        return _none('Rim fiyati gecersiz.')
+    rim_global = n - window + rim_rel
+    base_len = window - rim_rel
+    if base_len < DB_MIN_DAYS:
+        return _none(f'Rim cok yakin / baz <{DB_MIN_DAYS}g (7 hafta) — kirilim sonrasi?')
+
+    # 2) W yapisi: post-rim bolge -> iki dip (yari-yari) + ARALARINDAKI orta tepe.
+    #    Orta tepe iki dip ARASINDA aranir (rim'e bitisik post[0] yuksekligi degil) ->
+    #    gercek W ortasi yakalanir, sol kenar (rim) disarida kalir.
+    post_h = seg_h[rim_rel + 1:]
+    post_l = seg_l[rim_rel + 1:]
+    if len(post_h) < 15:
+        return _none('W yapisi icin yetersiz post-rim veri.')
+    half = len(post_l) // 2
+    if half < 3:
+        return _none('W yapisi icin yetersiz post-rim veri.')
+    l1_idx = post_l[:half].index(min(post_l[:half]))            # 1. dip (ilk yari)
+    l2_idx = half + post_l[half:].index(min(post_l[half:]))     # 2. dip (ikinci yari)
+    if l2_idx <= l1_idx + 1:
+        return _none('Iki dip ayrismiyor — W yapisi yok.')
+    first_low = post_l[l1_idx]
+    second_low = post_l[l2_idx]
+    mp_region = post_h[l1_idx:l2_idx + 1]
+    mp_idx = l1_idx + mp_region.index(max(mp_region))           # orta tepe (iki dip arasi en yuksek)
+    mp_high = post_h[mp_idx]
+    base_low = min(first_low, second_low)
+    base_depth_pct = round((rim_high - base_low) / rim_high * 100, 2)
+    if base_depth_pct > DB_DEPTH_REJECT_PCT:
+        return _none(f'Derinlik %{base_depth_pct} (>%{DB_DEPTH_REJECT_PCT:.0f}) — double bottom degil.')
+
+    # 3) UNDERCUT (tanimlayici): 2. dip 1. dibi gecmeli — yoksa double bottom DEGIL
+    undercut = second_low <= first_low
+    if not undercut:
+        return _none('2. dip 1. dibi undercut etmiyor — O\'Neil double bottom degil (TraderLion).')
+
+    # 4) Orta tepe bazin ust yarisinda mi (zayif W kontrolu)
+    base_mid = (rim_high + base_low) / 2
+    mp_upper_half = mp_high > base_mid
+
+    # 5) Onceki advance (>=%30 O'Neil baz kurali)
+    pre = lows[max(0, rim_global - 252):rim_global]
+    prior_low = min(pre) if pre else base_low
+    prior_advance_pct = round((rim_high - prior_low) / prior_low * 100, 2) if prior_low > 0 else 0.0
+
+    # 6) 2. dip hacim dry-up (heuristic — kitapta sayisal esik yok)
+    volume_dryup = None
+    if volumes and len(volumes) == n:
+        seg_v = volumes[-window:]
+        post_v = seg_v[rim_rel + 1:]
+        v_l1 = post_v[l1_idx:mp_idx]
+        v_l2 = post_v[mp_idx:l2_idx + 1]
+        if v_l1 and v_l2:
+            a1 = sum(v_l1) / len(v_l1)
+            a2 = sum(v_l2) / len(v_l2)
+            volume_dryup = a1 > 0 and a2 <= a1   # 2. dip ort hacmi 1. dipten dusuk/esit
+
+    # --- Kusur tespiti ---
+    faults: list[str] = []
+    if base_depth_pct > DB_DEPTH_MAX_PCT:
+        faults.append(f'derinlik %{base_depth_pct} (>%35, sadece sert ayida — IBD)')
+    if prior_advance_pct < DB_PRIOR_ADVANCE_MIN_PCT:
+        faults.append(f'onceki advance %{prior_advance_pct} (<%30, O\'Neil baz kurali)')
+    if not mp_upper_half:
+        faults.append('orta tepe bazin alt yarisinda (zayif W)')
+
+    detected = len(faults) == 0
+    if detected:
+        quality = 'EXCELLENT' if (volume_dryup and base_depth_pct <= 30.0) else 'GOOD'
+    elif len(faults) == 1:
+        quality = 'MARGINAL'
+    else:
+        quality = 'NONE'
+        detected = False
+
+    pivot_price = round(mp_high, 2)
+    weeks = round(base_len / 5, 1)
+    l1r = round(first_low, 2)
+    l2r = round(second_low, 2)
+    fault_str = '; '.join(faults)
+    if quality == 'EXCELLENT':
+        says = (f'✓ EXCELLENT Double Bottom (W) — pivot ${pivot_price} (orta tepe). {weeks} hafta, '
+                f'derinlik %{base_depth_pct}, 2. dip ${l2r} < 1. dip ${l1r} (undercut/shakeout), '
+                f'onceki advance %{prior_advance_pct}. O\'Neil canon tam; +%40 hacim kirilimda AL.')
+    elif quality == 'GOOD':
+        says = (f'GOOD Double Bottom (W) — pivot ${pivot_price} (orta tepe). 2. dip ${l2r} undercut ✓, '
+                f'derinlik %{base_depth_pct}. O\'Neil yapi tutuyor; +%40 hacim kirilim bekle.')
+    elif quality == 'MARGINAL':
+        says = (f'⚠️ MARGINAL Double Bottom — pivot ${pivot_price}. Kusur: {fault_str}. O\'Neil: dikkatli.')
+    else:
+        says = f'Double Bottom kusurlu — {fault_str}.'
+
+    return {
+        'detected': detected,
+        'quality': quality,
+        'pivot_price': pivot_price,
+        'prior_advance_pct': prior_advance_pct,
+        'base_depth_pct': base_depth_pct,
+        'base_duration_days': base_len,
+        'undercut': undercut,
+        'first_low': l1r,
+        'second_low': l2r,
+        'middle_peak': pivot_price,
+        'faults': faults,
+        'mark_says': says,
+    }
+
+
+# ======================================================================
 # KARAR #733 alt-paket (Paket 76, 25 May 2026) — Overhead Supply Detection
 #
 # Mark TLSMW Ch 10 canon: "Overhead supply" = bir hissenin geçmişte
