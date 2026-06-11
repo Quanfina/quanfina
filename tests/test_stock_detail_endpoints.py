@@ -58,7 +58,7 @@ def _seed_cache():
         api_main._OHLCV_CACHE.pop(sym, None)
 
 
-METRICS = ["overhead", "atr", "relative-volume", "breakout-quality", "cup-handle", "flat-base", "double-bottom"]
+METRICS = ["overhead", "atr", "relative-volume", "breakout-quality", "cup-handle", "flat-base", "double-bottom", "high-tight-flag"]
 
 
 class TestStockDetailComputeEndpoints:

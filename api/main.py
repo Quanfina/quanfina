@@ -68,6 +68,7 @@ from quanfina_math import (  # noqa: E402
     compute_cup_with_handle,
     compute_flat_base,
     compute_double_bottom,
+    compute_high_tight_flag,
     compute_stage_transition,
     compute_faber_timing,
     compute_mcclellan_oscillator,
@@ -3180,6 +3181,65 @@ def get_double_bottom(symbol: str) -> DoubleBottomInfo:
         first_low=r.get("first_low"),
         second_low=r.get("second_low"),
         middle_peak=r.get("middle_peak"),
+        faults=r.get("faults", []),
+        mark_says=r.get("mark_says", ""),
+    )
+
+
+# Paket 462 (11 Haz 2026): High Tight Flag endpoint (= Minervini Power Play)
+# O'Neil HTF — compute_high_tight_flag wire (base detector ailesi 4. uye, EN NADIR/RISKLI).
+# Derin internet arastirma (IBD/MarketSmith/Minervini s.255) ile esikler kaynak-atifli (Kural #26).
+class HighTightFlagInfo(BaseModel):
+    detected: bool = False
+    quality: Optional[Literal["EXCELLENT", "GOOD", "MARGINAL", "NONE"]] = None
+    pivot_price: Optional[float] = None
+    flagpole_pct: Optional[float] = None
+    flagpole_weeks: Optional[float] = None
+    flag_depth_pct: Optional[float] = None
+    flag_duration_days: Optional[int] = None
+    volume_dryup: Optional[bool] = None
+    faults: list[str] = []
+    mark_says: str
+
+
+@app.get("/api/stock/{symbol}/high-tight-flag", response_model=HighTightFlagInfo)
+def get_high_tight_flag(symbol: str) -> HighTightFlagInfo:
+    """O'Neil High Tight Flag (= Minervini Power Play) tespiti (flagpole >=%100 + tight flag, P462).
+
+    compute_high_tight_flag — GERCEK OHLCV. Esikler kaynak-atifli (flagpole >=%100 <=8hf /
+    flag <=%25 3-6hf / pivot = flag zirvesi). En guclu + EN NADIR + EN RISKLI patern.
+    """
+    sym = symbol.upper()
+    stock = _STOCK_BY_SYM.get(sym)
+    if stock:
+        price = stock.price
+    else:
+        try:
+            wl = [r for r in watchlist_get_all() if r["symbol"] == sym]
+        except OperationalError:
+            wl = []
+        if wl:
+            price = float(wl[0]["price"])
+        else:
+            scan_data = _fetch_scan_symbol_data(sym)
+            price = scan_data["price"] if scan_data else 100.0
+
+    bars = _get_ohlcv(sym, price)
+    highs = [b.high for b in bars]
+    lows = [b.low for b in bars]
+    closes = [b.close for b in bars]
+    volumes = [b.volume for b in bars]
+
+    r = compute_high_tight_flag(highs, lows, closes, volumes)
+    return HighTightFlagInfo(
+        detected=r.get("detected", False),
+        quality=r.get("quality"),
+        pivot_price=r.get("pivot_price"),
+        flagpole_pct=r.get("flagpole_pct"),
+        flagpole_weeks=r.get("flagpole_weeks"),
+        flag_depth_pct=r.get("flag_depth_pct"),
+        flag_duration_days=r.get("flag_duration_days"),
+        volume_dryup=r.get("volume_dryup"),
         faults=r.get("faults", []),
         mark_says=r.get("mark_says", ""),
     )

@@ -4369,6 +4369,157 @@ def compute_double_bottom(
 
 
 # ======================================================================
+# Paket 462 (11 Haz 2026) — High Tight Flag Detection (= Minervini Power Play)
+#
+# O'Neil "High Tight Flag" (HTF) = Mark Minervini "Power Play" (Trade Like a Stock
+# Market Wizard Bol.11). En guclu + EN NADIR + EN RISKLI momentum bazi. Derin internet
+# arastirma (IBD/MarketSmith/Minervini cok-kaynak) ile esikler kaynak-atifli (Kural #26):
+#   - FLAGPOLE (direk): >=%100 yukselis (Minervini s.255 ZORUNLU; tipik %100-120 O'Neil)
+#                       <=8 hafta=40g icinde (O'Neil 4-8 hf; Minervini "<8 hafta")
+#   - FLAG (bayrak)    : sig/dar geri cekilme %10-25 (max %25, ideal <=%20 Minervini)
+#                       3-6 hafta=15-30g; hacim dry-up (50g MA alti)
+#   - PIVOT           : FLAG (konsolidasyon) zirvesi (+10 cent IBD) — POLE zirvesi DEGIL
+#   - Kirilim hacim   : 50g ort +%40-50 (IBD/pratisyen; Minervini nicel degil)
+#   - PROFIL          : O'Neil "strongest of patterns but very risky/difficult" — nadir
+#   - Kusurlu         : pole <%100 (HTF degil), flag >%25 derin, flag cok uzun (>6 hf), gevsek
+#
+# Clean-room: kod adi "high_tight_flag" (genel O'Neil/IBD terimi, literaturde mevcut —
+# Stage 2/VCP gibi izinli). "Power Play" Minervini-ozel terim -> sadece yorum referansi.
+# v1 not: pole_top = pencere max high; flag = pole_top sonrasi; pole = pole_top oncesi 40g.
+# ======================================================================
+
+HTF_POLE_MIN_PCT: float = 100.0            # Minervini s.255 ZORUNLU alt esik
+HTF_POLE_MAX_DAYS: int = 40                # 8 hafta (O'Neil 4-8 hf)
+HTF_FLAG_DEPTH_MAX_PCT: float = 25.0       # O'Neil/Minervini max bayrak derinligi
+HTF_FLAG_DEPTH_IDEAL_PCT: float = 20.0     # Minervini ideal (<=%20 -> EXCELLENT)
+HTF_FLAG_DEPTH_REJECT_PCT: float = 40.0    # >%40 = bayrak degil (derin duzeltme)
+HTF_FLAG_MIN_DAYS: int = 15                # 3 hafta
+HTF_FLAG_MAX_DAYS: int = 30                # 6 hafta
+HTF_BREAKOUT_VOL_RATIO: float = 1.40       # IBD kirilim +%40
+
+
+def compute_high_tight_flag(
+    highs: list[float],
+    lows: list[float],
+    closes: list[float],
+    volumes: list[float] | None = None,
+) -> dict:
+    """O'Neil High Tight Flag (= Minervini Power Play) tespiti (kaynak-atifli + Kural #26).
+
+    Args:
+        highs/lows/closes: gunluk OHLC (kronolojik, esit uzunluk)
+        volumes: gunluk hacim (opsiyonel — bayrak dry-up degerlendirmesi)
+
+    Returns:
+        dict {detected, quality, pivot_price, flagpole_pct, flagpole_weeks,
+              flag_depth_pct, flag_duration_days, volume_dryup, faults, mark_says}
+    """
+    def _none(msg: str) -> dict:
+        return {
+            'detected': False, 'quality': 'NONE', 'pivot_price': None,
+            'flagpole_pct': None, 'flagpole_weeks': None, 'flag_depth_pct': None,
+            'flag_duration_days': None, 'volume_dryup': None, 'faults': [], 'mark_says': msg,
+        }
+
+    if not highs or not lows or not closes:
+        return _none('Yetersiz veri — high tight flag hesaplanamiyor.')
+    n = len(closes)
+    if not (len(highs) == len(lows) == n):
+        return _none('HTF: highs/lows/closes uzunluk farkli.')
+    if n < HTF_FLAG_MIN_DAYS + 25:
+        return _none(f'Yetersiz veri — en az {HTF_FLAG_MIN_DAYS + 25} gun gerek.')
+
+    # 1) Pole top = pencere max high (direk zirvesi). Flag bunun ALTINDA olusur.
+    window = min(n, HTF_POLE_MAX_DAYS + HTF_FLAG_MAX_DAYS + 10)
+    seg_h = highs[-window:]
+    seg_l = lows[-window:]
+    pole_top_rel = seg_h.index(max(seg_h))
+    pole_high = seg_h[pole_top_rel]
+    if pole_high <= 0:
+        return _none('Pole zirvesi gecersiz.')
+    pole_top_global = n - window + pole_top_rel
+
+    # 2) Flag = pole_top sonrasi konsolidasyon
+    flag_l = seg_l[pole_top_rel:]
+    flag_duration = len(flag_l) - 1                  # pole top sonrasi bar sayisi
+    if flag_duration < HTF_FLAG_MIN_DAYS:
+        return _none(f'Bayrak <{HTF_FLAG_MIN_DAYS}g (3 hafta) — pole zirvesi cok yeni / flag olusmadi.')
+    flag_low = min(flag_l)
+    flag_depth_pct = round((pole_high - flag_low) / pole_high * 100, 2)
+    if flag_depth_pct > HTF_FLAG_DEPTH_REJECT_PCT:
+        return _none(f'Geri cekilme %{flag_depth_pct} (>%{HTF_FLAG_DEPTH_REJECT_PCT:.0f}) — bayrak degil.')
+
+    # 3) Flagpole = pole_top ONCESI <=40g icindeki dip -> pole_top yukselisi
+    pole_lb_start = max(0, pole_top_global - HTF_POLE_MAX_DAYS)
+    pole_window_lows = lows[pole_lb_start:pole_top_global + 1]
+    if not pole_window_lows:
+        return _none('Pole oncesi veri yok.')
+    pole_base_low = min(pole_window_lows)
+    pole_base_global = pole_lb_start + pole_window_lows.index(pole_base_low)
+    flagpole_pct = round((pole_high - pole_base_low) / pole_base_low * 100, 2) if pole_base_low > 0 else 0.0
+    flagpole_days = pole_top_global - pole_base_global
+    flagpole_weeks = round(flagpole_days / 5, 1)
+
+    # 4) FLAGPOLE >=%100 ZORUNLU (Minervini s.255) — yoksa HTF degil
+    if flagpole_pct < HTF_POLE_MIN_PCT:
+        return _none(f'Flagpole %{flagpole_pct} (<%100, {flagpole_weeks} hf) — High Tight Flag degil.')
+
+    # 5) Bayrak hacim dry-up (heuristic — direk hacmine gore)
+    volume_dryup = None
+    if volumes and len(volumes) == n:
+        seg_v = volumes[-window:]
+        pole_v = seg_v[max(0, pole_top_rel - HTF_POLE_MAX_DAYS):pole_top_rel + 1]
+        flag_v = seg_v[pole_top_rel + 1:]
+        if pole_v and flag_v:
+            pa = sum(pole_v) / len(pole_v)
+            fa = sum(flag_v) / len(flag_v)
+            volume_dryup = pa > 0 and fa < pa     # bayrak ort hacmi direkten dusuk
+
+    # --- Kusur tespiti ---
+    faults: list[str] = []
+    if flag_depth_pct > HTF_FLAG_DEPTH_MAX_PCT:
+        faults.append(f'bayrak %{flag_depth_pct} derin (>%25 — O\'Neil/Minervini)')
+    if flag_duration > HTF_FLAG_MAX_DAYS:
+        faults.append(f'bayrak {flag_duration}g uzun (>6 hf — tightness kaybi)')
+
+    detected = len(faults) == 0
+    if detected:
+        quality = 'EXCELLENT' if (volume_dryup and flag_depth_pct <= HTF_FLAG_DEPTH_IDEAL_PCT) else 'GOOD'
+    elif len(faults) == 1:
+        quality = 'MARGINAL'
+    else:
+        quality = 'NONE'
+        detected = False
+
+    pivot_price = round(pole_high, 2)
+    fault_str = '; '.join(faults)
+    if quality == 'EXCELLENT':
+        says = (f'✓ EXCELLENT High Tight Flag — pivot ${pivot_price} (bayrak zirvesi). Flagpole '
+                f'%{flagpole_pct} ({flagpole_weeks} hf), bayrak %{flag_depth_pct} sig + hacim dry-up. '
+                f'O\'Neil EN GUCLU patern (NADIR + RISKLI); +%40 hacim kirilimda AL.')
+    elif quality == 'GOOD':
+        says = (f'GOOD High Tight Flag — pivot ${pivot_price}. Flagpole %{flagpole_pct} ({flagpole_weeks} hf), '
+                f'bayrak %{flag_depth_pct}. O\'Neil yapi tutuyor (riskli patern); +%40 hacim kirilim bekle.')
+    elif quality == 'MARGINAL':
+        says = (f'⚠️ MARGINAL High Tight Flag — pivot ${pivot_price}. Kusur: {fault_str}. O\'Neil: dikkatli (riskli).')
+    else:
+        says = f'High Tight Flag kusurlu — {fault_str}.'
+
+    return {
+        'detected': detected,
+        'quality': quality,
+        'pivot_price': pivot_price,
+        'flagpole_pct': flagpole_pct,
+        'flagpole_weeks': flagpole_weeks,
+        'flag_depth_pct': flag_depth_pct,
+        'flag_duration_days': flag_duration,
+        'volume_dryup': volume_dryup,
+        'faults': faults,
+        'mark_says': says,
+    }
+
+
+# ======================================================================
 # KARAR #733 alt-paket (Paket 76, 25 May 2026) — Overhead Supply Detection
 #
 # Mark TLSMW Ch 10 canon: "Overhead supply" = bir hissenin geçmişte
