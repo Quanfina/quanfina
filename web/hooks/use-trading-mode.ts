@@ -91,16 +91,27 @@ export function useTradingMode(): TradingModeInfo {
 
     const marketHealthScore = market.data?.market_health_score ?? null;
     // Piyasa Stage Mark canon — health_label / mode kullan
-    const marketMode = market.data?.suggested_mode ?? null;  // LONG / SHORT / NEUTRAL
+    const marketMode = market.data?.suggested_mode ?? null;  // LONG / CAUTION / DEFENSIVE
     const isMarketWeak = marketHealthScore != null && marketHealthScore < 30;
     const isMarketStrong = marketHealthScore != null && marketHealthScore > 70;
+    // P451 (DD araştırma follow-up): İLKE #10 "Defansif = Piyasa Stage 3-4 VEYA
+    // MH<30". Eski kod SADECE MH<30 bakıyordu → Stage 3 (topping) market MH>=30
+    // ise defansif kaçırıyordu; getDefansifBlockMessage "Stage 3-4" iddia ediyordu
+    // (kod-mesaj tutarsızlığı). 2+ endeks Stage 3-4 = piyasa bozulması
+    // (_compute_market_health "2+ Stage 4" pateniyle tutarlı; conservative — 1 değil 2).
+    const stage34Count = [
+      market.data?.spy_stage, market.data?.qqq_stage, market.data?.iwm_stage,
+    ].filter((s) => s != null && s >= 3).length;
+    const isMarketStage34 = stage34Count >= 2;
 
     // Tetik sırası (önce kötü, sonra iyi):
-    // 1. Defansif (piyasa zayıf)
-    if (isMarketWeak) {
+    // 1. Defansif (piyasa zayıf VEYA Stage 3-4 — İLKE #10)
+    if (isMarketWeak || isMarketStage34) {
       return {
         mode: "defansif",
-        reason: `Piyasa sağlığı ${marketHealthScore ?? "—"}/100 (<30). Yeni AL'lar bloklu, kapanış öncelikli.`,
+        reason: isMarketWeak
+          ? `Piyasa sağlığı ${marketHealthScore ?? "—"}/100 (<30). Yeni AL'lar bloklu, kapanış öncelikli.`
+          : `${stage34Count} endeks Stage 3-4 (topping/düşüş) — İLKE #10 defansif. Yeni AL'lar bloklu.`,
         emoji: "🛡️",
         color: "var(--mtp-danger)",
         recommendedSizingPct: 0,
@@ -176,7 +187,7 @@ export function useTradingMode(): TradingModeInfo {
  */
 export function getDefansifBlockMessage(mode: TradingMode): string | null {
   if (mode === "defansif") {
-    return "DEFANSİF mod aktif (piyasa Stage 3-4 + MH<30) — Mark TTLC s.187: yeni AL BLOK";
+    return "DEFANSİF mod aktif (piyasa Stage 3-4 veya MH<30) — Mark TTLC s.187: yeni AL BLOK";
   }
   return null;
 }

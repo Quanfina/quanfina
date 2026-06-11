@@ -16,6 +16,9 @@ const mockMarket = vi.fn<() => {
     market_health_score: number | null;
     market_health_label?: string;  // P383: clean-room enum (HEALTHY/NEUTRAL/UNDER_PRESSURE)
     suggested_mode?: string | null;
+    spy_stage?: number;  // P451: İLKE #10 defansif Stage 3-4 tetiği
+    qqq_stage?: number;
+    iwm_stage?: number;
   };
 }>();
 
@@ -82,6 +85,23 @@ describe("useTradingMode — 4 mod tetik öncelik (Defansif > Rehab > Agresif > 
 
     it("market_health=30 (sınır dışı) → Normal", () => {
       mockMarket.mockReturnValue({ data: { market_health_score: 30 } });
+      const { result } = renderHook(() => useTradingMode());
+      expect(result.current.mode).toBe("normal");
+    });
+
+    it("P451: MH=50 + 2 endeks Stage 3 → Defansif (İLKE #10 Stage 3-4 tetiği)", () => {
+      mockMarket.mockReturnValue({
+        data: { market_health_score: 50, spy_stage: 3, qqq_stage: 3, iwm_stage: 2 },
+      });
+      const { result } = renderHook(() => useTradingMode());
+      expect(result.current.mode).toBe("defansif");
+      expect(result.current.reason).toContain("Stage 3-4");
+    });
+
+    it("P451: MH=50 + sadece 1 endeks Stage 4 → Normal (2+ gerekir, conservative)", () => {
+      mockMarket.mockReturnValue({
+        data: { market_health_score: 50, spy_stage: 4, qqq_stage: 2, iwm_stage: 2 },
+      });
       const { result } = renderHook(() => useTradingMode());
       expect(result.current.mode).toBe("normal");
     });
