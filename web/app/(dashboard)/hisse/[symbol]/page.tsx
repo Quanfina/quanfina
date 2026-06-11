@@ -22,6 +22,7 @@ import { RelativeVolumeCard } from "@/components/stock/RelativeVolumeCard";
 import { BreakoutQualityCard } from "@/components/stock/BreakoutQualityCard";
 import { CupHandleCard } from "@/components/stock/CupHandleCard";
 import { FlatBaseCard } from "@/components/stock/FlatBaseCard";
+import { DoubleBottomCard } from "@/components/stock/DoubleBottomCard";
 import { RiskSummaryCard } from "@/components/stock/RiskSummaryCard";
 import { MarkRegimeBanner } from "@/components/mark/MarkRegimeBanner";
 import { ModBadge } from "@/components/mark/ModBadge";
@@ -335,6 +336,8 @@ export default function HissePage({
           <CupHandleCard symbol={sym} />
           {/* Paket 458 (11 Haz 2026): Flat Base — O'Neil/IBD later-stage */}
           <FlatBaseCard symbol={sym} />
+          {/* Paket 460 (11 Haz 2026): Double Bottom (W) — O'Neil/IBD */}
+          <DoubleBottomCard symbol={sym} />
         </div>
 
         {/* Setup notes (only when notes exist) */}
