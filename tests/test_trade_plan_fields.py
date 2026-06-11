@@ -9,7 +9,6 @@ Bu testler api/main.py TradeCreate/TradeUpdate Pydantic modellerinin
 DB gerektirmez - sadece Pydantic schema testleri.
 """
 import pytest
-from pydantic import ValidationError
 import sys
 import os
 from pathlib import Path
@@ -22,9 +21,10 @@ if str(API_DIR) not in sys.path:
 # main.py basliyor ama uvicorn yok - sadece Pydantic modellerini import ediyoruz
 # import_module ile sadece Trade/TradeCreate/TradeUpdate alalim
 try:
+    from pydantic import ValidationError
     from main import Trade, TradeCreate, TradeUpdate, TimeHorizon
 except ImportError:
-    pytest.skip("api/main.py import edilemedi (uvicorn vb. eksik olabilir)", allow_module_level=True)
+    pytest.skip("pydantic/api bagimliligi yok (root venv) — api/.venv ile kos", allow_module_level=True)
 
 
 # =====================================================================
