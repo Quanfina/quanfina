@@ -66,6 +66,7 @@ from quanfina_math import (  # noqa: E402
     compute_relative_volume,
     compute_breakout_quality,
     compute_cup_with_handle,
+    compute_flat_base,
     compute_stage_transition,
     compute_faber_timing,
     compute_mcclellan_oscillator,
@@ -3056,6 +3057,65 @@ def get_cup_handle(symbol: str) -> CupHandleInfo:
         handle_depth_pct=r.get("handle_depth_pct"),
         handle_in_upper_half=r.get("handle_in_upper_half", False),
         shakeout=r.get("shakeout", False),
+        faults=r.get("faults", []),
+        mark_says=r.get("mark_says", ""),
+    )
+
+
+# Paket 458 (11 Haz 2026): Flat Base endpoint
+# O'Neil/IBD Flat Base — compute_flat_base wire (base detector ailesi 2. uye).
+# Derin internet arastirma (IBD/MarketSmith/TraderLion) ile esikler kaynak-atifli (Kural #26).
+class FlatBaseInfo(BaseModel):
+    detected: bool = False
+    quality: Optional[Literal["EXCELLENT", "GOOD", "MARGINAL", "NONE"]] = None
+    pivot_price: Optional[float] = None
+    prior_advance_pct: Optional[float] = None
+    base_depth_pct: Optional[float] = None
+    base_duration_days: Optional[int] = None
+    is_sideways: bool = False
+    volume_dryup: Optional[bool] = None
+    faults: list[str] = []
+    mark_says: str
+
+
+@app.get("/api/stock/{symbol}/flat-base", response_model=FlatBaseInfo)
+def get_flat_base(symbol: str) -> FlatBaseInfo:
+    """O'Neil/IBD flat base tespiti (later-stage yatay konsolidasyon, P458 wire).
+
+    compute_flat_base — GERCEK OHLCV (highs/lows/closes/volumes). Esikler IBD-canon
+    (min 5 hafta / derinlik <=%15 / onceki advance >=%20 / yatay / pivot = baz zirvesi).
+    """
+    sym = symbol.upper()
+    stock = _STOCK_BY_SYM.get(sym)
+    if stock:
+        price = stock.price
+    else:
+        try:
+            wl = [r for r in watchlist_get_all() if r["symbol"] == sym]
+        except OperationalError:
+            wl = []
+        if wl:
+            price = float(wl[0]["price"])
+        else:
+            scan_data = _fetch_scan_symbol_data(sym)
+            price = scan_data["price"] if scan_data else 100.0
+
+    bars = _get_ohlcv(sym, price)
+    highs = [b.high for b in bars]
+    lows = [b.low for b in bars]
+    closes = [b.close for b in bars]
+    volumes = [b.volume for b in bars]
+
+    r = compute_flat_base(highs, lows, closes, volumes)
+    return FlatBaseInfo(
+        detected=r.get("detected", False),
+        quality=r.get("quality"),
+        pivot_price=r.get("pivot_price"),
+        prior_advance_pct=r.get("prior_advance_pct"),
+        base_depth_pct=r.get("base_depth_pct"),
+        base_duration_days=r.get("base_duration_days"),
+        is_sideways=r.get("is_sideways", False),
+        volume_dryup=r.get("volume_dryup"),
         faults=r.get("faults", []),
         mark_says=r.get("mark_says", ""),
     )

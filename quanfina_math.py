@@ -4029,6 +4029,166 @@ def compute_cup_with_handle(
 
 
 # ======================================================================
+# Paket 458 (11 Haz 2026) — Flat Base Detection
+#
+# William O'Neil "How to Make Money in Stocks" (CAN SLIM) + IBD Flat Base.
+# Derin internet arastirma (workflow, IBD/MarketSmith/TraderLion cok-kaynak HIGH
+# guven) ile esikler kaynak-atifli (Kural #26 — uydurma yok):
+#   - Min sure    : >=5 hafta = 25 islem gunu (IBD "at least five weeks")
+#   - Maks sure   : MarketSmith "5 to 65 week" -> 325 gun (kesin ust yok)
+#   - Maks derinlik: <=%15 intraday tepe-dip (IBD + MarketSmith); >%25 = flat base DEGIL
+#   - Onceki advance: >=%20 later-stage 2./3. baz (IBD/Invezz). NOT: TraderLion %30
+#     der ama o genel ilk-baz kurali — flat-base-ozgu sayi %20 (MEDIUM guven).
+#   - Yatay/dar   : "fairly tight sideways" NITEL — kaynakta SAYISAL esik YOK
+#     -> Quanfina heuristic (baz 1.yari-2.yari ort farki <=%8 = yatay).
+#   - Pivot       : baz icindeki en yuksek (+10 cent IBD); +%40 hacim kirilim teyit.
+#   - Hacim       : baz ici dry-up (ozellikle down haftalar); kirilim +%40-50 (canon %40).
+#   - Kusurlu     : >%15 genis/gevsek, downtrend, <5 hafta, gec-asama (3./4. baz).
+#
+# v1 not: en yeni hem SIG hem YATAY pencereyi tarar (monotonik trend sideways
+# kontrolunde elenir). Base-stage sayimi (kacinci baz) YOK -> gec-asama kusuru
+# tespit edilmez (GELISTIRILMESI LAZIM, gelecek is).
+# ======================================================================
+
+FLAT_BASE_MIN_DAYS: int = 25                   # IBD >=5 hafta
+FLAT_BASE_MAX_DAYS: int = 325                  # MarketSmith 5-65 hafta
+FLAT_BASE_DEPTH_MAX_PCT: float = 15.0          # IBD/MarketSmith maks derinlik
+FLAT_BASE_DEPTH_REJECT_PCT: float = 25.0       # Investing.com ">25% flat base degil"
+FLAT_BASE_PRIOR_ADVANCE_MIN_PCT: float = 20.0  # IBD/Invezz prior uptrend (MEDIUM: TraderLion 30)
+FLAT_BASE_BREAKOUT_VOL_RATIO: float = 1.40     # IBD "+40% above 50-day" (50% looser pratisyen)
+FLAT_BASE_SIDEWAYS_TOL_PCT: float = 8.0        # Quanfina heuristic (kitapta sayisal tightness YOK)
+
+
+def compute_flat_base(
+    highs: list[float],
+    lows: list[float],
+    closes: list[float],
+    volumes: list[float] | None = None,
+) -> dict:
+    """O'Neil/IBD flat base tespiti (IBD-canon esikler, derin arastirma + Kural #26).
+
+    Args:
+        highs/lows/closes: gunluk OHLC (kronolojik, esit uzunluk)
+        volumes: gunluk hacim (opsiyonel — baz dry-up degerlendirmesi)
+
+    Returns:
+        dict {detected, quality, pivot_price, prior_advance_pct, base_depth_pct,
+              base_duration_days, is_sideways, volume_dryup, faults, mark_says}
+    """
+    def _none(msg: str) -> dict:
+        return {
+            'detected': False, 'quality': 'NONE', 'pivot_price': None,
+            'prior_advance_pct': None, 'base_depth_pct': None, 'base_duration_days': None,
+            'is_sideways': False, 'volume_dryup': None, 'faults': [], 'mark_says': msg,
+        }
+
+    if not highs or not lows or not closes:
+        return _none('Yetersiz veri — flat base hesaplanamiyor.')
+    n = len(closes)
+    if not (len(highs) == len(lows) == n):
+        return _none('Flat base: highs/lows/closes uzunluk farkli.')
+    if n < FLAT_BASE_MIN_DAYS + 25:
+        return _none(f'Yetersiz veri — en az {FLAT_BASE_MIN_DAYS + 25} gun gerek.')
+
+    # 1) Tight band tahmini (son MIN_DAYS) + bar-bazli geri yurume.
+    #    Overshoot (high > ceiling) veya deep-dip (low < floor) baz sinirini belirler
+    #    -> onceki advance/kirilim absorbe edilmez (aggregate ort. creep'i onlenir).
+    max_extend = min(n - 25, FLAT_BASE_MAX_DAYS)  # onceki advance icin >=25 bar birak
+    ref_high = max(highs[-FLAT_BASE_MIN_DAYS:])
+    ref_low = min(lows[-FLAT_BASE_MIN_DAYS:])
+    rng = ref_high - ref_low
+    floor = ref_low - rng * 0.5          # asagi modest genisleme toleransi
+    ceiling = ref_high * 1.03            # yukari kirilim/overshoot siniri
+    k = 0
+    while k < max_extend:
+        idx = n - 1 - k
+        if lows[idx] >= floor and highs[idx] <= ceiling:
+            k += 1
+        else:
+            break
+    base_len = k
+    if base_len < FLAT_BASE_MIN_DAYS:
+        return _none(f'Yatay konsolidasyon <{FLAT_BASE_MIN_DAYS}g (5 hafta) — kisa veya trend icinde.')
+
+    base_high = max(highs[-base_len:])
+    base_low = min(lows[-base_len:])
+    if base_high <= 0:
+        return _none('Baz fiyati gecersiz.')
+    base_depth_pct = round((base_high - base_low) / base_high * 100, 2)
+    if base_depth_pct > FLAT_BASE_DEPTH_REJECT_PCT:
+        return _none(f'Derinlik %{base_depth_pct} (>%{FLAT_BASE_DEPTH_REJECT_PCT:.0f}) — flat base degil.')
+
+    # 2) Yatay (sideways) FILTRE — trend ise flat base degil (1.yari vs 2.yari ort)
+    base_closes = closes[-base_len:]
+    half = base_len // 2
+    first_avg = sum(base_closes[:half]) / half
+    second_avg = sum(base_closes[half:]) / (base_len - half)
+    half_diff_pct = round(abs(second_avg - first_avg) / first_avg * 100, 2) if first_avg > 0 else 999.0
+    is_sideways = half_diff_pct <= FLAT_BASE_SIDEWAYS_TOL_PCT
+    if not is_sideways:
+        return _none(f'Baz yatay degil (1.yari-2.yari %{half_diff_pct} fark) — trend, flat base degil.')
+
+    # 3) Onceki advance: baz oncesi ~252 gun dip -> baz zirvesi (later-stage sarti)
+    pre = lows[max(0, n - base_len - 252):n - base_len]
+    prior_low = min(pre) if pre else base_low
+    prior_advance_pct = round((base_high - prior_low) / prior_low * 100, 2) if prior_low > 0 else 0.0
+
+    # 4) Hacim dry-up (baz ort < onceki advance ort) — Quanfina heuristic (kitapta % yok)
+    volume_dryup = None
+    if volumes and len(volumes) == n:
+        base_vol = volumes[-base_len:]
+        pre_vol = volumes[max(0, n - base_len - 50):n - base_len]
+        if base_vol and pre_vol:
+            base_avg = sum(base_vol) / len(base_vol)
+            pre_avg = sum(pre_vol) / len(pre_vol)
+            volume_dryup = pre_avg > 0 and base_avg < pre_avg
+
+    # --- Kusur tespiti (IBD) ---
+    faults: list[str] = []
+    if base_depth_pct > FLAT_BASE_DEPTH_MAX_PCT:
+        faults.append(f'derinlik %{base_depth_pct} (>%15 genis/gevsek, IBD)')
+    if prior_advance_pct < FLAT_BASE_PRIOR_ADVANCE_MIN_PCT:
+        faults.append(f'onceki advance %{prior_advance_pct} (<%20 — later-stage degil)')
+
+    detected = len(faults) == 0
+    if detected:
+        quality = 'EXCELLENT' if (volume_dryup and base_depth_pct <= 10.0) else 'GOOD'
+    elif len(faults) == 1:
+        quality = 'MARGINAL'
+    else:
+        quality = 'NONE'
+        detected = False
+
+    pivot_price = round(base_high, 2)
+    weeks = round(base_len / 5, 1)
+    fault_str = '; '.join(faults)
+    if quality == 'EXCELLENT':
+        says = (f'✓ EXCELLENT Flat Base — pivot ${pivot_price}. {weeks} hafta yatay, derinlik '
+                f'%{base_depth_pct} (sig), onceki advance %{prior_advance_pct}, hacim dry-up. '
+                f'O\'Neil later-stage canon; +%40 hacim kirilimda AL adayi.')
+    elif quality == 'GOOD':
+        says = (f'GOOD Flat Base — pivot ${pivot_price}. {weeks} hafta yatay, derinlik %{base_depth_pct}, '
+                f'onceki advance %{prior_advance_pct}. O\'Neil yapi tutuyor; +%40 hacim kirilim bekle.')
+    elif quality == 'MARGINAL':
+        says = (f'⚠️ MARGINAL Flat Base — pivot ${pivot_price}. Kusur: {fault_str}. O\'Neil: dikkatli.')
+    else:
+        says = f'Flat Base kusurlu — {fault_str}.'
+
+    return {
+        'detected': detected,
+        'quality': quality,
+        'pivot_price': pivot_price,
+        'prior_advance_pct': prior_advance_pct,
+        'base_depth_pct': base_depth_pct,
+        'base_duration_days': base_len,
+        'is_sideways': is_sideways,
+        'volume_dryup': volume_dryup,
+        'faults': faults,
+        'mark_says': says,
+    }
+
+
+# ======================================================================
 # KARAR #733 alt-paket (Paket 76, 25 May 2026) — Overhead Supply Detection
 #
 # Mark TLSMW Ch 10 canon: "Overhead supply" = bir hissenin geçmişte
