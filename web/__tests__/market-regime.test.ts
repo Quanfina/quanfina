@@ -33,16 +33,18 @@ describe("computeMarketRegime — 4 katman DD eşikleri (KARAR #488)", () => {
     });
   });
 
-  describe("UNDER_PRESSURE (4 DD — Mark Hard Filter)", () => {
-    it("DD=4 → UNDER_PRESSURE %50 pozisyon", () => {
+  describe("UNDER_PRESSURE (4 DD — IBD Uptrend Under Pressure)", () => {
+    // P449 (DD canon araştırma): 4 DD = "Uptrend Under Pressure" → %50 + "avoid
+    // new buys" AMA kapı aralık (mutlak YASAK DEĞİL). YASAK 5-6 DD (Correction).
+    // newBuyAllowed: false → true (dd_severity 4DD=CAUTION ile tutarlı).
+    it("DD=4 → UNDER_PRESSURE %50, yeni alım kısıtlı-açık (YASAK değil)", () => {
       const r = computeMarketRegime(4);
       expect(r.regime).toBe("UNDER_PRESSURE");
       expect(r.label).toBe("Baskı Altında");
       expect(r.emoji).toBe("🟠");
       expect(r.allocation).toContain("%50");
-      expect(r.newBuyAllowed).toBe(false);
+      expect(r.newBuyAllowed).toBe(true);
       expect(r.pilotOverride).toBe(true);
-      expect(r.markSays).toContain("O'Neil Hard Filter");
     });
   });
 

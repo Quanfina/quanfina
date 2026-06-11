@@ -126,10 +126,13 @@ class TestMarkRegimeCanon:
         assert len(status["mark_regime"]["allocation"]) > 5
 
     def test_new_buy_allowed_consistency(self, status):
-        """DD <= 3 -> new_buy_allowed=True; DD >= 4 -> False."""
+        """P449 (DD canon araştırma): DD <= 4 -> new_buy_allowed=True (4 DD = IBD
+        'Uptrend Under Pressure', kapı aralık — mutlak YASAK DEĞİL); DD >= 5 ->
+        False (Market in Correction, canon 5-6 DD). Eski hali 4 DD'de False idi —
+        dd_severity (4 DD=CAUTION) ile çelişiyordu (3-katman bug, P446 kökü)."""
         dd = status["distribution_days"]
         nb = status["mark_regime"]["new_buy_allowed"]
-        if dd <= 3:
+        if dd <= 4:
             assert nb is True
         else:
             assert nb is False

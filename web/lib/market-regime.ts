@@ -59,9 +59,13 @@ const REGIME_MAP: Record<MarketRegime, MarkRegimeStaticData> = {
     emoji: "🟠",
     color: "#F59E0B",
     bgColor: "rgba(245,158,11,0.18)",
-    allocation: "%50 pozisyon, yeni alım YASAK",
-    markSays: "O'Neil Hard Filter: 4 DD / 4-5 hafta → yeni alım dur. Mevcut pozisyonları koru veya azalt.",
-    newBuyAllowed: false,
+    // P449 (DD canon araştırma): 4 DD = IBD "Uptrend Under Pressure" → %50 + "avoid
+    // new buys" AMA kapı aralık (mutlak YASAK DEĞİL); YASAK 5-6 DD (Correction).
+    // Backend _compute_mark_regime ile birebir hizalı (eski newBuyAllowed:false,
+    // dd_severity 4DD=CAUTION ile çelişiyordu — P446 çelişkisinin kökü).
+    allocation: "%50 pozisyon — yeni alım sadece A+ setup + lider pilot (kapı aralık)",
+    markSays: "4 DD / 25 işlem günü — kurumsal baskı. Yeni alım sadece A+ setup + lider pilot. YASAK 5-6 DD'de.",
+    newBuyAllowed: true,
     pilotOverride: true,  // Lider hisse %1-2 delebilir
   },
   BEAR_PRESSURE: {
