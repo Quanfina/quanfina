@@ -3936,6 +3936,18 @@ def compute_cup_with_handle(
     prior_minor_low = min(pre_handle_lows) if pre_handle_lows else handle_low_price
     shakeout = handle_low_price < prior_minor_low
 
+    # 7b) Upward-wedging kulp = MAJOR flaw (s.164,178): saglikli kulp dipleri ASAGI
+    # suruklenir (son shakeout). Dipler yukari kama yaparsa "yeterli talep/shakeout
+    # yok" demek. 11 Haz cift danisma teyit: NotebookLM O'Neil ("handles that ...
+    # drift upwards along their price lows have a higher probability of failing") +
+    # IBD ("avoid bases that carry an upward-wedging handle; this is a flaw").
+    # handle_high bar'inin low'unu (after_hh_l[0]) haric tut — kulp pullback dipleri trendini olc
+    _handle_lows = after_hh_l[1:] if len(after_hh_l) > 1 else after_hh_l
+    wedging_up = False
+    if len(_handle_lows) >= 4:
+        _mid = len(_handle_lows) // 2
+        wedging_up = min(_handle_lows[_mid:]) > min(_handle_lows[:_mid])
+
     # 8) U vs V (s.163): dip etrafinda zaman (kupa dibinin +%5 icinde >=5 bar = genis U)
     near_bottom = [lo for lo in after_rim_l if lo <= cup_low_price * 1.05]
     is_u_shaped = len(near_bottom) >= 5
@@ -3974,6 +3986,8 @@ def compute_cup_with_handle(
         faults.append('kupa dibi dar V — U sekli degil (s.163)')
     if not shakeout:
         faults.append('kulp sonunda shakeout yok (s.163-164)')
+    if wedging_up:
+        faults.append('kulp yukari kama — dipler yukseliyor, shakeout yok (s.164,178)')
 
     detected = len(faults) == 0
     if detected:

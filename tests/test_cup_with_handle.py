@@ -12,11 +12,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from quanfina_math import compute_cup_with_handle
 
 
-def _build_cup_handle(prior_start=70.0, handle_low=92.0, handle_vol=450_000):
+def _build_cup_handle(prior_start=70.0, handle_low=92.0, handle_vol=450_000, wedge=False):
     """Sentetik cup-with-handle: prior uptrend -> kupa (U) -> kulp (ust yari).
 
     prior_start dusuk (70) => guclu onceki trend; yuksek (92) => zayif (<%30).
-    handle_low dusuk (78) => kulp cok derin/alt yari (kusurlu).
+    handle_low dusuk (82) => kulp cok derin (kusurlu); 70 => cup-low alti (yapi yok).
+    wedge=True => kulp dipleri YUKARI kama (major flaw, O'Neil s.164,178).
     """
     highs, lows, closes, vols = [], [], [], []
 
@@ -34,8 +35,12 @@ def _build_cup_handle(prior_start=70.0, handle_low=92.0, handle_vol=450_000):
         add(80 + (i % 3) * 0.5, 900_000)
     for i in range(35):                        # 4) sag toparlanma 80 -> 98
         add(80 + 18 * i / 34, 1_000_000)
-    for i in range(12):                        # 5) kulp 98 -> handle_low (hacim dry-up)
-        add(98 - (98 - handle_low) * i / 11, handle_vol)
+    if wedge:                                  # 5w) kulp dipleri yukari kama (kusurlu)
+        for p in (97.0, 96.0, 95.0, 94.0, 94.0, 94.0, 94.5, 95.0, 95.5, 96.0, 96.5, 96.5):
+            add(p, handle_vol)
+    else:                                      # 5) kulp 98 -> handle_low (hacim dry-up)
+        for i in range(12):
+            add(98 - (98 - handle_low) * i / 11, handle_vol)
     return highs, lows, closes, vols
 
 
@@ -97,6 +102,14 @@ def test_weak_prior_uptrend_faulty():
     assert r['detected'] is False
     assert any('onceki trend' in f for f in r['faults'])
     assert r['prior_uptrend_pct'] < 30.0
+
+
+def test_upward_wedging_handle_faulty():
+    # Kulp dipleri yukari kama (drift up) -> MAJOR flaw (O'Neil s.164,178)
+    h, l, c, v = _build_cup_handle(wedge=True)
+    r = compute_cup_with_handle(h, l, c, v)
+    assert r['detected'] is False
+    assert any('kama' in f for f in r['faults']), f"faults: {r['faults']}"
 
 
 def test_monotonic_uptrend_no_cup():

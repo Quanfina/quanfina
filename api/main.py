@@ -65,6 +65,7 @@ from quanfina_math import (  # noqa: E402
     compute_distribution_day_severity,
     compute_relative_volume,
     compute_breakout_quality,
+    compute_cup_with_handle,
     compute_stage_transition,
     compute_faber_timing,
     compute_mcclellan_oscillator,
@@ -2994,6 +2995,69 @@ def get_breakout_quality(symbol: str) -> BreakoutQualityInfo:
             "volume", "gap_up", "breakout_strength", "prior_contraction", "overhead_clean",
         ],
         mark_says=result.get("mark_says", ""),
+    )
+
+
+# Paket 456 (11 Haz 2026): Cup-with-Handle endpoint
+# O'Neil CAN SLIM "How to Make Money in Stocks" Bol.15 — compute_cup_with_handle wire.
+# Uc-kaynak danisma (NotebookLM O'Neil + Minervini x2 + IBD corroborate) ile esikler
+# kitap-birebir (Kural #26). VCP'nin yaninda 2. base patern (/hisse + Pattern Library).
+class CupHandleInfo(BaseModel):
+    detected: bool = False
+    quality: Optional[Literal["EXCELLENT", "GOOD", "MARGINAL", "NONE"]] = None
+    pivot_price: Optional[float] = None
+    prior_uptrend_pct: Optional[float] = None
+    cup_depth_pct: Optional[float] = None
+    cup_duration_days: Optional[int] = None
+    handle_depth_pct: Optional[float] = None
+    handle_in_upper_half: bool = False
+    shakeout: bool = False
+    faults: list[str] = []
+    mark_says: str
+
+
+@app.get("/api/stock/{symbol}/cup-handle", response_model=CupHandleInfo)
+def get_cup_handle(symbol: str) -> CupHandleInfo:
+    """O'Neil CAN SLIM cup-with-handle base tespiti (HTMMIS Bol.15, P456 wire).
+
+    compute_cup_with_handle — GERCEK OHLCV (highs/lows/closes/volumes). Tum esikler
+    kitap-birebir (prior +%30 / kupa %12-33 / kulp <=%15 ust yari + 200MA / shakeout /
+    U-sekil / upward-wedging fault). AÇIK KONU #75: production gercek base tarihi ideal.
+    """
+    sym = symbol.upper()
+    stock = _STOCK_BY_SYM.get(sym)
+    if stock:
+        price = stock.price
+    else:
+        try:
+            wl = [r for r in watchlist_get_all() if r["symbol"] == sym]
+        except OperationalError:
+            wl = []
+        if wl:
+            price = float(wl[0]["price"])
+        else:
+            scan_data = _fetch_scan_symbol_data(sym)
+            price = scan_data["price"] if scan_data else 100.0
+
+    bars = _get_ohlcv(sym, price)
+    highs = [b.high for b in bars]
+    lows = [b.low for b in bars]
+    closes = [b.close for b in bars]
+    volumes = [b.volume for b in bars]
+
+    r = compute_cup_with_handle(highs, lows, closes, volumes)
+    return CupHandleInfo(
+        detected=r.get("detected", False),
+        quality=r.get("quality"),
+        pivot_price=r.get("pivot_price"),
+        prior_uptrend_pct=r.get("prior_uptrend_pct"),
+        cup_depth_pct=r.get("cup_depth_pct"),
+        cup_duration_days=r.get("cup_duration_days"),
+        handle_depth_pct=r.get("handle_depth_pct"),
+        handle_in_upper_half=r.get("handle_in_upper_half", False),
+        shakeout=r.get("shakeout", False),
+        faults=r.get("faults", []),
+        mark_says=r.get("mark_says", ""),
     )
 
 
