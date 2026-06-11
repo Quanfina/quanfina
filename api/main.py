@@ -56,6 +56,7 @@ from quanfina_math import (  # noqa: E402
     compute_follow_through_day,
     compute_pivot_breakout,
     compute_overhead_supply,
+    compute_vcp_pass,
     compute_climax_run,
     compute_brandon_expectancy,
     compute_relative_strength_rating,
@@ -2936,27 +2937,58 @@ def get_breakout_quality(symbol: str) -> BreakoutQualityInfo:
 
     bars = _get_ohlcv(sym, price)
     volumes = [b.volume for b in bars]
+    closes = [b.close for b in bars]
+    opens = [b.open for b in bars]
 
     # rel_vol hesapla — volume_confirmed icin (>=1.5x = teyit)
     rv = compute_relative_volume(volumes)
     volume_confirmed = (rv.get("rel_vol") or 0.0) >= 1.5
 
-    # Diger parametreler MOCK (ACIK KONU #75: gercek pivot tarihi)
+    # P450 (DD-sonrasi #2 derin arastirma): 4/5 hardcoded bilesen GERCEK OHLCV'den
+    # hesaplandi — mevcut CANLI helper'lar (yeni helper YOK). P443 "kismi MOCK"
+    # uyarisi kapaniyor. Kaynaklar:
+    #   - gap_up: inline (open[-1]-close[-2])/close[-2]*100 >= 3.0 — compute_climax_run
+    #     CLIMAX_GAP_UP_PCT=3.0 ile birebir tutarli. NOT: %3 esigi helper-ici sabit,
+    #     Mark kitap-sayfa atfi eksik → GELISTIRILMESI LAZIM (Kural #26 — NotebookLM
+    #     "Quanfina Minervini" cift danisma adayi).
+    #   - breakout_pct: compute_pivot_breakout (20-bar pivot, AÇIK KONU #75 calisan cozum)
+    #   - overhead_clean: compute_overhead_supply category == NONE
+    #   - prior_contraction: compute_vcp_pass (Brandon V-Dry VCP, KARAR #464 gercek hesap)
+    gap_up = (
+        len(opens) >= 2
+        and closes[-2] > 0
+        and (opens[-1] - closes[-2]) / closes[-2] * 100.0 >= 3.0
+    )
+    pb = compute_pivot_breakout(closes, volumes)
+    breakout_pct = pb.get("breakout_pct")
+    if breakout_pct is None:
+        breakout_pct = 0.0  # pivot yok → breakout gucu 0 (kirilim henuz degil)
+    oh = compute_overhead_supply(closes)
+    overhead_clean = oh.get("category") == "NONE"
+    pvh = [
+        {"open": b.open, "high": b.high, "low": b.low, "close": b.close, "volume": b.volume}
+        for b in bars
+    ]
+    prior_contraction = compute_vcp_pass(pvh)
+
     result = compute_breakout_quality(
         volume_confirmed=volume_confirmed,
-        gap_up=False,
-        breakout_pct=1.5,
-        prior_contraction=False,
-        overhead_clean=False,
+        gap_up=gap_up,
+        breakout_pct=breakout_pct,
+        prior_contraction=prior_contraction,
+        overhead_clean=overhead_clean,
     )
-    # P443 (Kural #28): sadece volume gercek; digerleri hardcoded → UI isaretler.
+    # P450: 5/5 bilesen artik gercek OHLCV'den (volume zaten gercekti) — "kismi"
+    # uyarisi kalkar. (breakout_strength puanlama ust-kapak '>5% chase' fix ayri
+    # paket — Sn. Ferit karari, quanfina_math.py:4584 scoring degisimi.)
     return BreakoutQualityInfo(
         score=result.get("score", 0),
         category=result.get("category"),
         breakdown=result.get("breakdown", {}),
-        real_components=["volume"],
-        mark_says="(Kısmi: yalnız Hacim gerçek hesaplanıyor — AÇIK KONU #75) "
-        + result.get("mark_says", ""),
+        real_components=[
+            "volume", "gap_up", "breakout_strength", "prior_contraction", "overhead_clean",
+        ],
+        mark_says=result.get("mark_says", ""),
     )
 
 
