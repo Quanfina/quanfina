@@ -21,6 +21,7 @@ import { MarkProfileBar } from "@/components/stock/MarkProfileBar";
 import { RelativeVolumeCard } from "@/components/stock/RelativeVolumeCard";
 import { BreakoutQualityCard } from "@/components/stock/BreakoutQualityCard";
 import { CupHandleCard } from "@/components/stock/CupHandleCard";
+import { FlatBaseCard } from "@/components/stock/FlatBaseCard";
 import { RiskSummaryCard } from "@/components/stock/RiskSummaryCard";
 import { MarkRegimeBanner } from "@/components/mark/MarkRegimeBanner";
 import { ModBadge } from "@/components/mark/ModBadge";
@@ -332,6 +333,8 @@ export default function HissePage({
           <BreakoutQualityCard symbol={sym} />
           {/* Paket 456 (11 Haz 2026): Cup-with-Handle — O'Neil CAN SLIM Bol.15 */}
           <CupHandleCard symbol={sym} />
+          {/* Paket 458 (11 Haz 2026): Flat Base — O'Neil/IBD later-stage */}
+          <FlatBaseCard symbol={sym} />
         </div>
 
         {/* Setup notes (only when notes exist) */}
