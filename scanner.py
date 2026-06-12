@@ -32,6 +32,7 @@ from db_connection import get_connection
 from quanfina_math import (
     compute_vcp_pass, compute_vcp_quality, compute_vcp_ready_score,
     compute_power_play_pass,
+    compute_cup_with_handle, compute_flat_base, compute_double_bottom,
     # Sprint 4-bis.7 Faz 2 (Vizyon v22.03 + Migration 007)
     detect_tennis_ball, compute_volume_asymmetry,
     # KARAR #733 (Paket 272 — 28 May 2026): Carr Stage 4-Stage detector
@@ -148,6 +149,10 @@ def init_db():
         "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS carr_slope_pct_per_year NUMERIC(8,2)",
         "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS carr_ma_value NUMERIC(12,4)",
         "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS carr_price_vs_ma_pct NUMERIC(8,2)",
+        # Paket 465 (12 Haz 2026): O'Neil base detector ailesi (cup/flat/double quality)
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS cup_handle_quality TEXT DEFAULT NULL",
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS flat_base_quality TEXT DEFAULT NULL",
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS double_bottom_quality TEXT DEFAULT NULL",
     ]:
         c.execute(col_sql)
     c.execute("""
@@ -1043,6 +1048,26 @@ def save_results(df_finviz, slopes, scan_date):
         except Exception:
             pass
 
+        # Paket 465 (12 Haz 2026): O'Neil base detector ailesi — cup-with-handle /
+        # flat-base / double-bottom. pvh (80g) cup/double icin kisa -> carr_stage gibi
+        # TAM high/low/close/volume Series (DataFrame dropna ile hizali). quality string
+        # saklanir (EXCELLENT/GOOD/MARGINAL/NONE) -> /screens "gecerli baz" filtresi.
+        cup_handle_quality = None
+        flat_base_quality = None
+        double_bottom_quality = None
+        try:
+            _bdf = data[ticker][["High", "Low", "Close", "Volume"]].dropna()
+            if len(_bdf) >= 60:
+                _bh = [float(x) for x in _bdf["High"].tolist()]
+                _bl = [float(x) for x in _bdf["Low"].tolist()]
+                _bc = [float(x) for x in _bdf["Close"].tolist()]
+                _bv = [float(x) for x in _bdf["Volume"].tolist()]
+                cup_handle_quality = compute_cup_with_handle(_bh, _bl, _bc, _bv).get("quality")
+                flat_base_quality = compute_flat_base(_bh, _bl, _bc, _bv).get("quality")
+                double_bottom_quality = compute_double_bottom(_bh, _bl, _bc, _bv).get("quality")
+        except Exception:
+            pass
+
         # Kural 3: MA200 yükselişte (slope > 0)
         passed = 1 if slope is not None and slope > 0 else 0
 
@@ -1058,8 +1083,9 @@ def save_results(df_finviz, slopes, scan_date):
                  confirmations, violations,
                  rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mansfield,
                  carr_stage, carr_stage_label, carr_slope_pct_per_year,
-                 carr_ma_value, carr_price_vs_ma_pct)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                 carr_ma_value, carr_price_vs_ma_pct,
+                 cup_handle_quality, flat_base_quality, double_bottom_quality)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 ON CONFLICT(scan_date, ticker) DO UPDATE SET
                     company               = EXCLUDED.company,
                     sector                = EXCLUDED.sector,
@@ -1094,7 +1120,10 @@ def save_results(df_finviz, slopes, scan_date):
                     carr_stage_label      = EXCLUDED.carr_stage_label,
                     carr_slope_pct_per_year = EXCLUDED.carr_slope_pct_per_year,
                     carr_ma_value         = EXCLUDED.carr_ma_value,
-                    carr_price_vs_ma_pct  = EXCLUDED.carr_price_vs_ma_pct
+                    carr_price_vs_ma_pct  = EXCLUDED.carr_price_vs_ma_pct,
+                    cup_handle_quality    = EXCLUDED.cup_handle_quality,
+                    flat_base_quality     = EXCLUDED.flat_base_quality,
+                    double_bottom_quality = EXCLUDED.double_bottom_quality
             """, (
                 scan_date, ticker,
                 row.get("Company", ""), row.get("Sector", ""), row.get("Industry", ""),
@@ -1108,6 +1137,7 @@ def save_results(df_finviz, slopes, scan_date):
                 rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mf,
                 carr_stage, carr_stage_label, carr_slope_pct_per_year,
                 carr_ma_value, carr_price_vs_ma_pct,
+                cup_handle_quality, flat_base_quality, double_bottom_quality,
             ))
             saved += 1
         except Exception as e:
@@ -1299,6 +1329,10 @@ def run_scan(scan_date_override: str = None, force: bool = False):
         "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS carr_slope_pct_per_year NUMERIC(8,2)",
         "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS carr_ma_value NUMERIC(12,4)",
         "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS carr_price_vs_ma_pct NUMERIC(8,2)",
+        # Paket 465 (12 Haz 2026): O'Neil base detector ailesi (cup/flat/double quality)
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS cup_handle_quality TEXT DEFAULT NULL",
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS flat_base_quality TEXT DEFAULT NULL",
+        "ALTER TABLE minervini_scans ADD COLUMN IF NOT EXISTS double_bottom_quality TEXT DEFAULT NULL",
     ]:
         c.execute(col_sql)
 
