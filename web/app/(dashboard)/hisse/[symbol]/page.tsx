@@ -24,6 +24,7 @@ import { CupHandleCard } from "@/components/stock/CupHandleCard";
 import { FlatBaseCard } from "@/components/stock/FlatBaseCard";
 import { DoubleBottomCard } from "@/components/stock/DoubleBottomCard";
 import { HighTightFlagCard } from "@/components/stock/HighTightFlagCard";
+import { BaseSummaryCard } from "@/components/stock/BaseSummaryCard";
 import { RiskSummaryCard } from "@/components/stock/RiskSummaryCard";
 import { MarkRegimeBanner } from "@/components/mark/MarkRegimeBanner";
 import { ModBadge } from "@/components/mark/ModBadge";
@@ -333,6 +334,8 @@ export default function HissePage({
           <RelativeVolumeCard symbol={sym} />
           {/* KARAR #733 alt-paket (Paket 134): Breakout Quality — Mark TLSMW Ch 10 */}
           <BreakoutQualityCard symbol={sym} />
+          {/* Paket 467 (12 Haz 2026): Base Detector Özeti — 4 O'Neil baz tek bakışta (konsolide) */}
+          <BaseSummaryCard symbol={sym} />
           {/* Paket 456 (11 Haz 2026): Cup-with-Handle — O'Neil CAN SLIM Bol.15 */}
           <CupHandleCard symbol={sym} />
           {/* Paket 458 (11 Haz 2026): Flat Base — O'Neil/IBD later-stage */}
