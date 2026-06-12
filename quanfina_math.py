@@ -964,6 +964,18 @@ def compute_power_play_pass(price_volume_history: Optional[list[dict]]) -> bool:
         bool: True = Power Play setup'i (POLE + FLAG kosullari saglandi)
 
     Backward compat: Eski close-only PVH veya kisa veri -> False
+
+    NOT — CIFTLEME REFERANSI (12 Haz 2026, P464): Bu fonksiyon `compute_high_tight_flag`
+    (P462, /hisse) ile AYNI canon'u (Power Play = High Tight Flag, Mark TLSMW Bol.10 +
+    O'Neil) paylasir. BILINCLI iki-arayuz:
+      - compute_power_play_pass: scanner BULK bool — sabit pencere (pole [-70:-30],
+        flag [-30:]), hizli, minervini_scans.power_play_pass kolonu.
+      - compute_high_tight_flag: /hisse DETAYLI — dinamik pole-top tespiti + quality
+        (EXCELLENT/GOOD/MARGINAL) + flagpole_pct/flag_depth, endpoint + kart.
+    Esikler hizali (pole >=%100/<=8hf, flag <=%25). Tek-kaynak konsolidasyon ALGORITMA
+    farki (sabit vs dinamik) + production scanner davranis riski nedeniyle ERTELENDI;
+    sapma olursa reconcile (Ilke #4 DRY / Kural #18). Kural #14 alt-bolum: cift VAR ama
+    bilincli + belgeli (silent degil).
     """
     required_days = POWER_PLAY_POLE_MAX_DAYS + POWER_PLAY_FLAG_MAX_WEEKS * 5  # 70
     if not price_volume_history or len(price_volume_history) < required_days:
@@ -4413,6 +4425,11 @@ def compute_high_tight_flag(
     Returns:
         dict {detected, quality, pivot_price, flagpole_pct, flagpole_weeks,
               flag_depth_pct, flag_duration_days, volume_dryup, faults, mark_says}
+
+    NOT — CIFTLEME REFERANSI (12 Haz 2026, P464): `compute_power_play_pass` (KARAR #467,
+    scanner bulk bool, sabit-pencere) AYNI canon'dur (Power Play = HTF). Bu fonksiyon
+    /hisse DETAYLI (dinamik pole-top + quality). Iki-arayuz BILINCLI; esikler hizali.
+    Detay + konsolidasyon erteleme gerekcesi: bkz. compute_power_play_pass NOT bloku.
     """
     def _none(msg: str) -> dict:
         return {
