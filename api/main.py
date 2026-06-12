@@ -4168,14 +4168,39 @@ def get_signals() -> list[Signal]:
 
     def _build_signal(row: WatchlistRow) -> Signal:
         added_prefix = (row.added_date or "")[:10]
+        bars = []
+        try:
+            bars = _get_ohlcv(row.symbol, row.price) or []
+        except Exception:
+            bars = []
         # Relative volume — yfinance + compute_relative_volume (Mark TLSMW Bol. 6)
         rv_val: Optional[float] = None
         try:
-            bars = _get_ohlcv(row.symbol, row.price)
             if bars and len(bars) >= 52:
                 rv_dict = compute_relative_volume([b.volume for b in bars])
                 if rv_dict.get("rel_vol") is not None:
                     rv_val = float(rv_dict["rel_vol"])
+        except Exception:
+            pass
+        # P466 (12 Haz 2026): Stop·Hedef·R/R canli hesap. web_watchlist'te kolon YOK ->
+        # eskiden None idi (KARAR #473 acigi, /signals "—"). Mark Risk-first canon
+        # (RiskSummaryCard P439 ile ayni): ATR stop (suggested_stop_normal=Entry-2.5xATR)
+        # + 3R hedef (Mark R-multiple framework; sabit fiyat hedefi DEGIL — Kural #26
+        # seffaf, hisseye gore degisir) + R/R. bars zaten cekildi, ek fetch yok.
+        stop_val: Optional[float] = None
+        target_val: Optional[float] = None
+        rr_val: Optional[float] = None
+        try:
+            if bars and len(bars) >= 30:
+                entry = bars[-1].close
+                atr_info = compute_atr_volatility(
+                    [b.high for b in bars], [b.low for b in bars], [b.close for b in bars]
+                )
+                sn = atr_info.get("suggested_stop_normal")
+                if sn is not None and entry > sn > 0:
+                    stop_val = round(sn, 2)
+                    target_val = round(entry + 3.0 * (entry - sn), 2)  # 3R (Mark ideal R-multiple)
+                    rr_val = _calc_rr(entry, stop_val, target_val)
         except Exception:
             pass
         return Signal(
@@ -4185,9 +4210,9 @@ def get_signals() -> list[Signal]:
             setup_type=row.setup_type,
             rs_rating=row.rs_rating,
             price=row.price,
-            stop_loss=None,
-            target_price=None,
-            risk_reward=None,
+            stop_loss=stop_val,
+            target_price=target_val,
+            risk_reward=rr_val,
             added_date=row.added_date,
             is_new_today=(added_prefix == today),
             mark_signals=_compute_live_mark_signals(row.symbol, row.price),
