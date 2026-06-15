@@ -244,7 +244,13 @@ export default function SignalsPage() {
       // KARAR #473: R/R = (hedef - fiyat) / (fiyat - stop). Backend hesaplar.
       // Paket 158 (26 May 2026): DOM createElement -> SignalRREnrichedCell React component
       // (React 19 crash önleme — components/signals/SignalRREnrichedCell.tsx).
+      // P468 (15 Haz 2026): headerTooltip — P466 hedef = giris + 3R (ATR stop bazli)
+      // oldugu icin R/R sabit ~3.0 gorunur. Tooltip "projeksiyon, grafik hedefi degil"
+      // netligi verir (komsu Fiyat/Bagil Hacim kolonlari ayni headerTooltip patern).
       headerName: "R/R",
+      headerTooltip:
+        "R/R = (hedef − fiyat) / (fiyat − stop). Hedef = giriş + 3R projeksiyon " +
+        "(2.5×ATR stop bazlı, Mark R-multiple) — sabit grafik hedefi değil, bu yüzden ~3.0 sabit.",
       width: 150,
       type: "rightAligned",
       cellRenderer: SignalRREnrichedCell,
