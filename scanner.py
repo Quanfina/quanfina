@@ -933,12 +933,21 @@ def check_ma200_slope(tickers):
                     "Close": close, "Volume": volume,
                 }).dropna()
                 confs, viols = detect_signals(ohlcv)
+                # P469 (15 Haz 2026): tam OHLCV listeleri slope_info'da saklanir -> run_scan
+                # canli yolu carr_stage (>=150 bar) + base detector (cup/flat/double, >=60 bar)
+                # hesaplayabilsin. pvh tail-80 carr icin yetersiz; eski save_results bunlari
+                # scope-disi 'close'/'volume'/'data[ticker]' ile okuyordu (olu kod bug). Artik
+                # tek kaynak burasi (dropna ile hizali Series'ten).
                 results[ticker] = {
                     "slope":                slope,
                     "high52":               high52,
                     "sma50":                sma50_val,
                     "atr14":                atr14_val,
                     "price_volume_history": pvh_val,
+                    "ohlcv_high":           [float(x) for x in ohlcv["High"].tolist()],
+                    "ohlcv_low":            [float(x) for x in ohlcv["Low"].tolist()],
+                    "ohlcv_close":          [float(x) for x in ohlcv["Close"].tolist()],
+                    "ohlcv_volume":         [float(x) for x in ohlcv["Volume"].tolist()],
                     "confirmations":        ",".join(confs),
                     "violations":           ",".join(viols),
                 }
@@ -967,181 +976,174 @@ def check_ma200_slope(tickers):
     return results, spy_actual_date
 
 # --- VERİTABANINA KAYDET ---
+def _upsert_minervini_scan_row(c, scan_date, ticker, row, slope_info):
+    """P469 (15 Haz 2026): minervini_scans tek-satir UPSERT — DRY tek yazma yolu.
+
+    save_results (eski) ve run_scan ayni 39-kolon INSERT'i buradan cagirir; boylece
+    kolon/placeholder/tuple drift'i + olu-kod bug'i biter. Onceki durum: 39-kolon
+    INSERT yalniz save_results'taydi (HIC cagrilmiyordu) + carr/base'i scope-disi
+    'close'/'volume'/'data[ticker]' ile okuyordu; canli run_scan inline 21-kolon INSERT
+    base/carr/vcp kolonlarini hic yazmiyordu. Artik tum hesaplama row (Finviz) + slope_info
+    (check_ma200_slope: pvh + ohlcv_*) uzerinden, tek kaynak.
+    """
+    slope_info = slope_info or {}
+    slope   = slope_info.get("slope")
+    high52  = slope_info.get("high52")
+    confs   = slope_info.get("confirmations", "")
+    viols   = slope_info.get("violations", "")
+    rs_ibd  = slope_info.get("rs_ibd")
+    rs_12m  = slope_info.get("rs_12m")
+    rs_20d  = slope_info.get("rs_20d")
+    rs_50d  = slope_info.get("rs_50d")
+    rs_200d = slope_info.get("rs_200d")
+    rs_mf   = slope_info.get("rs_mansfield")
+    sma50   = slope_info.get("sma50")
+    atr14   = slope_info.get("atr14")
+    pvh     = slope_info.get("price_volume_history")
+    pvh_json = json.dumps(pvh) if pvh else None
+
+    # VCP / Power Play (pvh'den) — KARAR #461/#465/#466/#467
+    tight_low_vol_pass = compute_vcp_pass(pvh)
+    vcp_quality_score = compute_vcp_quality(pvh)
+    vcp_ready_score = compute_vcp_ready_score(pvh)
+    power_play_pass = compute_power_play_pass(pvh)
+
+    # Tennis Ball (pvh'den) — KARAR ADAY #893
+    tennis_ball_pattern = None
+    if pvh and len(pvh) >= 10:
+        try:
+            recent_window = min(10, len(pvh))
+            breakout_idx = len(pvh) - recent_window + max(
+                range(recent_window),
+                key=lambda i: pvh[-recent_window + i].get('close', 0)
+            )
+            tb_result = detect_tennis_ball(breakout_idx, pvh)
+            tennis_ball_pattern = tb_result.get('pattern')
+        except Exception:
+            tennis_ball_pattern = None
+
+    # Volume Asymmetry (pvh'den) — KARAR ADAY #882
+    volume_asymmetry_ratio = None
+    volume_asymmetry_tier = None
+    if pvh and len(pvh) >= 5:
+        try:
+            va_result = compute_volume_asymmetry(pvh, lookback_days=20)
+            volume_asymmetry_ratio = va_result.get('asymmetry_ratio')
+            volume_asymmetry_tier = va_result.get('tier')
+        except Exception:
+            pass
+
+    # Carr Stage (tam OHLCV — slope_info ohlcv_close/volume) — KARAR #733
+    carr_stage = carr_stage_label = carr_slope_pct_per_year = None
+    carr_ma_value = carr_price_vs_ma_pct = None
+    _oc = slope_info.get("ohlcv_close")
+    _ov = slope_info.get("ohlcv_volume")
+    try:
+        if _oc and _ov and len(_oc) >= 150 and len(_oc) == len(_ov):
+            cs_result = compute_carr_stage(_oc, _ov)
+            carr_stage = cs_result.get('stage')
+            carr_stage_label = cs_result.get('stage_label')
+            carr_slope_pct_per_year = cs_result.get('slope_pct_per_year')
+            carr_ma_value = cs_result.get('ma_value')
+            carr_price_vs_ma_pct = cs_result.get('price_vs_ma_pct')
+    except Exception:
+        pass
+
+    # O'Neil base detector (tam OHLCV — slope_info ohlcv_*) — Paket 465
+    cup_handle_quality = flat_base_quality = double_bottom_quality = None
+    _oh = slope_info.get("ohlcv_high")
+    _ol = slope_info.get("ohlcv_low")
+    try:
+        if (_oh and _ol and _oc and _ov and len(_oc) >= 60
+                and len({len(_oh), len(_ol), len(_oc), len(_ov)}) == 1):
+            cup_handle_quality = compute_cup_with_handle(_oh, _ol, _oc, _ov).get("quality")
+            flat_base_quality = compute_flat_base(_oh, _ol, _oc, _ov).get("quality")
+            double_bottom_quality = compute_double_bottom(_oh, _ol, _oc, _ov).get("quality")
+    except Exception:
+        pass
+
+    passed = 1 if slope is not None and slope > 0 else 0
+
+    c.execute("""
+        INSERT INTO minervini_scans
+        (scan_date, ticker, company, sector, industry,
+         price, change_pct, volume, market_cap, pe,
+         ma200_slope, passed, high52, sma50, atr14,
+         price_volume_history, tight_low_vol_pass, vcp_quality_score,
+         vcp_ready_score, power_play_pass,
+         tennis_ball_pattern, volume_asymmetry_ratio, volume_asymmetry_tier,
+         confirmations, violations,
+         rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mansfield,
+         carr_stage, carr_stage_label, carr_slope_pct_per_year,
+         carr_ma_value, carr_price_vs_ma_pct,
+         cup_handle_quality, flat_base_quality, double_bottom_quality)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        ON CONFLICT(scan_date, ticker) DO UPDATE SET
+            company               = EXCLUDED.company,
+            sector                = EXCLUDED.sector,
+            industry              = EXCLUDED.industry,
+            price                 = EXCLUDED.price,
+            change_pct            = EXCLUDED.change_pct,
+            volume                = EXCLUDED.volume,
+            market_cap            = EXCLUDED.market_cap,
+            pe                    = EXCLUDED.pe,
+            ma200_slope           = EXCLUDED.ma200_slope,
+            passed                = EXCLUDED.passed,
+            high52                = EXCLUDED.high52,
+            sma50                 = EXCLUDED.sma50,
+            atr14                 = EXCLUDED.atr14,
+            price_volume_history  = EXCLUDED.price_volume_history,
+            tight_low_vol_pass    = EXCLUDED.tight_low_vol_pass,
+            vcp_quality_score     = EXCLUDED.vcp_quality_score,
+            vcp_ready_score       = EXCLUDED.vcp_ready_score,
+            power_play_pass       = EXCLUDED.power_play_pass,
+            tennis_ball_pattern   = EXCLUDED.tennis_ball_pattern,
+            volume_asymmetry_ratio = EXCLUDED.volume_asymmetry_ratio,
+            volume_asymmetry_tier  = EXCLUDED.volume_asymmetry_tier,
+            confirmations         = EXCLUDED.confirmations,
+            violations            = EXCLUDED.violations,
+            rs_ibd                = EXCLUDED.rs_ibd,
+            rs_12m                = EXCLUDED.rs_12m,
+            rs_20d                = EXCLUDED.rs_20d,
+            rs_50d                = EXCLUDED.rs_50d,
+            rs_200d               = EXCLUDED.rs_200d,
+            rs_mansfield          = EXCLUDED.rs_mansfield,
+            carr_stage            = EXCLUDED.carr_stage,
+            carr_stage_label      = EXCLUDED.carr_stage_label,
+            carr_slope_pct_per_year = EXCLUDED.carr_slope_pct_per_year,
+            carr_ma_value         = EXCLUDED.carr_ma_value,
+            carr_price_vs_ma_pct  = EXCLUDED.carr_price_vs_ma_pct,
+            cup_handle_quality    = EXCLUDED.cup_handle_quality,
+            flat_base_quality     = EXCLUDED.flat_base_quality,
+            double_bottom_quality = EXCLUDED.double_bottom_quality
+    """, (
+        scan_date, ticker,
+        row.get("Company", ""), row.get("Sector", ""), row.get("Industry", ""),
+        row.get("Price", 0), row.get("Change", ""), row.get("Volume", 0),
+        row.get("Market Cap", 0), row.get("P/E", 0),
+        slope, passed, high52, sma50, atr14,
+        pvh_json, tight_low_vol_pass, vcp_quality_score, vcp_ready_score,
+        power_play_pass,
+        tennis_ball_pattern, volume_asymmetry_ratio, volume_asymmetry_tier,
+        confs, viols,
+        rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mf,
+        carr_stage, carr_stage_label, carr_slope_pct_per_year,
+        carr_ma_value, carr_price_vs_ma_pct,
+        cup_handle_quality, flat_base_quality, double_bottom_quality,
+    ))
+
+
 def save_results(df_finviz, slopes, scan_date):
     conn = get_connection()
     c = conn.cursor()
     saved = 0
     
     for _, row in df_finviz.iterrows():
-        ticker     = row["Ticker"]
-        slope_info = slopes.get(ticker) or {}
-        slope      = slope_info.get("slope")
-        high52     = slope_info.get("high52")
-        confs      = slope_info.get("confirmations", "")
-        viols      = slope_info.get("violations", "")
-        rs_ibd     = slope_info.get("rs_ibd")
-        rs_12m     = slope_info.get("rs_12m")
-        rs_20d     = slope_info.get("rs_20d")
-        rs_50d     = slope_info.get("rs_50d")
-        rs_200d    = slope_info.get("rs_200d")
-        rs_mf      = slope_info.get("rs_mansfield")
-        sma50      = slope_info.get("sma50")
-        atr14      = slope_info.get("atr14")
-        pvh        = slope_info.get("price_volume_history")
-        pvh_json   = json.dumps(pvh) if pvh else None
-
-        # Sprint 4-bis.4 KARAR #461 — VCP pre-compute (quanfina_math motoru — tek motor)
-        tight_low_vol_pass = compute_vcp_pass(pvh)
-        # Sprint 4-bis.5 KARAR #466 — VCP Kalite Skoru (EXCELLENT/PASS/None)
-        vcp_quality_score = compute_vcp_quality(pvh)
-        # Sprint 4-bis.5 KARAR #465 — VCP Ready Score 0-100
-        vcp_ready_score = compute_vcp_ready_score(pvh)
-        # Sprint 4-bis.5 KARAR #467 — Power Play (HTF) Mark canon
-        power_play_pass = compute_power_play_pass(pvh)
-
-        # Sprint 4-bis.7 KARAR ADAY #893 — Tennis Ball Detector (TLSMW s.253)
-        # Breakout idx = pvh sondan ~5 gün önce (recent breakout var mı kontrolü).
-        # PVH son 80 gün var; index olarak son 70 günü kullan (10 gün gözlem penceresi).
-        tennis_ball_pattern = None
-        if pvh and len(pvh) >= 10:
-            try:
-                # Son 5-10 gün içindeki en yüksek close'u breakout candidate yap
-                recent_window = min(10, len(pvh))
-                breakout_idx = len(pvh) - recent_window + max(
-                    range(recent_window),
-                    key=lambda i: pvh[-recent_window + i].get('close', 0)
-                )
-                tb_result = detect_tennis_ball(breakout_idx, pvh)
-                tennis_ball_pattern = tb_result.get('pattern')
-            except Exception:
-                tennis_ball_pattern = None
-
-        # Sprint 4-bis.7 KARAR ADAY #882 — Volume Asymmetry Tracker (TLSMW s.234)
-        volume_asymmetry_ratio = None
-        volume_asymmetry_tier = None
-        if pvh and len(pvh) >= 5:
-            try:
-                va_result = compute_volume_asymmetry(pvh, lookback_days=20)
-                volume_asymmetry_ratio = va_result.get('asymmetry_ratio')
-                volume_asymmetry_tier = va_result.get('tier')
-            except Exception:
-                pass
-
-        # KARAR #733 (Paket 272 — 28 May 2026): Carr Stage 4-Stage detector
-        # 30W (~150 trade gun) MA + slope yillik. yfinance 420 takvim gunu (~300 trade gun)
-        # cektiginden close/volume yeterli; pvh tail(80) yetersiz oldugu icin Series'ten dogrudan.
-        carr_stage = None
-        carr_stage_label = None
-        carr_slope_pct_per_year = None
-        carr_ma_value = None
-        carr_price_vs_ma_pct = None
         try:
-            closes_list = [float(x) for x in close.dropna().tolist()]
-            volumes_list = [float(x) for x in volume.dropna().tolist()]
-            if len(closes_list) >= 150 and len(closes_list) == len(volumes_list):
-                cs_result = compute_carr_stage(closes_list, volumes_list)
-                carr_stage = cs_result.get('stage')
-                carr_stage_label = cs_result.get('stage_label')
-                carr_slope_pct_per_year = cs_result.get('slope_pct_per_year')
-                carr_ma_value = cs_result.get('ma_value')
-                carr_price_vs_ma_pct = cs_result.get('price_vs_ma_pct')
-        except Exception:
-            pass
-
-        # Paket 465 (12 Haz 2026): O'Neil base detector ailesi — cup-with-handle /
-        # flat-base / double-bottom. pvh (80g) cup/double icin kisa -> carr_stage gibi
-        # TAM high/low/close/volume Series (DataFrame dropna ile hizali). quality string
-        # saklanir (EXCELLENT/GOOD/MARGINAL/NONE) -> /screens "gecerli baz" filtresi.
-        cup_handle_quality = None
-        flat_base_quality = None
-        double_bottom_quality = None
-        try:
-            _bdf = data[ticker][["High", "Low", "Close", "Volume"]].dropna()
-            if len(_bdf) >= 60:
-                _bh = [float(x) for x in _bdf["High"].tolist()]
-                _bl = [float(x) for x in _bdf["Low"].tolist()]
-                _bc = [float(x) for x in _bdf["Close"].tolist()]
-                _bv = [float(x) for x in _bdf["Volume"].tolist()]
-                cup_handle_quality = compute_cup_with_handle(_bh, _bl, _bc, _bv).get("quality")
-                flat_base_quality = compute_flat_base(_bh, _bl, _bc, _bv).get("quality")
-                double_bottom_quality = compute_double_bottom(_bh, _bl, _bc, _bv).get("quality")
-        except Exception:
-            pass
-
-        # Kural 3: MA200 yükselişte (slope > 0)
-        passed = 1 if slope is not None and slope > 0 else 0
-
-        try:
-            c.execute("""
-                INSERT INTO minervini_scans
-                (scan_date, ticker, company, sector, industry,
-                 price, change_pct, volume, market_cap, pe,
-                 ma200_slope, passed, high52, sma50, atr14,
-                 price_volume_history, tight_low_vol_pass, vcp_quality_score,
-                 vcp_ready_score, power_play_pass,
-                 tennis_ball_pattern, volume_asymmetry_ratio, volume_asymmetry_tier,
-                 confirmations, violations,
-                 rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mansfield,
-                 carr_stage, carr_stage_label, carr_slope_pct_per_year,
-                 carr_ma_value, carr_price_vs_ma_pct,
-                 cup_handle_quality, flat_base_quality, double_bottom_quality)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                ON CONFLICT(scan_date, ticker) DO UPDATE SET
-                    company               = EXCLUDED.company,
-                    sector                = EXCLUDED.sector,
-                    industry              = EXCLUDED.industry,
-                    price                 = EXCLUDED.price,
-                    change_pct            = EXCLUDED.change_pct,
-                    volume                = EXCLUDED.volume,
-                    market_cap            = EXCLUDED.market_cap,
-                    pe                    = EXCLUDED.pe,
-                    ma200_slope           = EXCLUDED.ma200_slope,
-                    passed                = EXCLUDED.passed,
-                    high52                = EXCLUDED.high52,
-                    sma50                 = EXCLUDED.sma50,
-                    atr14                 = EXCLUDED.atr14,
-                    price_volume_history  = EXCLUDED.price_volume_history,
-                    tight_low_vol_pass    = EXCLUDED.tight_low_vol_pass,
-                    vcp_quality_score     = EXCLUDED.vcp_quality_score,
-                    vcp_ready_score       = EXCLUDED.vcp_ready_score,
-                    power_play_pass       = EXCLUDED.power_play_pass,
-                    tennis_ball_pattern   = EXCLUDED.tennis_ball_pattern,
-                    volume_asymmetry_ratio = EXCLUDED.volume_asymmetry_ratio,
-                    volume_asymmetry_tier  = EXCLUDED.volume_asymmetry_tier,
-                    confirmations         = EXCLUDED.confirmations,
-                    violations            = EXCLUDED.violations,
-                    rs_ibd                = EXCLUDED.rs_ibd,
-                    rs_12m                = EXCLUDED.rs_12m,
-                    rs_20d                = EXCLUDED.rs_20d,
-                    rs_50d                = EXCLUDED.rs_50d,
-                    rs_200d               = EXCLUDED.rs_200d,
-                    rs_mansfield          = EXCLUDED.rs_mansfield,
-                    carr_stage            = EXCLUDED.carr_stage,
-                    carr_stage_label      = EXCLUDED.carr_stage_label,
-                    carr_slope_pct_per_year = EXCLUDED.carr_slope_pct_per_year,
-                    carr_ma_value         = EXCLUDED.carr_ma_value,
-                    carr_price_vs_ma_pct  = EXCLUDED.carr_price_vs_ma_pct,
-                    cup_handle_quality    = EXCLUDED.cup_handle_quality,
-                    flat_base_quality     = EXCLUDED.flat_base_quality,
-                    double_bottom_quality = EXCLUDED.double_bottom_quality
-            """, (
-                scan_date, ticker,
-                row.get("Company", ""), row.get("Sector", ""), row.get("Industry", ""),
-                row.get("Price", 0), row.get("Change", ""), row.get("Volume", 0),
-                row.get("Market Cap", 0), row.get("P/E", 0),
-                slope, passed, high52, sma50, atr14,
-                pvh_json, tight_low_vol_pass, vcp_quality_score, vcp_ready_score,
-                power_play_pass,
-                tennis_ball_pattern, volume_asymmetry_ratio, volume_asymmetry_tier,
-                confs, viols,
-                rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mf,
-                carr_stage, carr_stage_label, carr_slope_pct_per_year,
-                carr_ma_value, carr_price_vs_ma_pct,
-                cup_handle_quality, flat_base_quality, double_bottom_quality,
-            ))
+            _upsert_minervini_scan_row(c, scan_date, row["Ticker"], row, slopes.get(row["Ticker"]))
             saved += 1
         except Exception as e:
-            print(f"  Kayıt hatası {ticker}: {e}")
+            print(f"  Kayit hatasi {row['Ticker']}: {e}")
             break  # ilk hatada dur
 
     conn.commit()
@@ -1466,61 +1468,15 @@ def run_scan(scan_date_override: str = None, force: bool = False):
         saved = 0
 
         for _, row in df.iterrows():
-            ticker     = row["Ticker"]
-            slope_info = slopes.get(ticker) or {}
-            slope      = slope_info.get("slope")
-            high52     = slope_info.get("high52")
-            confs      = slope_info.get("confirmations", "")
-            viols      = slope_info.get("violations", "")
-            rs_ibd     = slope_info.get("rs_ibd")
-            rs_12m     = slope_info.get("rs_12m")
-            rs_20d     = slope_info.get("rs_20d")
-            rs_50d     = slope_info.get("rs_50d")
-            rs_200d    = slope_info.get("rs_200d")
-            rs_mf      = slope_info.get("rs_mansfield")
-
-            # Kural 3: MA200 yükselişte (slope > 0)
-            passed = 1 if slope is not None and slope > 0 else 0
-
+            # P469 (15 Haz 2026): canli yazma yolu artik tek _upsert_minervini_scan_row
+            # helper'i (DRY). Eskiden bu inline INSERT yalniz 21 kolon yaziyordu -> base
+            # (cup/flat/double) + carr + vcp/power_play kolonlari NULL kaliyordu. Helper
+            # 39 kolonu (slope_info pvh + ohlcv_*) yazar.
             try:
-                c.execute("""
-                    INSERT INTO minervini_scans
-                    (scan_date, ticker, company, sector, industry,
-                     price, change_pct, volume, market_cap, pe,
-                     ma200_slope, passed, high52, confirmations, violations,
-                     rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mansfield)
-                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                    ON CONFLICT(scan_date, ticker) DO UPDATE SET
-                        company       = EXCLUDED.company,
-                        sector        = EXCLUDED.sector,
-                        industry      = EXCLUDED.industry,
-                        price         = EXCLUDED.price,
-                        change_pct    = EXCLUDED.change_pct,
-                        volume        = EXCLUDED.volume,
-                        market_cap    = EXCLUDED.market_cap,
-                        pe            = EXCLUDED.pe,
-                        ma200_slope   = EXCLUDED.ma200_slope,
-                        passed        = EXCLUDED.passed,
-                        high52        = EXCLUDED.high52,
-                        confirmations = EXCLUDED.confirmations,
-                        violations    = EXCLUDED.violations,
-                        rs_ibd        = EXCLUDED.rs_ibd,
-                        rs_12m        = EXCLUDED.rs_12m,
-                        rs_20d        = EXCLUDED.rs_20d,
-                        rs_50d        = EXCLUDED.rs_50d,
-                        rs_200d       = EXCLUDED.rs_200d,
-                        rs_mansfield  = EXCLUDED.rs_mansfield
-                """, (
-                    scan_date, ticker,
-                    row.get("Company", ""), row.get("Sector", ""), row.get("Industry", ""),
-                    row.get("Price", 0), row.get("Change", ""), row.get("Volume", 0),
-                    row.get("Market Cap", 0), row.get("P/E", 0),
-                    slope, passed, high52, confs, viols,
-                    rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mf,
-                ))
+                _upsert_minervini_scan_row(c, scan_date, row["Ticker"], row, slopes.get(row["Ticker"]))
                 saved += 1
             except Exception as e:
-                print(f"  Kayıt hatası {ticker}: {e}")
+                print(f"  Kayıt hatası {row['Ticker']}: {e}")
                 break  # ilk hatada dur
 
         conn.commit()

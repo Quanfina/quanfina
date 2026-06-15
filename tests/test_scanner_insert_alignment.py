@@ -37,12 +37,14 @@ def test_scanner_file_exists():
     assert SCANNER_PATH.exists(), f"scanner.py bulunamadi: {SCANNER_PATH}"
 
 
-def test_at_least_two_minervini_inserts():
-    # Ana (tam) + fallback (hafif) INSERT path'leri var.
+def test_single_consolidated_insert():
+    # P469 (15 Haz 2026): save_results + run_scan TEK _upsert_minervini_scan_row
+    # helper'inda birlesti (DRY). Tam olarak 1 minervini_scans INSERT olmali.
+    # >1 ise bir yazma yolu tekrar ayristi (drift) -> helper'a yonlendirilmeli.
     matches = _load_inserts()
-    assert len(matches) >= 2, (
-        f"minervini_scans INSERT sayisi beklenmedik: {len(matches)} (>=2 bekleniyor). "
-        "Pattern bozulmus olabilir."
+    assert len(matches) == 1, (
+        f"minervini_scans INSERT sayisi {len(matches)} (P469 konsolidasyon sonrasi tam 1 "
+        "helper bekleniyor). >1 ise DRY ihlali: yeni yazma yolu _upsert_minervini_scan_row kullanmali."
     )
 
 
