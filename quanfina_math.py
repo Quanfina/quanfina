@@ -4286,18 +4286,27 @@ def compute_double_bottom(
     post_l = seg_l[rim_rel + 1:]
     if len(post_h) < 15:
         return _none('W yapisi icin yetersiz post-rim veri.')
-    half = len(post_l) // 2
-    if half < 3:
+    # P471 (15 Haz 2026): PEAK-FIRST geometri. Kitapta (O'Neil s.166) "W" icin acik
+    # algoritma YOK — sekil yorumu (NotebookLM O'Neil CAN SLIM danismasi). Docstring
+    # intent'i: orta tepe ONCE bul (post-rim en yuksek high, iki yana dip icin kenar
+    # tampon haric), sonra 1.dip = orta tepe ONCESI min, 2.dip = orta tepe SONRASI min.
+    # Eski takvim-yari bolmesi (len//2) asimetrik W'leri yanlis konumluyordu: iki dip ayni
+    # takvim yarisinda + sag taraf yukseliste ise 2.dip rising-right'a kayip sisiyor ->
+    # undercut false-reject. Peak-first bunu giderir; undercut `<=` canon-dogru (s.166:
+    # "touch ... OR undercut by one or two points" -> esit kabul).
+    m = len(post_l)
+    edge = max(3, m // 10)            # iki yanda dip olusumu icin tampon
+    if m < 2 * edge + 5:
         return _none('W yapisi icin yetersiz post-rim veri.')
-    l1_idx = post_l[:half].index(min(post_l[:half]))            # 1. dip (ilk yari)
-    l2_idx = half + post_l[half:].index(min(post_l[half:]))     # 2. dip (ikinci yari)
-    if l2_idx <= l1_idx + 1:
-        return _none('Iki dip ayrismiyor — W yapisi yok.')
+    interior_h = post_h[edge:m - edge]
+    mp_idx = edge + interior_h.index(max(interior_h))           # orta tepe (iki yanda dip icin yer var)
+    mp_high = post_h[mp_idx]
+    l1_idx = post_l[:mp_idx].index(min(post_l[:mp_idx]))        # 1. dip = orta tepe ONCESI min
+    l2_idx = (mp_idx + 1) + post_l[mp_idx + 1:].index(min(post_l[mp_idx + 1:]))  # 2. dip = SONRASI min
+    if mp_idx - l1_idx < 2 or l2_idx - mp_idx < 2:
+        return _none('Dip-tepe-dip yeterince ayrismiyor — W yapisi yok.')
     first_low = post_l[l1_idx]
     second_low = post_l[l2_idx]
-    mp_region = post_h[l1_idx:l2_idx + 1]
-    mp_idx = l1_idx + mp_region.index(max(mp_region))           # orta tepe (iki dip arasi en yuksek)
-    mp_high = post_h[mp_idx]
     base_low = min(first_low, second_low)
     base_depth_pct = round((rim_high - base_low) / rim_high * 100, 2)
     if base_depth_pct > DB_DEPTH_REJECT_PCT:

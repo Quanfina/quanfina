@@ -13,8 +13,10 @@ from quanfina_math import compute_double_bottom
 
 
 def _build_double_bottom(prior_start=70.0, rim=100.0, l1=85.0, mp=95.0, l2=83.0,
-                         recover=93.0, base_vol=400_000, adv_vol=900_000, l2_vol=300_000):
-    """Sentetik W: prior advance(overshoot rim) -> L1 -> orta tepe -> L2 -> recovery."""
+                         recover=93.0, base_vol=400_000, adv_vol=900_000, l2_vol=300_000,
+                         recover_steps=10):
+    """Sentetik W: prior advance(overshoot rim) -> L1 -> orta tepe -> L2 -> recovery.
+    recover_steps: sag-taraf toparlanma uzunlugu (asimetrik W regresyon testi icin uzatilir)."""
     highs, lows, closes, vols = [], [], [], []
 
     def add(p, v):
@@ -31,7 +33,7 @@ def _build_double_bottom(prior_start=70.0, rim=100.0, l1=85.0, mp=95.0, l2=83.0,
     ramp(rim, l1, 10, base_vol)            # 1. dip'e inis
     ramp(l1, mp, 10, base_vol)             # orta tepe'ye toparlanma
     ramp(mp, l2, 10, l2_vol)               # 2. dip'e inis (undercut), dusuk hacim
-    ramp(l2, recover, 10, base_vol)        # pivot'a dogru toparlanma (current)
+    ramp(l2, recover, recover_steps, base_vol)  # pivot'a dogru toparlanma (current)
     return highs, lows, closes, vols
 
 
@@ -71,6 +73,19 @@ def test_volume_dryup_promotes_excellent():
     r = compute_double_bottom(h, l, c, v)
     assert r['detected'] is True
     assert r['quality'] == 'EXCELLENT'
+
+
+def test_asymmetric_w_long_recovery_peak_first():
+    # P471 regresyon: W erken (l1/mp/l2 baz'in ilk bolumunde) + UZUN yukselen sag taraf.
+    # Eski takvim-yari bolmesi (len//2) 2.dip'i rising-right'a kaydirip undercut'i
+    # false-reject ediyordu. Peak-first orta tepeyi dogru bulur -> tespit korunur.
+    h, l, c, v = _build_double_bottom(recover_steps=40)
+    r = compute_double_bottom(h, l, c, v)
+    assert r['detected'] is True, f"faults: {r['faults']} | says: {r['mark_says']}"
+    assert r['undercut'] is True
+    assert r['second_low'] <= r['first_low']
+    # pivot orta tepe (~95.5) civari — rising-right zirvesi (~93) DEGIL
+    assert 94.0 <= r['pivot_price'] <= 97.0
 
 
 def test_no_undercut_is_not_double_bottom():
