@@ -232,7 +232,16 @@ export default function SignalsPage() {
       width: 90,
       type: "rightAligned",
       valueFormatter: (p) => fmtUsd(p.value as number | null),
-      cellStyle: { ...MONO_RIGHT, color: "var(--mtp-danger)" },
+      // P472 (Kural #28): MOCK-türevi stop (yfinance fail → sentetik volatilite) → amber
+      // (Fiyat quote_source paten). Gerçek bazlı → danger kırmızı.
+      cellStyle: (p) =>
+        p.data?.stop_basis_is_mock
+          ? { ...MONO_RIGHT, color: "#F59E0B" }
+          : { ...MONO_RIGHT, color: "var(--mtp-danger)" },
+      tooltipValueGetter: (p) =>
+        p.data?.stop_basis_is_mock
+          ? "Sentetik volatiliteden (yfinance erişilemiyor) — paper trading için güvenilmez"
+          : undefined,
     },
     {
       field: "target_price",
@@ -242,7 +251,15 @@ export default function SignalsPage() {
       width: 90,
       type: "rightAligned",
       valueFormatter: (p) => fmtUsd(p.value as number | null),
-      cellStyle: { ...MONO_RIGHT, color: "var(--mtp-excellent)" },
+      // P472 (Kural #28): MOCK-türevi hedef → amber.
+      cellStyle: (p) =>
+        p.data?.stop_basis_is_mock
+          ? { ...MONO_RIGHT, color: "#F59E0B" }
+          : { ...MONO_RIGHT, color: "var(--mtp-excellent)" },
+      tooltipValueGetter: (p) =>
+        p.data?.stop_basis_is_mock
+          ? "Sentetik volatiliteden (yfinance erişilemiyor) — paper trading için güvenilmez"
+          : undefined,
     },
     {
       field: "risk_reward",

@@ -67,6 +67,14 @@ export function SignalRREnrichedCell(p: ICellRendererParams<Signal>) {
           {rsMeta.label}
         </span>
       )}
+      {row?.stop_basis_is_mock && (
+        <span
+          title="Stop/Hedef sentetik volatiliteden (yfinance erişilemiyor) — paper trading için güvenilmez"
+          style={{ fontSize: 10, lineHeight: 1, color: "#F59E0B" }}
+        >
+          ⚠
+        </span>
+      )}
       <span
         title={`Risk/Reward = (hedef-fiyat) / (fiyat-stop) = ${v.toFixed(2)}`}
         style={{

@@ -4049,6 +4049,10 @@ class Signal(BaseModel):
     # "Hacim teyit" canon. Bugün / 50-gün ortalama oranı. Watchlist'teki gibi
     # paper trading karar verirken pivot kırılım hacim teyit görünürlüğü.
     relative_volume: Optional[float] = None
+    # P472 (15 Haz 2026): Kural #28 — stop/hedef/R-R MOCK-turevi mi (yfinance fail -> sentetik
+    # volatilite). True ise UI Stop/Hedef/R-R'i amber isaretler (Fiyat quote_source paterni).
+    # None = stop yok veya bilinmiyor; False = gercek yfinance bazli.
+    stop_basis_is_mock: Optional[bool] = None
 
 
 _PIVOT_STATUS_CACHE: dict[str, tuple[float, Optional[str]]] = {}
@@ -4168,11 +4172,23 @@ def get_signals() -> list[Signal]:
 
     def _build_signal(row: WatchlistRow) -> Signal:
         added_prefix = (row.added_date or "")[:10]
+        # P472 (15 Haz 2026): Kural #28 — bars kaynagini (gercek yfinance vs MOCK) izle ki
+        # stop/hedef MOCK-turevi ise UI'da Fiyat gibi amber isaretlenebilsin. _get_ohlcv'nin
+        # ic mantigini birebir tekrarliyoruz (real>=10 -> gercek, yoksa MOCK) ki kaynak flag'i
+        # yakalanabilsin (_get_ohlcv imzasi degismez -> diger endpoint'ler etkilenmez).
         bars = []
+        bars_is_mock: Optional[bool] = None
         try:
-            bars = _get_ohlcv(row.symbol, row.price) or []
+            _real = _fetch_ohlcv_real(row.symbol)
+            if _real is not None and len(_real) >= 10:
+                bars = _real
+                bars_is_mock = False
+            else:
+                bars = _generate_ohlcv(row.symbol, row.price) or []
+                bars_is_mock = True
         except Exception:
             bars = []
+            bars_is_mock = None
         # Relative volume — yfinance + compute_relative_volume (Mark TLSMW Bol. 6)
         rv_val: Optional[float] = None
         try:
@@ -4190,6 +4206,8 @@ def get_signals() -> list[Signal]:
         stop_val: Optional[float] = None
         target_val: Optional[float] = None
         rr_val: Optional[float] = None
+        # P472: stop/hedef MOCK-turevi mi — sadece stop hesaplandiginda anlamli (Kural #28).
+        stop_basis_is_mock: Optional[bool] = None
         try:
             if bars and len(bars) >= 30:
                 entry = bars[-1].close
@@ -4201,6 +4219,7 @@ def get_signals() -> list[Signal]:
                     stop_val = round(sn, 2)
                     target_val = round(entry + 3.0 * (entry - sn), 2)  # 3R (Mark ideal R-multiple)
                     rr_val = _calc_rr(entry, stop_val, target_val)
+                    stop_basis_is_mock = bars_is_mock
         except Exception:
             pass
         return Signal(
@@ -4218,6 +4237,7 @@ def get_signals() -> list[Signal]:
             mark_signals=_compute_live_mark_signals(row.symbol, row.price),
             pivot_status=_compute_signal_pivot_status(row.symbol, row.price),
             relative_volume=rv_val,
+            stop_basis_is_mock=stop_basis_is_mock,
         )
 
     with ThreadPoolExecutor(max_workers=20) as pool:

@@ -136,4 +136,18 @@ describe("SignalRREnrichedCell — RS + Climax + R/R birleşik", () => {
     expect(screen.getByText(/2\.5/)).toBeInTheDocument();
     expect(screen.queryByText("L")).not.toBeInTheDocument();
   });
+
+  it("stop_basis_is_mock=true → ⚠ amber uyarı (P472, Kural #28)", () => {
+    render(
+      <SignalRREnrichedCell
+        {...signalParams(2.5, { rs_rating: 85, stop_basis_is_mock: true } as Partial<Signal>)}
+      />
+    );
+    expect(screen.getByText("⚠")).toBeInTheDocument();
+  });
+
+  it("stop_basis_is_mock yok → ⚠ göstermez (gerçek veri)", () => {
+    render(<SignalRREnrichedCell {...signalParams(2.5, { rs_rating: 85 })} />);
+    expect(screen.queryByText("⚠")).not.toBeInTheDocument();
+  });
 });

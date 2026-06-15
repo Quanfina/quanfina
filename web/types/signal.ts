@@ -34,4 +34,7 @@ export interface Signal {
   // useStockQuotes ile doldurulur, Fiyat kolonu canlıyı gösterir (watchlist paten).
   current_price?: number;
   quote_source?: "yfinance" | "mock";
+  // P472 (15 Haz 2026, Kural #28): Stop/Hedef/R-R MOCK-türevi mi (yfinance fail →
+  // sentetik volatilite). true → UI Stop/Hedef/R-R amber + uyarı (Fiyat quote_source paten).
+  stop_basis_is_mock?: boolean | null;
 }
