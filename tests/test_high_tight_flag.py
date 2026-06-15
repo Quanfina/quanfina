@@ -59,6 +59,14 @@ def test_excellent_needs_dryup():
     assert r['quality'] == 'GOOD'
 
 
+def test_volume_dryup_promotes_excellent():
+    # P468 (review): pozitif dry-up (bayrak hacmi << direk) + flag_depth<=20 -> EXCELLENT.
+    h, l, c, v = _build_htf()
+    r = compute_high_tight_flag(h, l, c, v)
+    assert r['detected'] is True
+    assert r['quality'] == 'EXCELLENT'
+
+
 def test_pole_under_100_is_not_htf():
     # Flagpole <%100 -> High Tight Flag DEGIL (tanimlayici esik, Minervini s.255)
     h, l, c, v = _build_htf(pole_base=70.0, pole_top=105.0)

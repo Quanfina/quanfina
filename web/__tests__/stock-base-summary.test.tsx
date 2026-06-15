@@ -39,6 +39,15 @@ describe("BaseSummaryCard", () => {
     expect(screen.getByText(/geçerli O'Neil baz paterni yok/)).toBeInTheDocument();
   });
 
+  it("biri hata + hiç tespit yok → 'kısmen alınamadı' (yanıltıcı 'yok' değil)", () => {
+    // P468 (review): detector HATA verdiyse "hiçbiri tespit edilmedi" yanıltıcı —
+    // çalıştı-bulamadı iddiası. anyError dalı degrade mesaj göstermeli.
+    mCup.mockReturnValue({ data: undefined, isLoading: false, isError: true });
+    render(<BaseSummaryCard symbol="AAPL" />);
+    expect(screen.getByText(/kısmen alınamadı/)).toBeInTheDocument();
+    expect(screen.queryByText(/hiçbiri tespit edilmedi/)).not.toBeInTheDocument();
+  });
+
   it("tek baz (Flat GOOD) → 'Flat Base · GOOD' + pivot", () => {
     mFlat.mockReturnValue(res("GOOD", 100.5));
     render(<BaseSummaryCard symbol="AAPL" />);

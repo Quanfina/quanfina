@@ -60,6 +60,14 @@ def test_excellent_needs_dryup_and_tight():
     assert r['quality'] == 'GOOD'
 
 
+def test_volume_dryup_promotes_excellent():
+    # P468 (review): pozitif dry-up + dar baz -> EXCELLENT terfi (negatif testin tersi).
+    h, l, c, v = _build_flat_base()
+    r = compute_flat_base(h, l, c, v)
+    assert r['detected'] is True
+    assert r['quality'] == 'EXCELLENT'
+
+
 def test_wide_base_is_faulty():
     # Derinlik >%15 (genis/gevsek) -> kusur (IBD); 82-100 ~%18
     h, l, c, v = _build_flat_base(base_lo=82.0, base_hi=100.0)

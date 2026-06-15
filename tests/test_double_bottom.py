@@ -65,6 +65,14 @@ def test_excellent_needs_dryup():
     assert r['quality'] == 'GOOD'
 
 
+def test_volume_dryup_promotes_excellent():
+    # P468 (review): pozitif dry-up (l2 hacmi << baz) + derinlik<=30 -> EXCELLENT terfi.
+    h, l, c, v = _build_double_bottom()
+    r = compute_double_bottom(h, l, c, v)
+    assert r['detected'] is True
+    assert r['quality'] == 'EXCELLENT'
+
+
 def test_no_undercut_is_not_double_bottom():
     # 2. dip 1. dibi gecmiyor (l2 > l1) -> O'Neil double bottom DEGIL -> NONE
     h, l, c, v = _build_double_bottom(l1=85.0, l2=88.0)

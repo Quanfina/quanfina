@@ -78,6 +78,15 @@ def test_excellent_needs_volume_dryup():
     assert r['quality'] == 'GOOD'
 
 
+def test_volume_dryup_promotes_excellent():
+    # P468 (review): pozitif dry-up -> GOOD->EXCELLENT terfi yolu (negatif testin tersi).
+    # handle_vol=450_000 << ~1M kupa ortalamasi -> volume_dryup True -> EXCELLENT.
+    h, l, c, v = _build_cup_handle()
+    r = compute_cup_with_handle(h, l, c, v)
+    assert r['detected'] is True
+    assert r['quality'] == 'EXCELLENT'
+
+
 def test_deep_handle_is_faulty():
     # Kulp >%15 derin (kupa dibi USTUNDE kalir) -> kusurlu (O'Neil s.164,178).
     # handle_low=82 -> depth ~%17.3, cup_low ~79.5 ustunde (yapi gecerli, fault yolu).

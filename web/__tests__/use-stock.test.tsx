@@ -70,11 +70,12 @@ describe("useStockInfo — Hisse meta info", () => {
 });
 
 describe("useOhlcv — Lightweight Charts data", () => {
-  it("Fetch URL: /api/stock/AAPL/ohlcv", async () => {
+  it("Fetch URL: /api/stock/AAPL/ohlcv?bars=460", async () => {
+    // P435: fetchOhlcv ?bars=460 ekliyor (200 MA warmup + ~252 görünür bar).
     fetchMock.mockResolvedValue(jsonResponse(OHLCV_HAPPY));
     renderHook(() => useOhlcv("AAPL"), { wrapper: withQueryClient() });
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
-    expect(fetchMock.mock.calls[0][0]).toBe("/api/stock/AAPL/ohlcv");
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/stock/AAPL/ohlcv?bars=460");
   });
 
   it("Happy → bar array döner", async () => {
@@ -114,7 +115,8 @@ describe("useStockInfo + useOhlcv — queryKey ayrımı (cache izolasyon)", () =
     fetchMock.mockImplementation(async (url) => {
       const u = url.toString();
       if (u.endsWith("/info")) return jsonResponse(INFO_HAPPY);
-      if (u.endsWith("/ohlcv")) return jsonResponse(OHLCV_HAPPY);
+      if (u.includes("/ohlcv")) return jsonResponse(OHLCV_HAPPY); // P435: ?bars=460 query string
+
       return new Response("", { status: 404 });
     });
     const { result: infoR } = renderHook(() => useStockInfo("AAPL"), {

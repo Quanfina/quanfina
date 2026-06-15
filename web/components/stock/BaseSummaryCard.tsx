@@ -52,8 +52,22 @@ export function BaseSummaryCard({ symbol }: { symbol: string }) {
     .filter((b): b is BaseItem => b.q != null && b.q !== "NONE")
     .sort((a, b) => RANK[b.q] - RANK[a.q]);
 
-  // Geçerli baz yok — detector çalıştı, bir şey bulamadı (net bilgi)
+  // Geçerli baz yok — ama önce ayır: detector HATA verdi (çalışmadı) mı, yoksa
+  // çalışıp bulamadı mı? (P468 review: hata durumunda "hiçbiri tespit edilmedi"
+  // yanıltıcı — detector RAN iddiası, oysa çalışmadı.)
+  const anyError = cup.isError || flat.isError || db.isError || htf.isError;
   if (detected.length === 0) {
+    if (anyError) {
+      return (
+        <div className="rounded-lg border p-2.5 flex items-center gap-2 text-xs text-muted-foreground">
+          <AlertTriangle size={15} />
+          <span>
+            <span className="font-semibold text-foreground">Baz Durumu:</span> baz taraması kısmen
+            alınamadı — tekrar deneyin
+          </span>
+        </div>
+      );
+    }
     return (
       <div className="rounded-lg border p-2.5 flex items-center gap-2 text-xs text-muted-foreground">
         <MinusCircle size={15} />

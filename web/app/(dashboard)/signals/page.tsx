@@ -225,6 +225,10 @@ export default function SignalsPage() {
     {
       field: "stop_loss",
       headerName: "Stop",
+      // P468 (15 Haz 2026): headerTooltip — Stop son GÜNLÜK KAPANIŞ bazlı (2.5×ATR),
+      // canlı Fiyat ile birebir örtüşmeyebilir (review bulgusu: baz netliği).
+      headerTooltip:
+        "Son günlük kapanış bazlı (2.5×ATR, Mark Risk-first). Canlı Fiyat ile birebir örtüşmeyebilir.",
       width: 90,
       type: "rightAligned",
       valueFormatter: (p) => fmtUsd(p.value as number | null),
@@ -233,6 +237,8 @@ export default function SignalsPage() {
     {
       field: "target_price",
       headerName: "Hedef",
+      headerTooltip:
+        "Son günlük kapanış + 3R projeksiyon. Canlı Fiyat ile birebir örtüşmeyebilir (sabit grafik hedefi değil).",
       width: 90,
       type: "rightAligned",
       valueFormatter: (p) => fmtUsd(p.value as number | null),

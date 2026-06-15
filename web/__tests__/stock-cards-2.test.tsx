@@ -75,7 +75,7 @@ describe("PivotBreakoutCard — 4 durum (Mark TLSMW Ch 10)", () => {
   });
 });
 
-describe("OverheadSupplyCard — 3 kategori (loading=null, skeleton yok)", () => {
+describe("OverheadSupplyCard — 3 kategori (P437: loading state, diğer kartlarla hizalı)", () => {
   function overheadData(category: OverheadSupplyInfo["category"]): OverheadSupplyInfo {
     return {
       category,
@@ -86,10 +86,10 @@ describe("OverheadSupplyCard — 3 kategori (loading=null, skeleton yok)", () =>
     };
   }
 
-  it("isLoading → null (skeleton yok)", () => {
+  it("isLoading → 'Overhead Supply yükleniyor...' (P437: diğer kartlarla hizalı)", () => {
     mockOverhead.mockReturnValue({ data: undefined, isLoading: true, isError: false });
-    const { container } = render(<OverheadSupplyCard symbol="AAPL" />);
-    expect(container.firstChild).toBeNull();
+    render(<OverheadSupplyCard symbol="AAPL" />);
+    expect(screen.getByText(/Overhead Supply yükleniyor/)).toBeInTheDocument();
   });
 
   it("category=null → null", () => {
