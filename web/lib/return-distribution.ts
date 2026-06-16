@@ -11,6 +11,7 @@
  * İLKE #11 Objektif Ayna Dil: sayı + birim, motivasyon yok.
  */
 import type { Trade } from "@/types/trade";
+import { classifyByReturnPct } from "./trade-classification";
 
 export interface ReturnBracket {
   /** Aralık alt sınır (% mutlak) */
@@ -71,10 +72,8 @@ export function computeReturnDistribution(trades: Trade[]): DistributionSummary 
       const absPct = Math.abs(t.pl_pct as number);
       return absPct >= bracket.min && absPct < bracket.max;
     });
-    const wins = inBracket.filter((t) => (t.pl_pct as number) > 0);
-    const losses = inBracket.filter((t) => (t.pl_pct as number) < 0);
-    const winRate =
-      inBracket.length > 0 ? (wins.length / inBracket.length) * 100 : 0;
+    // #24 (DRY): ortak pl_pct sınıflama (bracket içi win/loss/winRate)
+    const { winners: wins, losers: losses, winRate } = classifyByReturnPct(inBracket);
     const netPctSum = inBracket.reduce((s, t) => s + (t.pl_pct ?? 0), 0);
     const netDollarSum = inBracket.reduce((s, t) => s + (t.pl_dollar ?? 0), 0);
     const weight = closed.length > 0 ? inBracket.length / closed.length : 0;
@@ -90,19 +89,8 @@ export function computeReturnDistribution(trades: Trade[]): DistributionSummary 
     };
   });
 
-  // Overall Van Tharp Expectancy
-  const allWinners = closed.filter((t) => (t.pl_pct as number) > 0);
-  const allLosers = closed.filter((t) => (t.pl_pct as number) < 0);
-  const overallWinRate =
-    closed.length > 0 ? (allWinners.length / closed.length) * 100 : 0;
-  const avgGainPct =
-    allWinners.length > 0
-      ? allWinners.reduce((s, t) => s + (t.pl_pct ?? 0), 0) / allWinners.length
-      : 0;
-  const avgLossPct =
-    allLosers.length > 0
-      ? allLosers.reduce((s, t) => s + (t.pl_pct ?? 0), 0) / allLosers.length
-      : 0;
+  // Overall Van Tharp Expectancy — #24 (DRY): ortak pl_pct sınıflama
+  const { winRate: overallWinRate, avgGainPct, avgLossPct } = classifyByReturnPct(closed);
   const winRateDec = overallWinRate / 100;
   const lossRateDec = 1 - winRateDec;
   // E = winRate × avgGain − lossRate × |avgLoss|  (Van Tharp, % cinsinden)

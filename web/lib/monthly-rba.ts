@@ -9,6 +9,7 @@
  * İLKE #11 Objektif Ayna Dil: sayısal değer, motivasyon dili yok.
  */
 import type { Trade } from "@/types/trade";
+import { classifyByReturnPct } from "./trade-classification";
 
 export interface MonthlyRbaRow {
   /** "2026-05" formatı — YYYY-MM */
@@ -66,17 +67,8 @@ export function computeMonthlyRba(trades: Trade[]): MonthlyRbaRow[] {
 
   const rows: MonthlyRbaRow[] = [];
   for (const [key, ts] of groups) {
-    const winners = ts.filter((t) => (t.pl_pct ?? 0) > 0);
-    const losers = ts.filter((t) => (t.pl_pct ?? 0) < 0);
-    const winRate = ts.length > 0 ? (winners.length / ts.length) * 100 : 0;
-    const avgGainPct =
-      winners.length > 0
-        ? winners.reduce((s, t) => s + (t.pl_pct ?? 0), 0) / winners.length
-        : 0;
-    const avgLossPct =
-      losers.length > 0
-        ? losers.reduce((s, t) => s + (t.pl_pct ?? 0), 0) / losers.length
-        : 0;
+    // #24 (DRY): ortak pl_pct sınıflama (winners/losers/winRate/avgGain/avgLoss)
+    const { winners, losers, winRate, avgGainPct, avgLossPct } = classifyByReturnPct(ts);
     const netPct = ts.reduce((s, t) => s + (t.pl_pct ?? 0), 0) / ts.length;
     const totalPlDollar = ts.reduce((s, t) => s + (t.pl_dollar ?? 0), 0);
     const gainLossRatio =
