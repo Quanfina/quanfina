@@ -3500,6 +3500,12 @@ class Trade(BaseModel):
     plan_size_pct: Optional[float] = None
     plan_exit_strategy: Optional[str] = None
     plan_time_horizon: Optional[TimeHorizon] = None
+    # Migration 011 / KARAR ADAY #960 (16 Haz 2026): AKTIF/editable stop+hedef. plan_* orijinal
+    # plan (degismez), bunlar pozisyon acildiktan sonra ayarlanir. audible_reason = son stop/hedef
+    # degisikliginin sebebi (Mark "audible" disiplini — sebepsiz kaydirma yok).
+    stop_loss: Optional[float] = None
+    target_price: Optional[float] = None
+    audible_reason: Optional[str] = None
     # KARAR #733 alt-paket (Paket 41, 24 May 2026): Trade satirina Mark Profili
     # rozetlerini ekler (Watchlist + Signals + Screens + Hisse pateni).
     # Journal sayfasinda stage4Count gerçek hesaplama icin. Production'da
@@ -3563,6 +3569,11 @@ class TradeUpdate(BaseModel):
     plan_size_pct: Optional[float] = Field(default=None, gt=0, le=100, description="Portfoy yuzdesi (0, 100]")
     plan_exit_strategy: Optional[str] = None
     plan_time_horizon: Optional[TimeHorizon] = None
+    # Migration 011 / #960 (16 Haz 2026): aktif stop/hedef duzenleme + audible sebep.
+    # gt=0 (P385/P386 disiplin — long pozisyon negatif/sifir fiyat anlamsiz).
+    stop_loss: Optional[float] = Field(default=None, gt=0, description="Aktif stop fiyati > 0")
+    target_price: Optional[float] = Field(default=None, gt=0, description="Aktif hedef fiyati > 0")
+    audible_reason: Optional[str] = None
 
 
 def _make_closed(
@@ -3804,6 +3815,10 @@ def add_trade(body: TradeCreate) -> Trade:
         "plan_size_pct": body.plan_size_pct,
         "plan_exit_strategy": body.plan_exit_strategy,
         "plan_time_horizon": body.plan_time_horizon,
+        # Migration 011 (#960): aktif stop/hedef baslangici = plan (henuz audible yapilmadi)
+        "stop_loss": body.plan_stop,
+        "target_price": body.plan_target,
+        "audible_reason": None,
     }
     new_id = trades_insert(trade_data)
     return Trade(**trades_get_by_id(new_id))
@@ -3815,6 +3830,16 @@ def update_trade(trade_id: int, body: TradeUpdate) -> Trade:
     if not current:
         raise HTTPException(status_code=404, detail=f"Trade {trade_id} bulunamadı")
     updates = body.model_dump(include=body.model_fields_set)
+    # #960 Audible Lock (Migration 011): AKTIF stop/hedef DEGISIYORSA sebep ZORUNLU.
+    # Mark "audible" disiplini — sebepsiz stop kaydirma = disiplinsizlik. Sadece deger
+    # gercekten degisirse tetiklenir (ayni deger PATCH = serbest).
+    _stop_chg = "stop_loss" in updates and updates["stop_loss"] != current.get("stop_loss")
+    _tgt_chg = "target_price" in updates and updates["target_price"] != current.get("target_price")
+    if (_stop_chg or _tgt_chg) and not (updates.get("audible_reason") or "").strip():
+        raise HTTPException(
+            status_code=422,
+            detail="Aktif stop/hedef değişikliği için 'audible_reason' (sebep) zorunlu — Mark Audible disiplini (#960).",
+        )
     # Merge with current values for P/L recompute
     merged = {**current, **updates}
     if merged.get("status") == "closed" and merged.get("exit_price") is not None:

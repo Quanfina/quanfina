@@ -15,9 +15,10 @@ type Props = {
   onEdit: (trade: Trade) => void;
   onClose: (trade: Trade) => void;
   onDelete: (trade: Trade) => void;
+  onEditStop: (trade: Trade) => void;
 };
 
-export function TradeRowActions({ data, onEdit, onClose, onDelete }: Props) {
+export function TradeRowActions({ data, onEdit, onClose, onDelete, onEditStop }: Props) {
   if (!data) return null;
 
   return (
@@ -30,9 +31,14 @@ export function TradeRowActions({ data, onEdit, onClose, onDelete }: Props) {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-40">
         {data.status === "open" && (
-          <DropdownMenuItem onClick={() => onClose(data)}>
-            Kapat
-          </DropdownMenuItem>
+          <>
+            <DropdownMenuItem onClick={() => onEditStop(data)}>
+              Stop / Hedef Düzenle
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onClose(data)}>
+              Kapat
+            </DropdownMenuItem>
+          </>
         )}
         <DropdownMenuItem onClick={() => onEdit(data)}>
           Düzenle

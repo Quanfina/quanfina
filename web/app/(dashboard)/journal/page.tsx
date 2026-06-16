@@ -16,6 +16,7 @@ import { TRADE_COL_DEFS, TRADE_DEFAULT_COL_DEF } from "@/components/journal/colu
 import { TradeRowActions } from "@/components/journal/TradeRowActions";
 import { AddTradeDialog } from "@/components/journal/AddTradeDialog";
 import { CloseTradeDialog } from "@/components/journal/CloseTradeDialog";
+import { EditOpenTradeDialog } from "@/components/journal/EditOpenTradeDialog";
 import { RbaSummaryCard } from "@/components/journal/RbaSummaryCard";
 import { MarkRegimeBanner } from "@/components/mark/MarkRegimeBanner";
 import { ModBadge } from "@/components/mark/ModBadge";
@@ -58,17 +59,22 @@ export default function JournalPage() {
   const [closeOpen, setCloseOpen]       = useState(false);
   const [deletingTrade, setDeletingTrade] = useState<Trade | null>(null);
   const [deleteOpen, setDeleteOpen]     = useState(false);
+  // Migration 011 / #960: aktif stop/hedef düzenleme dialog state
+  const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
+  const [editOpen, setEditOpen]         = useState(false);
 
   // Stable callback ref (callbacksRef pattern — KARAR #391)
   const cbRef = useRef({
-    onEdit:   (_t: Trade) => {},
-    onClose:  (_t: Trade) => {},
-    onDelete: (_t: Trade) => {},
+    onEdit:     (_t: Trade) => {},
+    onClose:    (_t: Trade) => {},
+    onDelete:   (_t: Trade) => {},
+    onEditStop: (_t: Trade) => {},
   });
   cbRef.current = {
     onEdit: (t) => { setClosingTrade(t); setCloseOpen(true); },
     onClose: (t) => { setClosingTrade(t); setCloseOpen(true); },
     onDelete: (t) => { setDeletingTrade(t); setDeleteOpen(true); },
+    onEditStop: (t) => { setEditingTrade(t); setEditOpen(true); },
   };
 
   const columnDefs = useMemo<ColDef<Trade>[]>(
@@ -85,9 +91,10 @@ export default function JournalPage() {
         cellStyle: { display: "flex", alignItems: "center", justifyContent: "center" },
         cellRenderer: TradeRowActions,
         cellRendererParams: {
-          onEdit:   (t: Trade) => cbRef.current.onEdit(t),
-          onClose:  (t: Trade) => cbRef.current.onClose(t),
-          onDelete: (t: Trade) => cbRef.current.onDelete(t),
+          onEdit:     (t: Trade) => cbRef.current.onEdit(t),
+          onClose:    (t: Trade) => cbRef.current.onClose(t),
+          onDelete:   (t: Trade) => cbRef.current.onDelete(t),
+          onEditStop: (t: Trade) => cbRef.current.onEditStop(t),
         },
       },
     ],
@@ -338,6 +345,11 @@ export default function JournalPage() {
         trade={closingTrade}
         open={closeOpen}
         onOpenChange={(v) => { setCloseOpen(v); if (!v) setClosingTrade(null); }}
+      />
+      <EditOpenTradeDialog
+        trade={editingTrade}
+        open={editOpen}
+        onOpenChange={(v) => { setEditOpen(v); if (!v) setEditingTrade(null); }}
       />
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>

@@ -69,6 +69,12 @@ export interface Trade {
   plan_size_pct?: number | null;
   plan_exit_strategy?: string | null;
   plan_time_horizon?: TimeHorizon | null;
+  // Migration 011 / KARAR ADAY #960 (16 Haz 2026): AKTIF/editable stop+hedef + audible sebep.
+  // plan_* orijinal plan (değişmez); bunlar pozisyon yönetiminde ayarlanır. audible_reason =
+  // son stop/hedef değişiklik sebebi (Mark "audible" disiplini).
+  stop_loss?: number | null;
+  target_price?: number | null;
+  audible_reason?: string | null;
   // KARAR #733 alt-paket (Paket 41): Mark Profili enrichment (Watchlist + Signals pateni)
   // Journal sayfasinda stage4Count gerçek hesaplama + gelecek MarkBadgeStrip kolonu.
   mark_signals?: MarkSignals;
@@ -124,6 +130,10 @@ export interface TradeUpdate {
   plan_size_pct?: number | null;
   plan_exit_strategy?: string | null;
   plan_time_horizon?: TimeHorizon | null;
+  // Migration 011 / #960: aktif stop/hedef düzenleme + audible sebep (değişiyorsa zorunlu).
+  stop_loss?: number | null;
+  target_price?: number | null;
+  audible_reason?: string | null;
 }
 
 export interface SetupType {

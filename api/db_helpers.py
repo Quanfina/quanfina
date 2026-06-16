@@ -164,7 +164,8 @@ def trades_get_all() -> list[dict]:
                    shares, status, pl_dollar, pl_pct,
                    grade, exit_reason, lessons,
                    plan_entry_trigger, plan_stop, plan_target,
-                   plan_size_pct, plan_exit_strategy, plan_time_horizon
+                   plan_size_pct, plan_exit_strategy, plan_time_horizon,
+                   stop_loss, target_price, audible_reason
             FROM web_trades
             ORDER BY id DESC
         """))
@@ -177,6 +178,8 @@ def trades_get_all() -> list[dict]:
             for nf in (
                 "entry_price", "exit_price", "pl_dollar", "pl_pct",
                 "plan_stop", "plan_target", "plan_size_pct",
+                # Migration 011 (#960): aktif/editable stop+hedef
+                "stop_loss", "target_price",
             ):
                 if d.get(nf) is not None:
                     d[nf] = float(d[nf])
@@ -195,6 +198,10 @@ def trades_insert(trade: dict) -> int:
         "plan_size_pct": None,
         "plan_exit_strategy": None,
         "plan_time_horizon": None,
+        # Migration 011 (#960): aktif/editable stop+hedef + audible sebep
+        "stop_loss": None,
+        "target_price": None,
+        "audible_reason": None,
         **trade,
     }
     with engine.begin() as conn:
@@ -205,14 +212,16 @@ def trades_insert(trade: dict) -> int:
                 shares, status, pl_dollar, pl_pct,
                 grade, exit_reason, lessons,
                 plan_entry_trigger, plan_stop, plan_target,
-                plan_size_pct, plan_exit_strategy, plan_time_horizon
+                plan_size_pct, plan_exit_strategy, plan_time_horizon,
+                stop_loss, target_price, audible_reason
             ) VALUES (
                 :symbol, :strategy, :setup_type,
                 :entry_date, :entry_price, :exit_date, :exit_price,
                 :shares, :status, :pl_dollar, :pl_pct,
                 :grade, :exit_reason, :lessons,
                 :plan_entry_trigger, :plan_stop, :plan_target,
-                :plan_size_pct, :plan_exit_strategy, :plan_time_horizon
+                :plan_size_pct, :plan_exit_strategy, :plan_time_horizon,
+                :stop_loss, :target_price, :audible_reason
             )
             RETURNING id
         """), trade_with_plan)
@@ -247,7 +256,8 @@ def trades_get_by_id(trade_id: int) -> Optional[dict]:
                        shares, status, pl_dollar, pl_pct,
                        grade, exit_reason, lessons,
                        plan_entry_trigger, plan_stop, plan_target,
-                       plan_size_pct, plan_exit_strategy, plan_time_horizon
+                       plan_size_pct, plan_exit_strategy, plan_time_horizon,
+                       stop_loss, target_price, audible_reason
                 FROM web_trades WHERE id = :id
             """),
             {"id": trade_id},
@@ -262,6 +272,8 @@ def trades_get_by_id(trade_id: int) -> Optional[dict]:
         for nf in (
             "entry_price", "exit_price", "pl_dollar", "pl_pct",
             "plan_stop", "plan_target", "plan_size_pct",
+            # Migration 011 (#960): aktif/editable stop+hedef
+            "stop_loss", "target_price",
         ):
             if d[nf] is not None:
                 d[nf] = float(d[nf])
