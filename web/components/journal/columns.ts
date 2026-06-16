@@ -188,6 +188,32 @@ export const TRADE_COL_DEFS: ColDef<Trade>[] = [
     filter: false,
     cellRenderer: PivotBadgeCell,
   },
+  // P477 (#976, 16 Haz 2026): Satış Gücü — açık pozisyon Mark satış sinyalleri (entry-aware
+  // Hard Stop %10 + market sinyaller). HOLD/yok → "—" (temiz); WATCH/REDUCE/SELL → kategori +
+  // skor renkli. Backend enrichment (sadece open trade). field kullanılır (valueGetter DEĞİL — clean-room #4).
+  {
+    headerName: "SATIŞ",
+    field: "sell_strength",
+    width: 100,
+    minWidth: 85,
+    sortable: false,
+    filter: false,
+    valueFormatter: (p) => {
+      const ss = p.value as Trade["sell_strength"];
+      if (!ss?.category || ss.category === "HOLD") return "—";
+      const lbl: Record<string, string> = { SELL: "SAT", REDUCE: "AZALT", WATCH: "İZLE" };
+      return `${lbl[ss.category] ?? ss.category} ${ss.score}`;
+    },
+    cellStyle: (p: CellClassParams<Trade>): CellStyle => {
+      const cat = p.data?.sell_strength?.category;
+      const color =
+        cat === "SELL" ? "var(--mtp-danger)" :
+        cat === "REDUCE" ? "#F59E0B" :
+        cat === "WATCH" ? "var(--mtp-neutral)" :
+        "var(--muted-foreground)";
+      return { ...MONO, color, fontWeight: cat && cat !== "HOLD" ? 600 : 400 };
+    },
+  },
   {
     field: "grade",
     headerName: "GRADE",

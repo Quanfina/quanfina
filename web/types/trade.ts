@@ -75,6 +75,14 @@ export interface Trade {
   stop_loss?: number | null;
   target_price?: number | null;
   audible_reason?: string | null;
+  // P477 (#976): açık pozisyon sell-strength enrichment (entry-aware — Hard Stop %10 ateşlenir).
+  // Sadece open trade'lerde dolu (backend _enrich_trade). category → journal "Satış" kolonu rozeti.
+  sell_strength?: {
+    category: "HOLD" | "WATCH" | "REDUCE" | "SELL" | null;
+    score: number;
+    signals: string[];
+    mark_says: string;
+  } | null;
   // KARAR #733 alt-paket (Paket 41): Mark Profili enrichment (Watchlist + Signals pateni)
   // Journal sayfasinda stage4Count gerçek hesaplama + gelecek MarkBadgeStrip kolonu.
   mark_signals?: MarkSignals;

@@ -186,3 +186,23 @@ class TestDeterminism:
         for t1, t2 in zip(r1, r2):
             assert t1["symbol"] == t2["symbol"]
             assert t1["mark_signals"] == t2["mark_signals"]
+
+
+class TestSellStrengthEnrichment:
+    """P477 (#976): acik trade sell_strength enrichment (entry-aware Hard Stop + market sinyaller)."""
+
+    def test_open_trades_have_sell_strength(self, trades):
+        opens = [t for t in trades if t["status"] == "open"]
+        assert opens, "En az 1 acik trade bekleniyor"
+        for t in opens:
+            ss = t.get("sell_strength")
+            assert ss is not None, f"{t['symbol']} acik trade sell_strength eksik"
+            assert ss["category"] in ("HOLD", "WATCH", "REDUCE", "SELL")
+            assert 0 <= ss["score"] <= 10
+            assert isinstance(ss["signals"], list)
+
+    def test_closed_trades_no_sell_strength(self, trades):
+        """Kapanmis trade'lerde sell_strength enrichment yapilmaz (None)."""
+        for t in trades:
+            if t["status"] == "closed":
+                assert t.get("sell_strength") is None

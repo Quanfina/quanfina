@@ -3560,6 +3560,9 @@ class Trade(BaseModel):
     stop_loss: Optional[float] = None
     target_price: Optional[float] = None
     audible_reason: Optional[str] = None
+    # P477 (#976, 16 Haz 2026): acik pozisyon sell-strength (entry-aware — Hard Stop %10
+    # ateslenir). dict {category, score, signals, mark_says}. Sadece open trade enrichment.
+    sell_strength: Optional[dict] = None
     # KARAR #733 alt-paket (Paket 41, 24 May 2026): Trade satirina Mark Profili
     # rozetlerini ekler (Watchlist + Signals + Screens + Hisse pateni).
     # Journal sayfasinda stage4Count gerçek hesaplama icin. Production'da
@@ -3665,6 +3668,26 @@ def _enrich_trade_with_mark_signals(trade: Trade) -> Trade:
     pivot_status = _compute_signal_pivot_status(trade.symbol, trade.entry_price)
     if pivot_status:
         updates["pivot_status"] = pivot_status
+    # P477 (#976): acik pozisyon sell-strength (entry-aware -> Hard Stop %10 + market sinyaller).
+    # Sadece OPEN trade — kapanmislar icin anlamsiz. bars 5dk cache (mark_signals ile paylasimli).
+    if trade.status == "open":
+        try:
+            _bars = _get_ohlcv(trade.symbol, trade.entry_price)
+            if _bars and len(_bars) >= 50:
+                _ss = compute_sell_strength(
+                    [b.high for b in _bars], [b.low for b in _bars],
+                    [b.close for b in _bars], [b.volume for b in _bars],
+                    entry_price=trade.entry_price,
+                )
+                if _ss.get("category"):
+                    updates["sell_strength"] = {
+                        "category": _ss.get("category"),
+                        "score": _ss.get("sell_strength"),
+                        "signals": _ss.get("signals", []),
+                        "mark_says": _ss.get("mark_says", ""),
+                    }
+        except Exception:
+            pass
     # Paket 190: sektör konsantrasyon uyarısı için sector enrichment (_STOCK_META)
     # Fallback: sector field yoksa industry kullan (eski 28 sembol)
     meta = _STOCK_META.get(trade.symbol.upper())
