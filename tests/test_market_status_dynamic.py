@@ -170,14 +170,23 @@ class TestSectorVixSanity:
     def test_bottom_sectors_non_empty(self, status):
         assert len(status["bottom_sectors"]) > 0
 
-    def test_top_sector_change_positive(self, status):
-        """Top sector change_pct > 0 mantikli."""
-        for s in status["top_sectors"]:
-            assert s["change_pct"] > 0
+    def test_sector_change_pct_numeric(self, status):
+        """change_pct her top/bottom sektorde sayisal (canli perf_1w veya MOCK)."""
+        for s in status["top_sectors"] + status["bottom_sectors"]:
+            assert isinstance(s["change_pct"], (int, float))
 
-    def test_bottom_sector_change_negative(self, status):
-        for s in status["bottom_sectors"]:
-            assert s["change_pct"] < 0
+    def test_top_sectors_rank_above_bottom(self, status):
+        """Sıralama invariant'ı: en zayıf top sektör >= en güçlü bottom sektör.
+
+        perf_1w DESC sort garantisi (11 SPDR, top/bottom 3'er -> çakışma yok).
+        Eski sign-based testler (top>0 / bottom<0) canlı veride KIRILGANDI:
+        boğa haftasında bottom sektör bile pozitif (en kötü +%0.1) -> bottom<0
+        false; ayı haftasında top bile negatif -> top>0 false. Mutlak işaret
+        DEĞİL, GÖRECELİ sıra sanity'si canon-dogru (Kural #24 + #26)."""
+        tops = [s["change_pct"] for s in status["top_sectors"]]
+        bottoms = [s["change_pct"] for s in status["bottom_sectors"]]
+        if tops and bottoms:
+            assert min(tops) >= max(bottoms)
 
 
 # =====================================================================
