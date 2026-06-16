@@ -2317,6 +2317,10 @@ class StockInfo(BaseModel):
     change_pct: float
     rs_rating: int
     active_strategies: list[WatchlistRow]
+    # P479 (#1003, Kural #28): fiyat kaynagi seffafligi. "yfinance" = canli;
+    # "mock"/"watchlist"/"scan" = fallback (UI sari rozet + "stale olabilir" tooltip).
+    # Optional -> geriye donuk uyum (eski testler/frontend etkilenmez).
+    price_source: Optional[str] = None
     # KARAR ADAY #723 — Mark Profili rozetleri (Migration 004-007 sonrasi canli)
     mark_signals: Optional[MarkSignalsBlock] = None
 
@@ -2519,6 +2523,14 @@ def get_stock_info(symbol: str) -> StockInfo:
     except OperationalError:
         active = []
 
+    # P479 (#1003, Kural #28): canli fiyat once — mevcut get_stock_quote (DRY tek
+    # kaynak, _fetch_ohlcv_real cache paylasimi) reuse. yfinance varsa stale MOCK/DB
+    # fiyatini ezer (NVDA MOCK 875.40 -> canli ~209). source!="yfinance" -> None ->
+    # her branch kendi fallback degerini + price_source="mock|watchlist|scan" koyar.
+    # (Frontend zaten /quote ile ezer; bu /info ham API kontratini da dogru tutar.)
+    _q = get_stock_quote(sym)
+    live = (_q.price, _q.change_pct or 0.0) if _q.source == "yfinance" else None
+
     if stock:
         return StockInfo(
             symbol=sym,
@@ -2526,8 +2538,9 @@ def get_stock_info(symbol: str) -> StockInfo:
             sector=meta.get("sector", stock.sector),
             industry=meta.get("industry", stock.sector),
             market_cap=meta.get("market_cap", f"${stock.market_cap:.0f}B"),
-            price=stock.price,
-            change_pct=stock.change_pct,
+            price=live[0] if live else stock.price,
+            change_pct=live[1] if live else stock.change_pct,
+            price_source="yfinance" if live else "mock",
             rs_rating=int(stock.rs_ibd),
             active_strategies=active,
             mark_signals=mark_signals,
@@ -2540,8 +2553,9 @@ def get_stock_info(symbol: str) -> StockInfo:
             sector=meta.get("sector", "—"),
             industry=meta.get("industry", "—"),
             market_cap=meta.get("market_cap", "—"),
-            price=row.price,
-            change_pct=0.0,
+            price=live[0] if live else row.price,
+            change_pct=live[1] if live else 0.0,
+            price_source="yfinance" if live else "watchlist",
             rs_rating=row.rs_rating,
             active_strategies=active,
             mark_signals=mark_signals,
@@ -2556,8 +2570,9 @@ def get_stock_info(symbol: str) -> StockInfo:
             sector=scan_data["sector"],
             industry=scan_data["industry"],
             market_cap=meta.get("market_cap", "—"),
-            price=scan_data["price"],
-            change_pct=0.0,
+            price=live[0] if live else scan_data["price"],
+            change_pct=live[1] if live else 0.0,
+            price_source="yfinance" if live else "scan",
             rs_rating=scan_data["rs_ibd"],
             active_strategies=[],
             mark_signals=mark_signals,
@@ -2569,8 +2584,9 @@ def get_stock_info(symbol: str) -> StockInfo:
         sector="—",
         industry="—",
         market_cap="—",
-        price=100.0,
-        change_pct=0.0,
+        price=live[0] if live else 100.0,
+        change_pct=live[1] if live else 0.0,
+        price_source="yfinance" if live else "mock",
         rs_rating=50,
         active_strategies=[],
         mark_signals=mark_signals,
