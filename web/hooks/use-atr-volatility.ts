@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { fetchStockDetail } from "@/lib/stock-detail-fetch";
 
 /**
  * KARAR #733 alt-paket (Paket 103, 26 May 2026): /api/stock/{symbol}/atr hook.
@@ -20,11 +21,8 @@ export interface AtrVolatilityInfo {
 }
 
 async function fetchAtr(symbol: string): Promise<AtrVolatilityInfo> {
-  const res = await fetch(`/api/stock/${encodeURIComponent(symbol)}/atr`);
-  if (!res.ok) {
-    throw new Error(`ATR alınamadı (${symbol}): ${res.status}`);
-  }
-  return res.json();
+  // #25 (DRY): ortak fetchStockDetail (format-koruyan)
+  return fetchStockDetail<AtrVolatilityInfo>(symbol, "atr", "ATR");
 }
 
 export function useAtrVolatility(symbol: string | undefined) {

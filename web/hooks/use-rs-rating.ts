@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { fetchStockDetail } from "@/lib/stock-detail-fetch";
 
 /**
  * KARAR #733 alt-paket (Paket 94, 26 May 2026): /api/stock/{symbol}/rs hook.
@@ -22,11 +23,8 @@ export interface RsRatingInfo {
 }
 
 async function fetchRsRating(symbol: string): Promise<RsRatingInfo> {
-  const res = await fetch(`/api/stock/${encodeURIComponent(symbol)}/rs`);
-  if (!res.ok) {
-    throw new Error(`RS Rating alınamadı (${symbol}): ${res.status}`);
-  }
-  return res.json();
+  // #25 (DRY): ortak fetchStockDetail (format-koruyan)
+  return fetchStockDetail<RsRatingInfo>(symbol, "rs", "RS Rating");
 }
 
 export function useRsRating(symbol: string | undefined) {

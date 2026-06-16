@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { fetchStockDetail } from "@/lib/stock-detail-fetch";
 
 /**
  * Paket 460 (11 Haz 2026): /api/stock/{symbol}/double-bottom hook.
@@ -26,11 +27,8 @@ export interface DoubleBottomInfo {
 }
 
 async function fetchDoubleBottom(symbol: string): Promise<DoubleBottomInfo> {
-  const res = await fetch(`/api/stock/${encodeURIComponent(symbol)}/double-bottom`);
-  if (!res.ok) {
-    throw new Error(`Double Bottom alınamadı (${symbol}): ${res.status}`);
-  }
-  return res.json();
+  // #25 (DRY): ortak fetchStockDetail (format-koruyan)
+  return fetchStockDetail<DoubleBottomInfo>(symbol, "double-bottom", "Double Bottom");
 }
 
 export function useDoubleBottom(symbol: string | undefined) {

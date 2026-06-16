@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { fetchStockDetail } from "@/lib/stock-detail-fetch";
 
 /**
  * Paket 458 (11 Haz 2026): /api/stock/{symbol}/flat-base hook.
@@ -24,11 +25,8 @@ export interface FlatBaseInfo {
 }
 
 async function fetchFlatBase(symbol: string): Promise<FlatBaseInfo> {
-  const res = await fetch(`/api/stock/${encodeURIComponent(symbol)}/flat-base`);
-  if (!res.ok) {
-    throw new Error(`Flat Base alınamadı (${symbol}): ${res.status}`);
-  }
-  return res.json();
+  // #25 (DRY): ortak fetchStockDetail (format-koruyan)
+  return fetchStockDetail<FlatBaseInfo>(symbol, "flat-base", "Flat Base");
 }
 
 export function useFlatBase(symbol: string | undefined) {

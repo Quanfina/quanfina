@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { fetchStockDetail } from "@/lib/stock-detail-fetch";
 
 /**
  * KARAR #733 alt-paket (Paket 71): /api/stock/{symbol}/pivot hook.
@@ -24,11 +25,8 @@ export interface PivotBreakoutInfo {
 }
 
 async function fetchPivotBreakout(symbol: string): Promise<PivotBreakoutInfo> {
-  const res = await fetch(`/api/stock/${encodeURIComponent(symbol)}/pivot`);
-  if (!res.ok) {
-    throw new Error(`Pivot Breakout alınamadı (${symbol}): ${res.status}`);
-  }
-  return res.json();
+  // #25 (DRY): ortak fetchStockDetail (format-koruyan)
+  return fetchStockDetail<PivotBreakoutInfo>(symbol, "pivot", "Pivot Breakout");
 }
 
 export function usePivotBreakout(symbol: string | undefined) {

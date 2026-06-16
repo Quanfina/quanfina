@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { fetchStockDetail } from "@/lib/stock-detail-fetch";
 
 /**
  * Paket 456 (11 Haz 2026): /api/stock/{symbol}/cup-handle hook.
@@ -25,11 +26,8 @@ export interface CupHandleInfo {
 }
 
 async function fetchCupHandle(symbol: string): Promise<CupHandleInfo> {
-  const res = await fetch(`/api/stock/${encodeURIComponent(symbol)}/cup-handle`);
-  if (!res.ok) {
-    throw new Error(`Cup-with-Handle alınamadı (${symbol}): ${res.status}`);
-  }
-  return res.json();
+  // #25 (DRY): ortak fetchStockDetail (format-koruyan)
+  return fetchStockDetail<CupHandleInfo>(symbol, "cup-handle", "Cup-with-Handle");
 }
 
 export function useCupHandle(symbol: string | undefined) {
