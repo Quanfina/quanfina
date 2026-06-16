@@ -54,8 +54,10 @@ class TestExpectancyEndpointShape:
 class TestExpectancyEndpointAggregation:
     def test_totals_consistent(self, client):
         data = client.get("/api/trades/expectancy").json()
-        # winners + losers == total_closed
-        assert data["winners"] + data["losers"] == data["total_closed"]
+        # P480 (#2): basabas (pl%=0) trade winner/loser DEGIL (kanon compute_rba_metrics
+        # uyum) -> winners + losers + breakeven == total_closed (tam muhasebe).
+        assert data["winners"] + data["losers"] + data.get("breakeven", 0) == data["total_closed"]
+        assert data["winners"] + data["losers"] <= data["total_closed"]
 
     def test_win_rate_in_range(self, client):
         data = client.get("/api/trades/expectancy").json()

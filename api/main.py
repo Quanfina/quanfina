@@ -434,6 +434,9 @@ def get_screen_results(slug: str, limit: int = 500, nocache: bool = False) -> li
     stratejisiyle SCREENS_READY_9'a tasindi (scanner.py tight_low_vol_pass
     BOOLEAN kolonunu yazar, SQL sade WHERE okur). 501 deferred kaldirildi.
     """
+    # P480 (#3): limit clamp [1,500] — sinirsiz (slug,limit) cache key birikme + SQL LIMIT bound.
+    limit = max(1, min(limit, 500))
+
     valid_slugs = (
         set(SCREENS_READY_8.keys()) |  # alias of SCREENS_READY_9 (geriye uyum)
         set(SCREENS_PARSE_7.keys()) |
@@ -488,6 +491,11 @@ def get_screen_results(slug: str, limit: int = 500, nocache: bool = False) -> li
     with ThreadPoolExecutor(max_workers=20) as pool:
         enriched = list(pool.map(_enrich_one, db_results))
     # P415: Cache yaz (enrichment dahil tam sonuc — pivot_status dahil)
+    # P480 (#3): yazmadan once expired entry'leri purge et (TTL sadece okumada
+    # kontrol ediliyordu -> stale key'ler birikiyordu, sinirsiz buyume).
+    _expired = [k for k, (ts, _) in _SCREENS_CACHE.items() if _now() - ts >= _SCREENS_CACHE_TTL]
+    for k in _expired:
+        _SCREENS_CACHE.pop(k, None)
     _SCREENS_CACHE[cache_key] = (_now(), enriched)
     return enriched
 
@@ -2502,7 +2510,7 @@ def _fetch_scan_symbol_data(sym: str) -> dict | None:
                         "sector": row[4] or "—",
                         "industry": row[5] or "—",
                     }
-        except (OperationalError, Exception):
+        except Exception:  # P480 (#20): OperationalError zaten Exception alt-sinifi (redundant kaldirildi). 3-tablo best-effort fallback — biri yoksa/patlarsa sonrakine gec.
             continue
     return None
 
@@ -3781,6 +3789,7 @@ class BrandonExpectancyInfo(BaseModel):
     total_closed: int
     winners: int
     losers: int
+    breakeven: int = 0  # P480 (#2): pl%=0 trade winner/loser DEGIL (kanon compute_rba_metrics ile uyum, Optional default)
     avg_gain_pct: float
     avg_loss_pct: float
     win_rate: float
@@ -3853,7 +3862,8 @@ def get_trades_expectancy(strategy: Optional[str] = None) -> BrandonExpectancyIn
         )
 
     winners = [t for t in closed if (t.pl_pct or 0) > 0]
-    losers = [t for t in closed if (t.pl_pct or 0) <= 0]
+    losers = [t for t in closed if (t.pl_pct or 0) < 0]  # P480 (#2): basabas (=0) loser DEGIL — kanon compute_rba_metrics ile uyum (avg_loss iyimser sapma fix)
+    breakeven = [t for t in closed if (t.pl_pct or 0) == 0]
     avg_gain = (
         sum(t.pl_pct for t in winners if t.pl_pct is not None) / len(winners)
         if winners else 0.0
@@ -3874,6 +3884,7 @@ def get_trades_expectancy(strategy: Optional[str] = None) -> BrandonExpectancyIn
         total_closed=len(closed),
         winners=len(winners),
         losers=len(losers),
+        breakeven=len(breakeven),
         avg_gain_pct=round(avg_gain, 2),
         avg_loss_pct=round(avg_loss, 2),
         win_rate=round(win_rate, 3),
