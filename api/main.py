@@ -4249,6 +4249,24 @@ def _calc_rr(price: float, stop: Optional[float], target: Optional[float]) -> Op
     return round(reward / risk, 2)
 
 
+def _rel_vol(bars) -> Optional[float]:
+    """Relative volume: compute_relative_volume + rel_vol çıkar (None-guard, >=52 bar).
+
+    #14 (denetim DRY): signals MOCK fallback `s()` + `_build_signal` (gerçek yol)
+    aynı bloğu birebir tekrarlıyordu (compute_relative_volume([b.volume...]) +
+    rel_vol None-guard + float). Tek kaynak helper — davranış değişmez.
+    """
+    try:
+        if bars and len(bars) >= 52:
+            rv = compute_relative_volume([b.volume for b in bars])
+            v = rv.get("rel_vol")
+            if v is not None:
+                return float(v)
+    except Exception:
+        pass
+    return None
+
+
 @app.get("/api/signals", response_model=list[Signal])
 def get_signals() -> list[Signal]:
     today = date.today().isoformat()
@@ -4262,16 +4280,8 @@ def get_signals() -> list[Signal]:
         # KARAR #726: mark_signals MOCK lookup (_STOCK_MARK_SIGNALS dict)
         # Paket 147 (26 May 2026): _compute_live_mark_signals yfinance overlay (Watchlist pateni)
         def s(symbol, strategy, status, setup, rs, price, stop, target, added, new=False):
-            # P417: relative_volume MOCK fallback — yfinance varsa gerçek hesap
-            rv_val: Optional[float] = None
-            try:
-                bars = _get_ohlcv(symbol, price)
-                if bars and len(bars) >= 52:
-                    rv_dict = compute_relative_volume([b.volume for b in bars])
-                    if rv_dict.get("rel_vol") is not None:
-                        rv_val = float(rv_dict["rel_vol"])
-            except Exception:
-                pass
+            # P417: relative_volume MOCK fallback — yfinance varsa gerçek hesap (#14 DRY)
+            rv_val = _rel_vol(_get_ohlcv(symbol, price))
             return Signal(
                 symbol=symbol, strategy=strategy, status=status, setup_type=setup,
                 rs_rating=rs, price=price, stop_loss=stop, target_price=target,
@@ -4336,15 +4346,8 @@ def get_signals() -> list[Signal]:
         except Exception:
             bars = []
             bars_is_mock = None
-        # Relative volume — yfinance + compute_relative_volume (Mark TLSMW Bol. 6)
-        rv_val: Optional[float] = None
-        try:
-            if bars and len(bars) >= 52:
-                rv_dict = compute_relative_volume([b.volume for b in bars])
-                if rv_dict.get("rel_vol") is not None:
-                    rv_val = float(rv_dict["rel_vol"])
-        except Exception:
-            pass
+        # Relative volume — yfinance + compute_relative_volume (Mark TLSMW Bol. 6) — #14 DRY helper
+        rv_val = _rel_vol(bars)
         # P466 (12 Haz 2026): Stop·Hedef·R/R canli hesap. web_watchlist'te kolon YOK ->
         # eskiden None idi (KARAR #473 acigi, /signals "—"). Mark Risk-first canon
         # (RiskSummaryCard P439 ile ayni): ATR stop (suggested_stop_normal=Entry-2.5xATR)
