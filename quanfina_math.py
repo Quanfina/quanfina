@@ -5186,6 +5186,162 @@ def compute_distribution_day_severity(dd_count: int) -> dict:
 
 
 # ======================================================================
+# SELL STRENGTH SCANNER (KARAR ADAY #976) — Paket 475 (16 Haz 2026)
+#
+# Mark Minervini SATIS sinyalleri skorlu agregat (acik pozisyonda "ne zaman
+# sat/azalt"). Canon (Kural #26, NotebookLM Quanfina Minervini danismasi 16 Haz):
+#   DEFANSIF (kesin sat / sell into weakness):
+#     - Hard Stop / The Wall: kayip %10 (Mindset s.73 "largest loss I ever want to take")
+#     - 200-MA kirilim: close < MA200 ("never buy below 200")
+#     - Outside Day Negative Reversal: gun ici >=%10 + dunku low alti kapanis (Video Q&A "I'm gone")
+#     - 50-MA hacimli kirilim: close < MA50 + hacim (distribution, azalt)
+#   OFFENSIVE (guce sat / kar koru):
+#     - Climax Run: 200-MA'dan >%50 (uyari) / >%100 (sell into strength) — TLSMW Ch 10
+#     - Sell Half: kar >= 2x avg_gain -> yari sat + breakeven stop (bedava trade)
+# GELISTIRILMESI LAZIM (kitapta net sayi YOK -> UYDURULMADI, Kural #26): largest down
+#   day, exhaustion/island gap, churning. Pozisyon-baglami gerektirenler (late-stage base
+#   sayisi, horse-out size, give-back, time-stop) bu OHLCV-helper kapsami disinda (not).
+# ======================================================================
+
+SELL_HARD_STOP_PCT: float = 10.0          # The Wall (Mindset s.73)
+SELL_OUTSIDE_DAY_UP_PCT: float = 10.0     # Outside day gun ici >=%10 (Video Q&A)
+SELL_CLIMAX_WARN_PCT: float = 50.0        # 200-MA'dan >%50 = climax uyari
+SELL_CLIMAX_STRONG_PCT: float = 100.0     # >%100 = sell into strength
+SELL_HALF_AVG_GAIN_MULT: float = 2.0      # kar >= 2x ort kazanc -> yari sat
+
+
+def compute_sell_strength(
+    highs: list[float],
+    lows: list[float],
+    closes: list[float],
+    volumes: list[float] | None = None,
+    *,
+    entry_price: float | None = None,
+    avg_gain_pct: float | None = None,
+) -> dict:
+    """Mark satis sinyalleri skorlu agregat (KARAR ADAY #976, canon-atifli + Kural #26).
+
+    Args:
+        highs/lows/closes: gunluk OHLC (kronolojik, esit uzunluk)
+        volumes: gunluk hacim (50-MA kirilim hacim teyidi icin opsiyonel)
+        entry_price: acik pozisyon giris fiyati (Hard Stop sinyali icin, opsiyonel)
+        avg_gain_pct: ortalama kazanc % (Sell Half sinyali icin, opsiyonel)
+
+    Returns:
+        dict {detected, signals, defensive, offensive, sell_strength (0-10),
+              category (HOLD/WATCH/REDUCE/SELL), pct_above_200ma, loss_pct, gain_pct, mark_says}
+    """
+    def _empty(msg: str) -> dict:
+        return {
+            'detected': False, 'signals': [], 'defensive': [], 'offensive': [],
+            'sell_strength': 0, 'category': 'HOLD',
+            'pct_above_200ma': None, 'loss_pct': None, 'gain_pct': None, 'mark_says': msg,
+        }
+
+    if not highs or not lows or not closes:
+        return _empty('Yetersiz veri — sell strength hesaplanamiyor.')
+    n = len(closes)
+    if not (len(highs) == len(lows) == n):
+        return _empty('Sell strength: highs/lows/closes uzunluk farkli.')
+    if n < 50:
+        return _empty('Yetersiz veri — en az 50 gun gerek (MA50).')
+
+    close = closes[-1]
+    defensive: list[str] = []
+    offensive: list[str] = []
+
+    ma50 = sum(closes[-50:]) / 50
+    ma200 = sum(closes[-200:]) / 200 if n >= 200 else None
+
+    # 1) 200-MA kirilim (defansif, kesin)
+    if ma200 is not None and close < ma200:
+        defensive.append('200-MA kirilim (close < MA200) — Mark "never buy below 200", kesin sat')
+
+    # 2) 50-MA hacimli kirilim (azalt — distribution)
+    if close < ma50:
+        vol_note = ''
+        if volumes and len(volumes) == n and n >= 51:
+            avg_vol = sum(volumes[-51:-1]) / 50
+            if avg_vol > 0 and volumes[-1] > avg_vol:
+                vol_note = ' (hacim teyitli — distribution)'
+        defensive.append(f'50-MA alti kapanis{vol_note} — trend zayifligi, azalt')
+
+    # 3) Outside Day Negative Reversal (defansif, kesin) — gun ici >=%10 + dunku low alti
+    if n >= 2:
+        prev_close = closes[-2]
+        prev_low = lows[-2]
+        if prev_close > 0:
+            intraday_up = (highs[-1] - prev_close) / prev_close * 100
+            if intraday_up >= SELL_OUTSIDE_DAY_UP_PCT and close < prev_low:
+                defensive.append(
+                    f'Outside Day Negative Reversal (gun ici +%{intraday_up:.0f} -> dunku low alti) — Mark "I\'m gone"'
+                )
+
+    # 4) Climax Run (offensive, sell into strength)
+    pct_above_200 = None
+    if ma200 is not None and ma200 > 0:
+        pct_above_200 = round((close - ma200) / ma200 * 100, 2)
+        if pct_above_200 > SELL_CLIMAX_STRONG_PCT:
+            offensive.append(
+                f'Climax Run: 200-MA\'dan +%{pct_above_200:.0f} (>%100) — guce sat (sell into strength), stop 10/20-MA\'ya sik'
+            )
+        elif pct_above_200 > SELL_CLIMAX_WARN_PCT:
+            offensive.append(f'Asiri uzama: 200-MA\'dan +%{pct_above_200:.0f} (>%50 uyari) — climax izle, stop sikilastir')
+
+    # 5) Hard Stop / The Wall (defansif, kesin — entry verilirse)
+    loss_pct = None
+    if entry_price is not None and entry_price > 0:
+        loss_pct = round((close - entry_price) / entry_price * 100, 2)
+        if loss_pct <= -SELL_HARD_STOP_PCT:
+            defensive.append(f'Hard Stop / The Wall: kayip %{loss_pct:.1f} (<= -%10) — Mark mutlak duvar, KESIN sat')
+
+    # 6) Sell Half (offensive — avg_gain + entry verilirse)
+    gain_pct = None
+    if entry_price is not None and entry_price > 0 and avg_gain_pct is not None and avg_gain_pct > 0:
+        gain_pct = round((close - entry_price) / entry_price * 100, 2)
+        if gain_pct >= SELL_HALF_AVG_GAIN_MULT * avg_gain_pct:
+            offensive.append(
+                f'Sell Half: kar %{gain_pct:.1f} >= 2x ort kazanc (%{avg_gain_pct:.1f}) — yari sat, stop breakeven (bedava trade)'
+            )
+
+    signals = defensive + offensive
+    score = min(10, len(defensive) * 3 + len(offensive) * 2)
+
+    _kesin = any(('200-MA kirilim' in s) or ('Hard Stop' in s) or ('Outside Day' in s) for s in defensive)
+    _strong_off = any(('>%100' in s) or ('Sell Half' in s) for s in offensive)
+    if _kesin:
+        category = 'SELL'
+    elif defensive or _strong_off:
+        category = 'REDUCE'
+    elif offensive:
+        category = 'WATCH'
+    else:
+        category = 'HOLD'
+
+    if category == 'SELL':
+        says = f'SAT — {len(defensive)} defansif sinyal: {"; ".join(defensive[:2])}. Mark: teknik bozuldu, sermaye koru.'
+    elif category == 'REDUCE':
+        says = f'AZALT — {"; ".join(signals[:2])}. Mark: kademeli azalt / kar koru.'
+    elif category == 'WATCH':
+        says = f'IZLE — {"; ".join(offensive[:2])}. Mark: asiri uzama, stop sikilastir.'
+    else:
+        says = 'Aktif satis sinyali yok — pozisyon saglikli (stop disiplinini koru).'
+
+    return {
+        'detected': len(signals) > 0,
+        'signals': signals,
+        'defensive': defensive,
+        'offensive': offensive,
+        'sell_strength': score,
+        'category': category,
+        'pct_above_200ma': pct_above_200,
+        'loss_pct': loss_pct,
+        'gain_pct': gain_pct,
+        'mark_says': says,
+    }
+
+
+# ======================================================================
 # RELATIVE VOLUME — Mark hacim asimetri canon (Paket 106)
 # ======================================================================
 # Mark TLSMW Ch 6: "Volume tells the story" — bugünkü hacim normal mi,

@@ -66,6 +66,7 @@ from quanfina_math import (  # noqa: E402
     compute_relative_volume,
     compute_breakout_quality,
     compute_cup_with_handle,
+    compute_sell_strength,
     compute_flat_base,
     compute_double_bottom,
     compute_high_tight_flag,
@@ -3060,6 +3061,59 @@ def get_cup_handle(symbol: str) -> CupHandleInfo:
         handle_in_upper_half=r.get("handle_in_upper_half", False),
         shakeout=r.get("shakeout", False),
         faults=r.get("faults", []),
+        mark_says=r.get("mark_says", ""),
+    )
+
+
+# Paket 475 (16 Haz 2026): Sell Strength endpoint (KARAR ADAY #976)
+class SellStrengthInfo(BaseModel):
+    detected: bool = False
+    category: Optional[Literal["HOLD", "WATCH", "REDUCE", "SELL"]] = None
+    sell_strength: int = 0
+    signals: list[str] = []
+    defensive: list[str] = []
+    offensive: list[str] = []
+    pct_above_200ma: Optional[float] = None
+    mark_says: str
+
+
+@app.get("/api/stock/{symbol}/sell-strength", response_model=SellStrengthInfo)
+def get_sell_strength(symbol: str) -> SellStrengthInfo:
+    """Mark satis sinyalleri skorlu agregat (KARAR ADAY #976, P475 wire).
+
+    OHLCV-bazli market-state satis sinyalleri: 200/50-MA kirilim, Outside Day Negative
+    Reversal, Climax Run (200-MA'dan >%50/>%100). Canon NotebookLM Quanfina Minervini
+    (Kural #26). Pozisyon-spesifik (Hard Stop %10, Sell Half 2x avg gain) entry/avg_gain
+    gerektirir -> ileride journal/signals pozisyon baglamindan beslenir.
+    """
+    sym = symbol.upper()
+    stock = _STOCK_BY_SYM.get(sym)
+    if stock:
+        price = stock.price
+    else:
+        try:
+            wl = [r for r in watchlist_get_all() if r["symbol"] == sym]
+        except OperationalError:
+            wl = []
+        if wl:
+            price = float(wl[0]["price"])
+        else:
+            scan_data = _fetch_scan_symbol_data(sym)
+            price = scan_data["price"] if scan_data else 100.0
+
+    bars = _get_ohlcv(sym, price)
+    r = compute_sell_strength(
+        [b.high for b in bars], [b.low for b in bars],
+        [b.close for b in bars], [b.volume for b in bars],
+    )
+    return SellStrengthInfo(
+        detected=r.get("detected", False),
+        category=r.get("category"),
+        sell_strength=r.get("sell_strength", 0),
+        signals=r.get("signals", []),
+        defensive=r.get("defensive", []),
+        offensive=r.get("offensive", []),
+        pct_above_200ma=r.get("pct_above_200ma"),
         mark_says=r.get("mark_says", ""),
     )
 
