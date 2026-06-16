@@ -30,11 +30,23 @@ except ImportError:
 
 
 @pytest.fixture(autouse=True)
-def clear_caches():
-    """Her test ayrı cache state'i."""
+def clear_caches(monkeypatch):
+    """Her test ayrı cache state'i + #16 network bağımsızlık garantisi."""
     api_main._OHLCV_CACHE.clear()
     api_main._MARK_SIGNALS_CACHE.clear()
     api_main._PIVOT_STATUS_CACHE.clear()
+    # #16 (denetim): dosya "Network bağımsız" iddia ediyordu ama cache temizken
+    # _compute_live_mark_signals / _compute_signal_pivot_status içeride
+    # _fetch_ohlcv_real → CANLI yfinance çağırıyordu (NVDA/XYZTEST/OLD seed'siz) →
+    # flaky + yavaş. _fetch_ohlcv_real SADECE seed'li _OHLCV_CACHE'ten okusun
+    # (seed yoksa None = "bars missing"). Test niyeti korunur, network sıfır.
+    def _cache_only(symbol, n_bars=252):
+        entry = api_main._OHLCV_CACHE.get(symbol.upper())
+        if not entry or not entry[1]:
+            return None
+        bars = entry[1]
+        return bars[-n_bars:] if (n_bars and len(bars) > n_bars) else bars
+    monkeypatch.setattr(api_main, "_fetch_ohlcv_real", _cache_only)
     yield
     api_main._OHLCV_CACHE.clear()
     api_main._MARK_SIGNALS_CACHE.clear()

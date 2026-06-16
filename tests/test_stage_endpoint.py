@@ -22,6 +22,14 @@ def client():
     return TestClient(api_main.app)
 
 
+@pytest.fixture(autouse=True)
+def _no_network(monkeypatch):
+    """#31 (denetim): _fetch_ohlcv_real → None → endpoint _get_ohlcv deterministik
+    _generate_ohlcv MOCK kullanır. Eski hali her test CANLI yfinance çağırıyordu
+    (yavaş + flaky). Network-free + deterministik."""
+    monkeypatch.setattr(api_main, "_fetch_ohlcv_real", lambda *a, **k: None)
+
+
 def test_status_200(client):
     r = client.get("/api/stock/NVDA/stage")
     assert r.status_code == 200

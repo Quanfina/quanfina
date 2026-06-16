@@ -128,29 +128,29 @@ class TestYfinanceSuccessPath:
 # =====================================================================
 
 class TestMockFallback:
-    def test_known_symbol_stock_by_sym(self, client):
-        """_OHLCV_CACHE'de yok, _STOCK_BY_SYM'de var → mock source."""
-        # Cache temiz — yfinance fetch fail edecek (network),
-        # _STOCK_BY_SYM fallback'e düşmeli
-        # NOT: Gerçek test için _fetch_ohlcv_real'i mock'lamamız gerek
-        # Burada sadece response shape doğrulamayı geçiyoruz
+    @pytest.fixture
+    def no_yfinance(self, monkeypatch):
+        """#18 (denetim): _fetch_ohlcv_real → None (yfinance erişilemez simülasyonu).
+        MOCK fallback yolu DETERMINISTIK test edilir — eski 'yfinance VEYA mock ikisi
+        de geçerli' zayıf assertion + canlı network çağrısı yerine kesin kontrol."""
+        monkeypatch.setattr(api_main, "_fetch_ohlcv_real", lambda *a, **k: None)
+
+    def test_known_symbol_stock_by_sym(self, client, no_yfinance):
+        """yfinance yok + _STOCK_BY_SYM'de var (NVDA) → source='mock' + _STOCK_BY_SYM fiyatı."""
         r = client.get("/api/stock/NVDA/quote")
         assert r.status_code == 200
         data = r.json()
         assert data["symbol"] == "NVDA"
-        # source: yfinance (network OK) veya mock (fail) — ikisi de geçerli
-        assert data["source"] in ("yfinance", "mock")
+        assert data["source"] == "mock"
+        assert data["price"] > 0  # _STOCK_BY_SYM NVDA MOCK fiyatı (deterministik)
 
-    def test_unknown_symbol_generic_mock(self, client):
-        """Bilinmeyen sembol → 100.0 generic MOCK + source='mock'."""
-        # yfinance fail bekleniyor, _STOCK_BY_SYM'de yok
+    def test_unknown_symbol_generic_mock(self, client, no_yfinance):
+        """yfinance yok + _STOCK_BY_SYM'de yok → generic 100.0 + source='mock'."""
         r = client.get("/api/stock/ZZZZTEST/quote")
         assert r.status_code == 200
         data = r.json()
-        # Network'e bağlı: yfinance bulamazsa generic 100.0 + mock
-        if data["source"] == "mock":
-            # Generic 100.0 veya _STOCK_BY_SYM fiyatı
-            assert data["price"] > 0
+        assert data["source"] == "mock"
+        assert data["price"] == 100.0  # get_stock_quote generic fallback
 
 
 # =====================================================================

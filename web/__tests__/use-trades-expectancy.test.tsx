@@ -39,7 +39,9 @@ const EXCELLENT: BrandonExpectancyInfo = {
   losers: 7,
   avg_gain_pct: 25,
   avg_loss_pct: 8,
-  win_rate: 65,
+  // #17 (denetim): backend win_rate KESİR (0-1): len(winners)/len(closed)=13/20=0.65.
+  // Fixture %65 (100×) yanlıştı — UI yüzde formatlayınca %6500 gösterirdi.
+  win_rate: 0.65,
 };
 
 describe("useTradesExpectancy — URL building", () => {
@@ -129,7 +131,7 @@ describe("useTradesExpectancy — istatistikler döner", () => {
     const d = result.current.data!;
     expect(d.total_closed).toBe(20);
     expect(d.winners + d.losers).toBe(d.total_closed);
-    expect(d.win_rate).toBe(65);
+    expect(d.win_rate).toBe(0.65);  // #17: kesir (0-1), %65 değil
     expect(d.avg_gain_pct).toBe(25);
     expect(d.avg_loss_pct).toBe(8);
   });
