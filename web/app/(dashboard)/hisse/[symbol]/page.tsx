@@ -26,6 +26,7 @@ import { DoubleBottomCard } from "@/components/stock/DoubleBottomCard";
 import { HighTightFlagCard } from "@/components/stock/HighTightFlagCard";
 import { BaseSummaryCard } from "@/components/stock/BaseSummaryCard";
 import { RiskSummaryCard } from "@/components/stock/RiskSummaryCard";
+import { SellStrengthCard } from "@/components/stock/SellStrengthCard";
 import { MarkRegimeBanner } from "@/components/mark/MarkRegimeBanner";
 import { ModBadge } from "@/components/mark/ModBadge";
 import { PreTradeChecklist } from "@/components/journal/PreTradeChecklist";
@@ -316,6 +317,8 @@ export default function HissePage({
           {/* P438-M2: Risk-Özeti ilk sırada — Mark "Risk first" (TTLC Sec 1).
               Karar akışının başı: stop nerede, kaç R, pivota mesafe. */}
           <RiskSummaryCard symbol={sym} />
+          {/* P475 (#976): Mark satış sinyalleri — Risk-Özeti ile eşleşir ("ne zaman SAT") */}
+          <SellStrengthCard symbol={sym} />
           <ActiveStrategies strategies={info.active_strategies} symbol={sym} />
           <CarrStageCard symbol={sym} />
           {/* KARAR #733 alt-paket (Paket 72): Pivot Breakout Card */}
