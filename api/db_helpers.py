@@ -162,7 +162,7 @@ def trades_get_all() -> list[dict]:
             SELECT id, symbol, strategy, setup_type,
                    entry_date, entry_price, exit_date, exit_price,
                    shares, status, pl_dollar, pl_pct,
-                   grade, exit_reason, lessons,
+                   grade, exit_reason, lessons, signal_source,
                    plan_entry_trigger, plan_stop, plan_target,
                    plan_size_pct, plan_exit_strategy, plan_time_horizon,
                    stop_loss, target_price, audible_reason
@@ -202,6 +202,8 @@ def trades_insert(trade: dict) -> int:
         "stop_loss": None,
         "target_price": None,
         "audible_reason": None,
+        # Migration 012 (#477, P482): trade kokeni (sinyal kaynagi)
+        "signal_source": None,
         **trade,
     }
     with engine.begin() as conn:
@@ -210,7 +212,7 @@ def trades_insert(trade: dict) -> int:
                 symbol, strategy, setup_type,
                 entry_date, entry_price, exit_date, exit_price,
                 shares, status, pl_dollar, pl_pct,
-                grade, exit_reason, lessons,
+                grade, exit_reason, lessons, signal_source,
                 plan_entry_trigger, plan_stop, plan_target,
                 plan_size_pct, plan_exit_strategy, plan_time_horizon,
                 stop_loss, target_price, audible_reason
@@ -218,7 +220,7 @@ def trades_insert(trade: dict) -> int:
                 :symbol, :strategy, :setup_type,
                 :entry_date, :entry_price, :exit_date, :exit_price,
                 :shares, :status, :pl_dollar, :pl_pct,
-                :grade, :exit_reason, :lessons,
+                :grade, :exit_reason, :lessons, :signal_source,
                 :plan_entry_trigger, :plan_stop, :plan_target,
                 :plan_size_pct, :plan_exit_strategy, :plan_time_horizon,
                 :stop_loss, :target_price, :audible_reason
@@ -254,7 +256,7 @@ def trades_get_by_id(trade_id: int) -> Optional[dict]:
                 SELECT id, symbol, strategy, setup_type,
                        entry_date, entry_price, exit_date, exit_price,
                        shares, status, pl_dollar, pl_pct,
-                       grade, exit_reason, lessons,
+                       grade, exit_reason, lessons, signal_source,
                        plan_entry_trigger, plan_stop, plan_target,
                        plan_size_pct, plan_exit_strategy, plan_time_horizon,
                        stop_loss, target_price, audible_reason

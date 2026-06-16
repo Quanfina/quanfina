@@ -3912,6 +3912,8 @@ def add_trade(body: TradeCreate) -> Trade:
         "grade": body.grade,
         "exit_reason": body.exit_reason,
         "lessons": body.lessons,
+        # Migration 012 (#477, P482): trade kokeni — UX Bolum 7 (eskiden DB'ye yazilmiyordu, deger dusuyordu)
+        "signal_source": body.signal_source,
         # KARAR ADAY #717 — Mark TTLC Sec 1 6 zorunlu plan alani
         "plan_entry_trigger": body.plan_entry_trigger,
         "plan_stop": body.plan_stop,
