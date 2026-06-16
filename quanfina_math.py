@@ -4410,7 +4410,12 @@ def compute_double_bottom(
 # ======================================================================
 
 HTF_POLE_MIN_PCT: float = 100.0            # Minervini s.255 ZORUNLU alt esik
-HTF_POLE_MAX_DAYS: int = 40                # 8 hafta (O'Neil 4-8 hf)
+# Flagpole SURE (P473, 15 Haz 2026 NotebookLM O'Neil CAN SLIM danismasi, s.167):
+# "~100-120% in a very short period (four to eight weeks)". MAX=8hf (40g) pole_lb_start
+# window cap ile enforce edilir. MIN floor YOK: kitap "4-8 hafta" tipik pencere der ama
+# kati alt sinir VERMEZ -> Kural #26 geregi min-sure kapisi UYDURULMAZ. Degenerate 1-2 gun
+# gap/spike pole nadir + kitap adreslamiyor; sahte esik yerine kabul edilen sinir.
+HTF_POLE_MAX_DAYS: int = 40                # 8 hafta MAX (O'Neil 4-8 hf); min floor yok (ust not)
 HTF_FLAG_DEPTH_MAX_PCT: float = 25.0       # O'Neil/Minervini max bayrak derinligi
 HTF_FLAG_DEPTH_IDEAL_PCT: float = 20.0     # Minervini ideal (<=%20 -> EXCELLENT)
 HTF_FLAG_DEPTH_REJECT_PCT: float = 40.0    # >%40 = bayrak degil (derin duzeltme)
