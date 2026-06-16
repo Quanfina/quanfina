@@ -83,6 +83,11 @@ export interface MarketStatus {
   suggested_mode: "LONG" | "CAUTION" | "DEFENSIVE";
   top_sectors: SectorChange[];
   bottom_sectors: SectorChange[];
+  // P483 (#1, Kural #28): karar-kritik serit MOCK seffafligi. index_is_mock=True ->
+  // dd/stage/health/suggested_mode/mark_regime SPY MOCK verisinden turedi (sinyalsiz).
+  index_is_mock?: boolean;
+  vix_is_mock?: boolean;
+  sectors_is_mock?: boolean;
   // KARAR ADAY #731: Mark Regime backend (frontend DRY computeMarketRegime fallback)
   mark_regime?: MarkRegimeInfoBackend | null;
   // KARAR #733 alt-paket (Paket 52): Market Breadth A/D Line backend pre-compute

@@ -193,6 +193,43 @@ class TestSectorVixSanity:
 # Test: Determinism (ayni gun ayni cevap)
 # =====================================================================
 
+class TestIsMockFlags:
+    """P483 (#1, Kural #28): karar-kritik serit MOCK seffafligi.
+    index/vix/sectors sessizce MOCK'a duserken UI'in farkina varabilmesi icin flag."""
+
+    def test_flags_present_and_bool(self, status):
+        for f in ("index_is_mock", "vix_is_mock", "sectors_is_mock"):
+            assert f in status, f"{f} eksik"
+            assert isinstance(status[f], bool)
+
+    def test_all_mock_when_data_unavailable(self, client, monkeypatch):
+        """yfinance None + sector_rotation bos -> 3 flag de True."""
+        monkeypatch.setattr(api_main, "_fetch_ohlcv_real", lambda *a, **k: None)
+        monkeypatch.setattr(api_main, "sector_rotation_get_latest", lambda: [])
+        d = client.get("/api/market/status").json()
+        assert d["index_is_mock"] is True
+        assert d["vix_is_mock"] is True
+        assert d["sectors_is_mock"] is True
+
+    def test_flags_false_when_data_live(self, client, monkeypatch):
+        """yfinance gercek bar (>=60) + sector_rotation dolu -> 3 flag de False."""
+        class _B:
+            def __init__(self, c):
+                self.close = c; self.volume = 1_000_000
+                self.high = c; self.low = c; self.open = c; self.time = "2026-01-01"
+        monkeypatch.setattr(api_main, "_fetch_ohlcv_real",
+                            lambda sym, n=252, **k: [_B(100.0 + i * 0.1) for i in range(max(60, n if isinstance(n, int) else 60))])
+        monkeypatch.setattr(api_main, "sector_rotation_get_latest",
+                            lambda: [{"sector_name": "Tech", "perf_1w": 2.0},
+                                     {"sector_name": "Energy", "perf_1w": 1.0},
+                                     {"sector_name": "Health", "perf_1w": -1.0},
+                                     {"sector_name": "Utils", "perf_1w": -2.0}])
+        d = client.get("/api/market/status").json()
+        assert d["index_is_mock"] is False
+        assert d["vix_is_mock"] is False
+        assert d["sectors_is_mock"] is False
+
+
 class TestDeterminism:
     """Tarih + ticker hash seed -> ayni gun ayni MOCK -> ayni Stage/DD."""
 

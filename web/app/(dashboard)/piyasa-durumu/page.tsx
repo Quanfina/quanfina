@@ -7,6 +7,7 @@ import { ModeSuggestionCard } from "@/components/market/ModeSuggestionCard";
 import { SectorSummaryCard } from "@/components/market/SectorSummaryCard";
 import { MarketStatusBadge } from "@/components/market/MarketStatusBadge";
 import { MarkRegimeCard } from "@/components/market/MarkRegimeCard";
+import { MarketDataMockBanner } from "@/components/market/MarketDataMockBanner";
 import { ModBadge } from "@/components/mark/ModBadge";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -74,6 +75,10 @@ export default function PiyasaDurumuPage() {
         {/* ABD borsa açık/kapalı + TR/ET saat + sonraki açılış (Sprint 4-bis.7) */}
         <MarketStatusBadge />
       </div>
+
+      {/* P483 (#1, Kural #28): karar-kritik şerit MOCK uyarısı — sadece canlı veri
+          (index/VIX/sektör) alınamadığında görünür, aksi halde null. */}
+      <MarketDataMockBanner status={data} />
 
       {/* P447 (review — KARAR HIZI / 5-saniye testi): üst-fold Karar Şeridi.
           Mevcut alanları (regime new_buy_allowed + allocation + suggested_mode)

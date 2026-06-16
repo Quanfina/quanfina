@@ -1144,6 +1144,12 @@ class MarketStatus(BaseModel):
     suggested_mode: str
     top_sectors: list[SectorChange]
     bottom_sectors: list[SectorChange]
+    # P483 (#1, Kural #28): karar-kritik serit MOCK seffafligi (Optional default False).
+    # index_is_mock=True -> dd/stage/health/suggested_mode/mark_regime SPY MOCK verisinden
+    # turedi (yfinance fail/_YF_DISABLED) -> paper trading karar girdisi sinyalsiz.
+    index_is_mock: bool = False
+    vix_is_mock: bool = False
+    sectors_is_mock: bool = False
     # KARAR ADAY #731 (24 May 2026): Mark Regime backend pre-compute
     # (KARAR #488 4-Katman x 2-Eksen, frontend DRY)
     mark_regime: Optional[MarkRegimeInfo] = None
@@ -1377,6 +1383,11 @@ def get_market_status() -> MarketStatus:
     dd_result = count_distribution_days(closes, volumes, lookback_days=20)
     dd_count = dd_result["count"]
 
+    # P483 (#1, Kural #28): index MOCK fallback tespiti. SPY = dd/stage/health/regime
+    # surucusu; _index_closes_volumes ile AYNI kosul (_fetch_ohlcv_real cache -> ucuz).
+    _spy_bars = _fetch_ohlcv_real("SPY", 252)
+    index_is_mock = not (_spy_bars and len(_spy_bars) >= 60)
+
     # KARAR #733 alt (Paket 24): SPY/QQQ/IWM stage dinamik compute_carr_stage
     # Production'da yfinance/SQL real veri (AÇIK KONU #75).
     spy_stage = _index_stage("SPY", 400.0)
@@ -1457,12 +1468,14 @@ def get_market_status() -> MarketStatus:
     # Fail durumunda MOCK fallback (UX kesintisiz).
     vix_bars = _fetch_ohlcv_real("^VIX", 2)
     vix_value = round(vix_bars[-1].close, 2) if vix_bars else MOCK_MARKET_STATUS.vix
+    vix_is_mock = not vix_bars  # P483 (#1): VIX yfinance fail -> MOCK 14.2 isaretli
 
     # P398: top/bottom_sectors MOCK hardcoded -> gercek sector_rotation tablosu.
     # Cloud SQL sector_rotation gunluk 11 SPDR ETF taramasi (mevcut endpoint
     # /api/sector-rotation kullanir). perf_1w sirali — top 3 + bottom 3.
     # DB bos/erisilemez ise MOCK fallback (hardcoded 5 sabit sektor).
     sectors_db = sector_rotation_get_latest()
+    sectors_is_mock = not sectors_db  # P483 (#1): sector_rotation bos/erisilemez -> MOCK 5 sabit sektor isaretli
     if sectors_db:
         sorted_by_perf = sorted(
             sectors_db,
@@ -1488,6 +1501,9 @@ def get_market_status() -> MarketStatus:
             "vix": vix_value,
             "top_sectors": top_sectors_live,
             "bottom_sectors": bottom_sectors_live,
+            "index_is_mock": index_is_mock,  # P483 (#1)
+            "vix_is_mock": vix_is_mock,
+            "sectors_is_mock": sectors_is_mock,
             "market_health_score": health_score,
             "market_health_label": health_label,
             "suggested_mode": suggested_mode,
