@@ -40,9 +40,15 @@ export function TradeRowActions({ data, onEdit, onClose, onDelete, onEditStop }:
             </DropdownMenuItem>
           </>
         )}
-        <DropdownMenuItem onClick={() => onEdit(data)}>
-          Düzenle
-        </DropdownMenuItem>
+        {/* #26 (denetim): "Düzenle" SADECE kapalı trade'de — CloseTradeDialog kapalı
+            trade'i pre-fill edip grade/lessons/exit düzenler (doğru). Açık trade'de
+            onEdit Kapat dialog'unu açıyordu (yanlış: Düzenle pozisyonu kapatmamalı;
+            açık trade "Stop/Hedef Düzenle" kullanır). */}
+        {data.status === "closed" && (
+          <DropdownMenuItem onClick={() => onEdit(data)}>
+            Düzenle
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={() => onDelete(data)}

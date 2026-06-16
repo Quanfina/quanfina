@@ -337,7 +337,8 @@ export default function WatchlistPage() {
             <span className="text-2xl">🔍</span>
             <div className="font-medium text-foreground">Filtreyle eşleşen hisse yok</div>
             <div className="text-xs opacity-80">
-              Strateji / Statü / Konsensus filtrelerini gevşet veya arama metnini temizle.
+              {/* #29 (denetim): "Konsensus" filtresi KARAR #469 ile kaldırıldı — stale referans temizlendi. */}
+              Strateji / Statü filtrelerini gevşet veya arama metnini temizle.
             </div>
           </div>
         )}
@@ -360,6 +361,10 @@ export default function WatchlistPage() {
               columnDefs={columnDefs}
               defaultColDef={DEFAULT_COL_DEF}
               rowData={rowData}
+              // #28 (denetim): stabil satır kimliği — web_watchlist PK (symbol+strategy).
+              // getRowId yokken 60s canlı quote refetch tüm satırları yeniden yaratıyor
+              // (seçim/scroll/animasyon kaybı). Stabil id → AG Grid sadece değişeni günceller.
+              getRowId={(p) => `${p.data.symbol}-${p.data.strategy}`}
               rowHeight={36}
               headerHeight={36}
               suppressCellFocus={false}
