@@ -210,17 +210,20 @@ export default function SignalsPage() {
       type: "rightAligned",
       valueGetter: (p) => p.data?.current_price ?? p.data?.price,
       valueFormatter: (p) => fmtUsd(p.value as number),
-      // P445 (review Kural #28 fix): quote_source tüketilir (eski dead field).
-      // Mock (yfinance erişilemiyor) → amber + tooltip "sentetik"; eski hali
-      // mock fiyatı sessizce "Canlı yfinance" gibi gösteriyordu.
+      // P445 + #27 (Kural #28): canlı = SADECE quote_source==="yfinance". 3 durum:
+      // yfinance → normal "Canlı"; mock → amber "sentetik"; quote YOK (snapshot
+      // fallback p.data.price) → amber "snapshot, canlı değil". Eski hali quote
+      // eksikken stale snapshot'ı sessizce "Canlı yfinance" gibi gösteriyordu.
       cellStyle: (p: CellClassParams<Signal>) =>
-        p.data?.quote_source === "mock"
-          ? { ...MONO_RIGHT, color: "#F59E0B" }
-          : MONO_RIGHT,
+        p.data?.quote_source === "yfinance"
+          ? MONO_RIGHT
+          : { ...MONO_RIGHT, color: "#F59E0B" },
       tooltipValueGetter: (p) =>
-        p.data?.quote_source === "mock"
+        p.data?.quote_source === "yfinance"
+          ? "Canlı yfinance fiyatı"
+          : p.data?.quote_source === "mock"
           ? "Sentetik fiyat — yfinance erişilemiyor (paper trading için güvenilmez)"
-          : "Canlı yfinance fiyatı",
+          : "Snapshot fiyatı (canlı değil) — yfinance quote alınamadı",
     },
     {
       field: "stop_loss",

@@ -137,7 +137,10 @@ export default function JournalPage() {
     const enriched: Trade[] = rows.map((t) => {
       if (t.status !== "open") return t;
       const q = quoteMap.get(t.symbol.toUpperCase());
-      if (!q) return t;
+      // #10 (Kural #28): SADECE canlı yfinance quote ile enrich. MOCK fiyat "CANLI $"
+      // + unrealized P/L'yi sahte "canlı" gibi gösteriyordu (quote_source tüketilmiyordu).
+      // source mock/yok → enrich etme; kolon "—" gösterir (yanıltıcı sayı yok).
+      if (!q || q.source !== "yfinance") return t;
       const unrealized_pl_dollar = (q.price - t.entry_price) * t.shares;
       const unrealized_pl_pct = ((q.price / t.entry_price) - 1) * 100;
       return {

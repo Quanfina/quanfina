@@ -83,6 +83,18 @@ describe("usePositionAlerts — alert hesabı (saf useMemo)", () => {
     expect(result.current).toHaveLength(0);
   });
 
+  it("#9 (Kural #28): MOCK-source quote → alert ÜRETMEZ (sahte kritik stop alarmı engeli)", () => {
+    // price=92 <= plan_stop=93 normalde STOP_HIT (kritik "pozisyonu kapat!") üretir.
+    // MOCK fiyat ile bu YANILTICI -> source!="yfinance" ise alarm yok (paper trading güvenliği).
+    const mockQuote = {
+      data: { symbol: "AAPL", price: 92, change_dollar: 0, change_pct: 0, source: "mock" as const },
+    };
+    const { result } = renderHook(() =>
+      usePositionAlerts([makeTrade({ plan_stop: 93 })], [mockQuote])
+    );
+    expect(result.current).toHaveLength(0);
+  });
+
   describe("STOP_HIT (critical) — current <= plan_stop", () => {
     it("price=92 + plan_stop=93 → STOP_HIT", () => {
       const trades = [makeTrade({ plan_stop: 93 })];

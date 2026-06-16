@@ -41,7 +41,11 @@ export function PortfolioSummaryCard() {
     if (openTrades.length === 0) return null;
     const quoteMap = new Map<string, { price: number; change_pct: number | null }>();
     quoteResults.forEach((r) => {
-      if (r.data) {
+      // #11 (Kural #28): SADECE canlı yfinance quote portföy canlı değerine girer.
+      // MOCK fiyat currentValue/today change/coveredCount'a "canlı" gibi katılıyordu
+      // (paper trading portföy özeti yanıltıcı). MOCK → quoteMap dışı → trade entry
+      // değeriyle sayılır (else dalı) + coveredCount gerçek canlı kapsama yansıtır.
+      if (r.data && r.data.source === "yfinance") {
         quoteMap.set(r.data.symbol.toUpperCase(), {
           price: r.data.price,
           change_pct: r.data.change_pct,

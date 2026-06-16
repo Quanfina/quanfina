@@ -110,12 +110,23 @@ export function usePositionAlerts(
   trades: Trade[],
   quotes: Array<{ data?: StockQuote }>
 ): PositionAlert[] {
+  // #30 (perf): quotes dizisi her render YENİ identity -> useMemo boşa recompute
+  // ediyordu. Stabil imza (symbol:price:source) ile sadece veri değişince recompute.
+  const quotesKey = quotes
+    .map((r) => (r.data ? `${r.data.symbol}:${r.data.price}:${r.data.source}` : "·"))
+    .join("|");
+
   // Trade'leri sembol-quote ile eşle
   const alerts = useMemo<PositionAlert[]>(() => {
     if (!trades.length) return [];
     const quoteMap = new Map<string, number>();
     quotes.forEach((r) => {
-      if (r.data) quoteMap.set(r.data.symbol.toUpperCase(), r.data.price);
+      // #9 (Kural #28): SADECE canlı yfinance quote'tan alarm üret. MOCK fiyat
+      // sahte "STOP'A DEĞDİ" (kritik — pozisyonu kapat!) uyarısı tetikleyebilir;
+      // paper trading kararı için yanıltıcı. Kaynak teyit edilmeden alarm yok.
+      if (r.data && r.data.source === "yfinance") {
+        quoteMap.set(r.data.symbol.toUpperCase(), r.data.price);
+      }
     });
 
     const today = new Date().toISOString().slice(0, 10);
@@ -205,7 +216,8 @@ export function usePositionAlerts(
     });
 
     return result;
-  }, [trades, quotes]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- quotesKey tüm quote verisini kapsar (#30)
+  }, [trades, quotesKey]);
 
   // Toast tetik — render-dışı side effect
   // Dismissed Set ref ile takip, double-fire önleme
