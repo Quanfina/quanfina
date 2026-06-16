@@ -951,7 +951,7 @@ def check_ma200_slope(tickers):
                     "confirmations":        ",".join(confs),
                     "violations":           ",".join(viols),
                 }
-            except:
+            except Exception:  # P481 (#6): ciplak 'except:' -> Exception (KeyboardInterrupt/SystemExit maskelemesin; alttaki try zaten bu konvansiyonu kullaniyor)
                 results[ticker] = {"slope": None, "high52": None, "sma50": None, "atr14": None,
                                    "price_volume_history": None,
                                    "confirmations": "", "violations": "", **_null_rs}
@@ -1378,6 +1378,11 @@ def run_scan(scan_date_override: str = None, force: bool = False):
         "ALTER TABLE minervini_fundamental_only ADD COLUMN IF NOT EXISTS eps_qoq TEXT",
         "ALTER TABLE minervini_fundamental_only ADD COLUMN IF NOT EXISTS sales_qoq TEXT",
         "ALTER TABLE minervini_fundamental_only ADD COLUMN IF NOT EXISTS grade TEXT",
+        # P481 (#5): INSERT (asagida) perf_year/roe yaziyor ama tabloda yoktu ->
+        # her ticker INSERT "column does not exist" ile fail (1929 except: print) ->
+        # fresh DB'de minervini_fundamental_only BOS kaliyordu. Additive (Kodlama #2).
+        "ALTER TABLE minervini_fundamental_only ADD COLUMN IF NOT EXISTS perf_year DOUBLE PRECISION",
+        "ALTER TABLE minervini_fundamental_only ADD COLUMN IF NOT EXISTS roe DOUBLE PRECISION",
     ]:
         c.execute(col_sql)
 
@@ -1400,6 +1405,14 @@ def run_scan(scan_date_override: str = None, force: bool = False):
             UNIQUE(scan_date, ticker)
         )
     """)
+    for col_sql in [
+        # P481 (#4): INSERT (1894) perf_year/roe yaziyor ama 52w_high tablosunda yoktu ->
+        # her ticker INSERT sessizce fail -> fresh DB'de minervini_52w_high BOS kaliyordu.
+        # Additive ALTER (Kodlama #2, idempotent IF NOT EXISTS).
+        "ALTER TABLE minervini_52w_high ADD COLUMN IF NOT EXISTS perf_year DOUBLE PRECISION",
+        "ALTER TABLE minervini_52w_high ADD COLUMN IF NOT EXISTS roe DOUBLE PRECISION",
+    ]:
+        c.execute(col_sql)
 
     c.execute("""
         CREATE TABLE IF NOT EXISTS sector_rotation (

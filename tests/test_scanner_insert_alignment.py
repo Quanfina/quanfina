@@ -15,6 +15,7 @@ canli scan'de psycopg2 tarafindan zaten yuksek sesle dogrulanir; burada
 en sik drift kaynagi olan kolon<->placeholder invariantini sabitliyoruz.
 """
 import re
+import pytest
 from pathlib import Path
 
 SCANNER_PATH = Path(__file__).resolve().parents[1] / "scanner.py"
@@ -141,4 +142,57 @@ def test_insert_base_quality_cols_match_alter_migration():
     assert insert_quality == alter_quality, (
         f"INSERT base *_quality kolonlari {insert_quality} ile ALTER migration "
         f"kolonlari {alter_quality} ESLESMIYOR — bir yere eklenip digerine eklenmeyen kolon var."
+    )
+
+
+# ---- P481 (#4, #5): fundamental_only + 52w_high INSERT <-> sema kolon kapsami ----
+# Mevcut testler SADECE minervini_scans'i kapsiyordu -> #4/#5 (INSERT perf_year/roe
+# yaziyor ama tabloda yok) yakalanmamisti. Bu guard her tablo icin INSERT kolonlari
+# subset(sema kolonlari) invariantini sabitler: bir kolon INSERT'e eklenip CREATE/ALTER'a
+# eklenmezse "column does not exist" -> tum INSERT'ler sessizce fail -> tablo bos kalir.
+
+def _insert_cols(table):
+    src = SCANNER_PATH.read_text(encoding="utf-8")
+    rx = re.compile(rf"INSERT\s+INTO\s+{table}\s*\((?P<cols>[^)]*)\)\s*VALUES",
+                    re.DOTALL | re.IGNORECASE)
+    cols = set()
+    for m in rx.finditer(src):
+        for c in m.group("cols").split(","):
+            c = c.strip()
+            if c:
+                cols.add(c.lower())
+    return cols
+
+
+def _schema_cols(table):
+    """CREATE TABLE govdesi (tum kopyalar) + ALTER ADD COLUMN ile taninan kolonlar."""
+    src = SCANNER_PATH.read_text(encoding="utf-8")
+    cols = set(c.lower() for c in re.findall(
+        rf"ALTER\s+TABLE\s+{table}\s+ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+(\w+)",
+        src, re.IGNORECASE))
+    for m in re.finditer(
+        rf"CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+{table}\s*\((?P<body>.*?)UNIQUE",
+        src, re.DOTALL | re.IGNORECASE):
+        for line in m.group("body").splitlines():
+            tok = re.match(r"\s*(\w+)\s+\w", line)
+            if tok and tok.group(1).lower() not in ("unique", "primary"):
+                cols.add(tok.group(1).lower())
+    return cols
+
+
+@pytest.mark.parametrize("table", [
+    "minervini_fundamental_only",
+    "minervini_52w_high",
+    "minervini_fundamental_scans",
+])
+def test_insert_columns_exist_in_schema(table):
+    """P481 (#4,#5): INSERT yazdigi her kolon CREATE veya ALTER ile taninmali."""
+    insert_cols = _insert_cols(table)
+    if not insert_cols:
+        pytest.skip(f"{table} icin INSERT bulunamadi")
+    schema_cols = _schema_cols(table)
+    missing = insert_cols - schema_cols
+    assert not missing, (
+        f"{table}: INSERT su kolonlari yaziyor ama CREATE/ALTER'da YOK: {sorted(missing)} "
+        f"-> 'column does not exist' -> tum INSERT'ler sessizce fail -> tablo bos kalir."
     )
