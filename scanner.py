@@ -1619,6 +1619,7 @@ def run_scan(scan_date_override: str = None, force: bool = False):
         if i % 50 == 0 or i == 1:
             print(f"  [{i}/{len(tickers_data)}] {ticker} işleniyor...")
         try:
+            c.execute("SAVEPOINT row_sp")
             # Finviz Elite batch API'den veri oku (HTML scraping'in yerini aldı)
             row = extras.loc[ticker] if (extras is not None and ticker in extras.index) else None
             if row is not None:
@@ -1643,11 +1644,13 @@ def run_scan(scan_date_override: str = None, force: bool = False):
             """, (eps_qoq, sales_qoq, grade, earnings_date_raw, today_str, today_str,
                   perf_year, roe, scan_date, ticker))
 
+            c.execute("RELEASE SAVEPOINT row_sp")
             stats["scraped"] += 1
             if reason == "post_earnings":
                 stats["post_earnings"] += 1
 
         except Exception as e:
+            c.execute("ROLLBACK TO SAVEPOINT row_sp")
             print(f"  Extras okuma hatası {ticker}: {e}")
             continue
 
@@ -1677,6 +1680,7 @@ def run_scan(scan_date_override: str = None, force: bool = False):
                 continue  # MA200 slope geçemeyenleri kaydetme
 
             try:
+                c.execute("SAVEPOINT row_sp")
                 c.execute("""
                     INSERT INTO minervini_fundamental_scans
                     (scan_date, ticker, company, sector, industry,
@@ -1714,8 +1718,10 @@ def run_scan(scan_date_override: str = None, force: bool = False):
                     slope_info.get("rs_20d"), slope_info.get("rs_50d"),
                     slope_info.get("rs_200d"), slope_info.get("rs_mansfield"),
                 ))
+                c.execute("RELEASE SAVEPOINT row_sp")
                 saved_fund += 1
             except Exception as e:
+                c.execute("ROLLBACK TO SAVEPOINT row_sp")
                 print(f"  Kayıt hatası {ticker}: {e}")
         
         conn.commit()
@@ -1822,6 +1828,7 @@ def run_scan(scan_date_override: str = None, force: bool = False):
                 roe        = eps_data.get("roe")
 
             try:
+                c.execute("SAVEPOINT row_sp")
                 c.execute("""
                     INSERT INTO minervini_fundamental_only
                     (scan_date, ticker, company, sector, industry,
@@ -1864,8 +1871,10 @@ def run_scan(scan_date_override: str = None, force: bool = False):
                     rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mf,
                     perf_year, roe,
                 ))
+                c.execute("RELEASE SAVEPOINT row_sp")
                 saved_fund_only += 1
             except Exception as e:
+                c.execute("ROLLBACK TO SAVEPOINT row_sp")
                 print(f"  Kayit hatasi {ticker}: {e}")
 
         conn.commit()
@@ -1972,6 +1981,7 @@ def run_scan(scan_date_override: str = None, force: bool = False):
                 roe       = eps_data.get("roe")
 
             try:
+                c.execute("SAVEPOINT row_sp")
                 c.execute("""
                     INSERT INTO minervini_52w_high
                     (scan_date, ticker, company, sector, industry,
@@ -2013,8 +2023,10 @@ def run_scan(scan_date_override: str = None, force: bool = False):
                     rs_ibd, rs_12m, rs_20d, rs_50d, rs_200d, rs_mf,
                     perf_year, roe,
                 ))
+                c.execute("RELEASE SAVEPOINT row_sp")
                 saved_52w += 1
             except Exception as e:
+                c.execute("ROLLBACK TO SAVEPOINT row_sp")
                 print(f"  Kayit hatasi {ticker}: {e}")
 
         conn.commit()
