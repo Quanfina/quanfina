@@ -268,8 +268,50 @@ def init_db():
             linked_trade_id  INTEGER REFERENCES trades(id)
         )
     """)
+    resync_serial_sequences(c)
     conn.commit()
     conn.close()
+
+
+# Scanner SERIAL id tablolari — sequence resync hedefi (asagidaki helper kullanir)
+_SERIAL_ID_TABLES = [
+    "minervini_scans",
+    "minervini_fundamental_scans",
+    "minervini_fundamental_only",
+    "minervini_52w_high",
+    "sector_rotation",
+]
+
+
+def resync_serial_sequences(c, tables=None):
+    """SERIAL `id` sequence'lerini tablonun max(id)'sine senkronla.
+
+    Neden: DB'ye explicit-id ile satir eklenince (pg_dump/restore, kopya, manuel
+    import) sequence geride kalir; sonraki auto-increment INSERT'in urettigi id
+    zaten mevcut -> "duplicate key value violates unique constraint *_pkey". run_scan
+    ilk hatada `break` ettigi icin tum tarama sessizce 0 kayit yazar (17 Haz 2026'da
+    06-11..06-17 prod hisse taramasi 6 gun bu yuzden olu kaldi). Bu defansif resync
+    her init_db + her run_scan yazma oncesi calisir; idempotent + non-destructive
+    (satir silmez/degistirmez, yalniz sayaci ilerletir).
+    """
+    if tables is None:
+        tables = _SERIAL_ID_TABLES
+    for t in tables:
+        try:
+            c.execute("SELECT pg_get_serial_sequence(%s, 'id')", (t,))
+            row = c.fetchone()
+            seq = row[0] if row else None
+            if not seq:
+                continue
+            # is_called=false (empty tablo) -> next nextval = 1; aksi next = max(id)+1
+            c.execute(
+                "SELECT setval(%s, COALESCE((SELECT MAX(id) FROM {t}), 1), "
+                "(SELECT MAX(id) FROM {t}) IS NOT NULL)".format(t=t),
+                (seq,),
+            )
+        except Exception as e:
+            print(f"  [seq-resync] {t} atlandi: {e}")
+
 
 # --- FİNVİZ API SAĞLIK KONTROLLERI ---
 
@@ -976,6 +1018,28 @@ def check_ma200_slope(tickers):
     return results, spy_actual_date
 
 # --- VERİTABANINA KAYDET ---
+def _pvh_nan_safe(pvh):
+    """price_volume_history icindeki NaN/Inf degerleri -> None.
+
+    json.dumps NaN/Inf icin gecersiz JSON token ('NaN'/'Infinity') uretir; PostgreSQL
+    JSONB bunu reddeder ('invalid input syntax for type json: Token NaN is invalid').
+    GENB gibi eksik-OHLCV tickerda bu INSERT'i patlatip tum ana taramayi dusuruyordu
+    (17 Haz 2026 kok neden #2). NaN/Inf -> null cevrilir; yapi (list[dict]) korunur.
+    """
+    if not pvh:
+        return pvh
+    safe = []
+    for bar in pvh:
+        if isinstance(bar, dict):
+            safe.append({
+                k: (None if isinstance(v, float) and (v != v or v == float("inf") or v == float("-inf")) else v)
+                for k, v in bar.items()
+            })
+        else:
+            safe.append(bar)
+    return safe
+
+
 def _upsert_minervini_scan_row(c, scan_date, ticker, row, slope_info):
     """P469 (15 Haz 2026): minervini_scans tek-satir UPSERT — DRY tek yazma yolu.
 
@@ -1000,7 +1064,7 @@ def _upsert_minervini_scan_row(c, scan_date, ticker, row, slope_info):
     sma50   = slope_info.get("sma50")
     atr14   = slope_info.get("atr14")
     pvh     = slope_info.get("price_volume_history")
-    pvh_json = json.dumps(pvh) if pvh else None
+    pvh_json = json.dumps(_pvh_nan_safe(pvh)) if pvh else None
 
     # VCP / Power Play (pvh'den) — KARAR #461/#465/#466/#467
     tight_low_vol_pass = compute_vcp_pass(pvh)
@@ -1432,6 +1496,11 @@ def run_scan(scan_date_override: str = None, force: bool = False):
     """)
     c.execute("ALTER TABLE sector_rotation ADD COLUMN IF NOT EXISTS perf_1w DOUBLE PRECISION")
 
+    # SERIAL id sequence'lerini yazma oncesi senkronla (desync -> 'duplicate key id'
+    # -> tum tarama sessizce 0 kayit; 17 Haz 2026 kok neden). init_db da yapar ama
+    # CLI/local yolu init_db cagirmaz -> burada da garanti. Idempotent + non-destructive.
+    resync_serial_sequences(c)
+
     conn.commit()
 
     if not resume_partial:
@@ -1485,12 +1554,18 @@ def run_scan(scan_date_override: str = None, force: bool = False):
             # helper'i (DRY). Eskiden bu inline INSERT yalniz 21 kolon yaziyordu -> base
             # (cup/flat/double) + carr + vcp/power_play kolonlari NULL kaliyordu. Helper
             # 39 kolonu (slope_info pvh + ohlcv_*) yazar.
+            # Per-ticker SAVEPOINT (17 Haz 2026 — eski 'break' tek bozuk ticker'da
+            # tum transaction'i abort edip TUM taramayi 0 kayda dusuruyordu; GENB NaN-JSON
+            # bunu tetikledi). Savepoint ile yalniz bozuk satir rollback, gerisi devam.
             try:
+                c.execute("SAVEPOINT row_sp")
                 _upsert_minervini_scan_row(c, scan_date, row["Ticker"], row, slopes.get(row["Ticker"]))
+                c.execute("RELEASE SAVEPOINT row_sp")
                 saved += 1
             except Exception as e:
+                c.execute("ROLLBACK TO SAVEPOINT row_sp")
                 print(f"  Kayıt hatası {row['Ticker']}: {e}")
-                break  # ilk hatada dur
+                continue  # tek bozuk ticker tarama butununu dusurmesin
 
         conn.commit()
 

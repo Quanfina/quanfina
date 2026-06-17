@@ -73,6 +73,25 @@ def _existing_count(scan_date):
         conn.close()
 
 
+def _stock_row_count(scan_date):
+    """minervini_scans'te scan_date icin yazilan hisse satiri sayisi.
+
+    "Sessiz ok" tespiti icin: run_scan basariyla donse bile (Finviz/yfinance/sequence
+    sorununda sessizce return edebiliyor) gercekte satir yazilip yazilmadigini dogrular.
+    DB sorgusu hata verirse -1 (dogrulanamadi — false-warning uretme).
+    """
+    from db_connection import get_connection
+    conn = get_connection()
+    c = conn.cursor()
+    try:
+        c.execute("SELECT COUNT(*) FROM minervini_scans WHERE scan_date = %s", (scan_date,))
+        return c.fetchone()[0]
+    except Exception:
+        return -1
+    finally:
+        conn.close()
+
+
 @app.route("/health", methods=["GET"])
 def health():
     """Container ve DB sağlık kontrolü."""
@@ -143,7 +162,28 @@ def scan():
             log.info("Starting scan for %s (force=%s)", scan_date, force)
             run_scan(scan_date_override=date_override)
             log.info("Scan completed for %s", scan_date)
-            stock_response = {"status": "ok", "scan_date": scan_date}
+            # "Sessiz ok" defekti (17 Haz 2026): run_scan Finviz/yfinance/sequence
+            # hatasinda sessizce return ediyordu; endpoint "ok" sanip 0 satir
+            # yazildigini gizliyordu -> 06-12..06-17 prod hisse taramasi 6 gun
+            # gorunmez sekilde olu kaldi (sektor calistigi icin fark edilmedi).
+            # Cozum: gercek yazim sayisini dogrula, 0 ise "warning" don.
+            written = _stock_row_count(scan_date)
+            if written == 0:
+                log.error("Scan returned OK but 0 stock rows for %s — SILENT FAILURE", scan_date)
+                stock_response = {
+                    "status": "warning",
+                    "scan_date": scan_date,
+                    "stock_rows": 0,
+                    "warning": ("Tarama tamamlandi ama minervini_scans'e hisse "
+                                "yazilmadi. Olasi sebep: Finviz/yfinance erisimi "
+                                "veya SERIAL id sequence desync (duplicate key)."),
+                }
+            else:
+                stock_response = {
+                    "status": "ok",
+                    "scan_date": scan_date,
+                    "stock_rows": (written if written > 0 else None),
+                }
         except SystemExit:
             stock_response = {"status": "skipped", "scan_date": scan_date}
         except Exception as e:
