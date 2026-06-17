@@ -336,6 +336,16 @@ SCREENS_READY_9 = {
         "label": "📈 Healthy Accumulation",
         "filter": "volume_asymmetry_tier = 'healthy'",
     },
+    # KARAR ADAY (18 Haz 2026) — Geçerli Baz: O'Neil base detector (Cup-with-Handle /
+    # Flat Base / Double Bottom) en az birinde EXCELLENT veya GOOD kalite. MARGINAL
+    # (kusurlu, "O'Neil: dikkatli") + NONE haric — Minervini hard-cut felsefesi (bkz.
+    # SCREENS_DIFF_6 not "saf gecis yeterli"). Kolonlar scanner.py compute_cup_with_handle/
+    # compute_flat_base/compute_double_bottom (quanfina_math, O'Neil referansli) yazar;
+    # P490 sequence/NaN fix sonrasi base kolonlari canli doluyor (gate kalkti).
+    "valid_base": {
+        "label": "Geçerli Baz (Cup/Flat/Double — GOOD+)",
+        "filter": "(cup_handle_quality IN ('EXCELLENT','GOOD') OR flat_base_quality IN ('EXCELLENT','GOOD') OR double_bottom_quality IN ('EXCELLENT','GOOD'))",
+    },
     # KARAR ADAY #486 (23 May 2026) — Temel Eleme: 4 kosul (24 May revize)
     # 24 May 2026 — Gem + Quanfina Notebook Çift Danışma sonucu:
     #   Mark felsefesi gereği Fundamental "Hard Filter" DEĞİL, "Soft Score"

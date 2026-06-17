@@ -94,6 +94,10 @@ export const SCREEN_CATEGORIES: Record<string, string> = {
   stage2_10p: "Trend Template",
   temel_eleme: "Temel Eleme",
   tam_minervini: "Tam Minervini Tarama",
+  // 18 Haz 2026 — Geçerli Baz re-add. Olay tetikleyici (arşiv planı madde 1/3):
+  // P490 sequence/NaN fix sonrası base kolonları (cup/flat/double quality) canlı doldu.
+  // Vizyon "geçerli baz filtresi" (birleşik) — Cup/Flat/Double EXCELLENT+GOOD.
+  valid_base: "Geçerli Baz",
 };
 
 // SCREEN_DESCRIPTIONS kaldirildi (22 May 2026) — Sn. Ferit "bunu sil" talimati.
@@ -171,6 +175,17 @@ export const SCREEN_CONDITIONS: Record<string, ScreenCondition[]> = {
     { source: "mark_ekstra", text: "EPS Q/Q artışı ≥ %25 (TLSMW s.127 — Mark Soft Score, Recipe)" },
     { source: "mark_ekstra", text: "Sales Q/Q artışı ≥ %25 (TLSMW s.132 — Soft Score, ideal üç haneli)" },
     { source: "mark_ekstra", text: "ROE ≥ %15-17 (Momentum Masters s.74 — Soft Score, yeni IPO için esnetilir)" },
+  ],
+
+  // 18 Haz 2026 — Geçerli Baz (Cup-with-Handle / Flat Base / Double Bottom birleşik)
+  // O'Neil baz analizi (Minervini Stage 2 setup'ın temeli). Backend kolonları:
+  // cup_handle_quality / flat_base_quality / double_bottom_quality — quanfina_math
+  // compute_cup_with_handle / compute_flat_base / compute_double_bottom (O'Neil referanslı).
+  // "Geçerli" = en az birinde EXCELLENT veya GOOD; MARGINAL (kusurlu, "O'Neil dikkatli")
+  // ve NONE hariç (Minervini hard-cut felsefesi — bkz. SCREENS_DIFF_6 "saf geçiş yeterli").
+  valid_base: [
+    { source: "mark", text: "Cup-with-Handle, Flat Base veya Double Bottom baz formasyonu tespit edildi (O'Neil baz analizi)" },
+    { source: "mark", text: "Baz kalitesi EXCELLENT veya GOOD (kusurlu MARGINAL + formasyon yok NONE hariç — hard-cut)" },
   ],
 
   // 24 May 2026 — Tam Minervini Tarama (Hibrit Pipeline: 10 Hard + 5 Soft)

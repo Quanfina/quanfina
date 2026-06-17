@@ -448,3 +448,52 @@ class TestTamMinerviniConsistency:
         assert "Tam Minervini" in m.group(1), (
             f"tam_minervini label = '{m.group(1)}', 'Tam Minervini' içermeli."
         )
+
+
+class TestValidBaseConsistency:
+    """valid_base (Geçerli Baz) — UI dropdown ↔ Backend SQL bire-bir uyum.
+
+    18 Haz 2026 — P490 base kolonları (cup/flat/double quality) canlı doldu (sequence/
+    NaN fix). Vizyon "geçerli baz filtresi" re-add. Backend SQL filtresi O'Neil base
+    detector kolonlarını EXCELLENT/GOOD ile süzer (hard-cut, MARGINAL/NONE hariç).
+    """
+
+    @pytest.fixture(scope="class")
+    def ts(self) -> str:
+        return _read("web/types/screens.ts")
+
+    @pytest.fixture(scope="class")
+    def db_helpers(self) -> str:
+        return _read("api/db_helpers.py")
+
+    def test_db_helpers_has_valid_base_slug(self, db_helpers):
+        assert '"valid_base":' in db_helpers, (
+            "SCREENS_READY_9 dict'inde valid_base slug bulunamadı."
+        )
+
+    def test_sql_filter_references_three_base_columns(self, db_helpers):
+        """Filtre 3 base kalite kolonunu da içermeli (cup/flat/double)."""
+        sql = _extract_sql_filter(db_helpers, "valid_base")
+        for col in ("cup_handle_quality", "flat_base_quality", "double_bottom_quality"):
+            assert col in sql, f"valid_base filtresinde {col} eksik. Mevcut: {sql!r}"
+
+    def test_sql_filter_is_hard_cut_excellent_good(self, db_helpers):
+        """'Geçerli' = EXCELLENT veya GOOD; MARGINAL hariç (hard-cut felsefesi)."""
+        sql = _extract_sql_filter(db_helpers, "valid_base")
+        assert "EXCELLENT" in sql and "GOOD" in sql, (
+            f"valid_base filtresi EXCELLENT/GOOD içermeli. Mevcut: {sql!r}"
+        )
+        assert "MARGINAL" not in sql, (
+            "valid_base filtresinde MARGINAL OLMAMALI (kusurlu — hard-cut hariç)."
+        )
+
+    def test_ui_dropdown_has_valid_base(self, ts):
+        """SCREEN_CATEGORIES'de valid_base 'Geçerli Baz' label ile olmalı (dropdown)."""
+        m = re.search(r'valid_base:\s*"([^"]+)"', ts)
+        assert m is not None, "SCREEN_CATEGORIES'de valid_base bulunamadı (dropdown'da görünmez)."
+        assert "Geçerli Baz" in m.group(1), f"valid_base label = '{m.group(1)}'."
+
+    def test_ui_conditions_has_valid_base(self, ts):
+        """SCREEN_CONDITIONS'da valid_base 2 koşullu (formasyon + kalite) olmalı."""
+        n = _extract_screen_conditions_count(ts, "valid_base")
+        assert n == 2, f"valid_base UI koşul sayısı = {n}, beklenen 2 (formasyon + kalite)."
