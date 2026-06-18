@@ -3,6 +3,8 @@
 import { Activity, Minus } from "lucide-react";
 import { useBullishDivergence } from "@/hooks/use-bullish-divergence";
 import { fmtUsd } from "@/lib/format-currency";
+import { CarrPaperTradeButton } from "@/components/stock/CarrPaperTradeButton";
+import type { InitialData } from "@/components/journal/AddTradeDialog";
 
 /**
  * Paket 515 (18 Haz 2026): Carr Bullish Divergence paneli (/hisse/[symbol]).
@@ -12,7 +14,7 @@ import { fmtUsd } from "@/lib/format-currency";
  * eyeball → quality=CANDIDATE. Aday varsa giriş(close)/stop(sell-off dibi)/hedef(2R) + diverge
  * gösterge listesi + eyeball checklist; yoksa SMA + kaç gösterge diverge bağlamı.
  */
-export function BullishDivergenceCard({ symbol }: { symbol: string }) {
+export function BullishDivergenceCard({ symbol, onPaperTrade }: { symbol: string; onPaperTrade?: (d: InitialData) => void }) {
   const { data, isLoading, isError } = useBullishDivergence(symbol);
 
   if (isLoading) {
@@ -83,6 +85,13 @@ export function BullishDivergenceCard({ symbol }: { symbol: string }) {
             Risk %{data.risk_pct} · R:R 1:{data.rr} · {data.divergence_count}/6 gösterge diverge ·
             uzun tutma (Carr s.252)
           </p>
+          <CarrPaperTradeButton
+            data={{ symbol, strategy: "carr", setup_type: "bullish_divergence",
+              entry_price: data.entry ?? undefined, plan_stop: data.stop ?? undefined,
+              plan_target: data.target ?? undefined,
+              plan_entry_trigger: `Carr Bullish Divergence (s.258) — uptrend-dip, ${data.divergence_count}/6 gösterge divergence; göz kararı` }}
+            onPaperTrade={onPaperTrade}
+          />
         </>
       ) : (
         <div className="grid grid-cols-3 gap-2 text-xs pt-1 border-t border-muted-foreground/15">

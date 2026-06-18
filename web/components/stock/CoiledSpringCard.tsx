@@ -3,6 +3,8 @@
 import { Zap, Minus } from "lucide-react";
 import { useCoiledSpring } from "@/hooks/use-coiled-spring";
 import { fmtUsd } from "@/lib/format-currency";
+import { CarrPaperTradeButton } from "@/components/stock/CarrPaperTradeButton";
+import type { InitialData } from "@/components/journal/AddTradeDialog";
 
 /**
  * Paket 510 (18 Haz 2026): Carr Coiled Spring paneli (/hisse/[symbol]).
@@ -12,7 +14,7 @@ import { fmtUsd } from "@/lib/format-currency";
  * TIER-2 EYEBALL: tarama aday bulur, "göz kararı" şart → quality=CANDIDATE. Aday varsa
  * giriş(signal high)/stop(50MA-%2)/hedef(2R) + eyeball checklist; yoksa SMA20/SMA50 bağlamı.
  */
-export function CoiledSpringCard({ symbol }: { symbol: string }) {
+export function CoiledSpringCard({ symbol, onPaperTrade }: { symbol: string; onPaperTrade?: (d: InitialData) => void }) {
   const { data, isLoading, isError } = useCoiledSpring(symbol);
 
   if (isLoading) {
@@ -83,6 +85,13 @@ export function CoiledSpringCard({ symbol }: { symbol: string }) {
           <p className="text-[10px] text-muted-foreground">
             Risk %{data.risk_pct} · R:R 1:{data.rr} · Time stop YOK (trailing — Carr s.324)
           </p>
+          <CarrPaperTradeButton
+            data={{ symbol, strategy: "carr", setup_type: "coiled_spring",
+              entry_price: data.entry ?? undefined, plan_stop: data.stop ?? undefined,
+              plan_target: data.target ?? undefined,
+              plan_entry_trigger: "Carr Coiled Spring (s.250) — daralan yay ADAY; göz kararı: trendline kırılımı + 50MA temassız" }}
+            onPaperTrade={onPaperTrade}
+          />
         </>
       ) : (
         <div className="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-muted-foreground/15">

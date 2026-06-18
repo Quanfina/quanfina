@@ -37,12 +37,17 @@ import { useStockQuotes } from "@/hooks/use-stock-quote";
 const SELECT = "h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring";
 const TEXTAREA = "w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm resize-none focus:outline-none focus:ring-1 focus:ring-ring";
 
-interface InitialData {
+export interface InitialData {
   symbol?: string;
   strategy?: string;
   setup_type?: string;
   entry_date?: string;
   entry_price?: number;
+  // P529 (18 Haz 2026): Carr sinyali → paper trade köprüsü. Detected setup'ın
+  // entry/stop/target/tetikleyici plan alanlarını pre-fill (Mark Trade Plan).
+  plan_stop?: number;
+  plan_target?: number;
+  plan_entry_trigger?: string;
 }
 
 interface Props {
@@ -200,6 +205,12 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
     if (initialData.setup_type !== undefined) setSetupType(initialData.setup_type);
     if (initialData.entry_date !== undefined) setEntryDate(initialData.entry_date);
     if (initialData.entry_price !== undefined) setEntryPrice(String(initialData.entry_price));
+    // P529: Carr sinyali köprüsü — plan alanları pre-fill (entry/stop/target Carr detector'dan).
+    // ATR auto-fill effect'i (`!planStop`) bunu ezmez: initialData önce set eder, Carr-özel
+    // stop ATR genel önerisine üstün gelir (daha spesifik).
+    if (initialData.plan_stop !== undefined) setPlanStop(String(initialData.plan_stop));
+    if (initialData.plan_target !== undefined) setPlanTarget(String(initialData.plan_target));
+    if (initialData.plan_entry_trigger !== undefined) setPlanEntryTrigger(initialData.plan_entry_trigger);
     // KARAR #477: Sinyaller sayfasından AL ile geldiyse default "strategy" (sistem sinyali)
     setSignalSource("strategy");
   }, [open, initialData]);

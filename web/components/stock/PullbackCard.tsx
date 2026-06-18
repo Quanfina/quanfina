@@ -3,6 +3,8 @@
 import { TrendingUp, Minus } from "lucide-react";
 import { usePullback } from "@/hooks/use-pullback";
 import { fmtUsd } from "@/lib/format-currency";
+import { CarrPaperTradeButton } from "@/components/stock/CarrPaperTradeButton";
+import type { InitialData } from "@/components/journal/AddTradeDialog";
 
 /**
  * Paket 506 (18 Haz 2026): Carr Pullback paneli (/hisse/[symbol]).
@@ -12,7 +14,7 @@ import { fmtUsd } from "@/lib/format-currency";
  * giriş(signal high üstü)/stop(50MA-%2 / %8 cap)/hedef(2R); yoksa SMA + Stoch %K bağlamı.
  * Çift danışma (Carr NotebookLM) ile kanon doğrulandı. Veri: SMA200 → ≥200 bar gerek.
  */
-export function PullbackCard({ symbol }: { symbol: string }) {
+export function PullbackCard({ symbol, onPaperTrade }: { symbol: string; onPaperTrade?: (d: InitialData) => void }) {
   const { data, isLoading, isError } = usePullback(symbol);
 
   if (isLoading) {
@@ -76,6 +78,13 @@ export function PullbackCard({ symbol }: { symbol: string }) {
             Risk %{data.risk_pct} · R:R 1:{data.rr} · Stoch %K {data.stoch_k} · Time stop YOK
             (trailing — Carr s.324)
           </p>
+          <CarrPaperTradeButton
+            data={{ symbol, strategy: "carr", setup_type: "pullback",
+              entry_price: data.entry ?? undefined, plan_stop: data.stop ?? undefined,
+              plan_target: data.target ?? undefined,
+              plan_entry_trigger: "Carr Pullback (s.249) — WEAK_bull, Stoch<20 oversold pullback, ertesi gün signal high üstü" }}
+            onPaperTrade={onPaperTrade}
+          />
         </>
       ) : (
         <div className="grid grid-cols-4 gap-2 text-xs pt-1 border-t border-muted-foreground/15">

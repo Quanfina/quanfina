@@ -3,6 +3,8 @@
 import { Rocket, Minus } from "lucide-react";
 import { useBlueSky } from "@/hooks/use-blue-sky";
 import { fmtUsd } from "@/lib/format-currency";
+import { CarrPaperTradeButton } from "@/components/stock/CarrPaperTradeButton";
+import type { InitialData } from "@/components/journal/AddTradeDialog";
 
 /**
  * Paket 508 (18 Haz 2026): Carr Blue Sky Breakout paneli (/hisse/[symbol]).
@@ -12,7 +14,7 @@ import { fmtUsd } from "@/lib/format-currency";
  * yeni 40g yüksek + green mum. Sinyal varsa giriş(signal high)/stop(%6 Ch22)/hedef(2R);
  * yoksa 40g/52h yüksek + OBV/MACD bağlamı. Çift danışma (Carr NotebookLM) doğrulandı.
  */
-export function BlueSkyCard({ symbol }: { symbol: string }) {
+export function BlueSkyCard({ symbol, onPaperTrade }: { symbol: string; onPaperTrade?: (d: InitialData) => void }) {
   const { data, isLoading, isError } = useBlueSky(symbol);
 
   if (isLoading) {
@@ -76,6 +78,13 @@ export function BlueSkyCard({ symbol }: { symbol: string }) {
             Risk %{data.risk_pct} · R:R 1:{data.rr} · 40g yeni yüksek + OBV/MACD teyit · Time
             stop YOK (trailing — Carr s.324)
           </p>
+          <CarrPaperTradeButton
+            data={{ symbol, strategy: "carr", setup_type: "blue_sky",
+              entry_price: data.entry ?? undefined, plan_stop: data.stop ?? undefined,
+              plan_target: data.target ?? undefined,
+              plan_entry_trigger: "Carr Blue Sky (s.264) — 40g yeni yüksek breakout + OBV/MACD teyit, ertesi gün signal high üstü" }}
+            onPaperTrade={onPaperTrade}
+          />
         </>
       ) : (
         <div className="grid grid-cols-3 gap-2 text-xs pt-1 border-t border-muted-foreground/15">

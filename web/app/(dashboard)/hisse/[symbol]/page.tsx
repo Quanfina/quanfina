@@ -45,7 +45,7 @@ import { useAtrVolatility } from "@/hooks/use-atr-volatility";
 import { useTradingMode, isNewAlBlocked } from "@/hooks/use-trading-mode";
 import { useCarrStage } from "@/hooks/use-carr-stage";
 import { useClimaxRun } from "@/hooks/use-climax-run";
-import { AddTradeDialog } from "@/components/journal/AddTradeDialog";
+import { AddTradeDialog, type InitialData } from "@/components/journal/AddTradeDialog";
 import { Button } from "@/components/ui/button";
 import { todayLocalISO } from "@/lib/format-date";
 import { toast } from "sonner";
@@ -99,6 +99,14 @@ export default function HissePage({
   // Sn. Ferit Watchlist/Hisse Tarama'dan hisseye girdiğinde direkt buradan
   // trade açabilsin. Sinyaller AL butonu pateni — pre-fill ile.
   const [tradeOpen, setTradeOpen] = useState(false);
+  // P529: Carr sinyali → paper trade köprüsü. Detected LONG Carr kartı "📋 Paper Trade'e
+  // aktar" → bu state setlenip dialog entry/stop/target/setup pre-fill ile açılır.
+  const [carrPrefill, setCarrPrefill] = useState<InitialData | null>(null);
+
+  function tradeFromCarr(d: InitialData) {
+    setCarrPrefill(d);
+    setTradeOpen(true);
+  }
 
   function handleTradeClick() {
     // Stage 4 ise warning toast — KALICI İLKE #4 Mark "UZAK DUR" canon.
@@ -330,18 +338,19 @@ export default function HissePage({
           <SellStrengthCard symbol={sym} />
           <ActiveStrategies strategies={info.active_strategies} symbol={sym} />
           <CarrStageCard symbol={sym} />
-          {/* Paket 500 (18 Haz 2026): Carr Mean Reversion — countertrend çekirdek setup (s.356) */}
-          <MeanReversionCard symbol={sym} />
+          {/* Paket 500 (18 Haz 2026): Carr Mean Reversion — countertrend çekirdek setup (s.356)
+              P529: LONG sinyalde "Paper Trade'e aktar" köprüsü (MR kart LONG iken gösterir) */}
+          <MeanReversionCard symbol={sym} onPaperTrade={tradeFromCarr} />
           {/* Paket 506 (18 Haz 2026): Carr Pullback — WEAK_BULL trend-takip LONG (s.249) */}
-          <PullbackCard symbol={sym} />
+          <PullbackCard symbol={sym} onPaperTrade={tradeFromCarr} />
           {/* Paket 508 (18 Haz 2026): Carr Blue Sky Breakout — STRONG+WEAK_BULL breakout (s.264) */}
-          <BlueSkyCard symbol={sym} />
+          <BlueSkyCard symbol={sym} onPaperTrade={tradeFromCarr} />
           {/* Paket 510 (18 Haz 2026): Carr Coiled Spring — TIER-2 daralan yay ADAYI (s.250) */}
-          <CoiledSpringCard symbol={sym} />
+          <CoiledSpringCard symbol={sym} onPaperTrade={tradeFromCarr} />
           {/* Paket 513 (18 Haz 2026): Carr Bullish Base Breakout — CONTRARIAN downtrend baz (s.291) */}
-          <BullishBaseCard symbol={sym} />
+          <BullishBaseCard symbol={sym} onPaperTrade={tradeFromCarr} />
           {/* Paket 515 (18 Haz 2026): Carr Bullish Divergence — uptrend-dip 2+ gösterge (s.258) */}
-          <BullishDivergenceCard symbol={sym} />
+          <BullishDivergenceCard symbol={sym} onPaperTrade={tradeFromCarr} />
           {/* Paket 518 (18 Haz 2026): Carr Blue Sea Breakdown — strong-bear SHORT (s.289) */}
           <BlueSeaCard symbol={sym} />
           {/* Paket 520 (18 Haz 2026): Carr Gap Down — ralli-sonu reversal SHORT (s.273) */}
@@ -385,18 +394,24 @@ export default function HissePage({
           aktivse "minervini" tercih). Plan/Stop/Hedef Sn. Ferit elle doldurur. */}
       <AddTradeDialog
         open={tradeOpen}
-        onOpenChange={setTradeOpen}
-        initialData={{
-          symbol: sym,
-          strategy: info.active_strategies?.[0]?.strategy ?? "minervini",
-          entry_date: todayLocalISO(), // Paket 356: yerel tarih (UTC off-by-one fix)
-          // P437 (Kural #28): canlı yfinance quote öncelik, bayat info.price fallback.
-          // Header CANLI $ gösterirken form bayat $ ile açılmasın — yanlış giriş/R/stop.
-          entry_price:
-            quote?.source === "yfinance" && quote?.price != null
-              ? quote.price
-              : info.price,
-        }}
+        onOpenChange={(v) => { setTradeOpen(v); if (!v) setCarrPrefill(null); }}
+        initialData={
+          // P529: Carr sinyali köprüsü prefill varsa onu kullan (entry/stop/target/setup);
+          // entry_date default bugün. Yoksa standart sembol+fiyat pre-fill.
+          carrPrefill
+            ? { entry_date: todayLocalISO(), ...carrPrefill }
+            : {
+                symbol: sym,
+                strategy: info.active_strategies?.[0]?.strategy ?? "minervini",
+                entry_date: todayLocalISO(), // Paket 356: yerel tarih (UTC off-by-one fix)
+                // P437 (Kural #28): canlı yfinance quote öncelik, bayat info.price fallback.
+                // Header CANLI $ gösterirken form bayat $ ile açılmasın — yanlış giriş/R/stop.
+                entry_price:
+                  quote?.source === "yfinance" && quote?.price != null
+                    ? quote.price
+                    : info.price,
+              }
+        }
       />
     </div>
   );

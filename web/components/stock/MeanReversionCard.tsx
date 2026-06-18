@@ -3,6 +3,8 @@
 import { TrendingDown, TrendingUp, Minus } from "lucide-react";
 import { useMeanReversion } from "@/hooks/use-mean-reversion";
 import { fmtUsd } from "@/lib/format-currency";
+import { CarrPaperTradeButton } from "@/components/stock/CarrPaperTradeButton";
+import type { InitialData } from "@/components/journal/AddTradeDialog";
 
 /**
  * Paket 500 (18 Haz 2026): Carr Mean Reversion paneli (/hisse/[symbol]).
@@ -11,7 +13,7 @@ import { fmtUsd } from "@/lib/format-currency";
  * frekans setup (Carr.md %80). Sinyal varsa giriş/stop(%8 cap)/hedef(SMA20); yoksa
  * BB+SMA20 bağlamı. Göstergeler SADECE BB(20,2.0)+SMA20+candle (Carr canon).
  */
-export function MeanReversionCard({ symbol }: { symbol: string }) {
+export function MeanReversionCard({ symbol, onPaperTrade }: { symbol: string; onPaperTrade?: (d: InitialData) => void }) {
   const { data, isLoading, isError } = useMeanReversion(symbol);
 
   if (isLoading) {
@@ -91,6 +93,16 @@ export function MeanReversionCard({ symbol }: { symbol: string }) {
           <p className="text-[10px] text-muted-foreground">
             {data.time_stop_days}-gün time stop · Range/Weak piyasada geçerli (Carr s.356/400/410)
           </p>
+          {/* P529: SADECE LONG'da köprü (trade formu LONG-yönlü; MR SHORT olabilir) */}
+          {isLong && (
+            <CarrPaperTradeButton
+              data={{ symbol, strategy: "carr", setup_type: "mean_reversion",
+                entry_price: data.entry ?? undefined, plan_stop: data.stop ?? undefined,
+                plan_target: data.target ?? undefined,
+                plan_entry_trigger: "Carr Mean Reversion (s.307) — countertrend BB+SMA20 içeri dönüş" }}
+              onPaperTrade={onPaperTrade}
+            />
+          )}
         </>
       ) : (
         <div className="grid grid-cols-3 gap-2 text-xs pt-1 border-t border-muted-foreground/15">
