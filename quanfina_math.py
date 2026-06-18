@@ -5196,6 +5196,10 @@ def compute_bullish_divergence(
     div_count = len(div_names)
 
     pivot_low = min(lows[i], lows[i - 1])
+    # NOT (bar hizalama — KASITLI, Carr screener proxy s.258): fiyat pivot DUN (lows[i-1] <=
+    # 20g/5g once) iken gosterge BUGUN (>15g once) olcum noktasi. Genel divergence teorisi "ayni
+    # bar" der; ama Carr'in MEKANIK screener'i bu proxy'yi kullanir (kitap: "%100 dogrulukla
+    # taranamaz" -> insan gozle teyit, quality='CANDIDATE'). Bu uyumsuzluk DEGIL, kanon (Kural #26).
     rules = {
         'uptrend_50_200': sma50 > sma200,
         'pivot_low_20': lows[i - 1] <= lows[i - 1 - BULLISH_DIV_PIVOT_LB_LONG],
