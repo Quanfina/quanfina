@@ -5242,6 +5242,118 @@ def compute_bullish_divergence(
 
 
 # ======================================================================
+# CARR BLUE SEA BREAKDOWN (TLFAL 2.baski Bolum 18, s.283-289) — P517 (18 Haz 2026)
+# Blue Sky'in SHORT aynasi (strong bear trend-takip). Cift danisma (Carr NotebookLM, verbatim
+# teyit). Gosterge OBV+MACD "yeni 40g DUSUK" (s.286). KRITIK ASIMETRI (s.286): fiyat carpani
+# ÷2 DEGIL -> 0.8 (close > 0.8×52h ZIRVE; en fazla %20 dusmus, asiri satilmis shortlanmaz).
+# SINYAL screener (s.289, 6 kural HEPSI):
+#   (1) close < 40g prior min close (yeni 40g dusuk)
+#   (2) close > 260g prior min close (52h dip DEGIL — dipe yol var)
+#   (3) close > 0.8 × 260g max high (asimetri — 52h zirvenin %20 altinda, daha fazla degil)
+#   (4) OBV < 40g prior min OBV  (5) MACD line < 40g prior min MACD  (6) close < open (kirmizi)
+# TETIKLEYICI (s.317): ertesi gun signal LOW alti sell-stop -> entry = signal low (lows[bugun]).
+# CIKIS: Blue Sea-ozel KAYNAK YOK (cift danisma ❌) -> Ch22 EVRENSEL: stop %6 ustte (s.306),
+# %8 cap, target 2R asagi (s.324). TIME STOP YOK. Rejim: SADECE strong bear (s.283, one-trick
+# pony s.285). ON-FILTRE: Bearish Watch List (P/S yuksek, earnings dusen — s.284,288).
+# VERI: 260g -> >=261 bar (pvh 280 -> bulk MUMKUN).
+# ======================================================================
+BLUE_SEA_NEW_LOW_LOOKBACK: int = 40         # Carr s.289: 40-gun yeni dusuk (close/OBV/MACD)
+BLUE_SEA_52W_LOOKBACK: int = 260            # Carr s.289: 260 islem gunu (52 hafta)
+BLUE_SEA_MAX_PRICE_MULTIPLE: float = 0.8    # Carr s.286: close > 0.8×52h ZIRVE (ASIMETRI — Blue Sky 2.0'di)
+BLUE_SEA_MACD_FAST: int = 12                # Carr s.286 MACD (12,26,9)
+BLUE_SEA_MACD_SLOW: int = 26
+BLUE_SEA_STOP_PCT: float = 6.0              # Carr s.306 (Ch22 evrensel; Blue Sea-ozel YOK)
+BLUE_SEA_HARD_CAP_PCT: float = 8.0          # Carr s.306-308 "%8 hard cap"
+BLUE_SEA_TARGET_R_MULTIPLE: float = 2.0     # Carr s.324 (Ch22 evrensel)
+
+
+def compute_blue_sea_breakdown(
+    opens: list[float],
+    highs: list[float],
+    lows: list[float],
+    closes: list[float],
+    volumes: list[float],
+) -> dict:
+    """Carr Blue Sea Breakdown (2.baski s.289) — strong-bear trend-takip SHORT (Blue Sky aynasi).
+
+    SINYAL (s.289, 6 kural HEPSI): (1) close<40g prior min, (2) close>260g prior min (52h dip
+    DEGIL), (3) close > 0.8×260g max high (ASIMETRI s.286 — %20'den fazla dusmemis), (4) OBV<40g
+    prior min, (5) MACD<40g prior min, (6) close<open (kirmizi). ENTRY (s.317): ertesi gun signal
+    low alti sell-stop -> entry=lows[bugun]. CIKIS Ch22: stop %6 ustte / %8 cap (s.306), target
+    2R asagi (s.324). TIME STOP YOK. Rejim SADECE strong bear (s.283). Veri: 260g -> >=261 bar.
+
+    Returns: {detected, direction, quality, signal_close, entry, stop, target, risk_pct, rr,
+              low_40d, low_260d, high_260d, obv, macd, rules, mark_says}.
+    """
+    def _none(msg: str) -> dict:
+        return {
+            'detected': False, 'direction': None, 'quality': 'NONE',
+            'signal_close': None, 'entry': None, 'stop': None, 'target': None,
+            'risk_pct': None, 'rr': None, 'low_40d': None, 'low_260d': None,
+            'high_260d': None, 'obv': None, 'macd': None, 'rules': {}, 'mark_says': msg,
+        }
+
+    if not closes or not volumes or not opens or not highs or not lows:
+        return _none('Yetersiz veri — Blue Sea hesaplanamiyor.')
+    n = len(closes)
+    if not (len(opens) == len(highs) == len(lows) == len(volumes) == n):
+        return _none('Blue Sea: OHLCV uzunluk farkli.')
+    min_bars = BLUE_SEA_52W_LOOKBACK + 1
+    if n < min_bars:
+        return _none(f'Yetersiz veri — en az {min_bars} bar gerek (260g 52-hafta).')
+
+    i = n - 1
+    prior40 = closes[i - BLUE_SEA_NEW_LOW_LOOKBACK:i]
+    prior260 = closes[i - BLUE_SEA_52W_LOOKBACK:i]
+    high260 = highs[i - BLUE_SEA_52W_LOOKBACK + 1:i + 1]  # 260 incl bugun (52h zirve)
+    obv = _obv_series(closes, volumes)
+    macd = _macd_line_series(closes, BLUE_SEA_MACD_FAST, BLUE_SEA_MACD_SLOW)
+    obv_prior40 = obv[i - BLUE_SEA_NEW_LOW_LOOKBACK:i]
+    macd_prior40 = [m for m in macd[i - BLUE_SEA_NEW_LOW_LOOKBACK:i] if m is not None]
+    if macd[i] is None or not macd_prior40 or not obv_prior40:
+        return _none('Blue Sea: OBV/MACD hesaplanamadi (yetersiz veri).')
+
+    low40 = min(prior40)
+    low260 = min(prior260)
+    high260max = max(high260)
+    rules = {
+        'yeni_40g_dusuk': closes[i] < low40,
+        'degil_52h_dip': closes[i] > low260,
+        'asiri_satilmamis': closes[i] > BLUE_SEA_MAX_PRICE_MULTIPLE * high260max,
+        'obv_40g_dusuk': obv[i] < min(obv_prior40),
+        'macd_40g_dusuk': macd[i] < min(macd_prior40),
+        'bugun_kirmizi': closes[i] < opens[i],
+    }
+    base = {
+        'low_40d': round(low40, 2), 'low_260d': round(low260, 2),
+        'high_260d': round(high260max, 2), 'obv': round(obv[i], 0),
+        'macd': round(macd[i], 3), 'rules': rules,
+    }
+    if not all(rules.values()):
+        d = _none(f'Blue Sea sinyali yok ({sum(rules.values())}/6 kosul).')
+        d.update(base)
+        return d
+
+    entry = lows[i]  # ertesi gun signal low alti sell-stop (s.317)
+    stop = entry * (1 + BLUE_SEA_STOP_PCT / 100)   # SHORT — stop ustte, Ch22 %6 (Blue Sea-ozel YOK)
+    risk = stop - entry
+    target = entry - BLUE_SEA_TARGET_R_MULTIPLE * risk  # SHORT — hedef asagi
+    risk_pct = round(risk / entry * 100, 2) if entry else None
+    says = (f'✓ Carr Blue Sea Breakdown SHORT (strong-bear) — sinyal ${round(closes[i], 2)}, '
+            f'giris ${round(entry, 2)} (ertesi gun signal low alti), stop ${round(stop, 2)} '
+            f'(%6 ust Ch22), hedef ${round(target, 2)} (2R asagi). 40g yeni dusuk + OBV/MACD '
+            f'teyit, 52h zirve %20 altinda (asiri satilmamis). SADECE strong-bear (Carr s.283).')
+    d = {
+        'detected': True, 'direction': 'SHORT', 'quality': 'GOOD',
+        'signal_close': round(closes[i], 2), 'entry': round(entry, 2),
+        'stop': round(stop, 2), 'target': round(target, 2),
+        'risk_pct': risk_pct, 'rr': BLUE_SEA_TARGET_R_MULTIPLE, 'mark_says': says,
+    }
+    d.update(base)
+    return d
+
+
+# ======================================================================
 # Paket 462 (11 Haz 2026) — High Tight Flag Detection (= Minervini Power Play)
 #
 # O'Neil "High Tight Flag" (HTF) = Mark Minervini "Power Play" (Trade Like a Stock
