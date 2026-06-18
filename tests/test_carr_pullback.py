@@ -50,20 +50,35 @@ class TestCarrPullbackDetection:
         assert r["detected"] is True, r["mark_says"]
         assert r["direction"] == "LONG"
         assert all(r["rules"].values()), r["rules"]
-        assert r["entry"] == round(c[-1], 2)
+        # ENTRY = sinyal gunu HIGH'i ustu buy-stop (s.248), close DEGIL
+        assert r["entry"] == round(h[-1], 2)
+        assert r["signal_close"] == round(c[-1], 2)
 
     def test_stoch_oversold_below_20(self):
         o, h, l, c = _uptrend_pullback()
         r = compute_carr_pullback(o, h, l, c)
         assert r["stoch_k"] < 20.0, f"Stoch %K={r['stoch_k']} (oversold <20 bekleniyor)"
 
-    def test_stop_target_none_pending_cift_danisma(self):
-        """Kural #26 — Carr cikis kurallari (s.227-242) lokal eksik, uydurma YOK -> None."""
+    def test_exit_rules_computed(self):
+        """P505 cift danisma — stop (50MA-%2 / %8 cap) + target (2R) sourced (s.321-324)."""
         o, h, l, c = _uptrend_pullback()
         r = compute_carr_pullback(o, h, l, c)
         assert r["detected"] is True
-        assert r["stop"] is None
-        assert r["target"] is None
+        assert r["stop"] is not None and r["target"] is not None
+        assert r["stop"] < r["entry"], "long stop entry altinda olmali"
+        assert r["target"] > r["entry"], "target entry ustunde olmali"
+        # %8 hard cap asilmaz (s.322)
+        assert r["risk_pct"] <= 8.01, f"risk %{r['risk_pct']} > %8 cap ihlali"
+        # target = entry + 2.0R (s.324)
+        expected_target = r["entry"] + 2.0 * (r["entry"] - r["stop"])
+        assert abs(r["target"] - expected_target) < 0.05
+        assert r["rr"] == 2.0
+
+    def test_no_time_stop(self):
+        """Carr s.324 — Pullback trend-takip, MR'deki 7-gun time stop YOK."""
+        o, h, l, c = _uptrend_pullback()
+        r = compute_carr_pullback(o, h, l, c)
+        assert "time_stop_days" not in r
 
     def test_sma_alignment_reported(self):
         o, h, l, c = _uptrend_pullback()

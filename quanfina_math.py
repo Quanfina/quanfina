@@ -4509,25 +4509,35 @@ def compute_mean_reversion(
 
 
 # ======================================================================
-# CARR PULLBACK SETUP (TLFAL 2.baski s.268 entry screener) — P504 (18 Haz 2026)
+# CARR PULLBACK SETUP (TLFAL 2.baski s.249 entry screener) — P504->P505 (18 Haz 2026)
 # WEAK_BULL setup (Carr s.119) — trend-takip LONG. Carr'in amiral pullback setup'i.
 # Gosterge: Pullback -> Stochastics (5,3,3), esik 20/80 (Carr s.41-51, s.169, s.228).
 # TIER 1 (otomatik, s.218). On-filtre: Bullish Watch List (Beta>1.5, Price>$5, AvgVol>100K,
-# P/S<1 — s.204 Test 13; bulk screen katmaninda uygulanir, MR s.302 pateni).
-# CIKIS (stop/target): Carr.md B.11 s.227-242 + B.9 s.155-190 LOKAL EKSIK (v20.12 kayip) ->
-# Carr NotebookLM cift danisma BEKLIYOR. stop/target=None (Kural #26 uydurma yasak); ENTRY
-# tespiti tam sourced (s.268 6 kural). Sayfa atiflari MR P503 dersi geregi cift danisma teyitli.
+# P/S<1 — s.233,242 ZORUNLU; bulk screen katmaninda uygulanir, MR s.302 pateni).
+# CIFT DANISMA (Carr NotebookLM, 18 Haz 2026 — verbatim alinti teyit): TUM kanon dogrulandi.
+#   - ENTRY 6 kural ✅ ama sayfa s.249 (s.268 PDF farkiydi — MR P503 dersi tekrar).
+#   - TETIKLEYICI (s.248): 6 kural SINYAL gununu belirler; ENTRY ertesi gun sinyal gunu
+#     HIGH'i USTUNDE (buy-stop). entry = signal_high (close DEGIL — P504 hatasi duzeltildi).
+#   - STOP (s.321-322): Pullback-ozel Price Pattern = 50 MA'nin %1-2 alti (yapisal);
+#     evrensel %8 hard cap (s.322, tercih ~%6).
+#   - TARGET (s.324-326): R-multiple = entry + (1.5-2.0)x stop mesafesi.
+#   - TIME STOP: ❌ YOK (trend-takip, trailing stop — s.324; MR'den FARKLI).
+#   - PYRAMIDING (s.250): yeni pullback sinyali gelirse kademeli artis (pozisyon yonetimi).
 # NOT (veri): SMA200 gerektirir -> en az 200 bar. pvh (80 bar) YETERSIZ; /hisse karti
 # _get_ohlcv (yfinance full) ile calisir, bulk pvh-screen Pullback icin uygun degil.
 # ======================================================================
-PULLBACK_SMA_FAST: int = 20            # Carr s.268
-PULLBACK_SMA_MID: int = 50             # Carr s.268
-PULLBACK_SMA_SLOW: int = 200           # Carr s.268 (screener trend filtresi; chart paneli 20/50)
-PULLBACK_MID_RISING_LOOKBACK: int = 10  # Carr s.268: "50 SMA bugun > 50 SMA 10 gun once"
-PULLBACK_FAST_RISING_LOOKBACK: int = 5  # Carr s.268: "20 SMA bugun > 20 SMA 5 gun once"
-PULLBACK_STOCH_PERIOD: int = 5         # Carr Stochastics (5,3,3) — s.41-51, s.169
+PULLBACK_SMA_FAST: int = 20            # Carr s.249
+PULLBACK_SMA_MID: int = 50             # Carr s.249
+PULLBACK_SMA_SLOW: int = 200           # Carr s.249 (screener trend filtresi; chart paneli 20/50)
+PULLBACK_MID_RISING_LOOKBACK: int = 10  # Carr s.249: "50 SMA today > 50 SMA 10 days ago"
+PULLBACK_FAST_RISING_LOOKBACK: int = 5  # Carr s.249: "20 SMA today > 20 SMA 5 days ago"
+PULLBACK_STOCH_PERIOD: int = 5         # Carr Stochastics (5,3,3) — s.41-51, s.169, s.249
 PULLBACK_STOCH_SMOOTH: int = 3         # %K slowing 3 (slowed %K = SMA3 of raw %K)
-PULLBACK_STOCH_OVERSOLD: float = 20.0  # Carr s.268: "Stoch %K < 20" (s.169 esik 20/80)
+PULLBACK_STOCH_OVERSOLD: float = 20.0  # Carr s.249: "stochastics %K (5,3,3) ... < 20.0"
+# Cikis (s.321-326, cift danisma teyit):
+PULLBACK_STOP_MA_BUFFER_PCT: float = 2.0   # Carr s.322: 50 MA'nin "a percentage point or two" alti (1-2%; 2=muhafazakar)
+PULLBACK_HARD_CAP_PCT: float = 8.0         # Carr s.322: "not risking more than an 8 percent loss"
+PULLBACK_TARGET_R_MULTIPLE: float = 2.0    # Carr s.324: "1.5 to 2.0 times that of your stop-loss" (2.0=ust sinir)
 
 
 def _sma_at(closes: list[float], end_idx: int, period: int):
@@ -4561,25 +4571,29 @@ def compute_carr_pullback(
     lows: list[float],
     closes: list[float],
 ) -> dict:
-    """Carr Pullback (TLFAL 2.baski s.268 entry screener) — WEAK_BULL trend-takip LONG.
+    """Carr Pullback (TLFAL 2.baski s.249 entry screener) — WEAK_BULL trend-takip LONG.
 
-    ENTRY (s.268, 6 kural HEPSI gerekli):
+    SINYAL gunu (s.249, 6 kural HEPSI gerekli):
       (1) SMA20 > SMA50, (2) SMA50 > SMA200 (uzun trend),
       (3) SMA50 bugun > SMA50 10g once (50 yukseliyor),
       (4) SMA20 bugun > SMA20 5g once (20 yukseliyor),
       (5) Stoch %K(5,3,3) < 20 (oversold pullback tetigi),
       (6) bugun close > open (sicrama mumu).
-    Gosterge: Stochastics (s.228). On-filtre: Bullish Watch List (s.204).
-    CIKIS: stop/target Carr s.227-242 LOKAL EKSIK -> cift danisma BEKLIYOR; None doner
-    (Kural #26). Veri: SMA200 icin >=200 bar; pvh(80) yetersiz, /hisse _get_ohlcv ile calisir.
+    ENTRY tetikleyici (s.248): sinyal gunu ertesi, fiyat sinyal gunu HIGH'i USTUNE
+    ciktiginda alinir (buy-stop). entry = signal_high (= highs[bugun]).
+    STOP (s.321-322): 50 MA × (1 - %2) yapisal; evrensel %8 hard cap (s.322).
+    TARGET (s.324): R-multiple = entry + 2.0 × (entry - stop). TIME STOP YOK (trend-takip).
+    Gosterge: Stochastics (s.228). On-filtre: Bullish Watch List ZORUNLU (s.233,242).
+    Veri: SMA200 icin >=200 bar; pvh(80) yetersiz, /hisse _get_ohlcv ile calisir.
 
-    Returns: {detected, direction, quality, entry, stop, target, sma20, sma50, sma200,
-              stoch_k, rules, mark_says}.
+    Returns: {detected, direction, quality, signal_close, entry, stop, target, risk_pct,
+              rr, sma20, sma50, sma200, stoch_k, rules, mark_says}.
     """
     def _none(msg: str) -> dict:
         return {
             'detected': False, 'direction': None, 'quality': 'NONE',
-            'entry': None, 'stop': None, 'target': None,
+            'signal_close': None, 'entry': None, 'stop': None, 'target': None,
+            'risk_pct': None, 'rr': None,
             'sma20': None, 'sma50': None, 'sma200': None, 'stoch_k': None,
             'rules': {}, 'mark_says': msg,
         }
@@ -4620,14 +4634,25 @@ def compute_carr_pullback(
         d.update(base)
         return d
 
-    entry = closes[i]
-    says = (f'✓ Carr Pullback LONG (WEAK_BULL trend-takip) — giris ${round(entry, 2)}, '
-            f'Stoch %K {round(stoch_k, 1)}<20 oversold pullback. SMA20>SMA50>SMA200 dizilim, '
-            f'50+20 yukseliyor, sicrama mumu. CIKIS (stop/target) cift danisma bekliyor — '
-            f'Carr s.227-242 lokal eksik.')
+    # ENTRY = sinyal gunu HIGH'i ustunde buy-stop (s.248). Stop = 50 MA × (1-%2) yapisal,
+    # %8 hard cap ile (s.321-322). Target = entry + 2.0R (s.324). Time stop YOK (trend-takip).
+    entry = highs[i]
+    structural = sma50_t * (1 - PULLBACK_STOP_MA_BUFFER_PCT / 100)
+    hard_cap = entry * (1 - PULLBACK_HARD_CAP_PCT / 100)
+    stop = max(structural, hard_cap)  # entry'ye yakin (yuksek) olan = %8 cap asilmaz
+    risk = entry - stop
+    target = entry + PULLBACK_TARGET_R_MULTIPLE * risk
+    risk_pct = round(risk / entry * 100, 2) if entry else None
+    cap_note = ' (%8 cap)' if stop == hard_cap else ' (50MA -%2)'
+    says = (f'✓ Carr Pullback LONG (WEAK_BULL trend-takip) — sinyal ${round(closes[i], 2)}, '
+            f'giris ${round(entry, 2)} (ertesi gun signal high ustu), stop ${round(stop, 2)}'
+            f'{cap_note}, hedef ${round(target, 2)} (2R). Stoch %K {round(stoch_k, 1)}<20 '
+            f'oversold, SMA20>SMA50>SMA200 + ikisi yukseliyor. Time stop YOK — trailing (Carr s.324).')
     d = {
         'detected': True, 'direction': 'LONG', 'quality': 'GOOD',
-        'entry': round(entry, 2), 'stop': None, 'target': None, 'mark_says': says,
+        'signal_close': round(closes[i], 2), 'entry': round(entry, 2),
+        'stop': round(stop, 2), 'target': round(target, 2),
+        'risk_pct': risk_pct, 'rr': PULLBACK_TARGET_R_MULTIPLE, 'mark_says': says,
     }
     d.update(base)
     return d
