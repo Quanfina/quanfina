@@ -509,6 +509,8 @@ class TestImportantScreensReadded:
     SLUGS = (
         "top5_rpr", "power_play_ready", "tight_low_vol_excellent",
         "new_top5_rpr", "healthy_accumulation", "rpr_89_tpr_c",
+        # 18 Haz 2026 — yüksek-conviction izleme (bugün 0 ama kolon DOLU, canon eşik):
+        "vcp_ready_high", "tennis_ball_active",
     )
 
     @pytest.fixture(scope="class")

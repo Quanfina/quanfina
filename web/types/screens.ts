@@ -106,6 +106,10 @@ export const SCREEN_CATEGORIES: Record<string, string> = {
   new_top5_rpr: "Yeni Top %5 RS",            // DIFF: prev RS<95 -> RS≥95, 4 hisse (yeni lider)
   healthy_accumulation: "Sağlıklı Toplama",   // volume_asymmetry healthy, 33 hisse (kurumsal)
   rpr_89_tpr_c: "RS 89+ Grade A/B/C",        // RS≥89 + grade, 38 hisse (lider + temel kalite)
+  // 18 Haz 2026 — yüksek-conviction İZLEME ekranları (bugün 0; nadir güçlü setup çıkınca
+  // görünür — alarm değeri). Kolonlar DOLU (vcp_ready max 66<70 canon; bugün TENNIS_BALL yok).
+  vcp_ready_high: "VCP Ready (70+)",         // KARAR #465 — Inside Day + V-Dry + Tight ≥70
+  tennis_ball_active: "🎾 Tennis Ball",       // KARAR ADAY #893 — pullback+recovery (TLSMW s.253)
 };
 
 // SCREEN_DESCRIPTIONS kaldirildi (22 May 2026) — Sn. Ferit "bunu sil" talimati.
@@ -214,6 +218,12 @@ export const SCREEN_CONDITIONS: Record<string, ScreenCondition[]> = {
   ],
   rpr_89_tpr_c: [
     { source: "mark", text: "Relative Strength (RS) ≥ 89 + Grade A/B/C (güçlü lider + temel kalite teyidi)" },
+  ],
+  vcp_ready_high: [
+    { source: "mark", text: "VCP Ready Score ≥ 70 — Inside Day + Volume Dry-up + Tight daralma sentezi (Mark VCP hazırlık, KARAR #465)" },
+  ],
+  tennis_ball_active: [
+    { source: "mark", text: "Tennis Ball: breakout sonrası sağlıklı pullback + hızlı recovery — 'top değil tenis topu' (Mark TLSMW s.253, KARAR ADAY #893)" },
   ],
 
   // 24 May 2026 — Tam Minervini Tarama (Hibrit Pipeline: 10 Hard + 5 Soft)
