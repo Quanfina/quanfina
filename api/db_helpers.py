@@ -850,8 +850,64 @@ def screen_diff_get_results(slug: str, limit: int = 500) -> list[dict]:
         return rows
 
 
+def screen_mean_reversion_get_results(slug: str = "mean_reversion", limit: int = 500) -> list[dict]:
+    """Carr Mean Reversion bulk screen (P502) — sakli price_volume_history'den Python-hesap.
+
+    SQL filtre DEGIL (BB(20) SQL'de hesaplanamaz): son scan pvh (80 bar, open dahil) ->
+    quanfina_math.compute_mean_reversion -> direction='LONG' detected olanlar (long-biased
+    Quanfina). Carr 2.baski s.356 cekirdek countertrend setup. Scanner/kolon/deploy GEREKMEZ
+    (mevcut pvh kolonu yeter, P490 sonrasi 80 bar dolu).
+    """
+    import sys as _sys
+    import json as _json
+    _root = str(Path(__file__).resolve().parent.parent)
+    if _root not in _sys.path:
+        _sys.path.insert(0, _root)
+    from quanfina_math import compute_mean_reversion
+
+    query = text("""
+        SELECT ticker AS symbol, grade, rs_ibd, price, passed, scan_date,
+               eps_qoq, sales_qoq, price_volume_history
+        FROM minervini_scans
+        WHERE scan_date = (SELECT MAX(scan_date) FROM minervini_scans)
+          AND price_volume_history IS NOT NULL
+        ORDER BY rs_ibd DESC NULLS LAST, ticker ASC
+    """)
+    out: list[dict] = []
+    with engine.connect() as conn:
+        for row in conn.execute(query):
+            d = dict(row._mapping)
+            pvh = d.pop("price_volume_history", None)
+            try:
+                arr = pvh if isinstance(pvh, list) else _json.loads(pvh)
+            except Exception:
+                continue
+            if not arr or len(arr) < 21:
+                continue
+            try:
+                mr = compute_mean_reversion(
+                    [b["open"] for b in arr], [b["high"] for b in arr],
+                    [b["low"] for b in arr], [b["close"] for b in arr],
+                )
+            except Exception:
+                continue
+            if not (mr.get("detected") and mr.get("direction") == "LONG"):
+                continue
+            if d.get("price") is not None:
+                d["price"] = float(d["price"])
+            if d.get("rs_ibd") is not None:
+                d["rs_ibd"] = int(round(float(d["rs_ibd"])))
+            d["grade_no_data"] = _grade_no_data(d.get("grade"), d.get("eps_qoq"), d.get("sales_qoq"))
+            out.append(d)
+            if len(out) >= limit:
+                break
+    return out
+
+
 def screen_get_results_dispatch(slug: str, limit: int = 500) -> list[dict]:
-    """Dispatch: ready / parse / diff slug'a gore otomatik."""
+    """Dispatch: ready / parse / diff / mean_reversion slug'a gore otomatik."""
+    if slug == "mean_reversion":
+        return screen_mean_reversion_get_results(slug, limit)
     if slug in SCREENS_READY_8:
         return screen_get_results(slug, limit)
     if slug in SCREENS_PARSE_7:

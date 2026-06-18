@@ -110,6 +110,8 @@ export const SCREEN_CATEGORIES: Record<string, string> = {
   // görünür — alarm değeri). Kolonlar DOLU (vcp_ready max 66<70 canon; bugün TENNIS_BALL yok).
   vcp_ready_high: "VCP Ready (70+)",         // KARAR #465 — Inside Day + V-Dry + Tight ≥70
   tennis_ball_active: "🎾 Tennis Ball",       // KARAR ADAY #893 — pullback+recovery (TLSMW s.253)
+  // 18 Haz 2026 — Carr Mean Reversion bulk screen (P502). pvh-hesap, scanner/deploy yok.
+  mean_reversion: "Mean Reversion (Carr)",   // Carr 2.baskı s.356 countertrend LONG — çekirdek setup
 };
 
 // SCREEN_DESCRIPTIONS kaldirildi (22 May 2026) — Sn. Ferit "bunu sil" talimati.
@@ -132,7 +134,7 @@ export const SCREEN_CATEGORIES: Record<string, string> = {
 // - quanfina: Evren daraltma (Fiyat $10 + Hacim 500K) — UI 1-2. sıra
 // - mark: Mark Resmi Kural (kitap birebir 8 madde) — UI 3-10. sıra
 // - mark_ekstra: Mark kitap tavsiyesi (preferably/ideally şartları) — UI 11. sıra, TURUNCU
-export type ConditionSource = "mark" | "quanfina" | "mark_ekstra";
+export type ConditionSource = "mark" | "quanfina" | "mark_ekstra" | "carr";
 
 export interface ScreenCondition {
   source: ConditionSource;
@@ -225,6 +227,11 @@ export const SCREEN_CONDITIONS: Record<string, ScreenCondition[]> = {
   tennis_ball_active: [
     { source: "mark", text: "Tennis Ball: breakout sonrası sağlıklı pullback + hızlı recovery — 'top değil tenis topu' (Mark TLSMW s.253, KARAR ADAY #893)" },
   ],
+  // 18 Haz 2026 — Carr Mean Reversion (s.356) countertrend LONG; pvh-hesap bulk screen
+  mean_reversion: [
+    { source: "carr", text: "Countertrend LONG (Carr 2.baskı s.356): dün alt-BB altı → bugün alt-BB üstü dönüş + bugün close < SMA20×0.9 + dün bearish mum + bugün < dün open" },
+    { source: "carr", text: "Stop yapısal ×0.985 + %8 hard cap (s.410); hedef SMA20 dinamik (s.339); 7-gün time stop (s.400). Gösterge SADECE BB(20,2.0)+SMA20+candle" },
+  ],
 
   // 24 May 2026 — Tam Minervini Tarama (Hibrit Pipeline: 10 Hard + 5 Soft)
   // Sn. Ferit talimat: "tam minervini tarama listesi yapıcaz hem teknik
@@ -267,4 +274,5 @@ export const CONDITION_SOURCE_LABEL: Record<ConditionSource, string> = {
   mark: "Mark Resmi Kural",
   quanfina: "Quanfina Ek Filtre",
   mark_ekstra: "Mark Ekstra Kural",
+  carr: "Carr Kuralı",
 };

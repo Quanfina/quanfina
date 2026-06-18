@@ -535,3 +535,36 @@ class TestImportantScreensReadded:
         for slug in self.SLUGS:
             n = _extract_screen_conditions_count(ts, slug)
             assert n >= 1, f"SCREEN_CONDITIONS'da {slug} koşulu yok (n={n})."
+
+
+class TestMeanReversionScreen:
+    """P502 — Carr Mean Reversion bulk screen (pvh-hesap, scanner/deploy yok).
+    UI dropdown + koşul (carr source) + backend dispatch/fonksiyon bağı korunur.
+    """
+
+    @pytest.fixture(scope="class")
+    def ts(self) -> str:
+        return _read("web/types/screens.ts")
+
+    @pytest.fixture(scope="class")
+    def db_helpers(self) -> str:
+        return _read("api/db_helpers.py")
+
+    def test_backend_function_and_dispatch(self, db_helpers):
+        assert "def screen_mean_reversion_get_results" in db_helpers, "MR screen fonksiyonu yok."
+        assert 'if slug == "mean_reversion"' in db_helpers, "dispatch MR branch yok."
+
+    def test_ui_dropdown_has_mean_reversion(self, ts):
+        assert re.search(r'mean_reversion:\s*"[^"]+"', ts), "SCREEN_CATEGORIES'de mean_reversion yok."
+
+    def test_ui_conditions_use_carr_source(self, ts):
+        """Carr stratejisi — kaynak 'carr' (Mark değil, doğru atıf)."""
+        n = _extract_screen_conditions_count(ts, "mean_reversion")
+        assert n >= 1, f"mean_reversion koşulu yok (n={n})."
+        m = re.search(r'mean_reversion:\s*\[(.*?)\]\s*,', ts, re.DOTALL)
+        assert m and 'source: "carr"' in m.group(1), "mean_reversion koşulları 'carr' source kullanmalı."
+
+    def test_carr_source_registered(self, ts):
+        """ConditionSource + CONDITION_SOURCE_LABEL 'carr' tanımlı olmalı."""
+        assert '"carr"' in ts
+        assert re.search(r'carr:\s*"[^"]+"', ts), "CONDITION_SOURCE_LABEL.carr yok."

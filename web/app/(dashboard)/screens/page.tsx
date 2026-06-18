@@ -386,7 +386,9 @@ export default function ScreensPage() {
                           ? "var(--mtp-excellent)"
                           : cond.source === "mark_ekstra"
                             ? "#f97316" // turuncu (Tailwind orange-500)
-                            : "var(--mtp-neutral)",
+                            : cond.source === "carr"
+                              ? "#8b5cf6" // mor (Carr — Mark'tan ayrı strateji, P502)
+                              : "var(--mtp-neutral)",
                       }}>
                         {CONDITION_SOURCE_LABEL[cond.source]} —
                       </span>
