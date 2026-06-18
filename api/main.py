@@ -445,7 +445,8 @@ def get_screen_results(slug: str, limit: int = 500, nocache: bool = False) -> li
         set(SCREENS_READY_8.keys()) |  # alias of SCREENS_READY_9 (geriye uyum)
         set(SCREENS_PARSE_7.keys()) |
         set(SCREENS_DIFF_6.keys()) |
-        {"mean_reversion"}             # P502: pvh-hesap compute-screen (Carr s.356)
+        {"mean_reversion"} |           # P502: pvh-hesap compute-screen (Carr s.356)
+        {"coiled_spring"}              # P511: pvh-hesap compute-screen (Carr s.250, 60 bar)
     )
     if slug not in valid_slugs:
         from fastapi import HTTPException

@@ -112,6 +112,8 @@ export const SCREEN_CATEGORIES: Record<string, string> = {
   tennis_ball_active: "🎾 Tennis Ball",       // KARAR ADAY #893 — pullback+recovery (TLSMW s.253)
   // 18 Haz 2026 — Carr Mean Reversion bulk screen (P502). pvh-hesap, scanner/deploy yok.
   mean_reversion: "Mean Reversion (Carr)",   // Carr 2.baskı s.356 countertrend LONG — çekirdek setup
+  // 18 Haz 2026 — Carr Coiled Spring bulk screen (P511). pvh 80≥60 → bulk mümkün.
+  coiled_spring: "Coiled Spring (Carr)",     // Carr 2.baskı s.250 daralan yay TIER-2 ADAY (eyeball şart)
 };
 
 // SCREEN_DESCRIPTIONS kaldirildi (22 May 2026) — Sn. Ferit "bunu sil" talimati.
@@ -231,6 +233,11 @@ export const SCREEN_CONDITIONS: Record<string, ScreenCondition[]> = {
   mean_reversion: [
     { source: "carr", text: "Countertrend LONG (Carr 2.baskı s.356): dün alt-BB altı → bugün alt-BB üstü dönüş + bugün close < SMA20×0.9 + dün bearish mum + bugün < dün open" },
     { source: "carr", text: "Stop yapısal ×0.985 + %8 hard cap (s.410); hedef SMA20 dinamik (s.339); 7-gün time stop (s.400). Gösterge SADECE BB(20,2.0)+SMA20+candle" },
+  ],
+  // 18 Haz 2026 — Carr Coiled Spring (s.250) TIER-2 daralan yay ADAYI; pvh-hesap bulk screen
+  coiled_spring: [
+    { source: "carr", text: "Daralan yay LONG ADAYI (Carr 2.baskı s.250): high≤3/7g önce + low≥3/7g önce (range daralıyor) + 20g yüksek≥60g + close>SMA20 + SMA20>SMA50×1.03 + bugün yeşil" },
+    { source: "carr", text: "TIER-2 EYEBALL ŞART (s.248-249): trendline kırılımı + yukarı eğim DEĞİL + hiçbir kısım 50MA'ya değmez. GÖSTERGE YOK (pure pattern). Stop 50MA-%2/%8 cap, hedef 2R" },
   ],
 
   // 24 May 2026 — Tam Minervini Tarama (Hibrit Pipeline: 10 Hard + 5 Soft)

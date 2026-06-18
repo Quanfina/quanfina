@@ -579,3 +579,49 @@ class TestMeanReversionScreen:
         """ConditionSource + CONDITION_SOURCE_LABEL 'carr' tanımlı olmalı."""
         assert '"carr"' in ts
         assert re.search(r'carr:\s*"[^"]+"', ts), "CONDITION_SOURCE_LABEL.carr yok."
+
+
+class TestCoiledSpringScreen:
+    """P511 — Carr Coiled Spring bulk screen (pvh 80>=60, MR pateni).
+    TIER-2 eyeball ADAY; UI dropdown + koşul (carr source) + backend dispatch/fonksiyon.
+    """
+
+    @pytest.fixture(scope="class")
+    def ts(self) -> str:
+        return _read("web/types/screens.ts")
+
+    @pytest.fixture(scope="class")
+    def db_helpers(self) -> str:
+        return _read("api/db_helpers.py")
+
+    def test_backend_function_and_dispatch(self, db_helpers):
+        assert "def screen_coiled_spring_get_results" in db_helpers, "Coiled Spring fonksiyonu yok."
+        assert 'if slug == "coiled_spring"' in db_helpers, "dispatch coiled_spring branch yok."
+
+    def test_60_bar_requirement(self, db_helpers):
+        """Coiled Spring 60 bar gerektirir (pvh 80 yeterli — Pullback/BlueSky'in aksine)."""
+        m = re.search(r"def screen_coiled_spring_get_results.*?\n(?=def )", db_helpers, re.DOTALL)
+        assert m, "Coiled Spring fonksiyonu bulunamadi."
+        body = m.group(0)
+        assert "len(arr) < 60" in body, "60 bar esigi yok."
+        assert "compute_coiled_spring" in body, "compute_coiled_spring cagrisi yok."
+
+    def test_carr_prefilter_present(self, db_helpers):
+        """Carr s.244 on-filtre (MR s.302 pateni) — Fiyat>$5 + hacim>=100k."""
+        m = re.search(r"def screen_coiled_spring_get_results.*?\n(?=def )", db_helpers, re.DOTALL)
+        body = m.group(0)
+        assert "last_close <= 5.0" in body, "Fiyat>$5 on-filtresi yok."
+        assert "avg_vol < 100_000" in body, "hacim>=100k on-filtresi yok."
+
+    def test_ui_dropdown_and_carr_conditions(self, ts):
+        assert re.search(r'coiled_spring:\s*"[^"]+"', ts), "SCREEN_CATEGORIES'de coiled_spring yok."
+        n = _extract_screen_conditions_count(ts, "coiled_spring")
+        assert n >= 1, f"coiled_spring koşulu yok (n={n})."
+        m = re.search(r'coiled_spring:\s*\[(.*?)\]\s*,', ts, re.DOTALL)
+        assert m and 'source: "carr"' in m.group(1), "coiled_spring koşulları 'carr' source kullanmalı."
+
+    def test_ui_mentions_eyeball(self, ts):
+        """TIER-2 dürüstlük: UI koşulunda EYEBALL/göz kararı uyarısı olmalı (Kural #26)."""
+        m = re.search(r'coiled_spring:\s*\[(.*?)\]\s*,', ts, re.DOTALL)
+        block = m.group(1).upper()
+        assert "EYEBALL" in block or "GÖZ KARAR" in block, "TIER-2 eyeball uyarisi yok."

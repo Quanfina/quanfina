@@ -920,10 +920,79 @@ def screen_mean_reversion_get_results(slug: str = "mean_reversion", limit: int =
     return out
 
 
+def screen_coiled_spring_get_results(slug: str = "coiled_spring", limit: int = 500) -> list[dict]:
+    """Carr Coiled Spring bulk screen (P511) — sakli price_volume_history'den Python-hesap.
+
+    Coiled Spring 60 bar gerektirir; pvh (80 bar) YETERLI (Pullback 200 / Blue Sky 261'in
+    aksine bulk MUMKUN). son scan pvh -> quanfina_math.compute_coiled_spring -> detected
+    (quality='CANDIDATE', TIER-2 eyeball). Carr 2.baski s.250. Scanner/kolon/deploy GEREKMEZ.
+    On-filtre Carr s.244: Fiyat>$5 + ort. hacim>=100k (P/S+Zacks AÇIK KONU #79, MR s.302 pateni).
+    """
+    import sys as _sys
+    import json as _json
+    _root = str(Path(__file__).resolve().parent.parent)
+    if _root not in _sys.path:
+        _sys.path.insert(0, _root)
+    from quanfina_math import compute_coiled_spring
+
+    query = text("""
+        SELECT ticker AS symbol, grade, rs_ibd, price, passed, scan_date,
+               eps_qoq, sales_qoq, price_volume_history
+        FROM minervini_scans
+        WHERE scan_date = (SELECT MAX(scan_date) FROM minervini_scans)
+          AND price_volume_history IS NOT NULL
+        ORDER BY rs_ibd DESC NULLS LAST, ticker ASC
+    """)
+    out: list[dict] = []
+    with engine.connect() as conn:
+        for row in conn.execute(query):
+            d = dict(row._mapping)
+            pvh = d.pop("price_volume_history", None)
+            try:
+                arr = pvh if isinstance(pvh, list) else _json.loads(pvh)
+            except Exception:
+                continue
+            if not arr or len(arr) < 60:  # Coiled Spring 60g range gerektirir
+                continue
+            # Carr s.244 on-filtre (Bullish Watch List) — MR s.302 pateni.
+            # Sourceable: Fiyat>$5 + ort. gunluk hacim>=100k. P/S<1 + Zacks: AÇIK KONU #79.
+            try:
+                last_close = float(arr[-1]["close"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if last_close <= 5.0:
+                continue
+            recent_vols = [float(b["volume"]) for b in arr[-20:]
+                           if b.get("volume") is not None]
+            avg_vol = sum(recent_vols) / len(recent_vols) if recent_vols else 0.0
+            if avg_vol < 100_000:
+                continue
+            try:
+                cs = compute_coiled_spring(
+                    [b["open"] for b in arr], [b["high"] for b in arr],
+                    [b["low"] for b in arr], [b["close"] for b in arr],
+                )
+            except Exception:
+                continue
+            if not cs.get("detected"):
+                continue
+            if d.get("price") is not None:
+                d["price"] = float(d["price"])
+            if d.get("rs_ibd") is not None:
+                d["rs_ibd"] = int(round(float(d["rs_ibd"])))
+            d["grade_no_data"] = _grade_no_data(d.get("grade"), d.get("eps_qoq"), d.get("sales_qoq"))
+            out.append(d)
+            if len(out) >= limit:
+                break
+    return out
+
+
 def screen_get_results_dispatch(slug: str, limit: int = 500) -> list[dict]:
-    """Dispatch: ready / parse / diff / mean_reversion slug'a gore otomatik."""
+    """Dispatch: ready / parse / diff / mean_reversion / coiled_spring slug'a gore otomatik."""
     if slug == "mean_reversion":
         return screen_mean_reversion_get_results(slug, limit)
+    if slug == "coiled_spring":
+        return screen_coiled_spring_get_results(slug, limit)
     if slug in SCREENS_READY_8:
         return screen_get_results(slug, limit)
     if slug in SCREENS_PARSE_7:
