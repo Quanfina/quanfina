@@ -625,3 +625,61 @@ class TestCoiledSpringScreen:
         m = re.search(r'coiled_spring:\s*\[(.*?)\]\s*,', ts, re.DOTALL)
         block = m.group(1).upper()
         assert "EYEBALL" in block or "GÖZ KARAR" in block, "TIER-2 eyeball uyarisi yok."
+
+
+class TestCarrBulkScreensP516:
+    """P516 — pvh 280 bar -> Pullback/Blue Sky/Bullish Base/Divergence bulk /screens.
+    Generic pvh-compute helper + spec dict + dispatch + UI (carr source) korunur.
+    """
+
+    SLUGS = ("pullback", "blue_sky", "bullish_base", "bullish_divergence")
+
+    @pytest.fixture(scope="class")
+    def ts(self) -> str:
+        return _read("web/types/screens.ts")
+
+    @pytest.fixture(scope="class")
+    def db_helpers(self) -> str:
+        return _read("api/db_helpers.py")
+
+    @pytest.fixture(scope="class")
+    def scanner(self) -> str:
+        return _read("scanner.py")
+
+    @pytest.fixture(scope="class")
+    def main(self) -> str:
+        return _read("api/main.py")
+
+    def test_scanner_pvh_280(self, scanner):
+        """Carr 200-261 bar setup'lari icin pvh 80 -> 280 (Blue Sky 261)."""
+        assert ".tail(280)" in scanner, "pvh 280 bar'a cikmamis."
+        assert ".tail(80)" not in scanner, "eski 80 bar pvh kalmis."
+
+    def test_backend_generic_helper_and_specs(self, db_helpers):
+        assert "def _screen_carr_pvh_compute" in db_helpers, "generic pvh-compute helper yok."
+        assert "def _carr_pvh_screen_specs" in db_helpers, "spec dict fonksiyonu yok."
+        for slug in self.SLUGS:
+            assert f'"{slug}"' in db_helpers, f"spec'te {slug} yok."
+
+    def test_dispatch_routes_4_slugs(self, db_helpers):
+        assert "_carr_specs = _carr_pvh_screen_specs()" in db_helpers
+        assert "if slug in _carr_specs:" in db_helpers
+
+    def test_main_valid_slugs(self, main):
+        for slug in self.SLUGS:
+            assert f'"{slug}"' in main, f"main valid_slugs'te {slug} yok."
+
+    def test_ui_categories_and_carr_conditions(self, ts):
+        for slug in self.SLUGS:
+            assert re.search(rf'{slug}:\s*"[^"]+\(Carr\)"', ts), f"SCREEN_CATEGORIES {slug} yok."
+            n = _extract_screen_conditions_count(ts, slug)
+            assert n >= 1, f"{slug} koşulu yok (n={n})."
+            m = re.search(rf'\b{slug}:\s*\[(.*?)\]\s*,', ts, re.DOTALL)
+            assert m and 'source: "carr"' in m.group(1), f"{slug} 'carr' source kullanmali."
+
+    def test_min_bars_per_setup(self, db_helpers):
+        """Blue Sky 261 (52-hafta), digerleri 200 (SMA200) — kaynak-dogru esik."""
+        m = re.search(r"def _carr_pvh_screen_specs.*?\n(?=\ndef )", db_helpers, re.DOTALL)
+        body = m.group(0)
+        assert "261" in body, "Blue Sky 261 bar esigi yok."
+        assert "200" in body, "SMA200 200 bar esigi yok."

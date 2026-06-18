@@ -953,12 +953,16 @@ def check_ma200_slope(tickers):
                 # Pivot intraday high/low gerektirir (3 kanal onay).
                 # Sprint 4-bis.5 KARAR #467 — Power Play icin POLE 40 + FLAG 30 = 70
                 # gun gerekli, 80 gun marjli (compute_vcp_pass + power_play_pass yeter)
+                # P516 (18 Haz 2026): 80 -> 280 bar. Carr bulk /screens icin: Blue Sky 261g
+                # (52-hafta), Pullback/Bullish Base/Divergence 200g (SMA200) gerektirir. Kaynak
+                # ~300 islem gunu (420 takvim) -> 280 guvenli. MR(21)/Coiled(60)/Power Play(70)
+                # tail-slice ile etkilenmez. ~+10MB/scan storage (kabul, tek-kullanici).
                 try:
-                    tail_o = open_.tail(80)
-                    tail_h = high.tail(80)
-                    tail_l = low.tail(80)
-                    tail_c = close.tail(80)
-                    tail_v = volume.tail(80)
+                    tail_o = open_.tail(280)
+                    tail_h = high.tail(280)
+                    tail_l = low.tail(280)
+                    tail_c = close.tail(280)
+                    tail_v = volume.tail(280)
                     pvh_val = [
                         {"date": str(d.date()),
                          "open": float(o_), "high": float(h_), "low": float(l_),

@@ -114,6 +114,11 @@ export const SCREEN_CATEGORIES: Record<string, string> = {
   mean_reversion: "Mean Reversion (Carr)",   // Carr 2.baskı s.356 countertrend LONG — çekirdek setup
   // 18 Haz 2026 — Carr Coiled Spring bulk screen (P511). pvh 80≥60 → bulk mümkün.
   coiled_spring: "Coiled Spring (Carr)",     // Carr 2.baskı s.250 daralan yay TIER-2 ADAY (eyeball şart)
+  // 18 Haz 2026 — Carr 200-261 bar bulk screen (P516). pvh 80→280 sonrası (gelecek scan'de dolar).
+  pullback: "Pullback (Carr)",               // Carr s.249 WEAK_bull trend-takip
+  blue_sky: "Blue Sky Breakout (Carr)",      // Carr s.264 STRONG+WEAK breakout
+  bullish_base: "Bullish Base (Carr)",       // Carr s.291 CONTRARIAN downtrend baz TIER-2
+  bullish_divergence: "Bullish Divergence (Carr)",  // Carr s.258 uptrend-dip TIER-2
 };
 
 // SCREEN_DESCRIPTIONS kaldirildi (22 May 2026) — Sn. Ferit "bunu sil" talimati.
@@ -238,6 +243,23 @@ export const SCREEN_CONDITIONS: Record<string, ScreenCondition[]> = {
   coiled_spring: [
     { source: "carr", text: "Daralan yay LONG ADAYI (Carr 2.baskı s.250): high≤3/7g önce + low≥3/7g önce (range daralıyor) + 20g yüksek≥60g + close>SMA20 + SMA20>SMA50×1.03 + bugün yeşil" },
     { source: "carr", text: "TIER-2 EYEBALL ŞART (s.248-249): trendline kırılımı + yukarı eğim DEĞİL + hiçbir kısım 50MA'ya değmez. GÖSTERGE YOK (pure pattern). Stop 50MA-%2/%8 cap, hedef 2R" },
+  ],
+  // 18 Haz 2026 — Carr 200-261 bar setup'lar bulk (P516, pvh 80→280 sonrası dolar)
+  pullback: [
+    { source: "carr", text: "WEAK_bull trend-takip LONG (Carr 2.baskı s.249): SMA20>SMA50>SMA200 + 50/20 yükseliyor + Stoch %K(5,3,3)<20 (oversold pullback) + bugün close>open" },
+    { source: "carr", text: "ENTRY ertesi gün signal high üstü buy-stop (s.248). Stop 50MA-%2 / %8 cap (s.321), hedef 2R (s.324). Time stop YOK (trend trailing)" },
+  ],
+  blue_sky: [
+    { source: "carr", text: "STRONG+WEAK breakout LONG (Carr 2.baskı s.264): 40g yeni yüksek + 52h zirve ALTI + close≤260g min low×2 + OBV/MACD 40g yeni yüksek + bugün yeşil. SMA YOK" },
+    { source: "carr", text: "ENTRY ertesi gün signal high üstü (s.335). Stop %6 / %8 cap (s.325, Ch22 evrensel), hedef 2R (s.324). Time stop YOK" },
+  ],
+  bullish_base: [
+    { source: "carr", text: "CONTRARIAN downtrend-baz LONG ADAYI (Carr 2.baskı s.291): SMA50>SMA20 (downtrend) + 50 düşüyor + range daralma(30>15>5) + OBV/MACD yükseliyor + SMA50<SMA200 + bugün yeşil" },
+    { source: "carr", text: "TIER-2 EYEBALL (s.287-288): base tipi falling wedge/expanding triangle/rectangle — RISING WEDGE OLMAZ. Kırılım BEKLENMEZ → entry=close (s.284). Stop %6/%8 cap, hedef 2R" },
+  ],
+  bullish_divergence: [
+    { source: "carr", text: "Uptrend-dip LONG ADAYI (Carr 2.baskı s.258): SMA50>SMA200 + fiyat lower low + 6 göstergeden 2+'si higher low (MACD line/hist, Stoch%K, RSI(5), CCI(20), OBV) + bugün yeşil" },
+    { source: "carr", text: "TIER-2 EYEBALL (s.256): divergence gözle teyit (fiyat lower low + gösterge higher low). entry=close (s.262), stop sell-off son dibi/%8 cap, hedef 2R. Uzun tutma sabrı (s.252)" },
   ],
 
   // 24 May 2026 — Tam Minervini Tarama (Hibrit Pipeline: 10 Hard + 5 Soft)

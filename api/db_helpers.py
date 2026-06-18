@@ -987,12 +987,96 @@ def screen_coiled_spring_get_results(slug: str = "coiled_spring", limit: int = 5
     return out
 
 
+def _screen_carr_pvh_compute(detector_fn, min_arr_len: int, needs_volume: bool,
+                             limit: int = 500) -> list[dict]:
+    """Generic Carr pvh-compute bulk screen (P516) — MR/Coiled pateni genellestirilmis.
+
+    Son scan pvh -> detector_fn(opens,highs,lows,closes[,volumes]) -> detected olanlar.
+    Carr on-filtre (Fiyat>$5 + ort.hacim>=100k; P/S+Zacks AÇIK KONU #79). P516 sonrasi pvh
+    280 bar -> Pullback/Blue Sky/Bullish Base/Divergence (200-261 bar) bulk MUMKUN. NOT: pvh
+    280 bar'a CIKANA kadar (sonraki scan) bu screen'ler [] doner (yetersiz bar -> detected False).
+    """
+    import json as _json
+    query = text("""
+        SELECT ticker AS symbol, grade, rs_ibd, price, passed, scan_date,
+               eps_qoq, sales_qoq, price_volume_history
+        FROM minervini_scans
+        WHERE scan_date = (SELECT MAX(scan_date) FROM minervini_scans)
+          AND price_volume_history IS NOT NULL
+        ORDER BY rs_ibd DESC NULLS LAST, ticker ASC
+    """)
+    out: list[dict] = []
+    with engine.connect() as conn:
+        for row in conn.execute(query):
+            d = dict(row._mapping)
+            pvh = d.pop("price_volume_history", None)
+            try:
+                arr = pvh if isinstance(pvh, list) else _json.loads(pvh)
+            except Exception:
+                continue
+            if not arr or len(arr) < min_arr_len:
+                continue
+            # Carr on-filtre (Bullish Watch List) — MR s.302 pateni.
+            try:
+                last_close = float(arr[-1]["close"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if last_close <= 5.0:
+                continue
+            recent_vols = [float(b["volume"]) for b in arr[-20:]
+                           if b.get("volume") is not None]
+            avg_vol = sum(recent_vols) / len(recent_vols) if recent_vols else 0.0
+            if avg_vol < 100_000:
+                continue
+            try:
+                args = ([b["open"] for b in arr], [b["high"] for b in arr],
+                        [b["low"] for b in arr], [b["close"] for b in arr])
+                if needs_volume:
+                    args = args + ([float(b["volume"]) for b in arr],)
+                res = detector_fn(*args)
+            except Exception:
+                continue
+            if not res.get("detected"):
+                continue
+            if d.get("price") is not None:
+                d["price"] = float(d["price"])
+            if d.get("rs_ibd") is not None:
+                d["rs_ibd"] = int(round(float(d["rs_ibd"])))
+            d["grade_no_data"] = _grade_no_data(d.get("grade"), d.get("eps_qoq"), d.get("sales_qoq"))
+            out.append(d)
+            if len(out) >= limit:
+                break
+    return out
+
+
+def _carr_pvh_screen_specs() -> dict:
+    """slug -> (detector_fn, min_bar, needs_volume). Lazy import (quanfina_math path)."""
+    import sys as _sys
+    _root = str(Path(__file__).resolve().parent.parent)
+    if _root not in _sys.path:
+        _sys.path.insert(0, _root)
+    from quanfina_math import (
+        compute_carr_pullback, compute_blue_sky_breakout,
+        compute_bullish_base_breakout, compute_bullish_divergence,
+    )
+    return {
+        "pullback": (compute_carr_pullback, 200, False),           # SMA200
+        "blue_sky": (compute_blue_sky_breakout, 261, True),        # 260g 52-hafta
+        "bullish_base": (compute_bullish_base_breakout, 200, True),  # SMA200
+        "bullish_divergence": (compute_bullish_divergence, 201, True),  # SMA200 + dun
+    }
+
+
 def screen_get_results_dispatch(slug: str, limit: int = 500) -> list[dict]:
-    """Dispatch: ready / parse / diff / mean_reversion / coiled_spring slug'a gore otomatik."""
+    """Dispatch: ready / parse / diff / Carr (mean_reversion, coiled_spring + P516 4 bulk)."""
     if slug == "mean_reversion":
         return screen_mean_reversion_get_results(slug, limit)
     if slug == "coiled_spring":
         return screen_coiled_spring_get_results(slug, limit)
+    _carr_specs = _carr_pvh_screen_specs()
+    if slug in _carr_specs:
+        fn, min_bar, needs_vol = _carr_specs[slug]
+        return _screen_carr_pvh_compute(fn, min_bar, needs_vol, limit)
     if slug in SCREENS_READY_8:
         return screen_get_results(slug, limit)
     if slug in SCREENS_PARSE_7:

@@ -448,7 +448,9 @@ def get_screen_results(slug: str, limit: int = 500, nocache: bool = False) -> li
         set(SCREENS_PARSE_7.keys()) |
         set(SCREENS_DIFF_6.keys()) |
         {"mean_reversion"} |           # P502: pvh-hesap compute-screen (Carr s.356)
-        {"coiled_spring"}              # P511: pvh-hesap compute-screen (Carr s.250, 60 bar)
+        {"coiled_spring"} |            # P511: pvh-hesap compute-screen (Carr s.250, 60 bar)
+        # P516: pvh 280 bar -> 200-261 bar Carr setup'lari bulk (sonraki scan'de dolar)
+        {"pullback", "blue_sky", "bullish_base", "bullish_divergence"}
     )
     if slug not in valid_slugs:
         from fastapi import HTTPException
