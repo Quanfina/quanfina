@@ -506,7 +506,10 @@ class TestImportantScreensReadded:
     UI<->backend bağını (dropdown + koşul + slug) korur.
     """
 
-    SLUGS = ("top5_rpr", "power_play_ready", "tight_low_vol_excellent")
+    SLUGS = (
+        "top5_rpr", "power_play_ready", "tight_low_vol_excellent",
+        "new_top5_rpr", "healthy_accumulation", "rpr_89_tpr_c",
+    )
 
     @pytest.fixture(scope="class")
     def ts(self) -> str:

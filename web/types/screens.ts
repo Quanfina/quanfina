@@ -102,6 +102,10 @@ export const SCREEN_CATEGORIES: Record<string, string> = {
   top5_rpr: "Top %5 RS (Liderler)",          // RS≥95, 38 hisse — Mark #1 lider kriteri
   power_play_ready: "Power Play (HTF)",       // KARAR #467, 25 hisse — Mark canon momentum
   tight_low_vol_excellent: "VCP EXCELLENT",   // KARAR #466, 3 hisse — Mark imza paterni A+
+  // 18 Haz 2026 — 2. parti önemli (canlı sayım doğrulandı):
+  new_top5_rpr: "Yeni Top %5 RS",            // DIFF: prev RS<95 -> RS≥95, 4 hisse (yeni lider)
+  healthy_accumulation: "Sağlıklı Toplama",   // volume_asymmetry healthy, 33 hisse (kurumsal)
+  rpr_89_tpr_c: "RS 89+ Grade A/B/C",        // RS≥89 + grade, 38 hisse (lider + temel kalite)
 };
 
 // SCREEN_DESCRIPTIONS kaldirildi (22 May 2026) — Sn. Ferit "bunu sil" talimati.
@@ -201,6 +205,15 @@ export const SCREEN_CONDITIONS: Record<string, ScreenCondition[]> = {
   ],
   tight_low_vol_excellent: [
     { source: "mark", text: "VCP Kalite = EXCELLENT (A+): en sıkı daralma (<%50) + hacim kuruması + bonus teyit (Mark VCP canon, KARAR #466)" },
+  ],
+  new_top5_rpr: [
+    { source: "mark", text: "Yeni lider: önceki taramada RS < 95 iken şimdi RS ≥ 95 + fiyat ≥ $10 (Mark erken liderlik yakalama)" },
+  ],
+  healthy_accumulation: [
+    { source: "mark", text: "Up-volume >> Down-volume — kurumsal toplama (Mark Volume Asymmetry, TLSMW s.234)" },
+  ],
+  rpr_89_tpr_c: [
+    { source: "mark", text: "Relative Strength (RS) ≥ 89 + Grade A/B/C (güçlü lider + temel kalite teyidi)" },
   ],
 
   // 24 May 2026 — Tam Minervini Tarama (Hibrit Pipeline: 10 Hard + 5 Soft)
