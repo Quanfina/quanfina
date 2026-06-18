@@ -13,15 +13,25 @@ import {
   type ConditionSource,
 } from "@/types/screens";
 
-const SOURCES: ConditionSource[] = ["mark", "quanfina", "mark_ekstra"];
+// P502+ "carr" source eklendi (Carr stratejisi 9 setup); SOURCES güncel (4 kaynak).
+const SOURCES: ConditionSource[] = ["mark", "quanfina", "mark_ekstra", "carr"];
 
-describe("SCREEN_CATEGORIES — 3 tarama şablonu", () => {
-  it("3 kategori: stage2_10p / temel_eleme / tam_minervini", () => {
-    expect(Object.keys(SCREEN_CATEGORIES)).toEqual([
-      "stage2_10p",
-      "temel_eleme",
-      "tam_minervini",
-    ]);
+describe("SCREEN_CATEGORIES — tarama şablonları (Minervini + Carr)", () => {
+  // 18 Haz 2026: artık 21 ekran (3 Minervini çekirdek + Minervini lider/momentum + 9 Carr).
+  // Brittle toEqual yerine çekirdek + Carr 9 setup varlık kontrolü (gelecek eklemeye dayanıklı).
+  it("Minervini çekirdek 3 şablon mevcut", () => {
+    expect(Object.keys(SCREEN_CATEGORIES)).toEqual(
+      expect.arrayContaining(["stage2_10p", "temel_eleme", "tam_minervini"])
+    );
+  });
+
+  it("Carr 9 setup mevcut", () => {
+    expect(Object.keys(SCREEN_CATEGORIES)).toEqual(
+      expect.arrayContaining([
+        "mean_reversion", "pullback", "blue_sky", "coiled_spring", "bullish_base",
+        "bullish_divergence", "blue_sea", "gap_down", "rising_wedge",
+      ])
+    );
   });
 
   it("stage2_10p label = 'Trend Template'", () => {
@@ -149,17 +159,18 @@ describe("tam_minervini — Hibrit Pipeline (10 Hard + 5 Soft = 15)", () => {
   });
 });
 
-describe("CONDITION_SOURCE_LABEL — 3 kategori insan-okunabilir", () => {
-  it("3 source label tanımlı", () => {
+describe("CONDITION_SOURCE_LABEL — 4 kaynak insan-okunabilir", () => {
+  it("4 source label tanımlı (mark/quanfina/mark_ekstra/carr)", () => {
     for (const src of SOURCES) {
       expect(CONDITION_SOURCE_LABEL[src]).toBeDefined();
       expect(CONDITION_SOURCE_LABEL[src].length).toBeGreaterThan(0);
     }
   });
 
-  it("mark='Mark Resmi Kural', quanfina='Quanfina Ek Filtre', mark_ekstra='Mark Ekstra Kural'", () => {
+  it("mark='Mark Resmi Kural', quanfina='Quanfina Ek Filtre', mark_ekstra='Mark Ekstra Kural', carr='Carr Kuralı'", () => {
     expect(CONDITION_SOURCE_LABEL.mark).toBe("Mark Resmi Kural");
     expect(CONDITION_SOURCE_LABEL.quanfina).toBe("Quanfina Ek Filtre");
     expect(CONDITION_SOURCE_LABEL.mark_ekstra).toBe("Mark Ekstra Kural");
+    expect(CONDITION_SOURCE_LABEL.carr).toBe("Carr Kuralı");
   });
 });
