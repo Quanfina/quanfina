@@ -72,6 +72,7 @@ from quanfina_math import (  # noqa: E402
     compute_mean_reversion,
     compute_carr_pullback,
     compute_blue_sky_breakout,
+    compute_coiled_spring,
     compute_high_tight_flag,
     compute_stage_transition,
     compute_faber_timing,
@@ -3377,6 +3378,75 @@ def get_blue_sky(symbol: str) -> BlueSkyInfo:
         low_260d=r.get("low_260d"),
         obv=r.get("obv"),
         macd=r.get("macd"),
+        mark_says=r.get("mark_says", ""),
+        is_mock=is_mock,
+    )
+
+
+# P510 (18 Haz 2026): Carr Coiled Spring endpoint (s.250 entry + s.252-324 exit)
+# STRONG+WEAK_BULL+RANGE trend-takip LONG ADAYI. compute_coiled_spring wire. GOSTERGE YOK
+# (s.248 pure pattern). TIER-2 eyeball -> quality='CANDIDATE'. 60g -> >=60 bar (n_bars=252 yeter).
+class CoiledSpringInfo(BaseModel):
+    detected: bool = False
+    direction: Optional[Literal["LONG"]] = None
+    quality: Optional[str] = None
+    signal_close: Optional[float] = None
+    entry: Optional[float] = None       # ertesi gun signal high ustu (trendline kirilimi sonrasi, s.248)
+    stop: Optional[float] = None        # 50MA -%2 / %8 cap (s.252,303)
+    target: Optional[float] = None      # 2R (s.324)
+    risk_pct: Optional[float] = None
+    rr: Optional[float] = None
+    sma20: Optional[float] = None
+    sma50: Optional[float] = None
+    eyeball_checks: list[str] = []      # TIER-2 goz karari kontrolleri (s.248-249)
+    mark_says: str
+    is_mock: bool = False
+
+
+@app.get("/api/stock/{symbol}/coiled-spring", response_model=CoiledSpringInfo)
+def get_coiled_spring(symbol: str) -> CoiledSpringInfo:
+    """Carr Coiled Spring (2.baski s.250) — STRONG+WEAK_BULL+RANGE trend-takip LONG ADAYI.
+
+    8 tarama kosulu (daralan yay, s.250) + GOSTERGE YOK (s.248 pure pattern). TIER-2 EYEBALL
+    -> quality='CANDIDATE' (insan onayi sart: daralma + yukari egim DEGIL + 50MA temassiz).
+    ENTRY: trendline kirilimi -> ertesi gun signal high ustu (s.248,315). STOP 50MA-%2 / %8 cap
+    (s.252,303). TARGET 2R (s.324). 60g -> >=60 bar; is_mock = gercek 60+ bar yoksa True.
+    """
+    sym = symbol.upper()
+    stock = _STOCK_BY_SYM.get(sym)
+    if stock:
+        price = stock.price
+    else:
+        try:
+            wl = [r for r in watchlist_get_all() if r["symbol"] == sym]
+        except OperationalError:
+            wl = []
+        if wl:
+            price = float(wl[0]["price"])
+        else:
+            scan_data = _fetch_scan_symbol_data(sym)
+            price = scan_data["price"] if scan_data else 100.0
+
+    bars = _get_ohlcv(sym, price)
+    r = compute_coiled_spring(
+        [b.open for b in bars], [b.high for b in bars],
+        [b.low for b in bars], [b.close for b in bars],
+    )
+    _real = _fetch_ohlcv_real(sym, 252)
+    is_mock = not (_real and len(_real) >= 60)
+    return CoiledSpringInfo(
+        detected=r.get("detected", False),
+        direction=r.get("direction"),
+        quality=r.get("quality"),
+        signal_close=r.get("signal_close"),
+        entry=r.get("entry"),
+        stop=r.get("stop"),
+        target=r.get("target"),
+        risk_pct=r.get("risk_pct"),
+        rr=r.get("rr"),
+        sma20=r.get("sma20"),
+        sma50=r.get("sma50"),
+        eyeball_checks=r.get("eyeball_checks", []),
         mark_says=r.get("mark_says", ""),
         is_mock=is_mock,
     )
