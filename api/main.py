@@ -499,6 +499,69 @@ from time import time as _now
 _SCREENS_CACHE: dict[tuple[str, int], tuple[float, list]] = {}
 _SCREENS_CACHE_TTL = 30 * 60  # 30 dakika
 
+# P536 (18 Haz 2026): compute-screen'ler (mean_reversion/pullback/blue_sky/pocket_pivot
+# vb.) cold ~20s (800+ hisse x detector, GIL-bound). 30 dk cache dolunca KULLANICI 20s
+# skeleton bekliyordu. P532 carr/summary SWR pateni genellestirildi: bayat cache ->
+# eski sonucu ANINDA don + arka planda yenile. Detector/SQL mantigina sifir dokunus.
+_screen_refreshing: set[tuple[str, int]] = set()
+
+
+def _compute_screen_results(slug: str, limit: int) -> list[ScreenResultRow]:
+    """Screen sonuc hesabi (dispatch + pivot enrichment) + cache yaz.
+
+    db down -> MOCK (cache YAZILMAZ). Dispatch ValueError (bilinmeyen slug) yukselir;
+    diger Exception (Cloud SQL flaky) -> MOCK graceful (docstring kontrati, Kural #20).
+    P415 cache + P480 expired purge korundu. P536: SWR icin tek-kaynak compute.
+    """
+    cache_key = (slug, limit)
+    # MOCK fallback (dev ortam, db_connected=false) — KARAR #466+#465+#467
+    if not db_health_check():
+        return _screens_mock_results(slug, limit)
+    # Paket 381: db_health 30s TTL cache yaniltici "True" -> sorgu patlarsa MOCK (graceful)
+    try:
+        rows = screen_get_results_dispatch(slug, limit=limit)
+    except ValueError:
+        raise  # bilinmeyen slug — 404 mantigi disinda
+    except Exception:
+        return _screens_mock_results(slug, limit)
+    db_results = [ScreenResultRow(**{k: r.get(k) for k in
+                                ("symbol", "grade", "rs_ibd", "price", "passed", "scan_date",
+                                 "vcp_quality_score", "vcp_ready_score", "power_play_pass",
+                                 "grade_no_data")})  # P423: TEMEL "D" veri-yok ayrimi
+            for r in rows]
+    # KARAR #733 alt-paket (Paket 83): pivot_status enrichment (paralel 20 worker)
+    from concurrent.futures import ThreadPoolExecutor
+    def _enrich_one(row):
+        return row.model_copy(update={
+            "pivot_status": _compute_signal_pivot_status(row.symbol, row.price or 100.0),
+        })
+    with ThreadPoolExecutor(max_workers=20) as pool:
+        enriched = list(pool.map(_enrich_one, db_results))
+    # P480 (#3): yazmadan once expired entry'leri purge et (sinirsiz buyume engelle)
+    _expired = [k for k, (ts, _) in _SCREENS_CACHE.items() if _now() - ts >= _SCREENS_CACHE_TTL]
+    for k in _expired:
+        _SCREENS_CACHE.pop(k, None)
+    _SCREENS_CACHE[cache_key] = (_now(), enriched)
+    return enriched
+
+
+def _refresh_screen_bg(slug: str, limit: int) -> None:
+    """SWR arka plan yenileme (daemon thread). Ayni (slug,limit) icin tek thread (dedupe)."""
+    key = (slug, limit)
+    if key in _screen_refreshing:
+        return
+    _screen_refreshing.add(key)
+
+    def _run() -> None:
+        try:
+            _compute_screen_results(slug, limit)
+        except Exception:
+            pass
+        finally:
+            _screen_refreshing.discard(key)
+
+    threading.Thread(target=_run, daemon=True, name=f"screen-refresh-{slug}").start()
+
 
 @app.get("/api/screens/{slug}", response_model=list[ScreenResultRow])
 def get_screen_results(slug: str, limit: int = 500, nocache: bool = False) -> list[ScreenResultRow]:
@@ -544,51 +607,20 @@ def get_screen_results(slug: str, limit: int = 500, nocache: bool = False) -> li
         )
 
     # P415: Cache hit (TTL 30 dk, nocache=1 ile bust). Scanner gun-ici degismez.
+    # P536: stale-while-revalidate — bayat cache -> eski sonucu ANINDA don + arka planda
+    # yenile (compute-screen'ler ~20s cold; kullanici 20s skeleton beklemez).
     cache_key = (slug, limit)
     if not nocache:
         hit = _SCREENS_CACHE.get(cache_key)
-        if hit is not None and (_now() - hit[0]) < _SCREENS_CACHE_TTL:
+        if hit is not None:
+            if (_now() - hit[0]) < _SCREENS_CACHE_TTL:
+                return hit[1]                      # taze
+            _refresh_screen_bg(slug, limit)        # bayat -> stale don + arka plan yenile
             return hit[1]
 
-    # MOCK fallback (dev ortam, db_connected=false)
-    # KARAR #466+#465+#467 — VCP/Power Play slug'larinda kalite+ready+power_play sahte
-    if not db_health_check():
-        return _screens_mock_results(slug, limit)
-
-    # Gerçek DB sorgusu — ready VEYA parse VEYA diff (dispatch)
-    # Paket 381: db_health_check 30s TTL cache (db_helpers) yaniltici "True"
-    # donderebilir (saglik check anindan sorgu anina kadar Cloud SQL baglantisi
-    # dusebilir/pool tukenebilir/timeout) -> ham OperationalError 500'e cikiyordu.
-    # Graceful degradation: sorgu patlarsa MOCK don (docstring kontrati + Kural #20 UX).
-    try:
-        rows = screen_get_results_dispatch(slug, limit=limit)
-    except ValueError:
-        raise  # bilinmeyen slug — 404 mantigi disinda (dispatch ValueError)
-    except Exception:
-        return _screens_mock_results(slug, limit)
-    db_results = [ScreenResultRow(**{k: r.get(k) for k in
-                                ("symbol","grade","rs_ibd","price","passed","scan_date",
-                                 "vcp_quality_score","vcp_ready_score","power_play_pass",
-                                 "grade_no_data")})  # P423: TEMEL "D" veri-yok ayrimi
-            for r in rows]
-    # KARAR #733 alt-paket (Paket 83): pivot_status enrichment (DB yol)
-    # P415 (31 May 2026): Sira-i enrichment 228 satir × ~150ms yfinance =
-    # 30s+ timeout. Paralel 20 worker = ~3s (pivot cache ilk sicakta).
-    from concurrent.futures import ThreadPoolExecutor
-    def _enrich_one(row):
-        return row.model_copy(update={
-            "pivot_status": _compute_signal_pivot_status(row.symbol, row.price or 100.0),
-        })
-    with ThreadPoolExecutor(max_workers=20) as pool:
-        enriched = list(pool.map(_enrich_one, db_results))
-    # P415: Cache yaz (enrichment dahil tam sonuc — pivot_status dahil)
-    # P480 (#3): yazmadan once expired entry'leri purge et (TTL sadece okumada
-    # kontrol ediliyordu -> stale key'ler birikiyordu, sinirsiz buyume).
-    _expired = [k for k, (ts, _) in _SCREENS_CACHE.items() if _now() - ts >= _SCREENS_CACHE_TTL]
-    for k in _expired:
-        _SCREENS_CACHE.pop(k, None)
-    _SCREENS_CACHE[cache_key] = (_now(), enriched)
-    return enriched
+    # cold (cache yok) veya nocache=True -> bloklayan hesap (skeleton gosterilir).
+    # MOCK fallback / dispatch / pivot enrichment / cache yazimi _compute_screen_results'ta.
+    return _compute_screen_results(slug, limit)
 
 
 @app.get("/api/health", response_model=HealthResponse)
