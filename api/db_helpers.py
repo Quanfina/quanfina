@@ -1072,6 +1072,99 @@ def _carr_pvh_screen_specs() -> dict:
     }
 
 
+def screen_carr_summary(top_n: int = 6) -> list[dict]:
+    """Carr 9 setup ozet (P523) — son scan pvh TEK PASS, 9 detector per ticker.
+
+    Tek DB sorgusu + ticker basina tek pvh parse + 9 detector -> per-setup count + top adaylar
+    (RS'e gore). 9 ayri /api/screens cagrisindan cok daha verimli. Carr on-filtre (Fiyat>$5 +
+    hacim>=100k) tum setuplara. MR LONG-only (bulk pateni). Returns: setup basina dict.
+    """
+    import sys as _sys
+    import json as _json
+    _root = str(Path(__file__).resolve().parent.parent)
+    if _root not in _sys.path:
+        _sys.path.insert(0, _root)
+    from quanfina_math import (
+        compute_carr_pullback, compute_mean_reversion, compute_blue_sky_breakout,
+        compute_coiled_spring, compute_bullish_base_breakout, compute_bullish_divergence,
+        compute_blue_sea_breakdown, compute_gap_down, compute_rising_wedge_breakdown,
+    )
+    # (slug, label, direction, fn, min_bar, needs_volume)
+    specs = [
+        ("pullback", "Pullback", "LONG", compute_carr_pullback, 200, False),
+        ("mean_reversion", "Mean Reversion", "LONG", compute_mean_reversion, 21, False),
+        ("blue_sky", "Blue Sky Breakout", "LONG", compute_blue_sky_breakout, 261, True),
+        ("coiled_spring", "Coiled Spring", "LONG", compute_coiled_spring, 60, False),
+        ("bullish_base", "Bullish Base", "LONG", compute_bullish_base_breakout, 200, True),
+        ("bullish_divergence", "Bullish Divergence", "LONG", compute_bullish_divergence, 201, True),
+        ("blue_sea", "Blue Sea Breakdown", "SHORT", compute_blue_sea_breakdown, 261, True),
+        ("gap_down", "Gap Down", "SHORT", compute_gap_down, 111, False),
+        ("rising_wedge", "Rising Wedge", "SHORT", compute_rising_wedge_breakdown, 90, True),
+    ]
+    hits: dict = {s[0]: [] for s in specs}
+
+    query = text("""
+        SELECT ticker AS symbol, rs_ibd, price, price_volume_history
+        FROM minervini_scans
+        WHERE scan_date = (SELECT MAX(scan_date) FROM minervini_scans)
+          AND price_volume_history IS NOT NULL
+        ORDER BY rs_ibd DESC NULLS LAST, ticker ASC
+    """)
+    with engine.connect() as conn:
+        for row in conn.execute(query):
+            d = dict(row._mapping)
+            pvh = d.pop("price_volume_history", None)
+            try:
+                arr = pvh if isinstance(pvh, list) else _json.loads(pvh)
+            except Exception:
+                continue
+            if not arr or len(arr) < 60:  # min setup esigi (Coiled Spring)
+                continue
+            # Carr on-filtre (Fiyat>$5 + ort. hacim>=100k)
+            try:
+                last_close = float(arr[-1]["close"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if last_close <= 5.0:
+                continue
+            recent_vols = [float(b["volume"]) for b in arr[-20:] if b.get("volume") is not None]
+            avg_vol = sum(recent_vols) / len(recent_vols) if recent_vols else 0.0
+            if avg_vol < 100_000:
+                continue
+            # None bar (P492 NaN sanitize) olan ticker'i atla (bulk pateni — fatal degil)
+            try:
+                o = [b["open"] for b in arr]
+                h = [b["high"] for b in arr]
+                lo = [b["low"] for b in arr]
+                c = [b["close"] for b in arr]
+                v = [float(b["volume"]) for b in arr]
+            except (KeyError, TypeError, ValueError):
+                continue
+            rs = int(round(float(d["rs_ibd"]))) if d.get("rs_ibd") is not None else None
+            sym = d.get("symbol")
+            for slug, _label, _dir, fn, mn, nv in specs:
+                if len(arr) < mn:
+                    continue
+                try:
+                    res = fn(o, h, lo, c, v) if nv else fn(o, h, lo, c)
+                except Exception:
+                    continue
+                if not res.get("detected"):
+                    continue
+                if slug == "mean_reversion" and res.get("direction") != "LONG":
+                    continue
+                hits[slug].append({"symbol": sym, "rs_ibd": rs})
+
+    out: list[dict] = []
+    for slug, label, direction, _fn, _mn, _nv in specs:
+        cands = hits[slug][:top_n]  # zaten RS DESC sirali
+        out.append({
+            "slug": slug, "label": label, "direction": direction,
+            "count": len(hits[slug]), "candidates": cands,
+        })
+    return out
+
+
 def screen_get_results_dispatch(slug: str, limit: int = 500) -> list[dict]:
     """Dispatch: ready / parse / diff / Carr (mean_reversion, coiled_spring + P516 4 bulk)."""
     if slug == "mean_reversion":

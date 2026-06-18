@@ -6,7 +6,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Menu, Home, Activity, Globe,
   ListChecks, NotebookText, ScanLine, ChevronDown,
-  Quote, Calculator, CalendarDays, Layers, TrendingUp, BarChart3,
+  Quote, Calculator, CalendarDays, Layers, TrendingUp, BarChart3, Target,
 } from "lucide-react";
 // KARAR ADAY (22 May 2026): BarChart2, TrendingUp, Layers ikonlari kaldirildi -
 // Stratejiler grup sidebar'dan cikti (Secenek E). NavGroup tip ve rendering KORUNDU
@@ -35,6 +35,8 @@ const NAV_ITEMS: NavItem[] = [
   { kind: "leaf", href: "/signals",        label: "Sinyaller",     icon: Activity     },
   { kind: "leaf", href: "/watchlist",      label: "İzleme Listesi", icon: ListChecks  },
   { kind: "leaf", href: "/screens",        label: "Tarama",         icon: ScanLine    },
+  // P523 (18 Haz 2026) — Carr Sinyalleri: 9 Carr setup tek dashboard (aggregate ozet)
+  { kind: "leaf", href: "/carr-sinyalleri", label: "Carr Sinyalleri", icon: Target    },
   { kind: "leaf", href: "/journal",        label: "İşlem Günlüğü", icon: NotebookText },
   // KARAR ADAY #730 (24 May 2026) — Mark Zihinsel Disiplin Kütüphanesi
   { kind: "leaf", href: "/zihinsel-disiplin", label: "Mark Disiplin", icon: Quote },

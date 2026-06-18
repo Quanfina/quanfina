@@ -771,3 +771,43 @@ class TestRisingWedgeScreen:
         assert n >= 1, f"rising_wedge koşulu yok (n={n})."
         m = re.search(r'\brising_wedge:\s*\[(.*?)\]\s*,', ts, re.DOTALL)
         assert m and 'source: "carr"' in m.group(1), "rising_wedge 'carr' source kullanmali."
+
+
+class TestCarrSummaryP523:
+    """P523 — Carr Sinyalleri ozet (9 setup aggregate, tek pass). Backend + endpoint + nav."""
+
+    SLUGS = ("pullback", "mean_reversion", "blue_sky", "coiled_spring", "bullish_base",
+             "bullish_divergence", "blue_sea", "gap_down", "rising_wedge")
+
+    @pytest.fixture(scope="class")
+    def db_helpers(self) -> str:
+        return _read("api/db_helpers.py")
+
+    @pytest.fixture(scope="class")
+    def main(self) -> str:
+        return _read("api/main.py")
+
+    @pytest.fixture(scope="class")
+    def sidebar(self) -> str:
+        return _read("web/components/layout/sidebar.tsx")
+
+    def test_backend_function_9_setups(self, db_helpers):
+        assert "def screen_carr_summary" in db_helpers, "screen_carr_summary yok."
+        m = re.search(r"def screen_carr_summary.*?\n(?=\ndef )", db_helpers, re.DOTALL)
+        body = m.group(0)
+        for slug in self.SLUGS:
+            assert f'"{slug}"' in body, f"carr_summary spec'te {slug} yok."
+
+    def test_none_volume_guard(self, db_helpers):
+        """P492 NaN sanitize -> None volume bar olan ticker atlanmali (fatal degil)."""
+        m = re.search(r"def screen_carr_summary.*?\n(?=\ndef )", db_helpers, re.DOTALL)
+        body = m.group(0)
+        assert "except (KeyError, TypeError, ValueError):" in body, "None-bar guard yok."
+
+    def test_endpoint_and_models(self, main):
+        assert '@app.get("/api/carr/summary"' in main, "carr summary endpoint yok."
+        assert "class CarrSummarySetup" in main, "CarrSummarySetup model yok."
+        assert "screen_carr_summary" in main, "main carr_summary import/cagri yok."
+
+    def test_nav_entry(self, sidebar):
+        assert '/carr-sinyalleri' in sidebar, "sidebar'da Carr Sinyalleri nav yok."

@@ -311,6 +311,7 @@ def get_minervini_stocks() -> list[MinerviniStock]:
 from api.db_helpers import (
     screen_get_results,
     screen_get_results_dispatch,
+    screen_carr_summary,
     screen_list_available,
     SCREENS_READY_8,
     SCREENS_PARSE_7,
@@ -355,6 +356,43 @@ class ScreenResultRow(BaseModel):
 def list_screens() -> list[ScreenMeta]:
     """Mevcut 8 ready screen meta listesi (frontend dropdown icin)."""
     return [ScreenMeta(**m) for m in screen_list_available()]
+
+
+# P523 (18 Haz 2026): Carr Sinyalleri ozet — 9 setup tek dashboard (aggregate)
+class CarrSummaryCandidate(BaseModel):
+    symbol: str
+    rs_ibd: Optional[int] = None
+
+
+class CarrSummarySetup(BaseModel):
+    slug: str
+    label: str
+    direction: Literal["LONG", "SHORT"]
+    count: int
+    candidates: list[CarrSummaryCandidate] = []
+
+
+@app.get("/api/carr/summary", response_model=list[CarrSummarySetup])
+def get_carr_summary(top_n: int = 6, nocache: bool = False) -> list[CarrSummarySetup]:
+    """Carr 9 setup ozet (P523) — bugun hangi hisse hangi setup'i tetikliyor (tek pass).
+
+    son scan pvh tek DB sorgusu + ticker basina 9 detector -> per-setup count + top adaylar.
+    DB yoksa/hata -> bos liste (graceful). P415 cache pateni (30 dk TTL).
+    """
+    cache_key = ("carr_summary", top_n)
+    if not nocache:
+        hit = _SCREENS_CACHE.get(cache_key)
+        if hit is not None and (_now() - hit[0]) < _SCREENS_CACHE_TTL:
+            return hit[1]
+    if not db_health_check():
+        return []
+    try:
+        rows = screen_carr_summary(top_n=top_n)
+    except Exception:
+        return []
+    out = [CarrSummarySetup(**r) for r in rows]
+    _SCREENS_CACHE[cache_key] = (_now(), out)
+    return out
 
 
 def _screens_mock_results(slug: str, limit: int) -> list[ScreenResultRow]:
