@@ -80,6 +80,7 @@ from quanfina_math import (  # noqa: E402
     compute_gap_down,
     compute_rising_wedge_breakdown,
     compute_high_tight_flag,
+    compute_pocket_pivot,
     compute_stage_transition,
     compute_faber_timing,
     compute_mcclellan_oscillator,
@@ -4075,6 +4076,69 @@ def get_high_tight_flag(symbol: str) -> HighTightFlagInfo:
         volume_dryup=r.get("volume_dryup"),
         faults=r.get("faults", []),
         mark_says=r.get("mark_says", ""),
+    )
+
+
+# P533 (18 Haz 2026): Pocket Pivot endpoint (Minervini.md s.167 + Kacher/Morales).
+# SETUP_TYPES'ta vardi, detector yoktu (gap). Bazin icinde kurumsal guc donusu —
+# Minervini birincil AL DEGIL, on-deck/ekleme sinyali olarak izler (s.165, 218).
+class PocketPivotInfo(BaseModel):
+    detected: bool = False
+    quality: Optional[Literal["GOOD", "CANDIDATE", "NONE"]] = None
+    up_volume: Optional[float] = None
+    max_down_volume_10d: Optional[float] = None
+    volume_ratio: Optional[float] = None
+    sma10: Optional[float] = None
+    sma50: Optional[float] = None
+    off_ten_dma: bool = False
+    stage2: bool = False
+    mark_says: str
+    is_mock: bool = False
+
+
+@app.get("/api/stock/{symbol}/pocket-pivot", response_model=PocketPivotInfo)
+def get_pocket_pivot(symbol: str) -> PocketPivotInfo:
+    """Pocket Pivot (Minervini.md s.167 + Kacher/Morales) — bazin icinde kurumsal guc donusu.
+
+    Kanon: bugun yukari gun + hacmi son 10g en yuksek asagi hacimden buyuk (s.167) + Stage 2
+    on-sart (s.186) + 10-DMA donusu (Kacher/Morales 'Trade Like an O'Neil Disciple'). Minervini
+    birincil AL DEGIL — on-deck/ekleme sinyali (s.165, 218). is_mock = gercek 70+ bar yoksa
+    True (Kural #28 — sentetik veriyle paper trade kararina karsi seffaflik).
+    """
+    sym = symbol.upper()
+    stock = _STOCK_BY_SYM.get(sym)
+    if stock:
+        price = stock.price
+    else:
+        try:
+            wl = [r for r in watchlist_get_all() if r["symbol"] == sym]
+        except OperationalError:
+            wl = []
+        if wl:
+            price = float(wl[0]["price"])
+        else:
+            scan_data = _fetch_scan_symbol_data(sym)
+            price = scan_data["price"] if scan_data else 100.0
+
+    bars = _get_ohlcv(sym, price)
+    r = compute_pocket_pivot(
+        [b.open for b in bars], [b.high for b in bars], [b.low for b in bars],
+        [b.close for b in bars], [float(b.volume) for b in bars],
+    )
+    _real = _fetch_ohlcv_real(sym)
+    is_mock = not (_real and len(_real) >= 70)
+    return PocketPivotInfo(
+        detected=r.get("detected", False),
+        quality=r.get("quality"),
+        up_volume=r.get("up_volume"),
+        max_down_volume_10d=r.get("max_down_volume_10d"),
+        volume_ratio=r.get("volume_ratio"),
+        sma10=r.get("sma10"),
+        sma50=r.get("sma50"),
+        off_ten_dma=r.get("off_ten_dma", False),
+        stage2=r.get("stage2", False),
+        mark_says=r.get("mark_says", ""),
+        is_mock=is_mock,
     )
 
 

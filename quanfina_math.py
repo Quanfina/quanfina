@@ -3723,6 +3723,138 @@ def compute_pivot_breakout(
 
 
 # ======================================================================
+# Paket 533 (18 Haz 2026) — Pocket Pivot (Minervini.md s.167 + Kacher/Morales)
+#
+# SETUP_TYPES'ta "pocket_pivot" vardi ama detector YOKTU (gap). Minervini bizzat
+# kullanmaz (Kacher/Morales "Trade Like an O'Neil Disciple" terimi) AMA "on-deck /
+# institutional support" sinyali olarak izler (Minervini.md s.165, 218). Birincil AL
+# = Standart Pivot kirilimi (taban DISI); Pocket Pivot tabanin ICINDE guc belirtisi.
+#
+# KANON KURAL (Minervini.md s.167): bugun YUKARI gun + hacmi son 10 gunun en yuksek
+# ASAGI-gun hacminden buyuk. Baglam: Stage 2 on-sart (s.186), 10-DMA'dan donus
+# (Kacher/Morales — pocket pivot 10-gunluk cizgiden "gelir"). Kural #26: tum esikler
+# kaynak-atifli, UYDURMA YOK.
+# ======================================================================
+POCKET_PIVOT_DOWN_VOL_LOOKBACK = 10   # Minervini.md s.167: "son 10 gunun en yuksek asagi hacmi"
+POCKET_PIVOT_MA_RISING_LOOKBACK = 20  # 50-DMA ~1 ay once ile karsilastir (Stage 2 yukselen)
+POCKET_PIVOT_MIN_BARS = 70            # 50-DMA + 20g rising lookback + buffer
+
+
+def compute_pocket_pivot(
+    opens: list[float],
+    highs: list[float],
+    lows: list[float],
+    closes: list[float],
+    volumes: list[float],
+) -> dict:
+    """Pocket Pivot — bazin icinde kurumsal guc donusu (Minervini.md s.167; Kacher/Morales).
+
+    Minervini birebir kullanmaz; "on-deck / institutional support" sinyali olarak izler
+    (Minervini.md s.165, 218). Birincil AL = Standart Pivot kirilimi (taban DISI). Pocket
+    Pivot tabanin ICINDE guc belirtisi -> watchlist / ekleme noktasi (s.164, 1563).
+
+    Kanon kural (Minervini.md s.167): bugun YUKARI gun + hacmi son 10 gunun en yuksek
+    ASAGI-gun hacminden buyuk. Baglam: Stage 2 on-sart (s.186 "Trend Template karsilamayan
+    VCP gecersiz"), 10-DMA'dan donus (Kacher/Morales 'Trade Like an O'Neil Disciple' —
+    pocket pivot 10-gunluk cizgiden gelir; gunun dusugu 10-DMA'ya temas/alti).
+
+    quality: GOOD (hacim + Stage 2 + 10-DMA donusu) / CANDIDATE (hacim + Stage 2, 10-DMA
+    temasi yok -> goz karari) / NONE.
+
+    Args: opens/highs/lows/closes/volumes — gunluk OHLCV (kronolojik, esit uzunluk).
+          (opens/highs su an kullanilmiyor; house imzasi tutarliligi icin alinir.)
+    Returns: dict {detected, quality, up_volume, max_down_volume_10d, volume_ratio,
+                   sma10, sma50, off_ten_dma, stage2, is_mock, mark_says}
+    """
+    def _none(msg: str, sma10=None, sma50=None) -> dict:
+        return {
+            'detected': False, 'quality': 'NONE', 'up_volume': None,
+            'max_down_volume_10d': None, 'volume_ratio': None,
+            'sma10': round(sma10, 2) if sma10 is not None else None,
+            'sma50': round(sma50, 2) if sma50 is not None else None,
+            'off_ten_dma': False, 'stage2': False,
+            'is_mock': False, 'mark_says': msg,
+        }
+
+    if not closes or not volumes or not lows:
+        return _none('Yetersiz veri — pocket pivot hesaplanamiyor.')
+    n = len(closes)
+    if not (len(volumes) == len(lows) == n):
+        return _none('Pocket pivot: liste uzunluklari farkli.')
+    if n < POCKET_PIVOT_MIN_BARS:
+        return _none(f'Yetersiz veri — en az {POCKET_PIVOT_MIN_BARS} gun gerek (50-DMA + yukselis teyidi).')
+
+    today = n - 1
+
+    # MA baglami once hesapla — sinyal yok kartinda da fiyat/MA konumu gorunsun (UX).
+    sma50 = _sma_at(closes, today, 50)
+    sma50_prior = _sma_at(closes, today - POCKET_PIVOT_MA_RISING_LOOKBACK, 50)
+    sma10 = _sma_at(closes, today, 10)
+    if sma50 is None or sma50_prior is None or sma10 is None:
+        return _none('SMA hesaplanamadi — yetersiz veri.')
+
+    # 1) KANON KURAL (s.167): bugun yukari gun + hacim > son 10g en yuksek asagi-gun hacmi
+    up_day = closes[today] > closes[today - 1]
+    down_vols = [
+        volumes[i]
+        for i in range(today - POCKET_PIVOT_DOWN_VOL_LOOKBACK, today)
+        if i - 1 >= 0 and closes[i] < closes[i - 1]
+    ]
+    max_down_vol = max(down_vols) if down_vols else 0.0
+    up_vol = volumes[today]
+    vol_signature = up_day and up_vol > max_down_vol
+    if not vol_signature:
+        return _none(
+            'Pocket Pivot hacim imzasi yok — bugun yukari gun + hacmi son 10g en yuksek '
+            'asagi-gun hacminden buyuk olmali (Minervini s.167).',
+            sma10, sma50,
+        )
+
+    # 2) Stage 2 on-sart (s.186): close > 50-DMA + 50-DMA yukselen
+    stage2 = closes[today] > sma50 and sma50 > sma50_prior
+    if not stage2:
+        return _none(
+            'Stage 2 degil (close > 50-DMA + 50-DMA yukselen gerek) — Minervini s.186 '
+            'ön-sart: Trend Template karsilamayan setup gecersiz.',
+            sma10, sma50,
+        )
+
+    # 3) 10-DMA'dan donus (Kacher/Morales): gunun dusugu 10-DMA'ya temas/alti, kapanis ustu
+    off_ten_dma = lows[today] <= sma10 <= closes[today]
+
+    volume_ratio = round(up_vol / max_down_vol, 2) if max_down_vol > 0 else None
+    quality = 'GOOD' if off_ten_dma else 'CANDIDATE'
+
+    vr_str = f'{volume_ratio}x' if volume_ratio is not None else '10g asagi-gun yok'
+    if quality == 'GOOD':
+        says = (
+            f'✓ GOOD Pocket Pivot — yukari gun hacmi son 10g en yuksek asagi hacmin '
+            f'{vr_str} ustunde (Minervini s.167) + 10-DMA donusu (${sma10:.2f}). Stage 2 '
+            f'içi kurumsal talep. Minervini: birincil AL DEGIL — on-deck/ekleme sinyali (s.165).'
+        )
+    else:
+        says = (
+            f'⚠️ CANDIDATE Pocket Pivot — hacim imzasi var ({vr_str}, Minervini s.167) + Stage 2, '
+            f'AMA gunun dusugu 10-DMA (${sma10:.2f}) temas etmedi (extended olabilir). Goz karari: '
+            f'bazin icinde mi. Minervini: on-deck kaniti (s.218), birincil AL standart pivot.'
+        )
+
+    return {
+        'detected': True,
+        'quality': quality,
+        'up_volume': float(up_vol),
+        'max_down_volume_10d': float(max_down_vol),
+        'volume_ratio': volume_ratio,
+        'sma10': round(sma10, 2),
+        'sma50': round(sma50, 2),
+        'off_ten_dma': off_ten_dma,
+        'stage2': stage2,
+        'is_mock': False,
+        'mark_says': says,
+    }
+
+
+# ======================================================================
 # KARAR #733 alt-paket (Paket 73, 25 May 2026) — Brandon Avg Gain Expectancy
 #
 # Mark Brandon Video canon: "Average gain %20, average loss %4, win
