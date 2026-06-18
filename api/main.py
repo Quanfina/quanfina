@@ -4188,8 +4188,16 @@ SETUP_TYPES: list[SetupTypeModel] = [
     SetupTypeModel(key="power_play",    label="Power Play",   description="High Tight Flag — güçlü momentum"),
     SetupTypeModel(key="cup_and_handle",label="Cup & Handle", description="O'Neil klasik cup-and-handle formasyonu"),
     SetupTypeModel(key="flat_base",     label="Flat Base",    description="Dar bantlı konsolidasyon tabanı"),
-    SetupTypeModel(key="pullback",      label="Pullback",     description="Yükseliş trendinde geri çekilme — Carr"),
-    SetupTypeModel(key="coiled_spring", label="Coiled Spring",description="Sıkışma sonrası kırılım — Carr"),
+    SetupTypeModel(key="pullback",      label="Pullback",     description="Yükseliş trendinde geri çekilme — Carr s.249"),
+    SetupTypeModel(key="coiled_spring", label="Coiled Spring",description="Sıkışma sonrası kırılım — Carr s.250"),
+    # P528 (18 Haz 2026): Carr 9-setup tamamlandı → eksik 7 setup_type eklendi (paper trade etiketleme)
+    SetupTypeModel(key="mean_reversion",     label="Mean Reversion",     description="Countertrend BB+SMA20 dönüş — Carr s.307"),
+    SetupTypeModel(key="blue_sky",           label="Blue Sky Breakout",  description="40g yeni yüksek + OBV/MACD breakout — Carr s.264"),
+    SetupTypeModel(key="bullish_base",       label="Bullish Base",       description="Downtrend-sonu contrarian baz — Carr s.291"),
+    SetupTypeModel(key="bullish_divergence", label="Bullish Divergence", description="Uptrend-dip 2+ gösterge divergence — Carr s.258"),
+    SetupTypeModel(key="blue_sea",           label="Blue Sea Breakdown", description="SHORT strong-bear breakdown — Carr s.289"),
+    SetupTypeModel(key="gap_down",           label="Gap Down",           description="SHORT ralli-sonu reversal gap — Carr s.273"),
+    SetupTypeModel(key="rising_wedge",       label="Rising Wedge",       description="SHORT yükselen kama kırılımı — Carr Böl.19"),
 ]
 
 

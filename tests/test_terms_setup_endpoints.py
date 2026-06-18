@@ -54,3 +54,10 @@ class TestSetupTypes:
         assert r.status_code == 200
         data = r.json()
         assert isinstance(data, list) and len(data) > 0
+
+    def test_carr_9_setups_present(self, client):
+        """P528: 9 Carr setup paper trade etiketlenebilir olmali (Carr stratejisi %100)."""
+        keys = {s["key"] for s in client.get("/api/setup-types").json()}
+        carr = {"mean_reversion", "pullback", "blue_sky", "coiled_spring", "bullish_base",
+                "bullish_divergence", "blue_sea", "gap_down", "rising_wedge"}
+        assert carr <= keys, f"setup-types'ta eksik Carr setup: {carr - keys}"
