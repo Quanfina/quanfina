@@ -88,6 +88,18 @@ def test_not_stage2_rejected():
     assert "Stage 2 degil" in r["mark_says"]
 
 
+def test_no_down_days_rejected():
+    # Monoton 10g yukselis (hic asagi-gun yok) -> s.167 karsilastirmasi tanimsiz -> reddet.
+    closes = [100 + i * 0.4 for i in range(70)]  # saf monoton yukselis
+    volumes = [1_000_000] * 70
+    opens = [c for c in closes]
+    highs = [c + 0.3 for c in closes]
+    lows = [c - 0.6 for c in closes]
+    r = compute_pocket_pivot(opens, highs, lows, closes, volumes)
+    assert r["detected"] is False
+    assert "asagi-gun yok" in r["mark_says"]
+
+
 def test_insufficient_data_rejected():
     n = POCKET_PIVOT_MIN_BARS - 5
     closes = [100 + i * 0.4 for i in range(n)]

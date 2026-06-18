@@ -3800,7 +3800,15 @@ def compute_pocket_pivot(
         for i in range(today - POCKET_PIVOT_DOWN_VOL_LOOKBACK, today)
         if i - 1 >= 0 and closes[i] < closes[i - 1]
     ]
-    max_down_vol = max(down_vols) if down_vols else 0.0
+    # s.167 imzasi son 10g ASAGI-gun hacmiyle karsilastirma gerektirir; hic asagi-gun
+    # yoksa (monoton 10g yukselis) karsilastirma tanimsiz -> gecerli pocket pivot DEGIL.
+    if not down_vols:
+        return _none(
+            'Son 10g asagi-gun yok — pocket pivot karsilastirmasi tanimsiz (s.167 hacim '
+            'imzasi son 10g en yuksek asagi hacme dayanir). Muhtemelen extended.',
+            sma10, sma50,
+        )
+    max_down_vol = max(down_vols)
     up_vol = volumes[today]
     vol_signature = up_day and up_vol > max_down_vol
     if not vol_signature:
