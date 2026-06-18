@@ -554,6 +554,17 @@ class TestMeanReversionScreen:
         assert "def screen_mean_reversion_get_results" in db_helpers, "MR screen fonksiyonu yok."
         assert 'if slug == "mean_reversion"' in db_helpers, "dispatch MR branch yok."
 
+    def test_carr_prefilter_present(self, db_helpers):
+        """Carr s.302 on-filtre (Bullish Watch List) — falling-knife/value-trap onleme.
+        Cift danisma (18 Haz 2026) bulgu #2: MR on-filtresiz tehlikeli.
+        """
+        m = re.search(r"def screen_mean_reversion_get_results.*?\n(?=def )", db_helpers, re.DOTALL)
+        assert m, "MR fonksiyonu bulunamadi."
+        body = m.group(0)
+        assert "last_close <= 5.0" in body, "Carr s.302 Fiyat>$5 on-filtresi yok."
+        assert "avg_vol < 100_000" in body, "Carr s.302 hacim>=100k on-filtresi yok."
+        assert "s.302" in body, "Carr s.302 atfi yok (Kural #26 kaynak seffaflik)."
+
     def test_ui_dropdown_has_mean_reversion(self, ts):
         assert re.search(r'mean_reversion:\s*"[^"]+"', ts), "SCREEN_CATEGORIES'de mean_reversion yok."
 

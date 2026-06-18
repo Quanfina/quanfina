@@ -4394,16 +4394,18 @@ def compute_double_bottom(
 #
 # Quanfina CEKIRDEK frekans setup (Carr.md sat.438: %80 zaman; trend setup %20).
 # COUNTERTREND. TIER 1 (otomatik). Gostergeler SADECE BB(20,2.0) + SMA20 + candle
-# (hacim/ATR/Stoch FILTRE DEGIL — Carr s.121 canon). AÇIK KONU #22 = KARAR #444 hibrit
-# (Carr 1.+2. baski); MR 2018'e ozgu. Kural #26: tum esikler Carr 2.baski sayfa-atifli.
+# (hacim/ATR/Stoch FILTRE DEGIL — Carr s.307 canon). AÇIK KONU #22 = KARAR #444 hibrit
+# (Carr 1.+2. baski); MR Bolum 20 "Bonus System I: The Bull/Bear Mean Reversion Setup"
+# 2. baski 2018'e ozgu. Kural #26: tum esikler Carr 2.baski sayfa-atifli (NotebookLM cift
+# danisma teyit 18 Haz 2026 — verbatim alinti dogrulama, eski s.356/340/410 atiflari yanlisti).
 # ======================================================================
-MEAN_REV_BB_PERIOD = 20             # BB(20, 2.0) — Carr s.121
+MEAN_REV_BB_PERIOD = 20             # BB(20, 2.0) — Carr s.307 "Bollinger Bands (20, 2.0)"
 MEAN_REV_BB_STD = 2.0
-MEAN_REV_SMA_THRESHOLD = 0.9        # Carr s.340: Close < SMA20 × 0.9 (%10 esik KRITIK)
-MEAN_REV_STOP_BUFFER_LONG = 0.985   # Carr s.410-411: yapisal seviye × 0.985 (long)
-MEAN_REV_STOP_BUFFER_SHORT = 1.015  # × 1.015 (short)
-MEAN_REV_HARD_CAP_PCT = 8.0         # Carr s.410-411: %8 hard cap
-MEAN_REV_TIME_STOP_DAYS = 7         # Carr s.400, 404: 7 islem gunu KRITIK
+MEAN_REV_SMA_THRESHOLD = 0.9        # Carr s.307: "at least 10 percent below the 20 MA" (KRITIK)
+MEAN_REV_STOP_BUFFER_LONG = 0.985   # Carr s.311: "1.5 percent below the low ... whichever is lower"
+MEAN_REV_STOP_BUFFER_SHORT = 1.015  # Carr s.312: "1.5 percent above the high ... whichever is higher"
+MEAN_REV_HARD_CAP_PCT = 8.0         # Carr s.311-312: "In no case ... greater than -8 percent"
+MEAN_REV_TIME_STOP_DAYS = 7         # Carr s.311-312: "Exit at the close of the seventh day"
 
 
 def _bollinger_sma(closes: list[float], end_idx: int, period: int, num_std: float):
@@ -4421,14 +4423,18 @@ def compute_mean_reversion(
     lows: list[float],
     closes: list[float],
 ) -> dict:
-    """Carr Mean Reversion (2.baski s.356) — countertrend LONG/SHORT sinyal tespiti.
+    """Carr Mean Reversion (2.baski Bolum 20, s.307-312) — countertrend LONG/SHORT tespiti.
 
-    LONG (s.356): (1) dun close < alt BB, (2) bugun close > alt BB (iceri donus),
+    LONG (s.307): (1) dun close < alt BB, (2) bugun close > alt BB (iceri donus),
     (3) bugun close < SMA20 × 0.9, (4) dun bearish mum, (5) bugun close < dun open.
-    SHORT (s.357-358): simetrik ters (ust BB, SMA20 × 1.1, dun bullish, bugun > dun open).
-    Stop: yapisal (signal+prev gun low/high) × 0.985/1.015, %8 hard cap (s.410-411).
-    Target: SMA20 dinamik (s.339). Time stop: 7 islem gunu (s.400, 404).
-    Gosterge SADECE BB+SMA20+candle (Carr canon — hacim/ATR/Stoch yok).
+    SHORT (s.308): simetrik ters (ust BB, SMA20 × 1.1, dun bullish, bugun > dun open).
+    Stop: yapisal (signal+prev gun low/high) × 0.985/1.015, %8 hard cap (s.311-312).
+    Target: SMA20 dinamik GTC (s.310-312). Time stop: 7 islem gunu (s.311-312).
+    Gosterge SADECE BB+SMA20+candle (Carr s.307 canon — hacim/ATR/Stoch yok).
+    NOT (s.307): kural 5 icin "dar govdeli mum (narrow range)" subjektif istisnasi var —
+    deterministik tarayicida BILINCLI KATI birakildi (false-positive minimize; eyeballing yok).
+    On-filtre (s.302 Bullish/Bearish Watch List): bu fonksiyon SADECE mum/BB tespiti yapar;
+    Fiyat>$5 + hacim>100k + P/S on-filtresi bulk screen katmaninda (db_helpers) uygulanir.
 
     Returns: {detected, direction, quality, entry, stop, target, hard_cap_pct,
               time_stop_days, sma20, lower_bb, upper_bb, rules, mark_says}.
@@ -4491,7 +4497,7 @@ def compute_mean_reversion(
     target = round(sma_t, 2)
     risk_pct = round(abs(entry - stop) / entry * 100, 2) if entry else None
     says = (f'✓ Mean Reversion {direction} — giris ${round(entry, 2)}, stop ${round(stop, 2)} '
-            f'(risk %{risk_pct}, %8 cap), hedef SMA20 ${target}. 7-gun time stop (Carr s.356/400/410). '
+            f'(risk %{risk_pct}, %8 cap), hedef SMA20 ${target}. 7-gun time stop (Carr s.307-312). '
             f'COUNTERTREND — Range/Weak piyasada gecerli.')
     return {
         'detected': True, 'direction': direction, 'quality': 'GOOD',

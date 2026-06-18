@@ -884,6 +884,22 @@ def screen_mean_reversion_get_results(slug: str = "mean_reversion", limit: int =
                 continue
             if not arr or len(arr) < 21:
                 continue
+            # Carr s.302 on-filtre (Bullish Watch List) — falling-knife/value-trap onleme.
+            # MR SADECE on-filtreli havuzda calismali, yoksa "dusen bicak" riski (s.302).
+            # Sourceable: Fiyat>$5 + ort. gunluk hacim>=100k (pvh son 20 bar).
+            # YOK (uydurma yasak, Kural #26): P/S<1 (sales/revenue feed yok) + Zacks Rank
+            # (3.taraf tescilli, abone degiliz) -> AÇIK KONU #79 (gelecek temel-veri kaynagi).
+            try:
+                last_close = float(arr[-1]["close"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if last_close <= 5.0:
+                continue
+            recent_vols = [float(b["volume"]) for b in arr[-20:]
+                           if b.get("volume") is not None]
+            avg_vol = sum(recent_vols) / len(recent_vols) if recent_vols else 0.0
+            if avg_vol < 100_000:
+                continue
             try:
                 mr = compute_mean_reversion(
                     [b["open"] for b in arr], [b["high"] for b in arr],
