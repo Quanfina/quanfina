@@ -73,6 +73,7 @@ from quanfina_math import (  # noqa: E402
     compute_carr_pullback,
     compute_blue_sky_breakout,
     compute_coiled_spring,
+    compute_bullish_base_breakout,
     compute_high_tight_flag,
     compute_stage_transition,
     compute_faber_timing,
@@ -3447,6 +3448,81 @@ def get_coiled_spring(symbol: str) -> CoiledSpringInfo:
         rr=r.get("rr"),
         sma20=r.get("sma20"),
         sma50=r.get("sma50"),
+        eyeball_checks=r.get("eyeball_checks", []),
+        mark_says=r.get("mark_says", ""),
+        is_mock=is_mock,
+    )
+
+
+# P513 (18 Haz 2026): Carr Bullish Base Breakout endpoint (s.291 entry + s.324-325 exit)
+# CONTRARIAN downtrend-sonu LONG ADAYI. compute_bullish_base_breakout wire. entry=CLOSE
+# (kirilim beklenmez, s.284). OBV+MACD yukseliyor. 200g SMA -> >=200 bar (n_bars=252).
+class BullishBaseInfo(BaseModel):
+    detected: bool = False
+    direction: Optional[Literal["LONG"]] = None
+    quality: Optional[str] = None
+    signal_close: Optional[float] = None
+    entry: Optional[float] = None       # CLOSE (kirilim beklenmez — ilk yesil mum, s.284,289)
+    stop: Optional[float] = None        # Ch22 %6 / %8 cap (s.325)
+    target: Optional[float] = None      # 2R (s.324)
+    risk_pct: Optional[float] = None
+    rr: Optional[float] = None
+    sma20: Optional[float] = None
+    sma50: Optional[float] = None
+    sma200: Optional[float] = None
+    obv: Optional[float] = None
+    macd: Optional[float] = None
+    eyeball_checks: list[str] = []
+    mark_says: str
+    is_mock: bool = False
+
+
+@app.get("/api/stock/{symbol}/bullish-base", response_model=BullishBaseInfo)
+def get_bullish_base(symbol: str) -> BullishBaseInfo:
+    """Carr Bullish Base Breakout (2.baski s.291) — CONTRARIAN downtrend-sonu LONG ADAYI.
+
+    7 tarama kosulu + yesil tetik (s.291). KRITIK: kirilim BEKLENMEZ -> entry=CLOSE (s.284,289).
+    OBV+MACD yukseliyor + range daralma + downtrend baz (SMA50>SMA20, SMA50<SMA200). TIER-2
+    EYEBALL: base tipi (rising wedge DEGIL, s.287-288) -> quality='CANDIDATE'. CIKIS Ch22:
+    %6 stop / 2R (s.324-325). 200g SMA -> >=200 bar; is_mock = gercek 200+ bar yoksa True.
+    """
+    sym = symbol.upper()
+    stock = _STOCK_BY_SYM.get(sym)
+    if stock:
+        price = stock.price
+    else:
+        try:
+            wl = [r for r in watchlist_get_all() if r["symbol"] == sym]
+        except OperationalError:
+            wl = []
+        if wl:
+            price = float(wl[0]["price"])
+        else:
+            scan_data = _fetch_scan_symbol_data(sym)
+            price = scan_data["price"] if scan_data else 100.0
+
+    bars = _get_ohlcv(sym, price)
+    r = compute_bullish_base_breakout(
+        [b.open for b in bars], [b.high for b in bars], [b.low for b in bars],
+        [b.close for b in bars], [float(b.volume) for b in bars],
+    )
+    _real = _fetch_ohlcv_real(sym, 252)
+    is_mock = not (_real and len(_real) >= 200)
+    return BullishBaseInfo(
+        detected=r.get("detected", False),
+        direction=r.get("direction"),
+        quality=r.get("quality"),
+        signal_close=r.get("signal_close"),
+        entry=r.get("entry"),
+        stop=r.get("stop"),
+        target=r.get("target"),
+        risk_pct=r.get("risk_pct"),
+        rr=r.get("rr"),
+        sma20=r.get("sma20"),
+        sma50=r.get("sma50"),
+        sma200=r.get("sma200"),
+        obv=r.get("obv"),
+        macd=r.get("macd"),
         eyeball_checks=r.get("eyeball_checks", []),
         mark_says=r.get("mark_says", ""),
         is_mock=is_mock,

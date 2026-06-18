@@ -15,6 +15,7 @@ import { MeanReversionCard } from "@/components/stock/MeanReversionCard";
 import { PullbackCard } from "@/components/stock/PullbackCard";
 import { BlueSkyCard } from "@/components/stock/BlueSkyCard";
 import { CoiledSpringCard } from "@/components/stock/CoiledSpringCard";
+import { BullishBaseCard } from "@/components/stock/BullishBaseCard";
 import { PivotBreakoutCard } from "@/components/stock/PivotBreakoutCard";
 import { OverheadSupplyCard } from "@/components/stock/OverheadSupplyCard";
 import { ClimaxRunCard } from "@/components/stock/ClimaxRunCard";
@@ -333,6 +334,8 @@ export default function HissePage({
           <BlueSkyCard symbol={sym} />
           {/* Paket 510 (18 Haz 2026): Carr Coiled Spring — TIER-2 daralan yay ADAYI (s.250) */}
           <CoiledSpringCard symbol={sym} />
+          {/* Paket 513 (18 Haz 2026): Carr Bullish Base Breakout — CONTRARIAN downtrend baz (s.291) */}
+          <BullishBaseCard symbol={sym} />
           {/* KARAR #733 alt-paket (Paket 72): Pivot Breakout Card */}
           <PivotBreakoutCard symbol={sym} />
           {/* KARAR #733 alt-paket (Paket 78): Overhead Supply Card */}
