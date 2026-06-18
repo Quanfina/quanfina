@@ -70,6 +70,7 @@ from quanfina_math import (  # noqa: E402
     compute_flat_base,
     compute_double_bottom,
     compute_mean_reversion,
+    compute_carr_pullback,
     compute_high_tight_flag,
     compute_stage_transition,
     compute_faber_timing,
@@ -3232,6 +3233,76 @@ def get_mean_reversion(symbol: str) -> MeanReversionInfo:
         sma20=r.get("sma20"),
         lower_bb=r.get("lower_bb"),
         upper_bb=r.get("upper_bb"),
+        mark_says=r.get("mark_says", ""),
+        is_mock=is_mock,
+    )
+
+
+# P506 (18 Haz 2026): Carr Pullback endpoint (s.249 entry + s.321-324 exit)
+# WEAK_BULL trend-takip LONG. compute_carr_pullback wire. SMA200 -> >=200 bar gerek.
+class CarrPullbackInfo(BaseModel):
+    detected: bool = False
+    direction: Optional[Literal["LONG"]] = None
+    quality: Optional[str] = None
+    signal_close: Optional[float] = None
+    entry: Optional[float] = None       # ertesi gun signal high ustu buy-stop (s.248)
+    stop: Optional[float] = None        # 50MA -%2 / %8 cap (s.321-322)
+    target: Optional[float] = None      # 2R (s.324)
+    risk_pct: Optional[float] = None
+    rr: Optional[float] = None
+    sma20: Optional[float] = None
+    sma50: Optional[float] = None
+    sma200: Optional[float] = None
+    stoch_k: Optional[float] = None
+    mark_says: str
+    is_mock: bool = False
+
+
+@app.get("/api/stock/{symbol}/pullback", response_model=CarrPullbackInfo)
+def get_carr_pullback(symbol: str) -> CarrPullbackInfo:
+    """Carr Pullback (2.baski s.249) — WEAK_BULL trend-takip LONG tek-hisse.
+
+    Carr'in amiral pullback setup'i. OHLCV: _get_ohlcv (gercek yfinance + sentetik fallback).
+    SINYAL: SMA20>SMA50>SMA200 + 50/20 rising + Stoch %K(5,3,3)<20 + close>open (s.249).
+    ENTRY: ertesi gun signal high ustu (s.248). STOP: 50MA-%2 / %8 cap (s.321-322). TARGET:
+    2R (s.324). SMA200 icin >=200 bar gerek -> is_mock = gercek 200+ bar yoksa True.
+    """
+    sym = symbol.upper()
+    stock = _STOCK_BY_SYM.get(sym)
+    if stock:
+        price = stock.price
+    else:
+        try:
+            wl = [r for r in watchlist_get_all() if r["symbol"] == sym]
+        except OperationalError:
+            wl = []
+        if wl:
+            price = float(wl[0]["price"])
+        else:
+            scan_data = _fetch_scan_symbol_data(sym)
+            price = scan_data["price"] if scan_data else 100.0
+
+    bars = _get_ohlcv(sym, price)
+    r = compute_carr_pullback(
+        [b.open for b in bars], [b.high for b in bars],
+        [b.low for b in bars], [b.close for b in bars],
+    )
+    _real = _fetch_ohlcv_real(sym, 252)
+    is_mock = not (_real and len(_real) >= 200)
+    return CarrPullbackInfo(
+        detected=r.get("detected", False),
+        direction=r.get("direction"),
+        quality=r.get("quality"),
+        signal_close=r.get("signal_close"),
+        entry=r.get("entry"),
+        stop=r.get("stop"),
+        target=r.get("target"),
+        risk_pct=r.get("risk_pct"),
+        rr=r.get("rr"),
+        sma20=r.get("sma20"),
+        sma50=r.get("sma50"),
+        sma200=r.get("sma200"),
+        stoch_k=r.get("stoch_k"),
         mark_says=r.get("mark_says", ""),
         is_mock=is_mock,
     )

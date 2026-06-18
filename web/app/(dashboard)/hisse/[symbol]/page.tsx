@@ -12,6 +12,7 @@ import { StockHeader } from "@/components/stock/StockHeader";
 import { ActiveStrategies } from "@/components/stock/ActiveStrategies";
 import { CarrStageCard } from "@/components/stock/CarrStageCard";
 import { MeanReversionCard } from "@/components/stock/MeanReversionCard";
+import { PullbackCard } from "@/components/stock/PullbackCard";
 import { PivotBreakoutCard } from "@/components/stock/PivotBreakoutCard";
 import { OverheadSupplyCard } from "@/components/stock/OverheadSupplyCard";
 import { ClimaxRunCard } from "@/components/stock/ClimaxRunCard";
@@ -324,6 +325,8 @@ export default function HissePage({
           <CarrStageCard symbol={sym} />
           {/* Paket 500 (18 Haz 2026): Carr Mean Reversion — countertrend çekirdek setup (s.356) */}
           <MeanReversionCard symbol={sym} />
+          {/* Paket 506 (18 Haz 2026): Carr Pullback — WEAK_BULL trend-takip LONG (s.249) */}
+          <PullbackCard symbol={sym} />
           {/* KARAR #733 alt-paket (Paket 72): Pivot Breakout Card */}
           <PivotBreakoutCard symbol={sym} />
           {/* KARAR #733 alt-paket (Paket 78): Overhead Supply Card */}
