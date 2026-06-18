@@ -497,3 +497,36 @@ class TestValidBaseConsistency:
         """SCREEN_CONDITIONS'da valid_base 2 koşullu (formasyon + kalite) olmalı."""
         n = _extract_screen_conditions_count(ts, "valid_base")
         assert n == 2, f"valid_base UI koşul sayısı = {n}, beklenen 2 (formasyon + kalite)."
+
+
+class TestImportantScreensReadded:
+    """18 Haz 2026 — Minervini-core önemli taramalar arşivden UI'a geri (canlı sayım
+    doğrulandı: top5_rpr 38 / power_play_ready 25 / tight_low_vol_excellent 3).
+    Backend slug'lar SCREENS_READY_9'da zaten kanon (KARAR #461/#466/#467); bu test
+    UI<->backend bağını (dropdown + koşul + slug) korur.
+    """
+
+    SLUGS = ("top5_rpr", "power_play_ready", "tight_low_vol_excellent")
+
+    @pytest.fixture(scope="class")
+    def ts(self) -> str:
+        return _read("web/types/screens.ts")
+
+    @pytest.fixture(scope="class")
+    def db_helpers(self) -> str:
+        return _read("api/db_helpers.py")
+
+    def test_backend_slugs_exist(self, db_helpers):
+        for slug in self.SLUGS:
+            assert f'"{slug}":' in db_helpers, f"SCREENS_READY_9'da {slug} yok (backend)."
+
+    def test_ui_dropdown_has_all(self, ts):
+        for slug in self.SLUGS:
+            assert re.search(rf'{slug}:\s*"[^"]+"', ts), (
+                f"SCREEN_CATEGORIES'de {slug} yok (dropdown'da görünmez)."
+            )
+
+    def test_ui_conditions_present(self, ts):
+        for slug in self.SLUGS:
+            n = _extract_screen_conditions_count(ts, slug)
+            assert n >= 1, f"SCREEN_CONDITIONS'da {slug} koşulu yok (n={n})."

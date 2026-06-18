@@ -98,6 +98,10 @@ export const SCREEN_CATEGORIES: Record<string, string> = {
   // P490 sequence/NaN fix sonrası base kolonları (cup/flat/double quality) canlı doldu.
   // Vizyon "geçerli baz filtresi" (birleşik) — Cup/Flat/Double EXCELLENT+GOOD.
   valid_base: "Geçerli Baz",
+  // 18 Haz 2026 — Minervini-core önemli taramalar arşivden geri (canlı sayım doğrulandı):
+  top5_rpr: "Top %5 RS (Liderler)",          // RS≥95, 38 hisse — Mark #1 lider kriteri
+  power_play_ready: "Power Play (HTF)",       // KARAR #467, 25 hisse — Mark canon momentum
+  tight_low_vol_excellent: "VCP EXCELLENT",   // KARAR #466, 3 hisse — Mark imza paterni A+
 };
 
 // SCREEN_DESCRIPTIONS kaldirildi (22 May 2026) — Sn. Ferit "bunu sil" talimati.
@@ -186,6 +190,17 @@ export const SCREEN_CONDITIONS: Record<string, ScreenCondition[]> = {
   valid_base: [
     { source: "mark", text: "Cup-with-Handle, Flat Base veya Double Bottom baz formasyonu tespit edildi (O'Neil baz analizi)" },
     { source: "mark", text: "Baz kalitesi EXCELLENT veya GOOD (kusurlu MARGINAL + formasyon yok NONE hariç — hard-cut)" },
+  ],
+
+  // 18 Haz 2026 — Minervini-core önemli taramalar (arşivden geri, canlı sayım doğrulandı)
+  top5_rpr: [
+    { source: "mark", text: "Relative Strength (RS) ≥ 95 — en güçlü %5 lider (Mark: 'en güçlüyü al', TLSMW lider önceliği)" },
+  ],
+  power_play_ready: [
+    { source: "mark", text: "Power Play / High Tight Flag: POLE %100+ yükseliş + FLAG %10-25 sıkı bayrak (Mark canon, KARAR #467)" },
+  ],
+  tight_low_vol_excellent: [
+    { source: "mark", text: "VCP Kalite = EXCELLENT (A+): en sıkı daralma (<%50) + hacim kuruması + bonus teyit (Mark VCP canon, KARAR #466)" },
   ],
 
   // 24 May 2026 — Tam Minervini Tarama (Hibrit Pipeline: 10 Hard + 5 Soft)
