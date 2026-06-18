@@ -5058,6 +5058,190 @@ def compute_bullish_base_breakout(
 
 
 # ======================================================================
+# CARR BULLISH DIVERGENCE (TLFAL 2.baski Bolum 11, s.252-262) — P514 (18 Haz 2026)
+# Uptrend-dip LONG ADAYI: fiyat lower low yaparken 2+ gosterge higher low (divergence).
+# Cift danisma (Carr NotebookLM, verbatim teyit). 6 gosterge: MACD line, MACD histogram,
+# Stoch %K(5,3,3), RSI(5), CCI(20), OBV -> EN AZ 2'si bugun > 15g once (s.255,258).
+# SINYAL (s.258, screener): (1) SMA50>SMA200 (uptrend), (2) dun low<=20g once,
+#   (3) dun low<=5g once (pivot lower low), (4) 2+ gosterge >15g once (divergence),
+#   (5) bugun yesil (close>=open — s.256; kitap tarama "kirmizi" YAZAR HATASI, s.256 yesil dogru).
+# TETIKLEYICI (s.256,262): ilk yesil mum -> ertesi gun open (entry=close proxy).
+# CIKIS: stop tetikleyici sell-off SON DIBI alti (s.262 divergence-ozel) + %8 cap; target
+# Ch22 2R (s.324 — kitap dinamik exit s.262 hesaplanamaz). TIME STOP YOK (uzun tutma, s.252).
+# TIER-2 EYEBALL (s.256): divergence %100 taranamaz, gozle teyit sart -> quality='CANDIDATE'.
+# ON-FILTRE (s.261): Bullish Watch List ZORUNLU. Rejim: Range + WEAK bull + WEAK bear (s.252).
+# VERI: SMA200 -> >=200 bar (pvh 80<200, bulk YOK).
+# ======================================================================
+BULLISH_DIV_SMA_FAST: int = 50              # Carr s.258
+BULLISH_DIV_SMA_SLOW: int = 200             # Carr s.258 (uptrend onayi)
+BULLISH_DIV_PIVOT_LB_LONG: int = 20         # Carr s.258: dun low <= 20g once
+BULLISH_DIV_PIVOT_LB_SHORT: int = 5         # Carr s.258: dun low <= 5g once
+BULLISH_DIV_INDICATOR_LB: int = 15          # Carr s.258: gosterge 15g once kiyas
+BULLISH_DIV_MIN_INDICATORS: int = 2         # Carr s.255: en az 2 gosterge diverge
+BULLISH_DIV_MACD_FAST: int = 12
+BULLISH_DIV_MACD_SLOW: int = 26
+BULLISH_DIV_MACD_SIGNAL: int = 9
+BULLISH_DIV_STOCH_PERIOD: int = 5           # Stoch %K (5,3,3)
+BULLISH_DIV_STOCH_SMOOTH: int = 3
+BULLISH_DIV_RSI_PERIOD: int = 5             # Carr s.255: RSI(5)
+BULLISH_DIV_CCI_PERIOD: int = 20            # Carr s.255: CCI(20)
+BULLISH_DIV_HARD_CAP_PCT: float = 8.0       # Carr s.325 (Ch22 evrensel)
+BULLISH_DIV_TARGET_R_MULTIPLE: float = 2.0  # Carr s.324 (Ch22 — divergence dinamik exit hesaplanamaz)
+
+
+def _macd_histogram_series(closes: list[float], fast: int, slow: int, signal: int) -> list:
+    """MACD histogram = MACD line - signal(EMA9 of MACD line). slow+signal warmup oncesi None."""
+    ml = _macd_line_series(closes, fast, slow)
+    pairs = [(idx, v) for idx, v in enumerate(ml) if v is not None]
+    if len(pairs) < signal:
+        return [None] * len(closes)
+    sig = _ema_series([v for _, v in pairs], signal)
+    out: list = [None] * len(closes)
+    for k, (idx, _) in enumerate(pairs):
+        if sig[k] is not None:
+            out[idx] = ml[idx] - sig[k]
+    return out
+
+
+def _rsi_series(closes: list[float], period: int) -> list:
+    """RSI (basit ortalama gain/loss — Wilder degil; deterministik). period warmup oncesi None."""
+    n = len(closes)
+    out: list = [None] * n
+    if n <= period:
+        return out
+    gains = [max(closes[t] - closes[t - 1], 0.0) for t in range(1, n)]
+    losses = [max(closes[t - 1] - closes[t], 0.0) for t in range(1, n)]
+    for t in range(period, n):
+        ag = sum(gains[t - period:t]) / period
+        al = sum(losses[t - period:t]) / period
+        out[t] = 100.0 if al == 0 else 100.0 - 100.0 / (1.0 + ag / al)
+    return out
+
+
+def _cci_series(highs: list[float], lows: list[float], closes: list[float], period: int) -> list:
+    """Commodity Channel Index (Lambert): (TP - SMA(TP)) / (0.015 × mean deviation)."""
+    n = len(closes)
+    out: list = [None] * n
+    tp = [(highs[k] + lows[k] + closes[k]) / 3.0 for k in range(n)]
+    for t in range(period - 1, n):
+        window = tp[t - period + 1:t + 1]
+        sma = sum(window) / period
+        md = sum(abs(x - sma) for x in window) / period
+        out[t] = 0.0 if md == 0 else (tp[t] - sma) / (0.015 * md)
+    return out
+
+
+def compute_bullish_divergence(
+    opens: list[float],
+    highs: list[float],
+    lows: list[float],
+    closes: list[float],
+    volumes: list[float],
+) -> dict:
+    """Carr Bullish Divergence (2.baski s.258) — uptrend-dip LONG ADAYI (fiyat lower low +
+    2+ gosterge higher low).
+
+    SINYAL (s.258): (1) SMA50>SMA200, (2-3) dun low<=20g/5g once (pivot lower low), (4) 6
+    gostergeden 2+'si bugun>15g once (MACD line/hist, Stoch%K(5,3,3), RSI(5), CCI(20), OBV),
+    (5) bugun yesil (s.256 — kitap tarama "kirmizi" yazar hatasi). entry=close (ertesi gun
+    open, s.262 proxy). STOP sell-off son dibi alti (s.262) + %8 cap; target Ch22 2R (s.324).
+    TIME STOP YOK (s.252 uzun tutma). TIER-2 eyeball -> quality='CANDIDATE'. Veri: >=200 bar.
+
+    Returns: {detected, direction, quality, signal_close, entry, stop, target, risk_pct, rr,
+              sma50, sma200, divergence_count, divergence_indicators, eyeball_checks, rules, mark_says}.
+    """
+    def _none(msg: str) -> dict:
+        return {
+            'detected': False, 'direction': None, 'quality': 'NONE',
+            'signal_close': None, 'entry': None, 'stop': None, 'target': None,
+            'risk_pct': None, 'rr': None, 'sma50': None, 'sma200': None,
+            'divergence_count': 0, 'divergence_indicators': [],
+            'eyeball_checks': [], 'rules': {}, 'mark_says': msg,
+        }
+
+    if not closes or not volumes or not opens or not highs or not lows:
+        return _none('Yetersiz veri — Bullish Divergence hesaplanamiyor.')
+    n = len(closes)
+    if not (len(opens) == len(highs) == len(lows) == len(volumes) == n):
+        return _none('Bullish Divergence: OHLCV uzunluk farkli.')
+    if n < BULLISH_DIV_SMA_SLOW + 1:
+        return _none(f'Yetersiz veri — en az {BULLISH_DIV_SMA_SLOW + 1} bar gerek (SMA200 + dun).')
+
+    i = n - 1
+    sma50 = _sma_at(closes, i, BULLISH_DIV_SMA_FAST)
+    sma200 = _sma_at(closes, i, BULLISH_DIV_SMA_SLOW)
+    if sma50 is None or sma200 is None:
+        return _none('Bullish Divergence: SMA hesaplanamadi.')
+
+    lb = BULLISH_DIV_INDICATOR_LB
+    # 6 gosterge: bugun (i) vs 15g once (i-lb). En az 2 higher low (divergence).
+    ml = _macd_line_series(closes, BULLISH_DIV_MACD_FAST, BULLISH_DIV_MACD_SLOW)
+    mh = _macd_histogram_series(closes, BULLISH_DIV_MACD_FAST, BULLISH_DIV_MACD_SLOW, BULLISH_DIV_MACD_SIGNAL)
+    rsi = _rsi_series(closes, BULLISH_DIV_RSI_PERIOD)
+    cci = _cci_series(highs, lows, closes, BULLISH_DIV_CCI_PERIOD)
+    obv = _obv_series(closes, volumes)
+    stoch_now = _stochastic_k(highs, lows, closes, i, BULLISH_DIV_STOCH_PERIOD, BULLISH_DIV_STOCH_SMOOTH)
+    stoch_past = _stochastic_k(highs, lows, closes, i - lb, BULLISH_DIV_STOCH_PERIOD, BULLISH_DIV_STOCH_SMOOTH)
+
+    indicators = [
+        ('MACD line', ml[i], ml[i - lb]),
+        ('MACD histogram', mh[i], mh[i - lb]),
+        ('Stochastics %K', stoch_now, stoch_past),
+        ('RSI(5)', rsi[i], rsi[i - lb]),
+        ('CCI(20)', cci[i], cci[i - lb]),
+        ('OBV', obv[i], obv[i - lb]),
+    ]
+    div_names = [name for name, cur, past in indicators
+                 if cur is not None and past is not None and cur > past]
+    div_count = len(div_names)
+
+    pivot_low = min(lows[i], lows[i - 1])
+    rules = {
+        'uptrend_50_200': sma50 > sma200,
+        'pivot_low_20': lows[i - 1] <= lows[i - 1 - BULLISH_DIV_PIVOT_LB_LONG],
+        'pivot_low_5': lows[i - 1] <= lows[i - 1 - BULLISH_DIV_PIVOT_LB_SHORT],
+        'iki_gosterge_diverge': div_count >= BULLISH_DIV_MIN_INDICATORS,
+        'bugun_yesil': closes[i] >= opens[i],
+    }
+    base = {
+        'sma50': round(sma50, 2), 'sma200': round(sma200, 2),
+        'divergence_count': div_count, 'divergence_indicators': div_names, 'rules': rules,
+    }
+    if not all(rules.values()):
+        d = _none(f'Bullish Divergence sinyali yok ({sum(rules.values())}/5 kosul, '
+                  f'{div_count} gosterge diverge).')
+        d.update(base)
+        return d
+
+    entry = closes[i]  # ertesi gun open (s.262) — close proxy
+    structural = pivot_low  # tetikleyici sell-off son dibi (s.262)
+    stop = max(structural, entry * (1 - BULLISH_DIV_HARD_CAP_PCT / 100))  # %8 cap
+    if stop >= entry:  # pivot low entry ustunde kalirsa (nadirde) -> %8 stop
+        stop = entry * (1 - BULLISH_DIV_HARD_CAP_PCT / 100)
+    risk = entry - stop
+    target = entry + BULLISH_DIV_TARGET_R_MULTIPLE * risk
+    risk_pct = round(risk / entry * 100, 2) if entry else None
+    eyeball_checks = [
+        'Divergence gozle teyit: fiyat lower low + gosterge higher low (s.256)',
+        f'Diverge gosterge ({div_count}): {", ".join(div_names)}',
+        'Dipler arasi en az 5 islem gunu (s.255)',
+    ]
+    says = (f'~ Carr Bullish Divergence LONG ADAYI (uptrend-dip, TIER-2 eyeball) — '
+            f'giris ${round(entry, 2)} (ilk yesil mum / ertesi gun open s.262), stop '
+            f'${round(stop, 2)} (sell-off son dibi/%8 cap), hedef ${round(target, 2)} (2R). '
+            f'{div_count} gosterge divergence: {", ".join(div_names)}. Uzun tutma sabri (s.252).')
+    d = {
+        'detected': True, 'direction': 'LONG', 'quality': 'CANDIDATE',
+        'signal_close': round(closes[i], 2), 'entry': round(entry, 2),
+        'stop': round(stop, 2), 'target': round(target, 2),
+        'risk_pct': risk_pct, 'rr': BULLISH_DIV_TARGET_R_MULTIPLE,
+        'eyeball_checks': eyeball_checks, 'mark_says': says,
+    }
+    d.update(base)
+    return d
+
+
+# ======================================================================
 # Paket 462 (11 Haz 2026) — High Tight Flag Detection (= Minervini Power Play)
 #
 # O'Neil "High Tight Flag" (HTF) = Mark Minervini "Power Play" (Trade Like a Stock
