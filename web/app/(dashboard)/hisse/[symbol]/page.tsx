@@ -17,6 +17,7 @@ import { BlueSkyCard } from "@/components/stock/BlueSkyCard";
 import { CoiledSpringCard } from "@/components/stock/CoiledSpringCard";
 import { BullishBaseCard } from "@/components/stock/BullishBaseCard";
 import { BullishDivergenceCard } from "@/components/stock/BullishDivergenceCard";
+import { BlueSeaCard } from "@/components/stock/BlueSeaCard";
 import { PivotBreakoutCard } from "@/components/stock/PivotBreakoutCard";
 import { OverheadSupplyCard } from "@/components/stock/OverheadSupplyCard";
 import { ClimaxRunCard } from "@/components/stock/ClimaxRunCard";
@@ -339,6 +340,8 @@ export default function HissePage({
           <BullishBaseCard symbol={sym} />
           {/* Paket 515 (18 Haz 2026): Carr Bullish Divergence — uptrend-dip 2+ gösterge (s.258) */}
           <BullishDivergenceCard symbol={sym} />
+          {/* Paket 518 (18 Haz 2026): Carr Blue Sea Breakdown — strong-bear SHORT (s.289) */}
+          <BlueSeaCard symbol={sym} />
           {/* KARAR #733 alt-paket (Paket 72): Pivot Breakout Card */}
           <PivotBreakoutCard symbol={sym} />
           {/* KARAR #733 alt-paket (Paket 78): Overhead Supply Card */}

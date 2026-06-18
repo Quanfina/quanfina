@@ -75,6 +75,7 @@ from quanfina_math import (  # noqa: E402
     compute_coiled_spring,
     compute_bullish_base_breakout,
     compute_bullish_divergence,
+    compute_blue_sea_breakdown,
     compute_high_tight_flag,
     compute_stage_transition,
     compute_faber_timing,
@@ -450,7 +451,8 @@ def get_screen_results(slug: str, limit: int = 500, nocache: bool = False) -> li
         {"mean_reversion"} |           # P502: pvh-hesap compute-screen (Carr s.356)
         {"coiled_spring"} |            # P511: pvh-hesap compute-screen (Carr s.250, 60 bar)
         # P516: pvh 280 bar -> 200-261 bar Carr setup'lari bulk (sonraki scan'de dolar)
-        {"pullback", "blue_sky", "bullish_base", "bullish_divergence"}
+        {"pullback", "blue_sky", "bullish_base", "bullish_divergence"} |
+        {"blue_sea"}                   # P518: Carr SHORT bulk (Blue Sky aynasi, 261 bar)
     )
     if slug not in valid_slugs:
         from fastapi import HTTPException
@@ -3600,6 +3602,79 @@ def get_bullish_divergence(symbol: str) -> BullishDivergenceInfo:
         divergence_count=r.get("divergence_count", 0),
         divergence_indicators=r.get("divergence_indicators", []),
         eyeball_checks=r.get("eyeball_checks", []),
+        mark_says=r.get("mark_says", ""),
+        is_mock=is_mock,
+    )
+
+
+# P518 (18 Haz 2026): Carr Blue Sea Breakdown endpoint (s.289 entry + s.306-324 exit)
+# strong-bear trend-takip SHORT (Blue Sky aynasi). compute_blue_sea_breakdown wire. Asimetri
+# 0.8 (s.286). 260g -> >=261 bar (n_bars=460, cache 2y).
+class BlueSeaInfo(BaseModel):
+    detected: bool = False
+    direction: Optional[Literal["SHORT"]] = None
+    quality: Optional[str] = None
+    signal_close: Optional[float] = None
+    entry: Optional[float] = None       # ertesi gun signal low alti sell-stop (s.317)
+    stop: Optional[float] = None        # %6 USTTE / %8 cap (s.306)
+    target: Optional[float] = None      # 2R ASAGI (s.324)
+    risk_pct: Optional[float] = None
+    rr: Optional[float] = None
+    low_40d: Optional[float] = None
+    low_260d: Optional[float] = None
+    high_260d: Optional[float] = None
+    obv: Optional[float] = None
+    macd: Optional[float] = None
+    mark_says: str
+    is_mock: bool = False
+
+
+@app.get("/api/stock/{symbol}/blue-sea", response_model=BlueSeaInfo)
+def get_blue_sea(symbol: str) -> BlueSeaInfo:
+    """Carr Blue Sea Breakdown (2.baski s.289) — strong-bear trend-takip SHORT (Blue Sky aynasi).
+
+    40g yeni dusuk + 52h dip DEGIL + close>0.8×52h zirve (asimetri s.286) + OBV/MACD 40g yeni
+    dusuk + kirmizi (s.289). ENTRY: ertesi gun signal low alti (s.317). CIKIS Ch22: %6 stop ustte
+    / 2R asagi (s.306,324). Rejim SADECE strong bear (s.283). 260g -> >=261 bar; n_bars=460.
+    is_mock = gercek 261+ bar yoksa True.
+    """
+    sym = symbol.upper()
+    stock = _STOCK_BY_SYM.get(sym)
+    if stock:
+        price = stock.price
+    else:
+        try:
+            wl = [r for r in watchlist_get_all() if r["symbol"] == sym]
+        except OperationalError:
+            wl = []
+        if wl:
+            price = float(wl[0]["price"])
+        else:
+            scan_data = _fetch_scan_symbol_data(sym)
+            price = scan_data["price"] if scan_data else 100.0
+
+    bars = _get_ohlcv(sym, price, 460)
+    r = compute_blue_sea_breakdown(
+        [b.open for b in bars], [b.high for b in bars], [b.low for b in bars],
+        [b.close for b in bars], [float(b.volume) for b in bars],
+    )
+    _real = _fetch_ohlcv_real(sym, 460)
+    is_mock = not (_real and len(_real) >= 261)
+    return BlueSeaInfo(
+        detected=r.get("detected", False),
+        direction=r.get("direction"),
+        quality=r.get("quality"),
+        signal_close=r.get("signal_close"),
+        entry=r.get("entry"),
+        stop=r.get("stop"),
+        target=r.get("target"),
+        risk_pct=r.get("risk_pct"),
+        rr=r.get("rr"),
+        low_40d=r.get("low_40d"),
+        low_260d=r.get("low_260d"),
+        high_260d=r.get("high_260d"),
+        obv=r.get("obv"),
+        macd=r.get("macd"),
         mark_says=r.get("mark_says", ""),
         is_mock=is_mock,
     )

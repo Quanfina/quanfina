@@ -119,6 +119,8 @@ export const SCREEN_CATEGORIES: Record<string, string> = {
   blue_sky: "Blue Sky Breakout (Carr)",      // Carr s.264 STRONG+WEAK breakout
   bullish_base: "Bullish Base (Carr)",       // Carr s.291 CONTRARIAN downtrend baz TIER-2
   bullish_divergence: "Bullish Divergence (Carr)",  // Carr s.258 uptrend-dip TIER-2
+  // 18 Haz 2026 — Carr SHORT katalog (P518). Blue Sky aynası, strong-bear.
+  blue_sea: "Blue Sea Breakdown (Carr SHORT)",  // Carr s.289 strong-bear breakdown SHORT
 };
 
 // SCREEN_DESCRIPTIONS kaldirildi (22 May 2026) — Sn. Ferit "bunu sil" talimati.
@@ -260,6 +262,11 @@ export const SCREEN_CONDITIONS: Record<string, ScreenCondition[]> = {
   bullish_divergence: [
     { source: "carr", text: "Uptrend-dip LONG ADAYI (Carr 2.baskı s.258): SMA50>SMA200 + fiyat lower low + 6 göstergeden 2+'si higher low (MACD line/hist, Stoch%K, RSI(5), CCI(20), OBV) + bugün yeşil" },
     { source: "carr", text: "TIER-2 EYEBALL (s.256): divergence gözle teyit (fiyat lower low + gösterge higher low). entry=close (s.262), stop sell-off son dibi/%8 cap, hedef 2R. Uzun tutma sabrı (s.252)" },
+  ],
+  // 18 Haz 2026 — Carr Blue Sea Breakdown SHORT (s.289); Blue Sky aynası, pvh-hesap bulk
+  blue_sea: [
+    { source: "carr", text: "strong-bear SHORT (Carr 2.baskı s.289): 40g yeni DÜŞÜK + 52h dip DEĞİL + close>0.8×52h ZİRVE (asimetri s.286 — %20'den fazla düşmemiş) + OBV/MACD 40g yeni düşük + bugün kırmızı" },
+    { source: "carr", text: "ENTRY ertesi gün signal low altı sell-stop (s.317). Stop %6 ÜSTTE / %8 cap (s.306), hedef 2R AŞAĞI (s.324). SADECE strong-bear (s.283). Quanfina long-biased — bilgi amaçlı" },
   ],
 
   // 24 May 2026 — Tam Minervini Tarama (Hibrit Pipeline: 10 Hard + 5 Soft)

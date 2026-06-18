@@ -683,3 +683,33 @@ class TestCarrBulkScreensP516:
         body = m.group(0)
         assert "261" in body, "Blue Sky 261 bar esigi yok."
         assert "200" in body, "SMA200 200 bar esigi yok."
+
+
+class TestBlueSeaScreen:
+    """P518 — Carr Blue Sea Breakdown SHORT bulk screen (Blue Sky aynasi, 261 bar)."""
+
+    @pytest.fixture(scope="class")
+    def ts(self) -> str:
+        return _read("web/types/screens.ts")
+
+    @pytest.fixture(scope="class")
+    def db_helpers(self) -> str:
+        return _read("api/db_helpers.py")
+
+    @pytest.fixture(scope="class")
+    def main(self) -> str:
+        return _read("api/main.py")
+
+    def test_spec_and_valid_slug(self, db_helpers, main):
+        assert '"blue_sea": (compute_blue_sea_breakdown, 261, True)' in db_helpers, "blue_sea spec yok."
+        assert '"blue_sea"' in main, "main valid_slugs'te blue_sea yok."
+
+    def test_ui_category_short_label(self, ts):
+        """SHORT etiketi acik (long-biased platformda ayrim)."""
+        assert re.search(r'blue_sea:\s*"[^"]*SHORT[^"]*"', ts), "blue_sea SHORT etiketi yok."
+
+    def test_ui_carr_conditions(self, ts):
+        n = _extract_screen_conditions_count(ts, "blue_sea")
+        assert n >= 1, f"blue_sea koşulu yok (n={n})."
+        m = re.search(r'\bblue_sea:\s*\[(.*?)\]\s*,', ts, re.DOTALL)
+        assert m and 'source: "carr"' in m.group(1), "blue_sea 'carr' source kullanmali."

@@ -1058,12 +1058,14 @@ def _carr_pvh_screen_specs() -> dict:
     from quanfina_math import (
         compute_carr_pullback, compute_blue_sky_breakout,
         compute_bullish_base_breakout, compute_bullish_divergence,
+        compute_blue_sea_breakdown,
     )
     return {
         "pullback": (compute_carr_pullback, 200, False),           # SMA200
         "blue_sky": (compute_blue_sky_breakout, 261, True),        # 260g 52-hafta
         "bullish_base": (compute_bullish_base_breakout, 200, True),  # SMA200
         "bullish_divergence": (compute_bullish_divergence, 201, True),  # SMA200 + dun
+        "blue_sea": (compute_blue_sea_breakdown, 261, True),       # 260g 52-hafta (SHORT)
     }
 
 
