@@ -32,7 +32,7 @@ import type { ScreenSlug, ScreenResultRow } from "@/types/screens";
 import { MarkBadgeStrip } from "@/components/mark/MarkBadgeStrip";
 import { ModBadge } from "@/components/mark/ModBadge";
 import { useTradingMode, getModUiTheme } from "@/hooks/use-trading-mode";
-import { SCREEN_CATEGORIES, SCREEN_CONDITIONS, CONDITION_SOURCE_LABEL } from "@/types/screens";
+import { SCREEN_CATEGORIES, SCREEN_CONDITIONS, CONDITION_SOURCE_LABEL, SCREEN_GROUPS } from "@/types/screens";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { GridLoadingOverlay } from "@/components/ag-grid/LoadingOverlay";
 import { SymbolCellRenderer } from "@/components/watchlist/SymbolCellRenderer";
@@ -338,17 +338,26 @@ export default function ScreensPage() {
               onChange={(e) => setSelectedSlug(e.target.value as ScreenSlug)}
               className="h-8 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring min-w-[280px]"
             >
-              {SCREEN_SLUGS.map((slug, idx) => {
-                const label = SCREEN_CATEGORIES[slug];
-                const suffix =
-                  slug === selectedSlug && totalCount > 0 ? ` (${totalCount})` : "";
-                const num = String(idx + 1).padStart(2, "0");
-                return (
-                  <option key={slug} value={slug}>
-                    {num}. {label}{suffix}
-                  </option>
-                );
-              })}
+              {(() => {
+                // P524: strateji-bazlı optgroup. Global numara grup sırasını takip eder.
+                let n = 0;
+                return SCREEN_GROUPS.map((group) => (
+                  <optgroup key={group.label} label={group.label}>
+                    {group.slugs.map((slug) => {
+                      n += 1;
+                      const label = SCREEN_CATEGORIES[slug];
+                      const suffix =
+                        slug === selectedSlug && totalCount > 0 ? ` (${totalCount})` : "";
+                      const num = String(n).padStart(2, "0");
+                      return (
+                        <option key={slug} value={slug}>
+                          {num}. {label}{suffix}
+                        </option>
+                      );
+                    })}
+                  </optgroup>
+                ));
+              })()}
             </select>
             {resultsQ.isLoading && (
               <span className="text-xs font-mono text-muted-foreground ml-2">

@@ -773,6 +773,45 @@ class TestRisingWedgeScreen:
         assert m and 'source: "carr"' in m.group(1), "rising_wedge 'carr' source kullanmali."
 
 
+class TestScreenGroupsP524:
+    """P524 — /screens dropdown strateji-bazlı gruplama. SCREEN_GROUPS TÜM SCREEN_CATEGORIES
+    slug'larını tam 1 kez kapsamalı (eksik/çift = dropdown'da kaybolan/duplike ekran).
+    """
+
+    @pytest.fixture(scope="class")
+    def ts(self) -> str:
+        return _read("web/types/screens.ts")
+
+    def _category_keys(self, ts: str) -> set:
+        m = re.search(r"export const SCREEN_CATEGORIES[^{]*\{(.*?)\n\};", ts, re.DOTALL)
+        assert m, "SCREEN_CATEGORIES bloğu bulunamadı."
+        return set(re.findall(r'^\s{2}(\w+):\s*"', m.group(1), re.MULTILINE))
+
+    def _group_slugs(self, ts: str) -> list:
+        m = re.search(r"export const SCREEN_GROUPS[^[]*\[(.*?)\n\];", ts, re.DOTALL)
+        assert m, "SCREEN_GROUPS bloğu bulunamadı."
+        return re.findall(r'"(\w+)"', re.sub(r'label:\s*"[^"]*"', "", m.group(1)))
+
+    def test_groups_cover_all_categories(self, ts):
+        cats = self._category_keys(ts)
+        grouped = self._group_slugs(ts)
+        assert set(grouped) == cats, (
+            f"SCREEN_GROUPS != SCREEN_CATEGORIES. "
+            f"Eksik: {cats - set(grouped)} | Fazla: {set(grouped) - cats}"
+        )
+
+    def test_no_duplicate_in_groups(self, ts):
+        grouped = self._group_slugs(ts)
+        assert len(grouped) == len(set(grouped)), "SCREEN_GROUPS'ta duplike slug var."
+
+    def test_four_groups_minervini_carr(self, ts):
+        m = re.search(r"export const SCREEN_GROUPS[^[]*\[(.*?)\n\];", ts, re.DOTALL)
+        labels = re.findall(r'label:\s*"([^"]+)"', m.group(1))
+        assert len(labels) >= 4, f"En az 4 grup beklenir, {len(labels)} bulundu."
+        joined = " ".join(labels)
+        assert "Minervini" in joined and "Carr" in joined, "Minervini + Carr grup ayrımı yok."
+
+
 class TestCarrSummaryP523:
     """P523 — Carr Sinyalleri ozet (9 setup aggregate, tek pass). Backend + endpoint + nav."""
 

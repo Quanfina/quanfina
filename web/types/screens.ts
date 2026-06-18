@@ -127,6 +127,36 @@ export const SCREEN_CATEGORIES: Record<string, string> = {
   rising_wedge: "Rising Wedge (Carr SHORT)",    // Carr Böl.19 kama kırılımı SHORT (TIER-2)
 };
 
+// P524 (18 Haz 2026): /screens dropdown strateji-bazlı gruplama (21 ekran düz liste hantaldı,
+// 9 Carr eklendikten sonra). optgroup ile Minervini / Carr ayrımı — navigasyon kolaylığı.
+// Her grup içindeki slug sırası dropdown numarasını (global) belirler. TÜM SCREEN_CATEGORIES
+// slug'ları tam 1 grupta olmalı (consistency test korur).
+export interface ScreenGroup {
+  label: string;
+  slugs: string[];
+}
+
+export const SCREEN_GROUPS: ScreenGroup[] = [
+  {
+    label: "Minervini — Çekirdek (Trend & Temel)",
+    slugs: ["stage2_10p", "temel_eleme", "tam_minervini", "valid_base"],
+  },
+  {
+    label: "Minervini — Lider & Momentum",
+    slugs: ["top5_rpr", "power_play_ready", "tight_low_vol_excellent", "new_top5_rpr",
+            "healthy_accumulation", "rpr_89_tpr_c", "vcp_ready_high", "tennis_ball_active"],
+  },
+  {
+    label: "Carr — LONG / Countertrend",
+    slugs: ["mean_reversion", "pullback", "coiled_spring", "blue_sky",
+            "bullish_base", "bullish_divergence"],
+  },
+  {
+    label: "Carr — SHORT",
+    slugs: ["blue_sea", "gap_down", "rising_wedge"],
+  },
+];
+
 // SCREEN_DESCRIPTIONS kaldirildi (22 May 2026) — Sn. Ferit "bunu sil" talimati.
 // Kosullar listesi yeterli aciklayici, ek metin gerekmiyor. Gelecekte istenirse
 // tekrar eklenir.
