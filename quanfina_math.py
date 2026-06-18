@@ -4390,6 +4390,119 @@ def compute_double_bottom(
 
 
 # ======================================================================
+# Paket 500 (18 Haz 2026) — Carr Mean Reversion (2.baski Bonus System I, s.339-411)
+#
+# Quanfina CEKIRDEK frekans setup (Carr.md sat.438: %80 zaman; trend setup %20).
+# COUNTERTREND. TIER 1 (otomatik). Gostergeler SADECE BB(20,2.0) + SMA20 + candle
+# (hacim/ATR/Stoch FILTRE DEGIL — Carr s.121 canon). AÇIK KONU #22 = KARAR #444 hibrit
+# (Carr 1.+2. baski); MR 2018'e ozgu. Kural #26: tum esikler Carr 2.baski sayfa-atifli.
+# ======================================================================
+MEAN_REV_BB_PERIOD = 20             # BB(20, 2.0) — Carr s.121
+MEAN_REV_BB_STD = 2.0
+MEAN_REV_SMA_THRESHOLD = 0.9        # Carr s.340: Close < SMA20 × 0.9 (%10 esik KRITIK)
+MEAN_REV_STOP_BUFFER_LONG = 0.985   # Carr s.410-411: yapisal seviye × 0.985 (long)
+MEAN_REV_STOP_BUFFER_SHORT = 1.015  # × 1.015 (short)
+MEAN_REV_HARD_CAP_PCT = 8.0         # Carr s.410-411: %8 hard cap
+MEAN_REV_TIME_STOP_DAYS = 7         # Carr s.400, 404: 7 islem gunu KRITIK
+
+
+def _bollinger_sma(closes: list[float], end_idx: int, period: int, num_std: float):
+    """end_idx bari icin SMA + alt/ust Bollinger Band (population std — Bollinger/Metastock canon)."""
+    window = closes[end_idx - period + 1: end_idx + 1]
+    mean = sum(window) / period
+    var = sum((x - mean) ** 2 for x in window) / period
+    sd = var ** 0.5
+    return mean, mean - num_std * sd, mean + num_std * sd
+
+
+def compute_mean_reversion(
+    opens: list[float],
+    highs: list[float],
+    lows: list[float],
+    closes: list[float],
+) -> dict:
+    """Carr Mean Reversion (2.baski s.356) — countertrend LONG/SHORT sinyal tespiti.
+
+    LONG (s.356): (1) dun close < alt BB, (2) bugun close > alt BB (iceri donus),
+    (3) bugun close < SMA20 × 0.9, (4) dun bearish mum, (5) bugun close < dun open.
+    SHORT (s.357-358): simetrik ters (ust BB, SMA20 × 1.1, dun bullish, bugun > dun open).
+    Stop: yapisal (signal+prev gun low/high) × 0.985/1.015, %8 hard cap (s.410-411).
+    Target: SMA20 dinamik (s.339). Time stop: 7 islem gunu (s.400, 404).
+    Gosterge SADECE BB+SMA20+candle (Carr canon — hacim/ATR/Stoch yok).
+
+    Returns: {detected, direction, quality, entry, stop, target, hard_cap_pct,
+              time_stop_days, sma20, lower_bb, upper_bb, rules, mark_says}.
+    """
+    def _none(msg: str) -> dict:
+        return {
+            'detected': False, 'direction': None, 'quality': 'NONE',
+            'entry': None, 'stop': None, 'target': None,
+            'hard_cap_pct': MEAN_REV_HARD_CAP_PCT, 'time_stop_days': MEAN_REV_TIME_STOP_DAYS,
+            'sma20': None, 'lower_bb': None, 'upper_bb': None, 'rules': {}, 'mark_says': msg,
+        }
+
+    if not opens or not highs or not lows or not closes:
+        return _none('Yetersiz veri — Mean Reversion hesaplanamiyor.')
+    n = len(closes)
+    if not (len(opens) == len(highs) == len(lows) == n):
+        return _none('Mean Reversion: OHLC uzunluk farkli.')
+    if n < MEAN_REV_BB_PERIOD + 1:
+        return _none(f'Yetersiz veri — en az {MEAN_REV_BB_PERIOD + 1} bar gerek (BB20 + dun).')
+
+    sma_t, lbb_t, ubb_t = _bollinger_sma(closes, n - 1, MEAN_REV_BB_PERIOD, MEAN_REV_BB_STD)
+    _, lbb_y, ubb_y = _bollinger_sma(closes, n - 2, MEAN_REV_BB_PERIOD, MEAN_REV_BB_STD)
+    today_c, today_o = closes[-1], opens[-1]
+    yest_c, yest_o = closes[-2], opens[-2]
+
+    long_rules = {
+        'dun_alt_bb_alti': yest_c < lbb_y,
+        'bugun_alt_bb_ustu': today_c > lbb_t,
+        'sma20_x09_alti': today_c < sma_t * MEAN_REV_SMA_THRESHOLD,
+        'dun_bearish': yest_c < yest_o,
+        'bugun_dun_open_alti': today_c < yest_o,
+    }
+    short_rules = {
+        'dun_ust_bb_ustu': yest_c > ubb_y,
+        'bugun_ust_bb_alti': today_c < ubb_t,
+        'sma20_x11_ustu': today_c > sma_t * (2 - MEAN_REV_SMA_THRESHOLD),
+        'dun_bullish': yest_c > yest_o,
+        'bugun_dun_open_ustu': today_c > yest_o,
+    }
+    is_long = all(long_rules.values())
+    is_short = all(short_rules.values())
+
+    if not (is_long or is_short):
+        near = long_rules if sum(long_rules.values()) >= sum(short_rules.values()) else short_rules
+        d = _none(f'Mean Reversion sinyali yok ({sum(near.values())}/5 kosul).')
+        d.update({'sma20': round(sma_t, 2), 'lower_bb': round(lbb_t, 2),
+                  'upper_bb': round(ubb_t, 2), 'rules': near})
+        return d
+
+    direction = 'LONG' if is_long else 'SHORT'
+    entry = today_c
+    if direction == 'LONG':
+        structural = min(lows[-1], lows[-2]) * MEAN_REV_STOP_BUFFER_LONG
+        stop = max(structural, entry * (1 - MEAN_REV_HARD_CAP_PCT / 100))  # %8 cap asma
+        rules = long_rules
+    else:
+        structural = max(highs[-1], highs[-2]) * MEAN_REV_STOP_BUFFER_SHORT
+        stop = min(structural, entry * (1 + MEAN_REV_HARD_CAP_PCT / 100))
+        rules = short_rules
+    target = round(sma_t, 2)
+    risk_pct = round(abs(entry - stop) / entry * 100, 2) if entry else None
+    says = (f'✓ Mean Reversion {direction} — giris ${round(entry, 2)}, stop ${round(stop, 2)} '
+            f'(risk %{risk_pct}, %8 cap), hedef SMA20 ${target}. 7-gun time stop (Carr s.356/400/410). '
+            f'COUNTERTREND — Range/Weak piyasada gecerli.')
+    return {
+        'detected': True, 'direction': direction, 'quality': 'GOOD',
+        'entry': round(entry, 2), 'stop': round(stop, 2), 'target': target,
+        'hard_cap_pct': MEAN_REV_HARD_CAP_PCT, 'time_stop_days': MEAN_REV_TIME_STOP_DAYS,
+        'sma20': round(sma_t, 2), 'lower_bb': round(lbb_t, 2), 'upper_bb': round(ubb_t, 2),
+        'rules': rules, 'mark_says': says,
+    }
+
+
+# ======================================================================
 # Paket 462 (11 Haz 2026) — High Tight Flag Detection (= Minervini Power Play)
 #
 # O'Neil "High Tight Flag" (HTF) = Mark Minervini "Power Play" (Trade Like a Stock
