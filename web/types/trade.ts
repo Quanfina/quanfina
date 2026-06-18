@@ -169,4 +169,13 @@ export const SETUP_LABELS: Record<string, string> = {
   flat_base:     'Flat Base',
   pullback:      'Pullback',
   coiled_spring: 'Coiled Spring',
+  // P530 (18 Haz 2026): Carr 9-setup label hizalama (backend SETUP_TYPES ile birebir).
+  // Journal SETUP sütunu Carr paper trade'lerde ham slug yerine düzgün etiket gösterir.
+  mean_reversion:     'Mean Reversion',
+  blue_sky:           'Blue Sky Breakout',
+  bullish_base:       'Bullish Base',
+  bullish_divergence: 'Bullish Divergence',
+  blue_sea:           'Blue Sea Breakdown',
+  gap_down:           'Gap Down',
+  rising_wedge:       'Rising Wedge',
 };

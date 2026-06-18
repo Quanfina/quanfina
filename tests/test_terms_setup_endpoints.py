@@ -61,3 +61,20 @@ class TestSetupTypes:
         carr = {"mean_reversion", "pullback", "blue_sky", "coiled_spring", "bullish_base",
                 "bullish_divergence", "blue_sea", "gap_down", "rising_wedge"}
         assert carr <= keys, f"setup-types'ta eksik Carr setup: {carr - keys}"
+
+    def test_frontend_setup_labels_cover_backend(self, client):
+        """P530: Backend SETUP_TYPES (kanon) ⊆ frontend SETUP_LABELS (web/types/trade.ts).
+
+        Kural #24 UI↔backend tutarlilik: backend yeni setup_type ekler ama frontend label
+        sozlugu unutulursa journal SETUP sutunu ham slug gosterir. Bu test drift'i yakalar.
+        """
+        import re
+
+        keys = {s["key"] for s in client.get("/api/setup-types").json()}
+        trade_ts = PROJECT_ROOT / "web" / "types" / "trade.ts"
+        text = trade_ts.read_text(encoding="utf-8")
+        # SETUP_LABELS bloğunu izole et, sonra "slug:" anahtarlarini cek
+        block = text.split("SETUP_LABELS", 1)[1].split("};", 1)[0]
+        fe_keys = set(re.findall(r"^\s*([a-z_]+)\s*:", block, re.MULTILINE))
+        missing = keys - fe_keys
+        assert not missing, f"SETUP_LABELS'ta eksik backend setup_type: {missing}"
