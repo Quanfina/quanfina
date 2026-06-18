@@ -74,6 +74,7 @@ from quanfina_math import (  # noqa: E402
     compute_blue_sky_breakout,
     compute_coiled_spring,
     compute_bullish_base_breakout,
+    compute_bullish_divergence,
     compute_high_tight_flag,
     compute_stage_transition,
     compute_faber_timing,
@@ -3523,6 +3524,79 @@ def get_bullish_base(symbol: str) -> BullishBaseInfo:
         sma200=r.get("sma200"),
         obv=r.get("obv"),
         macd=r.get("macd"),
+        eyeball_checks=r.get("eyeball_checks", []),
+        mark_says=r.get("mark_says", ""),
+        is_mock=is_mock,
+    )
+
+
+# P515 (18 Haz 2026): Carr Bullish Divergence endpoint (s.258 entry + s.262-324 exit)
+# Uptrend-dip LONG ADAYI: fiyat lower low + 2+ gosterge higher low. compute_bullish_divergence
+# wire. 6 gosterge (MACD line/hist, Stoch, RSI, CCI, OBV). 200g SMA -> >=201 bar.
+class BullishDivergenceInfo(BaseModel):
+    detected: bool = False
+    direction: Optional[Literal["LONG"]] = None
+    quality: Optional[str] = None
+    signal_close: Optional[float] = None
+    entry: Optional[float] = None       # CLOSE (ertesi gun open proxy, s.262)
+    stop: Optional[float] = None        # sell-off son dibi alti / %8 cap (s.262,325)
+    target: Optional[float] = None      # 2R (s.324)
+    risk_pct: Optional[float] = None
+    rr: Optional[float] = None
+    sma50: Optional[float] = None
+    sma200: Optional[float] = None
+    divergence_count: int = 0
+    divergence_indicators: list[str] = []
+    eyeball_checks: list[str] = []
+    mark_says: str
+    is_mock: bool = False
+
+
+@app.get("/api/stock/{symbol}/bullish-divergence", response_model=BullishDivergenceInfo)
+def get_bullish_divergence(symbol: str) -> BullishDivergenceInfo:
+    """Carr Bullish Divergence (2.baski s.258) — uptrend-dip LONG ADAYI.
+
+    Fiyat lower low + 6 gostergeden 2+'si higher low (MACD line/hist, Stoch %K(5,3,3), RSI(5),
+    CCI(20), OBV; s.255). SMA50>SMA200 (uptrend) + dun pivot low + bugun yesil (s.258). entry=
+    close (ertesi gun open proxy, s.262). STOP sell-off son dibi alti (s.262) + %8 cap; target
+    Ch22 2R (s.324). TIER-2 eyeball -> quality='CANDIDATE'. 200g SMA -> is_mock = 201+ bar yoksa.
+    """
+    sym = symbol.upper()
+    stock = _STOCK_BY_SYM.get(sym)
+    if stock:
+        price = stock.price
+    else:
+        try:
+            wl = [r for r in watchlist_get_all() if r["symbol"] == sym]
+        except OperationalError:
+            wl = []
+        if wl:
+            price = float(wl[0]["price"])
+        else:
+            scan_data = _fetch_scan_symbol_data(sym)
+            price = scan_data["price"] if scan_data else 100.0
+
+    bars = _get_ohlcv(sym, price)
+    r = compute_bullish_divergence(
+        [b.open for b in bars], [b.high for b in bars], [b.low for b in bars],
+        [b.close for b in bars], [float(b.volume) for b in bars],
+    )
+    _real = _fetch_ohlcv_real(sym, 252)
+    is_mock = not (_real and len(_real) >= 201)
+    return BullishDivergenceInfo(
+        detected=r.get("detected", False),
+        direction=r.get("direction"),
+        quality=r.get("quality"),
+        signal_close=r.get("signal_close"),
+        entry=r.get("entry"),
+        stop=r.get("stop"),
+        target=r.get("target"),
+        risk_pct=r.get("risk_pct"),
+        rr=r.get("rr"),
+        sma50=r.get("sma50"),
+        sma200=r.get("sma200"),
+        divergence_count=r.get("divergence_count", 0),
+        divergence_indicators=r.get("divergence_indicators", []),
         eyeball_checks=r.get("eyeball_checks", []),
         mark_says=r.get("mark_says", ""),
         is_mock=is_mock,
