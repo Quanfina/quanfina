@@ -71,6 +71,7 @@ from quanfina_math import (  # noqa: E402
     compute_double_bottom,
     compute_mean_reversion,
     compute_carr_pullback,
+    compute_blue_sky_breakout,
     compute_high_tight_flag,
     compute_stage_transition,
     compute_faber_timing,
@@ -3303,6 +3304,79 @@ def get_carr_pullback(symbol: str) -> CarrPullbackInfo:
         sma50=r.get("sma50"),
         sma200=r.get("sma200"),
         stoch_k=r.get("stoch_k"),
+        mark_says=r.get("mark_says", ""),
+        is_mock=is_mock,
+    )
+
+
+# P508 (18 Haz 2026): Carr Blue Sky Breakout endpoint (s.264-265 entry + s.324-325 exit)
+# STRONG+WEAK_BULL trend-takip LONG breakout. compute_blue_sky_breakout wire. SMA YOK (s.261),
+# OBV+MACD bazli. 260g (52h) -> >=261 bar gerek -> n_bars=460 cek (cache 2y).
+class BlueSkyInfo(BaseModel):
+    detected: bool = False
+    direction: Optional[Literal["LONG"]] = None
+    quality: Optional[str] = None
+    signal_close: Optional[float] = None
+    entry: Optional[float] = None       # ertesi gun signal high ustu buy-stop (s.335)
+    stop: Optional[float] = None        # Ch22 evrensel %6 / %8 cap (s.325)
+    target: Optional[float] = None      # 2R (s.324)
+    risk_pct: Optional[float] = None
+    rr: Optional[float] = None
+    high_40d: Optional[float] = None
+    high_260d: Optional[float] = None
+    low_260d: Optional[float] = None
+    obv: Optional[float] = None
+    macd: Optional[float] = None
+    mark_says: str
+    is_mock: bool = False
+
+
+@app.get("/api/stock/{symbol}/blue-sky", response_model=BlueSkyInfo)
+def get_blue_sky(symbol: str) -> BlueSkyInfo:
+    """Carr Blue Sky Breakout (2.baski s.264-265) — STRONG+WEAK_BULL trend-takip LONG.
+
+    40g yeni yuksek + 52h zirve ALTI + OBV/MACD yeni 40g yuksek + green (s.264-265). SMA YOK
+    (s.261). ENTRY: ertesi gun signal high ustu (s.335). CIKIS Ch22 evrensel: %6 stop / 2R
+    (s.324-325). 260g lookback -> >=261 bar; n_bars=460 cek (cache 2y). is_mock = gercek 261+
+    bar yoksa True.
+    """
+    sym = symbol.upper()
+    stock = _STOCK_BY_SYM.get(sym)
+    if stock:
+        price = stock.price
+    else:
+        try:
+            wl = [r for r in watchlist_get_all() if r["symbol"] == sym]
+        except OperationalError:
+            wl = []
+        if wl:
+            price = float(wl[0]["price"])
+        else:
+            scan_data = _fetch_scan_symbol_data(sym)
+            price = scan_data["price"] if scan_data else 100.0
+
+    bars = _get_ohlcv(sym, price, 460)
+    r = compute_blue_sky_breakout(
+        [b.open for b in bars], [b.high for b in bars], [b.low for b in bars],
+        [b.close for b in bars], [float(b.volume) for b in bars],
+    )
+    _real = _fetch_ohlcv_real(sym, 460)
+    is_mock = not (_real and len(_real) >= 261)
+    return BlueSkyInfo(
+        detected=r.get("detected", False),
+        direction=r.get("direction"),
+        quality=r.get("quality"),
+        signal_close=r.get("signal_close"),
+        entry=r.get("entry"),
+        stop=r.get("stop"),
+        target=r.get("target"),
+        risk_pct=r.get("risk_pct"),
+        rr=r.get("rr"),
+        high_40d=r.get("high_40d"),
+        high_260d=r.get("high_260d"),
+        low_260d=r.get("low_260d"),
+        obv=r.get("obv"),
+        macd=r.get("macd"),
         mark_says=r.get("mark_says", ""),
         is_mock=is_mock,
     )
