@@ -4346,6 +4346,17 @@ def get_signals() -> list[Signal]:
         except Exception:
             bars = []
             bars_is_mock = None
+        # P493 (Kural #28): "price" eskiden stale web_watchlist snapshot'iydi (eklendigi
+        # tarihteki fiyat) -> NVDA 05-16'da $875.40, canli ~$209 => canli OHLCV'den
+        # hesaplanan stop/hedef ile TUTARSIZ (hedef $268 < fiyat $875 = sacma) + paper-trade
+        # icin yaniltici. Gercek (MOCK-olmayan) bars varsa son kapanisi kullan; frontend
+        # zaten /quote ile eziyordu (P431/P437), ham API kontrati da tutarli olsun.
+        live_price = row.price
+        if bars and bars_is_mock is False:
+            try:
+                live_price = round(bars[-1].close, 2)
+            except Exception:
+                live_price = row.price
         # Relative volume — yfinance + compute_relative_volume (Mark TLSMW Bol. 6) — #14 DRY helper
         rv_val = _rel_vol(bars)
         # P466 (12 Haz 2026): Stop·Hedef·R/R canli hesap. web_watchlist'te kolon YOK ->
@@ -4378,7 +4389,7 @@ def get_signals() -> list[Signal]:
             status=row.status,
             setup_type=row.setup_type,
             rs_rating=row.rs_rating,
-            price=row.price,
+            price=live_price,
             stop_loss=stop_val,
             target_price=target_val,
             risk_reward=rr_val,

@@ -61,3 +61,19 @@ def test_signal_strategy_valid(client):
     r = client.get("/api/signals")
     for s in r.json():
         assert s["strategy"] in ("minervini", "carr")
+
+
+def test_signal_price_coherent_with_stop_target(client):
+    """P493 (Kural #28): price stale web_watchlist snapshot iken stop/hedef ile
+    TUTARSIZdi (NVDA price=$875.40 eklendigi tarih, ama hedef $268 canli OHLCV'den
+    => price > hedef = sacma sinyal). Fix: price canli son kapanis. Invariant:
+    stop/hedef doluysa stop_loss < price < target_price (tutarli AL sinyali).
+    """
+    r = client.get("/api/signals")
+    for s in r.json():
+        stop, price, target = s.get("stop_loss"), s.get("price"), s.get("target_price")
+        if stop is not None and target is not None and price is not None:
+            assert stop < price < target, (
+                f"{s['symbol']}/{s['strategy']}: price={price} stop/hedef ile tutarsiz "
+                f"(stop={stop}, hedef={target}). Stale-price regresyonu (P493)?"
+            )
