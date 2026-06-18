@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 import random
 import sys
+import threading
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
@@ -372,18 +373,16 @@ class CarrSummarySetup(BaseModel):
     candidates: list[CarrSummaryCandidate] = []
 
 
-@app.get("/api/carr/summary", response_model=list[CarrSummarySetup])
-def get_carr_summary(top_n: int = 6, nocache: bool = False) -> list[CarrSummarySetup]:
-    """Carr 9 setup ozet (P523) — bugun hangi hisse hangi setup'i tetikliyor (tek pass).
+# P532 (18 Haz 2026): screen_carr_summary cold-compute ~23s (800+ hisse x 9 detector,
+# tek-pass, GIL-bound). 30 dk cache dolunca KULLANICI 23s skeleton bekliyordu. Cozum:
+# stale-while-revalidate — cache bayatladiginda ESKI degeri ANINDA don + arka planda
+# yenile. Detector mantigina sifir dokunus (Kural #24). Cold (cache yok) hala bloklar
+# (skeleton P526 gosterir); SWR tekrar eden 30-dk expiry hit'ini gizler.
+_carr_summary_refreshing: set[int] = set()
 
-    son scan pvh tek DB sorgusu + ticker basina 9 detector -> per-setup count + top adaylar.
-    DB yoksa/hata -> bos liste (graceful). P415 cache pateni (30 dk TTL).
-    """
-    cache_key = ("carr_summary", top_n)
-    if not nocache:
-        hit = _SCREENS_CACHE.get(cache_key)
-        if hit is not None and (_now() - hit[0]) < _SCREENS_CACHE_TTL:
-            return hit[1]
+
+def _compute_carr_summary_cached(top_n: int) -> list[CarrSummarySetup]:
+    """screen_carr_summary -> model + cache yaz. DB yoksa/hata -> [] (cache yazILMAZ)."""
     if not db_health_check():
         return []
     try:
@@ -391,8 +390,44 @@ def get_carr_summary(top_n: int = 6, nocache: bool = False) -> list[CarrSummaryS
     except Exception:
         return []
     out = [CarrSummarySetup(**r) for r in rows]
-    _SCREENS_CACHE[cache_key] = (_now(), out)
+    _SCREENS_CACHE[("carr_summary", top_n)] = (_now(), out)
     return out
+
+
+def _refresh_carr_summary_bg(top_n: int) -> None:
+    """SWR arka plan yenileme (daemon thread). Ayni top_n icin tek thread (dedupe)."""
+    if top_n in _carr_summary_refreshing:
+        return
+    _carr_summary_refreshing.add(top_n)
+
+    def _run() -> None:
+        try:
+            _compute_carr_summary_cached(top_n)
+        finally:
+            _carr_summary_refreshing.discard(top_n)
+
+    threading.Thread(target=_run, daemon=True, name=f"carr-summary-refresh-{top_n}").start()
+
+
+@app.get("/api/carr/summary", response_model=list[CarrSummarySetup])
+def get_carr_summary(top_n: int = 6, nocache: bool = False) -> list[CarrSummarySetup]:
+    """Carr 9 setup ozet (P523) — bugun hangi hisse hangi setup'i tetikliyor (tek pass).
+
+    son scan pvh tek DB sorgusu + ticker basina 9 detector -> per-setup count + top adaylar.
+    DB yoksa/hata -> bos liste (graceful). Cache: 30 dk TTL + P532 stale-while-revalidate.
+    """
+    cache_key = ("carr_summary", top_n)
+    if not nocache:
+        hit = _SCREENS_CACHE.get(cache_key)
+        if hit is not None:
+            if (_now() - hit[0]) < _SCREENS_CACHE_TTL:
+                return hit[1]                      # taze
+            # P532: BAYAT -> eski degeri aninda don + arka planda yenile (SWR).
+            # Kullanici 23s beklemez; bir sonraki istek tazesini alir.
+            _refresh_carr_summary_bg(top_n)
+            return hit[1]
+    # cold (cache yok) veya nocache=True -> bloklayan hesap
+    return _compute_carr_summary_cached(top_n)
 
 
 def _screens_mock_results(slug: str, limit: int) -> list[ScreenResultRow]:
