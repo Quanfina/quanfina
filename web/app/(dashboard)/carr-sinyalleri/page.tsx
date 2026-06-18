@@ -34,8 +34,26 @@ export default function CarrSinyalleriPage() {
       </header>
 
       {isLoading && (
-        <div className="rounded-lg border p-6 text-sm text-muted-foreground">
-          Carr sinyalleri hesaplanıyor (9 setup, tüm evren)…
+        <div className="flex flex-col gap-3" aria-busy="true" data-testid="carr-summary-loading">
+          <div className="text-sm text-muted-foreground">
+            Carr sinyalleri hesaplanıyor (9 setup, tüm evren)…
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 9 }).map((_, i) => (
+              <div
+                key={i}
+                className="rounded-lg border p-3 flex flex-col gap-2 animate-pulse"
+                style={{ borderColor: "var(--mtp-neutral)33" }}
+              >
+                <div className="h-3 w-2/3 rounded bg-muted" />
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  <div className="h-4 w-10 rounded bg-muted" />
+                  <div className="h-4 w-12 rounded bg-muted" />
+                  <div className="h-4 w-9 rounded bg-muted" />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
