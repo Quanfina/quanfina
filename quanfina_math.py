@@ -4659,6 +4659,156 @@ def compute_carr_pullback(
 
 
 # ======================================================================
+# CARR BLUE SKY BREAKOUT (TLFAL 2.baski Bolum 12, s.257-265 + s.335) — P507 (18 Haz 2026)
+# STRONG+WEAK_BULL trend-takip LONG breakout. Cift danisma (Carr NotebookLM, verbatim teyit).
+# KRITIK: SMA YOK (s.261 "There are no moving averages used in this setup") — Pullback'ten
+# TAMAMEN FARKLI. Gosterge: OBV + MACD(12,26,9) "yeni 40g yuksek" olarak (s.261-262 ZORUNLU).
+# ENTRY screener (s.264-265, 6 kural HEPSI):
+#   (1) close > 40g prior max close (yeni 40g yuksek)
+#   (2) close < 260g prior max close (52-hafta yuksek DEGIL — eski tepeye dogru yol var)
+#   (3) close <= 260g min low × 2.0 (asiri uzama filtresi — dipten <%200)
+#   (4) OBV > 40g prior max OBV  (5) MACD line > 40g prior max MACD  (6) close > open (green)
+# TETIKLEYICI (s.335): ertesi gun signal high ustu +$0.02/$0.05 buy-stop (entry=signal high).
+# CIKIS: Blue Sky-ozel stop/target KAYNAK YOK (cift danisma ❌) -> Bolum 22 EVRENSEL: stop %6
+# (s.325 "more like 6 percent"), %8 hard cap (s.325), target 2R (s.324). TIME STOP YOK (trend).
+# ON-FILTRE (s.259,263): Bullish Watch List ZORUNLU. Rejim: STRONG+WEAK bull (s.257).
+# VERI: 260g (52-hafta) -> en az 261 bar. yfinance ~252 < 261 -> endpoint 2y (~500 bar) ceker.
+# ======================================================================
+BLUE_SKY_NEW_HIGH_LOOKBACK: int = 40       # Carr s.264: 40-gun yeni yuksek (close/OBV/MACD)
+BLUE_SKY_52W_LOOKBACK: int = 260           # Carr s.264-265: 260 islem gunu (52 hafta)
+BLUE_SKY_MAX_PRICE_MULTIPLE: float = 2.0   # Carr s.265: close <= 260g min low × 2 (asiri uzama)
+BLUE_SKY_MACD_FAST: int = 12               # Carr s.168 MACD (12,26,9)
+BLUE_SKY_MACD_SLOW: int = 26
+BLUE_SKY_STOP_PCT: float = 6.0             # Carr s.325 "more like 6 percent" (Blue Sky-ozel YOK -> Ch22)
+BLUE_SKY_HARD_CAP_PCT: float = 8.0         # Carr s.325 "not ... more than an 8 percent loss"
+BLUE_SKY_TARGET_R_MULTIPLE: float = 2.0    # Carr s.324 "1.5 to 2.0 times" (Blue Sky-ozel YOK -> Ch22)
+
+
+def _ema_series(values: list[float], period: int) -> list:
+    """EMA serisi (period SMA seed, sonra k=2/(period+1)). period oncesi None. len<period -> []."""
+    if len(values) < period:
+        return []
+    k = 2.0 / (period + 1)
+    seed = sum(values[:period]) / period
+    out: list = [None] * (period - 1) + [seed]
+    ema = seed
+    for v in values[period:]:
+        ema = v * k + ema * (1 - k)
+        out.append(ema)
+    return out
+
+
+def _obv_series(closes: list[float], volumes: list[float]) -> list[float]:
+    """On-Balance Volume (Granville). obv[0]=0; up->+vol, down->-vol, esit->degismez."""
+    obv = [0.0]
+    for t in range(1, len(closes)):
+        if closes[t] > closes[t - 1]:
+            obv.append(obv[-1] + volumes[t])
+        elif closes[t] < closes[t - 1]:
+            obv.append(obv[-1] - volumes[t])
+        else:
+            obv.append(obv[-1])
+    return obv
+
+
+def _macd_line_series(closes: list[float], fast: int, slow: int) -> list:
+    """MACD cizgisi = EMA(fast) - EMA(slow). slow seed oncesi None (Carr s.168 12/26)."""
+    ef = _ema_series(closes, fast)
+    es = _ema_series(closes, slow)
+    if not ef or not es:
+        return []
+    return [(ef[t] - es[t]) if (ef[t] is not None and es[t] is not None) else None
+            for t in range(len(closes))]
+
+
+def compute_blue_sky_breakout(
+    opens: list[float],
+    highs: list[float],
+    lows: list[float],
+    closes: list[float],
+    volumes: list[float],
+) -> dict:
+    """Carr Blue Sky Breakout (2.baski Bolum 12, s.264-265) — STRONG+WEAK_BULL trend-takip LONG.
+
+    SINYAL (s.264-265, 6 kural HEPSI): (1) close>40g prior max, (2) close<260g prior max
+    (52h yuksek degil), (3) close<=260g min low×2, (4) OBV>40g prior max, (5) MACD>40g prior
+    max, (6) close>open. SMA YOK (s.261). OBV+MACD "yeni 40g yuksek" (s.261-262 zorunlu).
+    ENTRY (s.335): ertesi gun signal high ustu buy-stop -> entry=highs[bugun].
+    CIKIS (Ch22 evrensel, Blue Sky-ozel YOK): stop=entry×(1-%6) (s.325), %8 cap, target 2R
+    (s.324). TIME STOP YOK. Veri: 260g -> >=261 bar (yfinance 2y endpoint'te).
+
+    Returns: {detected, direction, quality, signal_close, entry, stop, target, risk_pct, rr,
+              high_40d, high_260d, low_260d, obv, macd, rules, mark_says}.
+    """
+    def _none(msg: str) -> dict:
+        return {
+            'detected': False, 'direction': None, 'quality': 'NONE',
+            'signal_close': None, 'entry': None, 'stop': None, 'target': None,
+            'risk_pct': None, 'rr': None, 'high_40d': None, 'high_260d': None,
+            'low_260d': None, 'obv': None, 'macd': None, 'rules': {}, 'mark_says': msg,
+        }
+
+    if not closes or not volumes or not opens or not highs or not lows:
+        return _none('Yetersiz veri — Blue Sky hesaplanamiyor.')
+    n = len(closes)
+    if not (len(opens) == len(highs) == len(lows) == len(volumes) == n):
+        return _none('Blue Sky: OHLCV uzunluk farkli.')
+    min_bars = BLUE_SKY_52W_LOOKBACK + 1  # bugun + prior 260
+    if n < min_bars:
+        return _none(f'Yetersiz veri — en az {min_bars} bar gerek (260g 52-hafta).')
+
+    i = n - 1
+    prior40 = closes[i - BLUE_SKY_NEW_HIGH_LOOKBACK:i]
+    prior260 = closes[i - BLUE_SKY_52W_LOOKBACK:i]
+    low260 = lows[i - BLUE_SKY_52W_LOOKBACK + 1:i + 1]  # 260 incl bugun
+    obv = _obv_series(closes, volumes)
+    macd = _macd_line_series(closes, BLUE_SKY_MACD_FAST, BLUE_SKY_MACD_SLOW)
+    obv_prior40 = obv[i - BLUE_SKY_NEW_HIGH_LOOKBACK:i]
+    macd_prior40 = [m for m in macd[i - BLUE_SKY_NEW_HIGH_LOOKBACK:i] if m is not None]
+    if macd[i] is None or not macd_prior40 or not obv_prior40:
+        return _none('Blue Sky: OBV/MACD hesaplanamadi (yetersiz veri).')
+
+    high40 = max(prior40)
+    high260 = max(prior260)
+    minlow260 = min(low260)
+    rules = {
+        'yeni_40g_yuksek': closes[i] > high40,
+        'degil_52h_yuksek': closes[i] < high260,
+        'asiri_uzama_yok': closes[i] <= minlow260 * BLUE_SKY_MAX_PRICE_MULTIPLE,
+        'obv_40g_yuksek': obv[i] > max(obv_prior40),
+        'macd_40g_yuksek': macd[i] > max(macd_prior40),
+        'bugun_bullish': closes[i] > opens[i],
+    }
+    base = {
+        'high_40d': round(high40, 2), 'high_260d': round(high260, 2),
+        'low_260d': round(minlow260, 2), 'obv': round(obv[i], 0),
+        'macd': round(macd[i], 3), 'rules': rules,
+    }
+    if not all(rules.values()):
+        d = _none(f'Blue Sky sinyali yok ({sum(rules.values())}/6 kosul).')
+        d.update(base)
+        return d
+
+    entry = highs[i]  # ertesi gun signal high ustu buy-stop (s.335)
+    stop = entry * (1 - BLUE_SKY_STOP_PCT / 100)   # Ch22 evrensel %6 (Blue Sky-ozel YOK)
+    risk = entry - stop
+    target = entry + BLUE_SKY_TARGET_R_MULTIPLE * risk
+    risk_pct = round(risk / entry * 100, 2) if entry else None
+    says = (f'✓ Carr Blue Sky Breakout LONG (STRONG/WEAK_BULL) — sinyal ${round(closes[i], 2)}, '
+            f'giris ${round(entry, 2)} (ertesi gun signal high ustu), stop ${round(stop, 2)} '
+            f'(%6 Ch22), hedef ${round(target, 2)} (2R). 40g yeni yuksek + OBV/MACD teyit, '
+            f'52h zirve alti (yol var). Time stop YOK — trailing (Carr s.324).')
+    d = {
+        'detected': True, 'direction': 'LONG', 'quality': 'GOOD',
+        'signal_close': round(closes[i], 2), 'entry': round(entry, 2),
+        'stop': round(stop, 2), 'target': round(target, 2),
+        'risk_pct': risk_pct, 'rr': BLUE_SKY_TARGET_R_MULTIPLE, 'mark_says': says,
+    }
+    d.update(base)
+    return d
+
+
+# ======================================================================
 # Paket 462 (11 Haz 2026) — High Tight Flag Detection (= Minervini Power Play)
 #
 # O'Neil "High Tight Flag" (HTF) = Mark Minervini "Power Play" (Trade Like a Stock
