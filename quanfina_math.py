@@ -5354,6 +5354,116 @@ def compute_blue_sea_breakdown(
 
 
 # ======================================================================
+# CARR GAP DOWN (TLFAL 2.baski Bolum 16, s.266-275) — P519 (18 Haz 2026)
+# SHORT reversal: uzun ralli SONU tersine donus (s.267). Cift danisma (Carr NotebookLM, verbatim).
+# GOSTERGE YOK (s.275 "pure price play" — sadece 50 SMA trend teyidi). Coiled Spring gibi.
+# GAP tanimi (s.270): bugun INTRADAY HIGH, dun INTRADAY LOW'un >=%1 ALTINDA (unfilled gap):
+#   high[bugun] < low[dun] × 0.99. (Kitap screener formulu ×1.01 YAZAR HATASI; s.270 metin net.)
+# SINYAL (s.273-274, 8 kural): (1) gap down, (2) close<open (kirmizi), (3-5) SMA50 20/40/60g
+#   yukseliyor (3 ay istikrarli uptrend), (6-8) close dun/20g/40g once > SMA50 (2 ay 50MA ustu).
+# TETIKLEYICI (s.270): signal low BEKLEMEZ -> gap gunu close VEYA ertesi gun open market emri
+#   -> entry = close (digerlerinden farkli). EYEBALL (s.272): ~%100 mekanik AMA haber teyidi
+#   sart (gap sirkete ozel kotu haberden mi?) -> quality='CANDIDATE'.
+# CIKIS: Gap-ozel KAYNAK YOK (cift danisma ❌) -> Ch22 EVRENSEL: stop %6 USTTE / %8 cap (s.305),
+#   target 2R ASAGI (s.324). TIME STOP YOK. Rejim: Bullish + Range (s.266 — bear DEGIL, Blue
+#   Sea'nin tersi). ON-FILTRE: Bearish Watch List (s.268). VERI: SMA50 60g once -> >=110 bar.
+# ======================================================================
+GAP_DOWN_GAP_PCT: float = 1.0               # Carr s.270: bugun high < dun low × 0.99 (>=%1 gap)
+GAP_DOWN_SMA: int = 50                       # Carr s.273-275: 50 SMA (tek gosterge)
+GAP_DOWN_STOP_PCT: float = 6.0              # Carr s.305 (Ch22 evrensel; Gap-ozel YOK)
+GAP_DOWN_HARD_CAP_PCT: float = 8.0          # Carr s.305-306 "%8 hard cap"
+GAP_DOWN_TARGET_R_MULTIPLE: float = 2.0     # Carr s.324 (Ch22 evrensel)
+
+
+def compute_gap_down(
+    opens: list[float],
+    highs: list[float],
+    lows: list[float],
+    closes: list[float],
+) -> dict:
+    """Carr Gap Down (2.baski s.273-274) — uzun-ralli-sonu reversal SHORT ADAYI.
+
+    SINYAL (s.273-274, 8 kural): (1) high[bugun]<low[dun]×0.99 (unfilled gap, s.270; kitap
+    ×1.01 typo), (2) close<open (kirmizi), (3-5) SMA50 bugun>20/40/60g once (3 ay uptrend),
+    (6-8) close dun/20g/40g once > kendi SMA50'si (2 ay 50MA ustu). GOSTERGE YOK (s.275 pure
+    price). ENTRY (s.270): gap gunu close (market emri — signal low BEKLEMEZ). EYEBALL (s.272):
+    haber teyidi sart -> quality='CANDIDATE'. CIKIS Ch22: stop %6 ustte / 2R asagi (s.305,324).
+    Rejim Bullish+Range (s.266). Veri: SMA50 60g -> >=110 bar.
+
+    NOT: kural 6-8 'close[t] > SMA50' contemporaneous SMA50[t] olarak yorumlandi (Carr INTENT
+    'fiyat 50MA ustunde tutundu'; literal current-SMA dik uptrend'de cok kati — Kural #26 seffaf).
+
+    Returns: {detected, direction, quality, signal_close, entry, stop, target, risk_pct, rr,
+              sma50, gap_pct, eyeball_checks, rules, mark_says}.
+    """
+    def _none(msg: str) -> dict:
+        return {
+            'detected': False, 'direction': None, 'quality': 'NONE',
+            'signal_close': None, 'entry': None, 'stop': None, 'target': None,
+            'risk_pct': None, 'rr': None, 'sma50': None, 'gap_pct': None,
+            'eyeball_checks': [], 'rules': {}, 'mark_says': msg,
+        }
+
+    if not opens or not highs or not lows or not closes:
+        return _none('Yetersiz veri — Gap Down hesaplanamiyor.')
+    n = len(closes)
+    if not (len(opens) == len(highs) == len(lows) == n):
+        return _none('Gap Down: OHLC uzunluk farkli.')
+    if n < GAP_DOWN_SMA + 60 + 1:  # SMA50 60g once -> >=111 bar (marj)
+        return _none(f'Yetersiz veri — en az {GAP_DOWN_SMA + 60 + 1} bar gerek (SMA50 60g once).')
+
+    i = n - 1
+    sma50 = _sma_at(closes, i, GAP_DOWN_SMA)
+    sma50_20 = _sma_at(closes, i - 20, GAP_DOWN_SMA)
+    sma50_40 = _sma_at(closes, i - 40, GAP_DOWN_SMA)
+    sma50_60 = _sma_at(closes, i - 60, GAP_DOWN_SMA)
+    sma50_y = _sma_at(closes, i - 1, GAP_DOWN_SMA)
+    if None in (sma50, sma50_20, sma50_40, sma50_60, sma50_y):
+        return _none('Gap Down: SMA50 hesaplanamadi (yetersiz veri).')
+
+    gap_level = lows[i - 1] * (1 - GAP_DOWN_GAP_PCT / 100)
+    rules = {
+        'gap_down': highs[i] < gap_level,
+        'bugun_kirmizi': closes[i] < opens[i],
+        'sma50_rising_20': sma50 > sma50_20,
+        'sma50_rising_40': sma50 > sma50_40,
+        'sma50_rising_60': sma50 > sma50_60,
+        'dun_close_ust_sma50': closes[i - 1] > sma50_y,
+        'close_20g_ust_sma50': closes[i - 20] > sma50_20,
+        'close_40g_ust_sma50': closes[i - 40] > sma50_40,
+    }
+    gap_pct = round((lows[i - 1] - highs[i]) / lows[i - 1] * 100, 2) if lows[i - 1] else None
+    base = {'sma50': round(sma50, 2), 'gap_pct': gap_pct, 'rules': rules}
+    if not all(rules.values()):
+        d = _none(f'Gap Down sinyali yok ({sum(rules.values())}/8 kosul).')
+        d.update(base)
+        return d
+
+    entry = closes[i]  # gap gunu close (market emri, s.270 — signal low BEKLEMEZ)
+    stop = entry * (1 + GAP_DOWN_STOP_PCT / 100)   # SHORT — stop ustte, Ch22 %6
+    risk = stop - entry
+    target = entry - GAP_DOWN_TARGET_R_MULTIPLE * risk  # SHORT — hedef asagi
+    risk_pct = round(risk / entry * 100, 2) if entry else None
+    eyeball_checks = [
+        'HABER TEYIDI sart: gap sirkete ozel KOTU haberden mi? (kotu bilanco, analist downgrade — s.272)',
+        'Uzun ralli sonu reversal: hisse asiri kosmus + 50MA 3 ay yukselmis olmali',
+    ]
+    says = (f'~ Carr Gap Down SHORT ADAYI (ralli-sonu reversal) — sinyal ${round(closes[i], 2)}, '
+            f'giris ${round(entry, 2)} (gap gunu close, market emri s.270), stop ${round(stop, 2)} '
+            f'(%6 ust Ch22), hedef ${round(target, 2)} (2R asagi). %{gap_pct} unfilled gap + 50MA '
+            f'3 ay uptrend. HABER TEYIDI sart (s.272). Bullish/Range piyasada (s.266).')
+    d = {
+        'detected': True, 'direction': 'SHORT', 'quality': 'CANDIDATE',
+        'signal_close': round(closes[i], 2), 'entry': round(entry, 2),
+        'stop': round(stop, 2), 'target': round(target, 2),
+        'risk_pct': risk_pct, 'rr': GAP_DOWN_TARGET_R_MULTIPLE,
+        'eyeball_checks': eyeball_checks, 'mark_says': says,
+    }
+    d.update(base)
+    return d
+
+
+# ======================================================================
 # Paket 462 (11 Haz 2026) — High Tight Flag Detection (= Minervini Power Play)
 #
 # O'Neil "High Tight Flag" (HTF) = Mark Minervini "Power Play" (Trade Like a Stock
