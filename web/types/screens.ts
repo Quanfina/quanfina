@@ -121,6 +121,8 @@ export const SCREEN_CATEGORIES: Record<string, string> = {
   bullish_divergence: "Bullish Divergence (Carr)",  // Carr s.258 uptrend-dip TIER-2
   // 18 Haz 2026 — Carr SHORT katalog (P518). Blue Sky aynası, strong-bear.
   blue_sea: "Blue Sea Breakdown (Carr SHORT)",  // Carr s.289 strong-bear breakdown SHORT
+  // 18 Haz 2026 — Carr SHORT katalog (P520). Ralli-sonu reversal.
+  gap_down: "Gap Down (Carr SHORT)",            // Carr s.273 ralli-sonu reversal SHORT
 };
 
 // SCREEN_DESCRIPTIONS kaldirildi (22 May 2026) — Sn. Ferit "bunu sil" talimati.
@@ -267,6 +269,11 @@ export const SCREEN_CONDITIONS: Record<string, ScreenCondition[]> = {
   blue_sea: [
     { source: "carr", text: "strong-bear SHORT (Carr 2.baskı s.289): 40g yeni DÜŞÜK + 52h dip DEĞİL + close>0.8×52h ZİRVE (asimetri s.286 — %20'den fazla düşmemiş) + OBV/MACD 40g yeni düşük + bugün kırmızı" },
     { source: "carr", text: "ENTRY ertesi gün signal low altı sell-stop (s.317). Stop %6 ÜSTTE / %8 cap (s.306), hedef 2R AŞAĞI (s.324). SADECE strong-bear (s.283). Quanfina long-biased — bilgi amaçlı" },
+  ],
+  // 18 Haz 2026 — Carr Gap Down SHORT (s.273); ralli-sonu reversal, pvh-hesap bulk
+  gap_down: [
+    { source: "carr", text: "ralli-sonu reversal SHORT (Carr 2.baskı s.273): high[bugün]<low[dün]×0.99 (unfilled gap ≥%1, s.270) + kırmızı mum + 50MA 20/40/60g yükseliyor + fiyat dün/20g/40g önce 50MA üstü. GÖSTERGE YOK (s.275 pure price)" },
+    { source: "carr", text: "ENTRY gap günü close (market emri, s.270 — signal low BEKLEMEZ). HABER TEYİDİ şart (s.272: gap şirkete özel kötü haberden mi?). Stop %6 ÜSTTE / 2R AŞAĞI (s.305,324). Bullish/Range piyasa (s.266)" },
   ],
 
   // 24 May 2026 — Tam Minervini Tarama (Hibrit Pipeline: 10 Hard + 5 Soft)

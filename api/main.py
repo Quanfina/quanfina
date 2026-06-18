@@ -76,6 +76,7 @@ from quanfina_math import (  # noqa: E402
     compute_bullish_base_breakout,
     compute_bullish_divergence,
     compute_blue_sea_breakdown,
+    compute_gap_down,
     compute_high_tight_flag,
     compute_stage_transition,
     compute_faber_timing,
@@ -452,7 +453,8 @@ def get_screen_results(slug: str, limit: int = 500, nocache: bool = False) -> li
         {"coiled_spring"} |            # P511: pvh-hesap compute-screen (Carr s.250, 60 bar)
         # P516: pvh 280 bar -> 200-261 bar Carr setup'lari bulk (sonraki scan'de dolar)
         {"pullback", "blue_sky", "bullish_base", "bullish_divergence"} |
-        {"blue_sea"}                   # P518: Carr SHORT bulk (Blue Sky aynasi, 261 bar)
+        {"blue_sea"} |                 # P518: Carr SHORT bulk (Blue Sky aynasi, 261 bar)
+        {"gap_down"}                   # P520: Carr SHORT bulk (ralli-sonu reversal, 110 bar)
     )
     if slug not in valid_slugs:
         from fastapi import HTTPException
@@ -3675,6 +3677,75 @@ def get_blue_sea(symbol: str) -> BlueSeaInfo:
         high_260d=r.get("high_260d"),
         obv=r.get("obv"),
         macd=r.get("macd"),
+        mark_says=r.get("mark_says", ""),
+        is_mock=is_mock,
+    )
+
+
+# P520 (18 Haz 2026): Carr Gap Down endpoint (s.273-274 entry + s.305-324 exit)
+# ralli-sonu reversal SHORT. compute_gap_down wire. GOSTERGE YOK (s.275, sadece 50MA).
+# entry=close (s.270, market emri). 110g (SMA50 60g) -> n_bars=252.
+class GapDownInfo(BaseModel):
+    detected: bool = False
+    direction: Optional[Literal["SHORT"]] = None
+    quality: Optional[str] = None
+    signal_close: Optional[float] = None
+    entry: Optional[float] = None       # gap gunu close (market emri, s.270)
+    stop: Optional[float] = None        # %6 USTTE / %8 cap (s.305)
+    target: Optional[float] = None      # 2R ASAGI (s.324)
+    risk_pct: Optional[float] = None
+    rr: Optional[float] = None
+    sma50: Optional[float] = None
+    gap_pct: Optional[float] = None
+    eyeball_checks: list[str] = []
+    mark_says: str
+    is_mock: bool = False
+
+
+@app.get("/api/stock/{symbol}/gap-down", response_model=GapDownInfo)
+def get_gap_down(symbol: str) -> GapDownInfo:
+    """Carr Gap Down (2.baski s.273-274) — uzun-ralli-sonu reversal SHORT ADAYI.
+
+    high[bugun]<low[dun]×0.99 (unfilled gap, s.270) + kirmizi + SMA50 3 ay uptrend + fiyat 2 ay
+    50MA ustu (s.273-274). GOSTERGE YOK (s.275 pure price). ENTRY: gap gunu close (market emri,
+    s.270). EYEBALL: haber teyidi sart -> quality='CANDIDATE' (s.272). CIKIS Ch22: %6 stop ustte
+    / 2R asagi (s.305,324). Rejim Bullish+Range (s.266). 110g -> is_mock = 110+ bar yoksa True.
+    """
+    sym = symbol.upper()
+    stock = _STOCK_BY_SYM.get(sym)
+    if stock:
+        price = stock.price
+    else:
+        try:
+            wl = [r for r in watchlist_get_all() if r["symbol"] == sym]
+        except OperationalError:
+            wl = []
+        if wl:
+            price = float(wl[0]["price"])
+        else:
+            scan_data = _fetch_scan_symbol_data(sym)
+            price = scan_data["price"] if scan_data else 100.0
+
+    bars = _get_ohlcv(sym, price)
+    r = compute_gap_down(
+        [b.open for b in bars], [b.high for b in bars],
+        [b.low for b in bars], [b.close for b in bars],
+    )
+    _real = _fetch_ohlcv_real(sym, 252)
+    is_mock = not (_real and len(_real) >= 111)
+    return GapDownInfo(
+        detected=r.get("detected", False),
+        direction=r.get("direction"),
+        quality=r.get("quality"),
+        signal_close=r.get("signal_close"),
+        entry=r.get("entry"),
+        stop=r.get("stop"),
+        target=r.get("target"),
+        risk_pct=r.get("risk_pct"),
+        rr=r.get("rr"),
+        sma50=r.get("sma50"),
+        gap_pct=r.get("gap_pct"),
+        eyeball_checks=r.get("eyeball_checks", []),
         mark_says=r.get("mark_says", ""),
         is_mock=is_mock,
     )

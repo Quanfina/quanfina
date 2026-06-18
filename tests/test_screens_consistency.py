@@ -713,3 +713,32 @@ class TestBlueSeaScreen:
         assert n >= 1, f"blue_sea koşulu yok (n={n})."
         m = re.search(r'\bblue_sea:\s*\[(.*?)\]\s*,', ts, re.DOTALL)
         assert m and 'source: "carr"' in m.group(1), "blue_sea 'carr' source kullanmali."
+
+
+class TestGapDownScreen:
+    """P520 — Carr Gap Down SHORT bulk screen (ralli-sonu reversal, 110 bar, son TIER-1)."""
+
+    @pytest.fixture(scope="class")
+    def ts(self) -> str:
+        return _read("web/types/screens.ts")
+
+    @pytest.fixture(scope="class")
+    def db_helpers(self) -> str:
+        return _read("api/db_helpers.py")
+
+    @pytest.fixture(scope="class")
+    def main(self) -> str:
+        return _read("api/main.py")
+
+    def test_spec_and_valid_slug(self, db_helpers, main):
+        assert '"gap_down": (compute_gap_down, 111, False)' in db_helpers, "gap_down spec yok."
+        assert '"gap_down"' in main, "main valid_slugs'te gap_down yok."
+
+    def test_ui_category_short_label(self, ts):
+        assert re.search(r'gap_down:\s*"[^"]*SHORT[^"]*"', ts), "gap_down SHORT etiketi yok."
+
+    def test_ui_carr_conditions(self, ts):
+        n = _extract_screen_conditions_count(ts, "gap_down")
+        assert n >= 1, f"gap_down koşulu yok (n={n})."
+        m = re.search(r'\bgap_down:\s*\[(.*?)\]\s*,', ts, re.DOTALL)
+        assert m and 'source: "carr"' in m.group(1), "gap_down 'carr' source kullanmali."
