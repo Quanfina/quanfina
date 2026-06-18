@@ -91,6 +91,7 @@ export function BullishDivergenceCard({ symbol, onPaperTrade }: { symbol: string
               plan_target: data.target ?? undefined,
               plan_entry_trigger: `Carr Bullish Divergence (s.258) — uptrend-dip, ${data.divergence_count}/6 gösterge divergence; göz kararı` }}
             onPaperTrade={onPaperTrade}
+            isMock={data.is_mock}
           />
         </>
       ) : (

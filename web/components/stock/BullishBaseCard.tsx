@@ -91,6 +91,7 @@ export function BullishBaseCard({ symbol, onPaperTrade }: { symbol: string; onPa
               plan_target: data.target ?? undefined,
               plan_entry_trigger: "Carr Bullish Base (s.291) — contrarian downtrend baz, entry=close (kırılım beklenmez); göz kararı: base tipi" }}
             onPaperTrade={onPaperTrade}
+            isMock={data.is_mock}
           />
         </>
       ) : (

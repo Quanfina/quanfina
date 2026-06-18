@@ -89,4 +89,25 @@ describe("BullishBaseCard (Carr s.291 contrarian)", () => {
     render(<BullishBaseCard symbol="PFE" />);
     expect(screen.getByText(/Sentetik/)).toBeInTheDocument();
   });
+
+  // P531 (Kural #28): paper trade köprü wiring — is_mock=data.is_mock geçiyor mu
+  it("detected + gerçek veri + onPaperTrade → paper trade butonu görünür", () => {
+    mockBB.mockReturnValue({
+      data: bbData({ detected: true, direction: "LONG", quality: "CANDIDATE",
+        entry: 138, stop: 129.72, target: 154.56, risk_pct: 6.0, rr: 2.0, is_mock: false }),
+      isLoading: false, isError: false,
+    });
+    render(<BullishBaseCard symbol="PFE" onPaperTrade={vi.fn()} />);
+    expect(screen.getByTestId("carr-paper-trade-btn")).toBeInTheDocument();
+  });
+
+  it("detected + is_mock + onPaperTrade → paper trade butonu GİZLİ (Kural #28)", () => {
+    mockBB.mockReturnValue({
+      data: bbData({ detected: true, direction: "LONG", quality: "CANDIDATE",
+        entry: 138, stop: 129.72, target: 154.56, risk_pct: 6.0, rr: 2.0, is_mock: true }),
+      isLoading: false, isError: false,
+    });
+    render(<BullishBaseCard symbol="PFE" onPaperTrade={vi.fn()} />);
+    expect(screen.queryByTestId("carr-paper-trade-btn")).toBeNull();
+  });
 });

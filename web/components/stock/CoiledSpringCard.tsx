@@ -91,6 +91,7 @@ export function CoiledSpringCard({ symbol, onPaperTrade }: { symbol: string; onP
               plan_target: data.target ?? undefined,
               plan_entry_trigger: "Carr Coiled Spring (s.250) — daralan yay ADAY; göz kararı: trendline kırılımı + 50MA temassız" }}
             onPaperTrade={onPaperTrade}
+            isMock={data.is_mock}
           />
         </>
       ) : (

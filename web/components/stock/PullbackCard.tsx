@@ -84,6 +84,7 @@ export function PullbackCard({ symbol, onPaperTrade }: { symbol: string; onPaper
               plan_target: data.target ?? undefined,
               plan_entry_trigger: "Carr Pullback (s.249) — WEAK_bull, Stoch<20 oversold pullback, ertesi gün signal high üstü" }}
             onPaperTrade={onPaperTrade}
+            isMock={data.is_mock}
           />
         </>
       ) : (

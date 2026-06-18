@@ -101,6 +101,7 @@ export function MeanReversionCard({ symbol, onPaperTrade }: { symbol: string; on
                 plan_target: data.target ?? undefined,
                 plan_entry_trigger: "Carr Mean Reversion (s.307) — countertrend BB+SMA20 içeri dönüş" }}
               onPaperTrade={onPaperTrade}
+              isMock={data.is_mock}
             />
           )}
         </>

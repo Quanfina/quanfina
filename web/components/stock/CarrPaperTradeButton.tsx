@@ -9,15 +9,21 @@ import type { InitialData } from "@/components/journal/AddTradeDialog";
  * pre-fill olarak aktarır. SADECE LONG setup'larda kullanılır (trade formu LONG-yönlü:
  * R/R risk=entry−stop). onPaperTrade /hisse sayfasından gelir (dialog'u prefill ile açar).
  * onPaperTrade verilmemişse (sayfa wire etmemişse) görünmez — backward-compatible.
+ *
+ * P531 (18 Haz 2026, Kural #28): isMock=true ise gizlenir. Sentetik / yetersiz-bar
+ * (<60/<200/<261) detector çıktısıyla paper trade açmak yanıltıcı — kart zaten "🟡 paper
+ * trade için güvenilmez" banner gösteriyor; buton da olmamalı (çelişki + dürüstlük).
  */
 export function CarrPaperTradeButton({
   data,
   onPaperTrade,
+  isMock,
 }: {
   data: InitialData;
   onPaperTrade?: (d: InitialData) => void;
+  isMock?: boolean;
 }) {
-  if (!onPaperTrade) return null;
+  if (!onPaperTrade || isMock) return null;
   return (
     <button
       type="button"

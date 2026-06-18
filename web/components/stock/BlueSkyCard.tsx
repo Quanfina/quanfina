@@ -84,6 +84,7 @@ export function BlueSkyCard({ symbol, onPaperTrade }: { symbol: string; onPaperT
               plan_target: data.target ?? undefined,
               plan_entry_trigger: "Carr Blue Sky (s.264) — 40g yeni yüksek breakout + OBV/MACD teyit, ertesi gün signal high üstü" }}
             onPaperTrade={onPaperTrade}
+            isMock={data.is_mock}
           />
         </>
       ) : (
