@@ -4809,6 +4809,126 @@ def compute_blue_sky_breakout(
 
 
 # ======================================================================
+# CARR COILED SPRING (TLFAL 2.baski Bolum 10, s.247-252) — P509 (18 Haz 2026)
+# STRONG+WEAK_BULL + RANGE trend-takip LONG. Cift danisma (Carr NotebookLM, verbatim teyit).
+# KRITIK: GOSTERGE YOK (s.248 "pure pattern play" — BB/ATR/ADX/Stoch/MACD HICBIRI). Sadece
+# 20MA + 50MA + trendline. Saf formasyon (daralan yay = consolidation 7-20 gun, s.247).
+# TIER-2 EYEBALL (s.248-249): tarama ADAY bulur, insan onaylar -> quality='CANDIDATE'.
+# ENTRY screener (s.250, 8 kural HEPSI):
+#   (1) close>=open  (2) high<=high[3g once]  (3) high<=high[7g once]
+#   (4) low>=low[3g once]  (5) low>=low[7g once]  (6) max high 20g >= max high 60g
+#   (7) close>SMA20  (8) SMA20 > SMA50×1.03
+# Kural 6 yorumu: literal "20g max > 60g max" overlapping pencerede IMKANSIZ (20g max <= 60g
+# max her zaman); Carr INTENT = 60g zirve son 20 gunde (yani 20g max == 60g max) -> '>=' ile
+# uygulandi (Kural #26 seffaflik: literal degil intent, MetaStock HHV(H,20)=HHV(H,60) idiomu).
+# TETIKLEYICI (s.248,315): coil ustu trendline kirilimi (EYEBALL) -> ertesi gun signal high
+# ustu buy-stop. entry=signal high.
+# CIKIS: stop 50MA alti (s.252) %2 buffer + %8 cap (s.303); target Ch22 2R (s.324, setup-ozel
+# YOK); TIME STOP YOK (trend-takip). EYEBALL onay: daralma sagi + yukari egim DEGIL + hicbir
+# kisim (fitil dahil) 50MA'ya degmez (s.248-249).
+# ON-FILTRE (s.244,253): Bullish Watch List ZORUNLU. Rejim STRONG+WEAK bull + RANGE (s.244).
+# VERI: 60g high -> en az 60 bar (pvh 80 yeterli -> bulk screen mumkun).
+# ======================================================================
+COILED_SPRING_SMA_FAST: int = 20            # Carr s.250
+COILED_SPRING_SMA_SLOW: int = 50            # Carr s.250
+COILED_SPRING_MA_SEPARATION: float = 1.03   # Carr s.250: SMA20 > SMA50 × 1.03
+COILED_SPRING_NARROW_SHORT: int = 3         # Carr s.250: high/low vs 3 gun once
+COILED_SPRING_NARROW_LONG: int = 7          # Carr s.250: high/low vs 7 gun once
+COILED_SPRING_RANGE_FAST: int = 20          # Carr s.250: 20g max high
+COILED_SPRING_RANGE_SLOW: int = 60          # Carr s.250: 60g max high
+COILED_SPRING_MIN_COIL_DAYS: int = 7        # Carr s.247: coil 7-20 gun (eyeball)
+COILED_SPRING_MAX_COIL_DAYS: int = 20
+COILED_SPRING_STOP_MA_BUFFER_PCT: float = 2.0  # Carr s.252 "under 50 MA" + s.322 genel %1-2
+COILED_SPRING_HARD_CAP_PCT: float = 8.0     # Carr s.303 "not ... more than an 8 percent loss"
+COILED_SPRING_TARGET_R_MULTIPLE: float = 2.0  # Carr s.324 (Ch22 evrensel; setup-ozel YOK)
+
+
+def compute_coiled_spring(
+    opens: list[float],
+    highs: list[float],
+    lows: list[float],
+    closes: list[float],
+) -> dict:
+    """Carr Coiled Spring (2.baski s.250) — STRONG+WEAK_BULL+RANGE trend-takip LONG ADAYI.
+
+    SINYAL screener (s.250, 8 kural HEPSI): (1) close>=open, (2-3) high<=high[3g/7g once],
+    (4-5) low>=low[3g/7g once] (daralma), (6) 20g max high >= 60g max high (60g zirve recent),
+    (7) close>SMA20, (8) SMA20>SMA50×1.03. GOSTERGE YOK (s.248 pure pattern). TIER-2 EYEBALL
+    -> quality='CANDIDATE'. ENTRY (s.248,315): trendline kirilimi (eyeball) -> ertesi gun
+    signal high ustu. STOP 50MA-%2 + %8 cap (s.252,303). TARGET 2R (s.324). TIME STOP YOK.
+    Veri: 60g -> >=60 bar (pvh 80 yeterli). EYEBALL: daralma + yukari egim DEGIL + 50MA temassiz.
+
+    Returns: {detected, direction, quality, signal_close, entry, stop, target, risk_pct, rr,
+              sma20, sma50, eyeball_checks, rules, mark_says}.
+    """
+    def _none(msg: str) -> dict:
+        return {
+            'detected': False, 'direction': None, 'quality': 'NONE',
+            'signal_close': None, 'entry': None, 'stop': None, 'target': None,
+            'risk_pct': None, 'rr': None, 'sma20': None, 'sma50': None,
+            'eyeball_checks': [], 'rules': {}, 'mark_says': msg,
+        }
+
+    if not opens or not highs or not lows or not closes:
+        return _none('Yetersiz veri — Coiled Spring hesaplanamiyor.')
+    n = len(closes)
+    if not (len(opens) == len(highs) == len(lows) == n):
+        return _none('Coiled Spring: OHLC uzunluk farkli.')
+    if n < COILED_SPRING_RANGE_SLOW:
+        return _none(f'Yetersiz veri — en az {COILED_SPRING_RANGE_SLOW} bar gerek (60g range).')
+
+    i = n - 1
+    sma20 = _sma_at(closes, i, COILED_SPRING_SMA_FAST)
+    sma50 = _sma_at(closes, i, COILED_SPRING_SMA_SLOW)
+    if sma20 is None or sma50 is None:
+        return _none('Coiled Spring: SMA hesaplanamadi (yetersiz veri).')
+
+    max_high_20 = max(highs[i - COILED_SPRING_RANGE_FAST + 1:i + 1])
+    max_high_60 = max(highs[i - COILED_SPRING_RANGE_SLOW + 1:i + 1])
+    rules = {
+        'bugun_yesil': closes[i] >= opens[i],
+        'high_3g_alti': highs[i] <= highs[i - COILED_SPRING_NARROW_SHORT],
+        'high_7g_alti': highs[i] <= highs[i - COILED_SPRING_NARROW_LONG],
+        'low_3g_ustu': lows[i] >= lows[i - COILED_SPRING_NARROW_SHORT],
+        'low_7g_ustu': lows[i] >= lows[i - COILED_SPRING_NARROW_LONG],
+        '20g_60g_yuksek': max_high_20 >= max_high_60,
+        'close_ust_sma20': closes[i] > sma20,
+        'sma20_ust_sma50_sep': sma20 > sma50 * COILED_SPRING_MA_SEPARATION,
+    }
+    base = {'sma20': round(sma20, 2), 'sma50': round(sma50, 2), 'rules': rules}
+    if not all(rules.values()):
+        d = _none(f'Coiled Spring sinyali yok ({sum(rules.values())}/8 kosul).')
+        d.update(base)
+        return d
+
+    entry = highs[i]  # ertesi gun signal high ustu buy-stop (trendline kirilimi eyeball, s.248,315)
+    structural = sma50 * (1 - COILED_SPRING_STOP_MA_BUFFER_PCT / 100)
+    stop = max(structural, entry * (1 - COILED_SPRING_HARD_CAP_PCT / 100))  # 50MA alti / %8 cap
+    risk = entry - stop
+    target = entry + COILED_SPRING_TARGET_R_MULTIPLE * risk
+    risk_pct = round(risk / entry * 100, 2) if entry else None
+    eyeball_checks = [
+        'Daralma: fiyat araligi saga dogru daraliyor mu?',
+        'Aci: formasyon YUKARI egimli OLMAMALI (yatay/hafif asagi)',
+        '50MA temasi: hicbir kisim (fitil dahil) 50MA\'ya degmemeli',
+        'Trendline: coil ustu trend cizgisi kirilmali (giris tetigi)',
+    ]
+    says = (f'~ Carr Coiled Spring LONG ADAYI (TIER-2 eyeball) — sinyal ${round(closes[i], 2)}, '
+            f'giris ${round(entry, 2)} (trendline kirilimi sonrasi), stop ${round(stop, 2)} '
+            f'(50MA alti/%8 cap), hedef ${round(target, 2)} (2R). 8 tarama kosulu gecti; '
+            f'GOZ KARARI sart: daralma + yukari egim DEGIL + 50MA temassiz (Carr s.248-249).')
+    d = {
+        'detected': True, 'direction': 'LONG', 'quality': 'CANDIDATE',
+        'signal_close': round(closes[i], 2), 'entry': round(entry, 2),
+        'stop': round(stop, 2), 'target': round(target, 2),
+        'risk_pct': risk_pct, 'rr': COILED_SPRING_TARGET_R_MULTIPLE,
+        'eyeball_checks': eyeball_checks, 'mark_says': says,
+    }
+    d.update(base)
+    return d
+
+
+# ======================================================================
 # Paket 462 (11 Haz 2026) — High Tight Flag Detection (= Minervini Power Play)
 #
 # O'Neil "High Tight Flag" (HTF) = Mark Minervini "Power Play" (Trade Like a Stock
