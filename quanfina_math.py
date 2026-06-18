@@ -5464,6 +5464,125 @@ def compute_gap_down(
 
 
 # ======================================================================
+# CARR RISING WEDGE BREAKDOWN (TLFAL 2.baski Bolum 19) — P521 (18 Haz 2026)
+# SHORT: uptrend yorgun, yukselen kama asagi kirilir. Cift danisma (Carr NotebookLM, verbatim).
+# Yukselen kama = uptrend'de daralan salinim (destek+direnc >=3 dokunus — EYEBALL). Gosterge:
+# 50MA + rising wedge pattern + MACD + OBV. Coiled Spring yapisi AMA bearish divergence + SHORT.
+# SINYAL screener (Bearish watch list, 6 kural):
+#   (1) SMA50 bugun > SMA50 40g once (uptrend — kama uptrend icinde)
+#   (2) max range 30g > max range 15g  (3) max range 15g > max range 5g (kama daralmasi)
+#   (4) MACD bugun < MACD 40g once (MACD dusuyor — bearish divergence)
+#   (5) OBV bugun < OBV 40g once (OBV dusuyor)  (6) close < open (kirmizi)
+# TETIKLEYICI: OBV trendline kirilimi -> ilk kirmizi mum (EYEBALL) -> entry=close.
+# BEARISH teyit: MACD lower highs iken fiyat higher/equal highs (divergence). EYEBALL: kama
+# trendline (>=3 dokunus) + OBV trendline kirilimi -> quality='CANDIDATE'.
+# CIKIS: Ch22 evrensel (Rising Wedge-ozel YOK): stop %6 USTTE / %8 cap, target 2R ASAGI.
+# TIME STOP YOK. Rejim: Bullish + Range (bear DEGIL). ON-FILTRE Bearish Watch List.
+# VERI: SMA50 40g once -> >=90 bar (pvh 280 -> bulk mumkun).
+# ======================================================================
+RISING_WEDGE_SMA: int = 50                   # Carr Bol.19: 50 SMA (uptrend teyidi)
+RISING_WEDGE_SMA_RISING_LB: int = 40         # SMA50 40g once kiyas
+RISING_WEDGE_RANGE_LONG: int = 30            # max range 30g
+RISING_WEDGE_RANGE_MID: int = 15
+RISING_WEDGE_RANGE_SHORT: int = 5
+RISING_WEDGE_MOMENTUM_LB: int = 40           # MACD/OBV 40g once kiyas
+RISING_WEDGE_MACD_FAST: int = 12
+RISING_WEDGE_MACD_SLOW: int = 26
+RISING_WEDGE_STOP_PCT: float = 6.0           # Ch22 evrensel (Rising Wedge-ozel YOK)
+RISING_WEDGE_HARD_CAP_PCT: float = 8.0       # Ch22 "%8 hard cap"
+RISING_WEDGE_TARGET_R_MULTIPLE: float = 2.0  # Ch22 evrensel
+
+
+def compute_rising_wedge_breakdown(
+    opens: list[float],
+    highs: list[float],
+    lows: list[float],
+    closes: list[float],
+    volumes: list[float],
+) -> dict:
+    """Carr Rising Wedge Breakdown (2.baski Bol.19) — uptrend-sonu kama kirilimi SHORT ADAYI.
+
+    SINYAL (6 kural): (1) SMA50 bugun>40g once (uptrend), (2-3) max range 30g>15g>5g (kama
+    daralmasi), (4) MACD bugun<40g once (dusuyor — bearish divergence), (5) OBV bugun<40g once
+    (dusuyor), (6) close<open (kirmizi). ENTRY: OBV trendline kirilimi -> ilk kirmizi mum
+    (eyeball) -> entry=close. CIKIS Ch22: stop %6 ustte / %8 cap, target 2R asagi. TIME STOP
+    YOK. TIER-2 eyeball (kama trendline >=3 dokunus + OBV kirilimi) -> quality='CANDIDATE'.
+    Rejim Bullish+Range. Veri: SMA50 40g -> >=90 bar.
+
+    Returns: {detected, direction, quality, signal_close, entry, stop, target, risk_pct, rr,
+              sma50, obv, macd, eyeball_checks, rules, mark_says}.
+    """
+    def _none(msg: str) -> dict:
+        return {
+            'detected': False, 'direction': None, 'quality': 'NONE',
+            'signal_close': None, 'entry': None, 'stop': None, 'target': None,
+            'risk_pct': None, 'rr': None, 'sma50': None, 'obv': None, 'macd': None,
+            'eyeball_checks': [], 'rules': {}, 'mark_says': msg,
+        }
+
+    if not closes or not volumes or not opens or not highs or not lows:
+        return _none('Yetersiz veri — Rising Wedge hesaplanamiyor.')
+    n = len(closes)
+    if not (len(opens) == len(highs) == len(lows) == len(volumes) == n):
+        return _none('Rising Wedge: OHLCV uzunluk farkli.')
+    if n < RISING_WEDGE_SMA + RISING_WEDGE_SMA_RISING_LB:  # SMA50 40g once -> >=90 bar
+        return _none(f'Yetersiz veri — en az {RISING_WEDGE_SMA + RISING_WEDGE_SMA_RISING_LB} bar gerek.')
+
+    i = n - 1
+    sma50 = _sma_at(closes, i, RISING_WEDGE_SMA)
+    sma50_prev = _sma_at(closes, i - RISING_WEDGE_SMA_RISING_LB, RISING_WEDGE_SMA)
+    obv = _obv_series(closes, volumes)
+    macd = _macd_line_series(closes, RISING_WEDGE_MACD_FAST, RISING_WEDGE_MACD_SLOW)
+    lb = RISING_WEDGE_MOMENTUM_LB
+    if sma50 is None or sma50_prev is None or macd[i] is None or macd[i - lb] is None:
+        return _none('Rising Wedge: gosterge hesaplanamadi (yetersiz veri).')
+
+    def _max_range(window: int) -> float:
+        return max(highs[j] - lows[j] for j in range(i - window + 1, i + 1))
+
+    r30 = _max_range(RISING_WEDGE_RANGE_LONG)
+    r15 = _max_range(RISING_WEDGE_RANGE_MID)
+    r5 = _max_range(RISING_WEDGE_RANGE_SHORT)
+    rules = {
+        'sma50_yukseliyor': sma50 > sma50_prev,
+        'range_30_15': r30 > r15,
+        'range_15_5': r15 > r5,
+        'macd_dusuyor': macd[i] < macd[i - lb],
+        'obv_dusuyor': obv[i] < obv[i - lb],
+        'bugun_kirmizi': closes[i] < opens[i],
+    }
+    base = {'sma50': round(sma50, 2), 'obv': round(obv[i], 0), 'macd': round(macd[i], 3), 'rules': rules}
+    if not all(rules.values()):
+        d = _none(f'Rising Wedge sinyali yok ({sum(rules.values())}/6 kosul).')
+        d.update(base)
+        return d
+
+    entry = closes[i]  # OBV trendline kirilimi sonrasi ilk kirmizi mum close (eyeball)
+    stop = entry * (1 + RISING_WEDGE_STOP_PCT / 100)   # SHORT — stop ustte, Ch22 %6
+    risk = stop - entry
+    target = entry - RISING_WEDGE_TARGET_R_MULTIPLE * risk  # SHORT — hedef asagi
+    risk_pct = round(risk / entry * 100, 2) if entry else None
+    eyeball_checks = [
+        'Kama trendline: destek+direnc >=3 dokunus, daralan salinim (gozle ciz)',
+        'Bearish teyit: MACD lower highs iken fiyat higher/equal highs (divergence)',
+        'Tetik: OBV trendline asagi kirilimi -> ilk kirmizi mum',
+    ]
+    says = (f'~ Carr Rising Wedge Breakdown SHORT ADAYI (uptrend-sonu, TIER-2 eyeball) — '
+            f'sinyal ${round(closes[i], 2)}, giris ${round(entry, 2)} (OBV kirilimi sonrasi '
+            f'kirmizi mum), stop ${round(stop, 2)} (%6 ust), hedef ${round(target, 2)} (2R asagi). '
+            f'Kama daralmasi + MACD/OBV bearish divergence. GOZ KARARI: kama + OBV trendline.')
+    d = {
+        'detected': True, 'direction': 'SHORT', 'quality': 'CANDIDATE',
+        'signal_close': round(closes[i], 2), 'entry': round(entry, 2),
+        'stop': round(stop, 2), 'target': round(target, 2),
+        'risk_pct': risk_pct, 'rr': RISING_WEDGE_TARGET_R_MULTIPLE,
+        'eyeball_checks': eyeball_checks, 'mark_says': says,
+    }
+    d.update(base)
+    return d
+
+
+# ======================================================================
 # Paket 462 (11 Haz 2026) — High Tight Flag Detection (= Minervini Power Play)
 #
 # O'Neil "High Tight Flag" (HTF) = Mark Minervini "Power Play" (Trade Like a Stock
