@@ -69,6 +69,7 @@ from quanfina_math import (  # noqa: E402
     compute_sell_strength,
     compute_flat_base,
     compute_double_bottom,
+    compute_mean_reversion,
     compute_high_tight_flag,
     compute_stage_transition,
     compute_faber_timing,
@@ -3166,6 +3167,72 @@ def get_sell_strength(symbol: str) -> SellStrengthInfo:
         offensive=r.get("offensive", []),
         pct_above_200ma=r.get("pct_above_200ma"),
         mark_says=r.get("mark_says", ""),
+    )
+
+
+# Paket 500 (18 Haz 2026): Carr Mean Reversion endpoint (strateji insasi adim 2)
+# Carr 2.baski s.356 countertrend LONG/SHORT. compute_mean_reversion wire.
+class MeanReversionInfo(BaseModel):
+    detected: bool = False
+    direction: Optional[Literal["LONG", "SHORT"]] = None
+    quality: Optional[str] = None
+    entry: Optional[float] = None
+    stop: Optional[float] = None
+    target: Optional[float] = None
+    hard_cap_pct: float = 8.0
+    time_stop_days: int = 7
+    sma20: Optional[float] = None
+    lower_bb: Optional[float] = None
+    upper_bb: Optional[float] = None
+    mark_says: str
+    is_mock: bool = False
+
+
+@app.get("/api/stock/{symbol}/mean-reversion", response_model=MeanReversionInfo)
+def get_mean_reversion(symbol: str) -> MeanReversionInfo:
+    """Carr Mean Reversion (2.baski s.356) — countertrend LONG/SHORT tek-hisse.
+
+    Quanfina cekirdek frekans setup (Carr.md %80). OHLCV: _get_ohlcv (gercek yfinance +
+    sentetik fallback). Gosterge SADECE BB(20,2.0)+SMA20+candle (Carr canon). %8 hard cap
+    (s.410-411) + 7-gun time stop (s.400) + SMA20 hedef (s.339). is_mock = gercek 21+ bar
+    yoksa True (UI banner; carr-stage/stage paterni).
+    """
+    sym = symbol.upper()
+    stock = _STOCK_BY_SYM.get(sym)
+    if stock:
+        price = stock.price
+    else:
+        try:
+            wl = [r for r in watchlist_get_all() if r["symbol"] == sym]
+        except OperationalError:
+            wl = []
+        if wl:
+            price = float(wl[0]["price"])
+        else:
+            scan_data = _fetch_scan_symbol_data(sym)
+            price = scan_data["price"] if scan_data else 100.0
+
+    bars = _get_ohlcv(sym, price)
+    r = compute_mean_reversion(
+        [b.open for b in bars], [b.high for b in bars],
+        [b.low for b in bars], [b.close for b in bars],
+    )
+    _real = _fetch_ohlcv_real(sym, 252)
+    is_mock = not (_real and len(_real) >= 21)
+    return MeanReversionInfo(
+        detected=r.get("detected", False),
+        direction=r.get("direction"),
+        quality=r.get("quality"),
+        entry=r.get("entry"),
+        stop=r.get("stop"),
+        target=r.get("target"),
+        hard_cap_pct=r.get("hard_cap_pct", 8.0),
+        time_stop_days=r.get("time_stop_days", 7),
+        sma20=r.get("sma20"),
+        lower_bb=r.get("lower_bb"),
+        upper_bb=r.get("upper_bb"),
+        mark_says=r.get("mark_says", ""),
+        is_mock=is_mock,
     )
 
 

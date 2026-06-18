@@ -11,6 +11,7 @@ import dynamic from "next/dynamic";
 import { StockHeader } from "@/components/stock/StockHeader";
 import { ActiveStrategies } from "@/components/stock/ActiveStrategies";
 import { CarrStageCard } from "@/components/stock/CarrStageCard";
+import { MeanReversionCard } from "@/components/stock/MeanReversionCard";
 import { PivotBreakoutCard } from "@/components/stock/PivotBreakoutCard";
 import { OverheadSupplyCard } from "@/components/stock/OverheadSupplyCard";
 import { ClimaxRunCard } from "@/components/stock/ClimaxRunCard";
@@ -321,6 +322,8 @@ export default function HissePage({
           <SellStrengthCard symbol={sym} />
           <ActiveStrategies strategies={info.active_strategies} symbol={sym} />
           <CarrStageCard symbol={sym} />
+          {/* Paket 500 (18 Haz 2026): Carr Mean Reversion — countertrend çekirdek setup (s.356) */}
+          <MeanReversionCard symbol={sym} />
           {/* KARAR #733 alt-paket (Paket 72): Pivot Breakout Card */}
           <PivotBreakoutCard symbol={sym} />
           {/* KARAR #733 alt-paket (Paket 78): Overhead Supply Card */}
