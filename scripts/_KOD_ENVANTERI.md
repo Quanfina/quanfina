@@ -245,7 +245,7 @@ journal/page.tsx'e geçince api/main.py bunu sarmalayabilir.
 
 **Next.js HTTP istemciler (`web/hooks/`):**
 ```
-api/main.py (port 8001)
+api/main.py (port 8000)
    ↑ HTTP
    ├── web/hooks/use-watchlist.ts → /api/watchlist (GET)
    ├── web/hooks/use-watchlist-mutations.ts → /api/watchlist (POST/PATCH/DELETE)
@@ -254,7 +254,7 @@ api/main.py (port 8001)
    └── web/app/(dashboard)/api-test/page.tsx → /api/health (test)
 ```
 
-**Proxy:** `web/next.config.ts` Next.js → FastAPI proxy (8001 port)
+**Proxy:** `web/next.config.ts` Next.js → FastAPI proxy (8000 port)
 ayarıyor.
 
 ### Cloud Run akışı

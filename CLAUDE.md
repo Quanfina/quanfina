@@ -2356,7 +2356,7 @@ Ortam değişkenleri: `.env` (local) / Secret Manager (production)
 **Çalıştırma:**
 ```powershell
 cd api
-.\.venv\Scripts\python.exe -m uvicorn main:app --reload --port 8001
+.\.venv\Scripts\python.exe -m uvicorn main:app --reload --port 8000
 ```
 
 **Endpoint durumları:**
@@ -2402,7 +2402,7 @@ cd web
 pnpm dev      # http://localhost:3000
 ```
 
-**API proxy:** `web/next.config.ts` → `/api/*` istekleri `http://localhost:8001`'e yönlenir.
+**API proxy:** `web/next.config.ts` → `/api/*` istekleri `http://localhost:8000`'e yönlenir.
 
 **Tamamlanan sayfalar:** watchlist, journal, signals, piyasa-durumu, minervini, carr
 **Eksik (Streamlit'ten taşınmamış):** Sektör Rotasyonu, Portfolio Risk, İstatistikler
@@ -2412,7 +2412,7 @@ pnpm dev      # http://localhost:3000
 ## Bağlantı Yönetimi (Python)
 
 ```python
-# api/ için (db_helpers.py) — port 8001
+# api/ için (db_helpers.py) — port 8000
 from sqlalchemy import create_engine
 engine = create_engine(_URL, pool_pre_ping=True)
 
@@ -2634,7 +2634,7 @@ Scope prefix zorunluluğu: bağlamı net yaz ("DB-Aşama 1", "UI-Adım 2.1" gibi
 8. Streamlit kodu silinmez — `_archive/streamlit_legacy/`'e taşınacak (henüz yapılmadı)
 9. `api/` için kök `venv\` yerine `api\.venv\` kullan
 10. `web/` için npm değil pnpm kullan
-11. FastAPI port: 8001 (next.config.ts proxy buna ayarlı — 8000 değil)
+11. FastAPI port: 8000 (next.config.ts proxy buna ayarlı; 8001'den geri dönüldü 18 Haz 2026)
 
 ---
 

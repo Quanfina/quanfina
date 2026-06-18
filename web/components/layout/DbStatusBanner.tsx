@@ -39,7 +39,7 @@ export function DbStatusBanner() {
       >
         <AlertTriangle size={14} />
         <span className="font-medium">API erişilemez</span>
-        <span className="opacity-80">— FastAPI sunucusu cevap vermiyor (port 8001).</span>
+        <span className="opacity-80">— FastAPI sunucusu cevap vermiyor (port 8000).</span>
         <button
           type="button"
           onClick={() => refetch()}
