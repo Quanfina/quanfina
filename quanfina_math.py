@@ -4929,6 +4929,135 @@ def compute_coiled_spring(
 
 
 # ======================================================================
+# CARR BULLISH BASE BREAKOUT (TLFAL 2.baski Bolum 13, s.281-294) — P512 (18 Haz 2026)
+# CONTRARIAN LONG — downtrend SONU bottom-fishing (Coiled Spring uptrend devamiydi; bu TERSI,
+# s.284,286). Cift danisma (Carr NotebookLM, verbatim teyit). Gosterge: OBV + MACD(12,26,9)
+# YUKSELIYOR (Blue Sky gibi, s.286-289). KRITIK: kirilim BEKLENMEZ (s.284 "buy ... even though
+# price has not yet broken out") -> entry = CLOSE (ilk yesil mum, s.289), signal high DEGIL.
+# ENTRY screener (s.291, 7 kural + yesil tetik):
+#   (1) SMA50 > SMA20 (downtrend — faster MA altta)  (2) SMA50 bugun < SMA50 40g once (50 dusuyor)
+#   (3) max range 30g > max range 15g  (4) max range 15g > max range 5g (daralma)
+#   (5) OBV bugun > OBV 40g once (yukseliyor)  (6) MACD bugun > MACD 40g once (yukseliyor)
+#   (7) SMA50 < SMA200 (uzun downtrend)  (8) bugun yesil (close>=open — alim tetigi, s.289)
+# CIKIS: Base-ozel KAYNAK YOK (cift danisma ❌) -> Ch22 EVRENSEL: stop %6 (s.325), %8 cap,
+# target 2R (s.324). TIME STOP YOK. TIER-2 EYEBALL (s.287-288): base tipi falling wedge /
+# expanding triangle / rectangle olmali; RISING WEDGE OLMAZ -> quality='CANDIDATE'.
+# ON-FILTRE (s.293-294): Bullish Watch List ZORUNLU. Rejim: WEAK_bull + Bearish + Range
+# (STRONG_bull HARIC, s.281 — contrarian). VERI: SMA200 -> >=200 bar (pvh 80<200, bulk YOK).
+# ======================================================================
+BULLISH_BASE_SMA_FAST: int = 20             # Carr s.291
+BULLISH_BASE_SMA_MID: int = 50              # Carr s.291
+BULLISH_BASE_SMA_SLOW: int = 200            # Carr s.291
+BULLISH_BASE_SMA_DECLINE_LB: int = 40       # Carr s.291: 50 SMA 40g once
+BULLISH_BASE_RANGE_LONG: int = 30           # Carr s.291: 30g max range
+BULLISH_BASE_RANGE_MID: int = 15            # Carr s.291: 15g max range
+BULLISH_BASE_RANGE_SHORT: int = 5           # Carr s.291: 5g max range
+BULLISH_BASE_MOMENTUM_LB: int = 40          # Carr s.291: OBV/MACD 40g once
+BULLISH_BASE_MACD_FAST: int = 12            # Carr s.288 MACD (12,26,9)
+BULLISH_BASE_MACD_SLOW: int = 26
+BULLISH_BASE_MIN_BASE_DAYS: int = 30        # Carr s.287: en az 30 gun (6 hafta, eyeball)
+BULLISH_BASE_STOP_PCT: float = 6.0          # Carr s.325 "more like 6 percent" (base-ozel YOK)
+BULLISH_BASE_HARD_CAP_PCT: float = 8.0      # Carr s.325 "not ... more than an 8 percent loss"
+BULLISH_BASE_TARGET_R_MULTIPLE: float = 2.0  # Carr s.324 (Ch22 evrensel; base-ozel YOK)
+
+
+def compute_bullish_base_breakout(
+    opens: list[float],
+    highs: list[float],
+    lows: list[float],
+    closes: list[float],
+    volumes: list[float],
+) -> dict:
+    """Carr Bullish Base Breakout (2.baski s.291) — CONTRARIAN downtrend-sonu LONG ADAYI.
+
+    SINYAL (s.291, 7 kural + yesil tetik): (1) SMA50>SMA20 (downtrend), (2) SMA50 dusuyor,
+    (3-4) max range 30g>15g>5g (daralma), (5) OBV yukseliyor (40g), (6) MACD yukseliyor (40g),
+    (7) SMA50<SMA200, (8) bugun yesil. KRITIK: kirilim BEKLENMEZ (s.284) -> entry=CLOSE (s.289).
+    CIKIS Ch22 evrensel: stop %6 / %8 cap (s.325), target 2R (s.324). TIME STOP YOK. TIER-2
+    EYEBALL (s.287-288): base falling wedge/expanding triangle/rectangle, RISING WEDGE OLMAZ
+    -> quality='CANDIDATE'. Veri: SMA200 -> >=200 bar (pvh 80<200, bulk YOK).
+
+    Returns: {detected, direction, quality, signal_close, entry, stop, target, risk_pct, rr,
+              sma20, sma50, sma200, obv, macd, eyeball_checks, rules, mark_says}.
+    """
+    def _none(msg: str) -> dict:
+        return {
+            'detected': False, 'direction': None, 'quality': 'NONE',
+            'signal_close': None, 'entry': None, 'stop': None, 'target': None,
+            'risk_pct': None, 'rr': None, 'sma20': None, 'sma50': None, 'sma200': None,
+            'obv': None, 'macd': None, 'eyeball_checks': [], 'rules': {}, 'mark_says': msg,
+        }
+
+    if not closes or not volumes or not opens or not highs or not lows:
+        return _none('Yetersiz veri — Bullish Base hesaplanamiyor.')
+    n = len(closes)
+    if not (len(opens) == len(highs) == len(lows) == len(volumes) == n):
+        return _none('Bullish Base: OHLCV uzunluk farkli.')
+    if n < BULLISH_BASE_SMA_SLOW:
+        return _none(f'Yetersiz veri — en az {BULLISH_BASE_SMA_SLOW} bar gerek (SMA200).')
+
+    i = n - 1
+    sma20 = _sma_at(closes, i, BULLISH_BASE_SMA_FAST)
+    sma50 = _sma_at(closes, i, BULLISH_BASE_SMA_MID)
+    sma200 = _sma_at(closes, i, BULLISH_BASE_SMA_SLOW)
+    sma50_prev = _sma_at(closes, i - BULLISH_BASE_SMA_DECLINE_LB, BULLISH_BASE_SMA_MID)
+    obv = _obv_series(closes, volumes)
+    macd = _macd_line_series(closes, BULLISH_BASE_MACD_FAST, BULLISH_BASE_MACD_SLOW)
+    lb = BULLISH_BASE_MOMENTUM_LB
+    if None in (sma20, sma50, sma200, sma50_prev) or macd[i] is None or macd[i - lb] is None:
+        return _none('Bullish Base: gosterge hesaplanamadi (yetersiz veri).')
+
+    def _max_range(window: int) -> float:
+        return max(highs[j] - lows[j] for j in range(i - window + 1, i + 1))
+
+    r30 = _max_range(BULLISH_BASE_RANGE_LONG)
+    r15 = _max_range(BULLISH_BASE_RANGE_MID)
+    r5 = _max_range(BULLISH_BASE_RANGE_SHORT)
+    rules = {
+        'sma50_ust_sma20': sma50 > sma20,
+        'sma50_dusuyor': sma50 < sma50_prev,
+        'range_30_15': r30 > r15,
+        'range_15_5': r15 > r5,
+        'obv_yukseliyor': obv[i] > obv[i - lb],
+        'macd_yukseliyor': macd[i] > macd[i - lb],
+        'sma50_alti_sma200': sma50 < sma200,
+        'bugun_yesil': closes[i] >= opens[i],
+    }
+    base = {
+        'sma20': round(sma20, 2), 'sma50': round(sma50, 2), 'sma200': round(sma200, 2),
+        'obv': round(obv[i], 0), 'macd': round(macd[i], 3), 'rules': rules,
+    }
+    if not all(rules.values()):
+        d = _none(f'Bullish Base sinyali yok ({sum(rules.values())}/8 kosul).')
+        d.update(base)
+        return d
+
+    entry = closes[i]  # kirilim BEKLENMEZ — ilk yesil mum close'unda al (s.284,289)
+    stop = entry * (1 - BULLISH_BASE_STOP_PCT / 100)   # Ch22 %6 (base-ozel YOK)
+    risk = entry - stop
+    target = entry + BULLISH_BASE_TARGET_R_MULTIPLE * risk
+    risk_pct = round(risk / entry * 100, 2) if entry else None
+    eyeball_checks = [
+        'Base tipi: falling wedge / expanding triangle / coklu dip (rectangle) olmali',
+        'RISING WEDGE OLMAZ: destek+direnc ikisi birden yukari bakmamali (s.288)',
+        'Konsolidasyon en az 30 gun (6 hafta, s.287)',
+    ]
+    says = (f'~ Carr Bullish Base Breakout LONG ADAYI (CONTRARIAN, TIER-2 eyeball) — '
+            f'giris ${round(entry, 2)} (ilk yesil mum close, kirilim BEKLENMEZ s.284), '
+            f'stop ${round(stop, 2)} (%6 Ch22), hedef ${round(target, 2)} (2R). OBV+MACD '
+            f'yukseliyor + range daralma + downtrend baz. GOZ KARARI: base tipi (rising wedge DEGIL).')
+    d = {
+        'detected': True, 'direction': 'LONG', 'quality': 'CANDIDATE',
+        'signal_close': round(closes[i], 2), 'entry': round(entry, 2),
+        'stop': round(stop, 2), 'target': round(target, 2),
+        'risk_pct': risk_pct, 'rr': BULLISH_BASE_TARGET_R_MULTIPLE,
+        'eyeball_checks': eyeball_checks, 'mark_says': says,
+    }
+    d.update(base)
+    return d
+
+
+# ======================================================================
 # Paket 462 (11 Haz 2026) — High Tight Flag Detection (= Minervini Power Play)
 #
 # O'Neil "High Tight Flag" (HTF) = Mark Minervini "Power Play" (Trade Like a Stock
