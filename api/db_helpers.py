@@ -1171,6 +1171,15 @@ def screen_get_results_dispatch(slug: str, limit: int = 500) -> list[dict]:
         return screen_mean_reversion_get_results(slug, limit)
     if slug == "coiled_spring":
         return screen_coiled_spring_get_results(slug, limit)
+    if slug == "pocket_pivot":
+        # P534: Pocket Pivot bulk screen (Minervini s.167 + Kacher/Morales). Generic
+        # pvh-compute (70+ bar gerek; 280-bar pvh ile rahat). On-deck guc taramasi.
+        import sys as _sys
+        _root = str(Path(__file__).resolve().parent.parent)
+        if _root not in _sys.path:
+            _sys.path.insert(0, _root)
+        from quanfina_math import compute_pocket_pivot
+        return _screen_carr_pvh_compute(compute_pocket_pivot, 70, True, limit)
     _carr_specs = _carr_pvh_screen_specs()
     if slug in _carr_specs:
         fn, min_bar, needs_vol = _carr_specs[slug]

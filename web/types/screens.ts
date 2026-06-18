@@ -110,6 +110,9 @@ export const SCREEN_CATEGORIES: Record<string, string> = {
   // görünür — alarm değeri). Kolonlar DOLU (vcp_ready max 66<70 canon; bugün TENNIS_BALL yok).
   vcp_ready_high: "VCP Ready (70+)",         // KARAR #465 — Inside Day + V-Dry + Tight ≥70
   tennis_ball_active: "🎾 Tennis Ball",       // KARAR ADAY #893 — pullback+recovery (TLSMW s.253)
+  // P534 (18 Haz 2026) — Pocket Pivot bulk (Minervini.md s.167 + Kacher/Morales). Bazın
+  // içinde kurumsal güç dönüşü; on-deck/ekleme sinyali (s.165, 218). 70-bar compute-screen.
+  pocket_pivot: "Pocket Pivot (Minervini)",  // s.167: yukarı gün hacmi > son 10g en yüksek aşağı hacim
   // 18 Haz 2026 — Carr Mean Reversion bulk screen (P502). pvh-hesap, scanner/deploy yok.
   mean_reversion: "Mean Reversion (Carr)",   // Carr 2.baskı s.356 countertrend LONG — çekirdek setup
   // 18 Haz 2026 — Carr Coiled Spring bulk screen (P511). pvh 80≥60 → bulk mümkün.
@@ -144,7 +147,8 @@ export const SCREEN_GROUPS: ScreenGroup[] = [
   {
     label: "Minervini — Lider & Momentum",
     slugs: ["top5_rpr", "power_play_ready", "tight_low_vol_excellent", "new_top5_rpr",
-            "healthy_accumulation", "rpr_89_tpr_c", "vcp_ready_high", "tennis_ball_active"],
+            "healthy_accumulation", "rpr_89_tpr_c", "vcp_ready_high", "tennis_ball_active",
+            "pocket_pivot"],
   },
   {
     label: "Carr — LONG / Countertrend",
@@ -311,6 +315,11 @@ export const SCREEN_CONDITIONS: Record<string, ScreenCondition[]> = {
   rising_wedge: [
     { source: "carr", text: "yükselen kama kırılımı SHORT (Carr 2.baskı Böl.19): SMA50 40g yükseliyor (uptrend) + range daralma (30>15>5, kama) + MACD 40g DÜŞÜYOR + OBV 40g DÜŞÜYOR (bearish divergence) + kırmızı mum" },
     { source: "carr", text: "TIER-2 EYEBALL: kama trendline (≥3 dokunuş) + OBV trendline aşağı kırılımı → ilk kırmızı mum (entry). MACD lower-highs / fiyat higher-highs divergence. Stop %6 ÜSTTE / 2R AŞAĞI. Bullish/Range" },
+  ],
+  // P534 (18 Haz 2026) — Pocket Pivot (Minervini.md s.167 + Kacher/Morales) compute-screen
+  pocket_pivot: [
+    { source: "mark", text: "Bazın içinde kurumsal güç (Minervini.md s.167): bugün YUKARI gün + hacmi son 10 günün en yüksek AŞAĞI-gün hacminden büyük" },
+    { source: "mark", text: "Stage 2 ön-şart (s.186): close > 50-DMA + 50-DMA yükselen. 10-DMA dönüşü → GOOD, extended → CANDIDATE (Kacher/Morales). Birincil AL DEĞİL — on-deck/ekleme sinyali (s.165, 218)" },
   ],
 
   // 24 May 2026 — Tam Minervini Tarama (Hibrit Pipeline: 10 Hard + 5 Soft)

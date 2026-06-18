@@ -73,6 +73,14 @@ class TestScreenResults:
         assert r.status_code == 404
         assert "bulunamadi" in r.json()["detail"].lower()
 
+    def test_pocket_pivot_slug_valid_200(self, client):
+        """P534: Pocket Pivot bulk screen slug gecerli (404 DEGIL) + JSON-safe liste."""
+        r = client.get("/api/screens/pocket_pivot?limit=5")
+        assert r.status_code == 200, f"pocket_pivot -> {r.status_code}: {r.text[:200]}"
+        data = r.json()
+        assert isinstance(data, list)
+        json.dumps(data, allow_nan=False)  # NaN/inf yok
+
 
 class TestScreenResilience:
     """Paket 381 — Transient DB hatasi (OperationalError) graceful MOCK fallback.
