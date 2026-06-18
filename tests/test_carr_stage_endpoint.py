@@ -55,13 +55,29 @@ class TestCarrStageEndpoint:
         data = _get(client, "NVDA").json()
         assert data["ma_window"] == 150
 
-    def test_different_symbols_different_seed(self, client):
-        """Farklı ticker → farklı deterministik MOCK → farklı stage olabilir."""
+    def test_different_symbols(self, client):
+        """Farklı ticker → kendi gerçek OHLCV'si (P499: artık yfinance, MOCK değil)."""
         nvda = _get(client, "NVDA").json()
         tsla = _get(client, "TSLA").json()
-        # Symbol farklı response symbol field farklı dönmeli
         assert nvda["symbol"] == "NVDA"
         assert tsla["symbol"] == "TSLA"
+
+    def test_is_mock_false_when_real_bars(self, client, monkeypatch):
+        """P499 (Kural #28): gerçek 150+ bar varsa is_mock=False (eskiden hep True idi)."""
+        import main as m
+        fake = [m.OhlcvBar(time=f"2025-{(i//28)%12+1:02d}-{(i%28)+1:02d}",
+                           open=100.0, high=102.0, low=99.0, close=100.0 + i * 0.1,
+                           volume=1_000_000) for i in range(200)]
+        monkeypatch.setattr(m, "_fetch_ohlcv_real", lambda s, n=252: fake)
+        data = _get(client, "TESTX").json()
+        assert data["is_mock"] is False
+
+    def test_is_mock_true_when_no_real_bars(self, client, monkeypatch):
+        """P499: gerçek yfinance erişilemezse is_mock=True (sentetik fallback, UI banner)."""
+        import main as m
+        monkeypatch.setattr(m, "_fetch_ohlcv_real", lambda s, n=252: None)
+        data = _get(client, "TESTY").json()
+        assert data["is_mock"] is True
 
     def test_stage_in_valid_range(self, client):
         """Stage 1, 2, 3, 4 veya null."""
@@ -121,7 +137,7 @@ class TestCarrStageMetrics:
             assert data["ma_value"] > 0
 
     def test_price_vs_ma_pct_within_reason(self, client):
-        """MOCK history hafif drift — sapma -%50 ile +%50 arası beklenir."""
+        """Gerçek yfinance — sapma -%50 ile +%100 arası mantıklı (güçlü lider MA çok üstünde)."""
         data = _get(client, "NVDA").json()
         if data["price_vs_ma_pct"] is not None:
             assert -50 < data["price_vs_ma_pct"] < 100

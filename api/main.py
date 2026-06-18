@@ -4150,17 +4150,35 @@ class CarrStageResponse(BaseModel):
 
 @app.get("/api/carr/stage/{symbol}", response_model=CarrStageResponse)
 def get_carr_stage(symbol: str) -> CarrStageResponse:
-    """KARAR #733 — Tek hisse Carr Stage Analizi detay.
+    """KARAR #733 — Tek hisse Carr Stage Analizi (Stan Weinstein 4-Stage) detay.
 
-    Sn. Ferit hisse ticker'i verir, 180 gun MOCK SPY-tipi history uretilir
-    + compute_carr_stage cagrisi + Stan Weinstein 4-Stage detay yanit.
-
-    Production'da yfinance/SQL real veri (ACIK KONU #75 yfinance pipeline).
+    P499 (Kural #28): _mock_index_history (ticker-hash deterministik SAHTE veri) yerine
+    GERCEK yfinance OHLCV — kardes /api/stock/{symbol}/stage (StageTransition) ile AYNI
+    _get_ohlcv pattern (gercek + sentetik fallback). Eskiden bu endpoint tek basina hep
+    is_mock=True donuyordu (atlanmis); yfinance pipeline (eski ACIK KONU #75) diger /hisse
+    kartlarinda zaten cozulmus. is_mock = gercek >=150 bar yoksa True (UI banner dogru).
     """
     sym = symbol.upper()
-    # MOCK SPY pattern (ticker hash seed deterministik)
-    start_price = 100.0 + (sum(ord(c) for c in sym) % 400)
-    closes, volumes = _mock_index_history(sym, start_price, days=180)
+    stock = _STOCK_BY_SYM.get(sym)
+    if stock:
+        price = stock.price
+    else:
+        try:
+            wl = [r for r in watchlist_get_all() if r["symbol"] == sym]
+        except OperationalError:
+            wl = []
+        if wl:
+            price = float(wl[0]["price"])
+        else:
+            scan_data = _fetch_scan_symbol_data(sym)
+            price = scan_data["price"] if scan_data else 100.0
+
+    bars = _get_ohlcv(sym, price)
+    closes = [b.close for b in bars]
+    volumes = [b.volume for b in bars]
+    # compute_carr_stage MA_WINDOW=150 (30 hafta) -> gercek 150+ bar yoksa guvenilmez = MOCK
+    _real = _fetch_ohlcv_real(sym, 252)
+    is_mock = not (_real and len(_real) >= 150)
     result = compute_carr_stage(closes, volumes, ma_window=150)
     return CarrStageResponse(
         symbol=sym,
@@ -4171,7 +4189,7 @@ def get_carr_stage(symbol: str) -> CarrStageResponse:
         slope_pct_per_year=result.get("slope_pct_per_year"),
         mark_says=result.get("mark_says", ""),
         ma_window=150,
-        is_mock=True,  # P413: _mock_index_history deterministik (ACIK KONU #75 cozulunce False)
+        is_mock=is_mock,
     )
 
 
