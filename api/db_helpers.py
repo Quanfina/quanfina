@@ -1059,6 +1059,7 @@ def _carr_pvh_screen_specs() -> dict:
         compute_carr_pullback, compute_blue_sky_breakout,
         compute_bullish_base_breakout, compute_bullish_divergence,
         compute_blue_sea_breakdown, compute_gap_down,
+        compute_rising_wedge_breakdown,
     )
     return {
         "pullback": (compute_carr_pullback, 200, False),           # SMA200
@@ -1067,6 +1068,7 @@ def _carr_pvh_screen_specs() -> dict:
         "bullish_divergence": (compute_bullish_divergence, 201, True),  # SMA200 + dun
         "blue_sea": (compute_blue_sea_breakdown, 261, True),       # 260g 52-hafta (SHORT)
         "gap_down": (compute_gap_down, 111, False),               # SMA50 60g (SHORT, gosterge yok)
+        "rising_wedge": (compute_rising_wedge_breakdown, 90, True),  # SMA50 40g (SHORT, OBV/MACD)
     }
 
 

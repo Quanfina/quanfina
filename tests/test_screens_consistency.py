@@ -742,3 +742,32 @@ class TestGapDownScreen:
         assert n >= 1, f"gap_down koşulu yok (n={n})."
         m = re.search(r'\bgap_down:\s*\[(.*?)\]\s*,', ts, re.DOTALL)
         assert m and 'source: "carr"' in m.group(1), "gap_down 'carr' source kullanmali."
+
+
+class TestRisingWedgeScreen:
+    """P522 — Carr Rising Wedge Breakdown SHORT bulk (kama kirilimi, 90 bar, SON Carr setup)."""
+
+    @pytest.fixture(scope="class")
+    def ts(self) -> str:
+        return _read("web/types/screens.ts")
+
+    @pytest.fixture(scope="class")
+    def db_helpers(self) -> str:
+        return _read("api/db_helpers.py")
+
+    @pytest.fixture(scope="class")
+    def main(self) -> str:
+        return _read("api/main.py")
+
+    def test_spec_and_valid_slug(self, db_helpers, main):
+        assert '"rising_wedge": (compute_rising_wedge_breakdown, 90, True)' in db_helpers, "rising_wedge spec yok."
+        assert '"rising_wedge"' in main, "main valid_slugs'te rising_wedge yok."
+
+    def test_ui_category_short_label(self, ts):
+        assert re.search(r'rising_wedge:\s*"[^"]*SHORT[^"]*"', ts), "rising_wedge SHORT etiketi yok."
+
+    def test_ui_carr_conditions(self, ts):
+        n = _extract_screen_conditions_count(ts, "rising_wedge")
+        assert n >= 1, f"rising_wedge koşulu yok (n={n})."
+        m = re.search(r'\brising_wedge:\s*\[(.*?)\]\s*,', ts, re.DOTALL)
+        assert m and 'source: "carr"' in m.group(1), "rising_wedge 'carr' source kullanmali."

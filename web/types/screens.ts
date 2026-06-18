@@ -123,6 +123,8 @@ export const SCREEN_CATEGORIES: Record<string, string> = {
   blue_sea: "Blue Sea Breakdown (Carr SHORT)",  // Carr s.289 strong-bear breakdown SHORT
   // 18 Haz 2026 — Carr SHORT katalog (P520). Ralli-sonu reversal.
   gap_down: "Gap Down (Carr SHORT)",            // Carr s.273 ralli-sonu reversal SHORT
+  // 18 Haz 2026 — Carr SHORT katalog SON (P522). Yükselen kama kırılımı.
+  rising_wedge: "Rising Wedge (Carr SHORT)",    // Carr Böl.19 kama kırılımı SHORT (TIER-2)
 };
 
 // SCREEN_DESCRIPTIONS kaldirildi (22 May 2026) — Sn. Ferit "bunu sil" talimati.
@@ -274,6 +276,11 @@ export const SCREEN_CONDITIONS: Record<string, ScreenCondition[]> = {
   gap_down: [
     { source: "carr", text: "ralli-sonu reversal SHORT (Carr 2.baskı s.273): high[bugün]<low[dün]×0.99 (unfilled gap ≥%1, s.270) + kırmızı mum + 50MA 20/40/60g yükseliyor + fiyat dün/20g/40g önce 50MA üstü. GÖSTERGE YOK (s.275 pure price)" },
     { source: "carr", text: "ENTRY gap günü close (market emri, s.270 — signal low BEKLEMEZ). HABER TEYİDİ şart (s.272: gap şirkete özel kötü haberden mi?). Stop %6 ÜSTTE / 2R AŞAĞI (s.305,324). Bullish/Range piyasa (s.266)" },
+  ],
+  // 18 Haz 2026 — Carr Rising Wedge Breakdown SHORT (Böl.19); pvh-hesap bulk (son Carr setup)
+  rising_wedge: [
+    { source: "carr", text: "yükselen kama kırılımı SHORT (Carr 2.baskı Böl.19): SMA50 40g yükseliyor (uptrend) + range daralma (30>15>5, kama) + MACD 40g DÜŞÜYOR + OBV 40g DÜŞÜYOR (bearish divergence) + kırmızı mum" },
+    { source: "carr", text: "TIER-2 EYEBALL: kama trendline (≥3 dokunuş) + OBV trendline aşağı kırılımı → ilk kırmızı mum (entry). MACD lower-highs / fiyat higher-highs divergence. Stop %6 ÜSTTE / 2R AŞAĞI. Bullish/Range" },
   ],
 
   // 24 May 2026 — Tam Minervini Tarama (Hibrit Pipeline: 10 Hard + 5 Soft)

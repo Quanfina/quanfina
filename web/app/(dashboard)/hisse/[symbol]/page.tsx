@@ -19,6 +19,7 @@ import { BullishBaseCard } from "@/components/stock/BullishBaseCard";
 import { BullishDivergenceCard } from "@/components/stock/BullishDivergenceCard";
 import { BlueSeaCard } from "@/components/stock/BlueSeaCard";
 import { GapDownCard } from "@/components/stock/GapDownCard";
+import { RisingWedgeCard } from "@/components/stock/RisingWedgeCard";
 import { PivotBreakoutCard } from "@/components/stock/PivotBreakoutCard";
 import { OverheadSupplyCard } from "@/components/stock/OverheadSupplyCard";
 import { ClimaxRunCard } from "@/components/stock/ClimaxRunCard";
@@ -345,6 +346,8 @@ export default function HissePage({
           <BlueSeaCard symbol={sym} />
           {/* Paket 520 (18 Haz 2026): Carr Gap Down — ralli-sonu reversal SHORT (s.273) */}
           <GapDownCard symbol={sym} />
+          {/* Paket 522 (18 Haz 2026): Carr Rising Wedge Breakdown — kama kırılımı SHORT (Böl.19) */}
+          <RisingWedgeCard symbol={sym} />
           {/* KARAR #733 alt-paket (Paket 72): Pivot Breakout Card */}
           <PivotBreakoutCard symbol={sym} />
           {/* KARAR #733 alt-paket (Paket 78): Overhead Supply Card */}

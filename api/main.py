@@ -77,6 +77,7 @@ from quanfina_math import (  # noqa: E402
     compute_bullish_divergence,
     compute_blue_sea_breakdown,
     compute_gap_down,
+    compute_rising_wedge_breakdown,
     compute_high_tight_flag,
     compute_stage_transition,
     compute_faber_timing,
@@ -454,7 +455,8 @@ def get_screen_results(slug: str, limit: int = 500, nocache: bool = False) -> li
         # P516: pvh 280 bar -> 200-261 bar Carr setup'lari bulk (sonraki scan'de dolar)
         {"pullback", "blue_sky", "bullish_base", "bullish_divergence"} |
         {"blue_sea"} |                 # P518: Carr SHORT bulk (Blue Sky aynasi, 261 bar)
-        {"gap_down"}                   # P520: Carr SHORT bulk (ralli-sonu reversal, 110 bar)
+        {"gap_down"} |                 # P520: Carr SHORT bulk (ralli-sonu reversal, 110 bar)
+        {"rising_wedge"}               # P522: Carr SHORT bulk (kama kirilimi, 90 bar) — son setup
     )
     if slug not in valid_slugs:
         from fastapi import HTTPException
@@ -3745,6 +3747,77 @@ def get_gap_down(symbol: str) -> GapDownInfo:
         rr=r.get("rr"),
         sma50=r.get("sma50"),
         gap_pct=r.get("gap_pct"),
+        eyeball_checks=r.get("eyeball_checks", []),
+        mark_says=r.get("mark_says", ""),
+        is_mock=is_mock,
+    )
+
+
+# P522 (18 Haz 2026): Carr Rising Wedge Breakdown endpoint (Bol.19) — son Carr setup
+# uptrend-sonu kama kirilimi SHORT. compute_rising_wedge_breakdown wire. MACD+OBV bearish
+# divergence. 90g (SMA50 40g) -> n_bars=252.
+class RisingWedgeInfo(BaseModel):
+    detected: bool = False
+    direction: Optional[Literal["SHORT"]] = None
+    quality: Optional[str] = None
+    signal_close: Optional[float] = None
+    entry: Optional[float] = None       # OBV kirilimi sonrasi kirmizi mum close (s.Bol19)
+    stop: Optional[float] = None        # %6 USTTE / %8 cap
+    target: Optional[float] = None      # 2R ASAGI
+    risk_pct: Optional[float] = None
+    rr: Optional[float] = None
+    sma50: Optional[float] = None
+    obv: Optional[float] = None
+    macd: Optional[float] = None
+    eyeball_checks: list[str] = []
+    mark_says: str
+    is_mock: bool = False
+
+
+@app.get("/api/stock/{symbol}/rising-wedge", response_model=RisingWedgeInfo)
+def get_rising_wedge(symbol: str) -> RisingWedgeInfo:
+    """Carr Rising Wedge Breakdown (2.baski Bol.19) — uptrend-sonu kama kirilimi SHORT ADAYI.
+
+    SMA50 uptrend + range daralma (kama) + MACD/OBV bearish divergence (40g dusuyor) + kirmizi.
+    ENTRY: OBV trendline kirilimi -> ilk kirmizi mum (eyeball) -> entry=close. CIKIS Ch22: %6 stop
+    ustte / 2R asagi. TIER-2 eyeball (kama + OBV trendline) -> quality='CANDIDATE'. Rejim
+    Bullish+Range. 90g -> is_mock = 90+ bar yoksa True.
+    """
+    sym = symbol.upper()
+    stock = _STOCK_BY_SYM.get(sym)
+    if stock:
+        price = stock.price
+    else:
+        try:
+            wl = [r for r in watchlist_get_all() if r["symbol"] == sym]
+        except OperationalError:
+            wl = []
+        if wl:
+            price = float(wl[0]["price"])
+        else:
+            scan_data = _fetch_scan_symbol_data(sym)
+            price = scan_data["price"] if scan_data else 100.0
+
+    bars = _get_ohlcv(sym, price)
+    r = compute_rising_wedge_breakdown(
+        [b.open for b in bars], [b.high for b in bars], [b.low for b in bars],
+        [b.close for b in bars], [float(b.volume) for b in bars],
+    )
+    _real = _fetch_ohlcv_real(sym, 252)
+    is_mock = not (_real and len(_real) >= 90)
+    return RisingWedgeInfo(
+        detected=r.get("detected", False),
+        direction=r.get("direction"),
+        quality=r.get("quality"),
+        signal_close=r.get("signal_close"),
+        entry=r.get("entry"),
+        stop=r.get("stop"),
+        target=r.get("target"),
+        risk_pct=r.get("risk_pct"),
+        rr=r.get("rr"),
+        sma50=r.get("sma50"),
+        obv=r.get("obv"),
+        macd=r.get("macd"),
         eyeball_checks=r.get("eyeball_checks", []),
         mark_says=r.get("mark_says", ""),
         is_mock=is_mock,
