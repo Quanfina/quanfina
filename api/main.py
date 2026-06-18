@@ -1867,6 +1867,17 @@ def _enrich_with_mark_signals(row: WatchlistRow) -> WatchlistRow:
                 updates["relative_volume"] = float(rv["rel_vol"])
     except Exception:
         pass
+    # P494 (Kural #28): "price" stale web_watchlist snapshot (eklendigi tarihteki fiyat)
+    # idi -> NVDA $875.40 / AAPL $182.30 yaniltici (canli ~$204 / ~$296). /signals P493 ile
+    # ayni fix: gercek (MOCK-olmayan) bars varsa canli son kapanis. Frontend zaten /quote ile
+    # eziyordu; ham API kontrati da tutarli olsun. _fetch_ohlcv_real cache'li (enrich zaten
+    # warmladi) -> ek fetch maliyeti yok.
+    try:
+        _real = _fetch_ohlcv_real(row.symbol)
+        if _real and len(_real):
+            updates["price"] = round(_real[-1].close, 2)
+    except Exception:
+        pass
     if updates:
         return row.model_copy(update=updates)
     return row

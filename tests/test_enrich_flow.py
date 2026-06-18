@@ -151,6 +151,42 @@ class TestEnrichWatchlistBatch:
         assert [r.symbol for r in result] == ["AAA", "BBB", "CCC"]
 
 
+class TestEnrichLivePriceOverride:
+    """P494 (Kural #28): stale web_watchlist.price -> canli son kapanis override.
+
+    Watchlist "price" eklendigi tarihteki snapshot'ti (NVDA $875.40 / AAPL $182.30
+    yaniltici, canli ~$204/~$296). Fix: gercek bars varsa price = bars[-1].close
+    (/signals P493 ile ayni). Enrich zaten OHLCV cekiyor -> ek fetch yok.
+    """
+
+    def test_stale_price_overridden_with_live_close(self):
+        bars = _make_long_bars(n=252, start=100.0, trend=0.001)
+        live_close = round(bars[-1].close, 2)
+        api_main._OHLCV_CACHE["TESTSYM"] = (time.time(), bars)
+        row = WatchlistRow(
+            symbol="TESTSYM", strategy="minervini", status="watch",
+            price=999.0,  # STALE snapshot
+            added_date="2026-05-01", setup_type=None, pivot_price=None, note=None,
+            rs_rating=80, consensus_count=1, consensus_strategies=["minervini"],
+        )
+        result = api_main._enrich_with_mark_signals(row)
+        assert result.price == live_close, (
+            f"price={result.price} canli son kapanis {live_close} ile eslesmiyor "
+            f"(stale 999 kalmis = P494 regresyon?)"
+        )
+        assert result.price != 999.0
+
+    def test_no_bars_keeps_original_price(self):
+        """Gercek bars yok (cache bos) -> _fetch_ohlcv_real None -> price degismez."""
+        row = WatchlistRow(
+            symbol="NOBARSXYZ", strategy="minervini", status="watch",
+            price=123.45, added_date="2026-05-01", setup_type=None, pivot_price=None,
+            note=None, rs_rating=80, consensus_count=1, consensus_strategies=["minervini"],
+        )
+        result = api_main._enrich_with_mark_signals(row)
+        assert result.price == 123.45
+
+
 # =====================================================================
 # _enrich_trade_batch flow
 # =====================================================================
