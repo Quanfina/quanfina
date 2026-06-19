@@ -187,6 +187,67 @@ class TestEnrichLivePriceOverride:
         assert result.price == 123.45
 
 
+class TestEnrichPocketPivot:
+    """P537: Pocket Pivot on-deck sinyali watchlist enrichment (Minervini s.167).
+
+    Kural #28: sadece gercek 70+ bar -> detected GOOD/CANDIDATE set; yoksa None.
+    Network-free (clear_caches fixture _fetch_ohlcv_real'i seed cache'e baglar).
+    """
+
+    def _pp_bars(self, good: bool = True):
+        # 60-bar uptrend (Stage 2) + 10-bar kuyruk (asagi gunler + bugun guclu yukari)
+        closes = [100 + i * 0.4 for i in range(60)]
+        base = closes[-1]
+        tail = [base + 0.3, base - 0.2, base - 0.5, base + 0.1, base - 0.3,
+                base + 0.2, base - 0.4, base + 0.5, base - 0.1, base + 1.5]
+        closes = closes + tail
+        tail_vol = [900_000, 700_000, 650_000, 900_000, 700_000,
+                    900_000, 680_000, 900_000, 720_000, 2_000_000]
+        volumes = [1_000_000] * 60 + tail_vol
+        lows = [c - 0.6 for c in closes]
+        sma10 = sum(closes[-10:]) / 10
+        lows[-1] = (sma10 - 0.5) if good else (sma10 + 0.3)  # GOOD: 10-DMA temas
+        bars = []
+        for i, c in enumerate(closes):
+            bars.append(OhlcvBar(
+                time=f"2025-{((i // 30) % 12) + 1:02d}-{(i % 28) + 1:02d}",
+                open=c, high=c + 0.3, low=lows[i], close=c, volume=volumes[i],
+            ))
+        return bars
+
+    def _row(self, sym):
+        return WatchlistRow(
+            symbol=sym, strategy="minervini", status="watch", price=100.0,
+            added_date="2026-05-01", setup_type=None, pivot_price=None, note=None,
+            rs_rating=80, consensus_count=1, consensus_strategies=["minervini"],
+        )
+
+    def test_detected_good_sets_pocket_pivot(self):
+        api_main._OHLCV_CACHE["PPGOOD"] = (time.time(), self._pp_bars(good=True))
+        result = api_main._enrich_with_mark_signals(self._row("PPGOOD"))
+        assert result.pocket_pivot == "GOOD"
+
+    def test_extended_sets_candidate(self):
+        api_main._OHLCV_CACHE["PPCAND"] = (time.time(), self._pp_bars(good=False))
+        result = api_main._enrich_with_mark_signals(self._row("PPCAND"))
+        assert result.pocket_pivot == "CANDIDATE"
+
+    def test_not_detected_none(self):
+        # Bugun ASAGI gun -> hacim imzasi yok -> pocket_pivot None
+        bars = self._pp_bars(good=True)
+        bars[-1] = OhlcvBar(time=bars[-1].time, open=bars[-1].open, high=bars[-1].high,
+                            low=bars[-1].low, close=bars[-2].close - 1.0, volume=bars[-1].volume)
+        api_main._OHLCV_CACHE["PPNONE"] = (time.time(), bars)
+        result = api_main._enrich_with_mark_signals(self._row("PPNONE"))
+        assert result.pocket_pivot is None
+
+    def test_insufficient_bars_none_kural28(self):
+        # <70 gercek bar -> pocket pivot atlanir (Kural #28 sentetik/yetersiz gosterme)
+        api_main._OHLCV_CACHE["PPSHORT"] = (time.time(), self._pp_bars(good=True)[-50:])
+        result = api_main._enrich_with_mark_signals(self._row("PPSHORT"))
+        assert result.pocket_pivot is None
+
+
 # =====================================================================
 # _enrich_trade_batch flow
 # =====================================================================

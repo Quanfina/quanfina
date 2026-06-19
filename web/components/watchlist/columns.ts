@@ -191,6 +191,27 @@ export const COL_DEFS: ColDef<WatchlistRow>[] = [
     filter: false,
     cellRenderer: PivotBadgeCell,
   },
+  // P537 (19 Haz 2026): Pocket Pivot on-deck sinyali (Minervini s.167 + Kacher/Morales).
+  // Bazın içinde kurumsal güç dönüşü — Minervini "on-deck kanıtı" (s.165, 218). Sadece
+  // detected GOOD/CANDIDATE → rozet; yoksa "—". Detay /hisse PocketPivotCard.
+  {
+    headerName: "POCKET",
+    field: "pocket_pivot",
+    width: 95,
+    minWidth: 80,
+    sortable: false,
+    filter: false,
+    valueFormatter: (p: ValueFormatterParams<WatchlistRow, string>) =>
+      p.value === "GOOD" ? "🟢 PP" : p.value === "CANDIDATE" ? "🟡 PP" : "—",
+    cellStyle: (p: CellClassParams<WatchlistRow, string>) => {
+      const v = p.value;
+      let color = "var(--muted-foreground)";
+      if (v === "GOOD") color = "var(--mtp-excellent)";
+      else if (v === "CANDIDATE") color = "var(--mtp-warning, #d97706)";
+      return { ...MONO, color, fontWeight: v ? 600 : 400 };
+    },
+    headerTooltip: "Pocket Pivot (Minervini s.167 + Kacher/Morales): bazın içinde kurumsal güç dönüşü, on-deck sinyali. 🟢 GOOD (10-DMA dönüşü) / 🟡 CANDIDATE (extended). Detay: hisse sayfası.",
+  },
   {
     field: "note",
     headerName: "NOT",

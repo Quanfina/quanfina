@@ -32,6 +32,10 @@ export interface WatchlistRow {
   // Bugün / 50-gün ortalama oranı. UI rozet: ≥1.5 yeşil "patlama" / 1.0-1.5
   // nötr / <0.7 kırmızı "sönük". Backend yfinance + compute_relative_volume.
   relative_volume?: number | null;
+  // P537 (19 Haz 2026): Pocket Pivot on-deck sinyali (Minervini.md s.167 + Kacher/Morales).
+  // Bazın içinde kurumsal güç dönüşü — Minervini "on-deck kanıtı" (s.165, 218). Sadece
+  // detected GOOD/CANDIDATE set edilir (yoksa null → rozet yok). Kural #28: gerçek 70+ bar.
+  pocket_pivot?: "GOOD" | "CANDIDATE" | null;
 }
 
 export interface WatchlistRowCreate {

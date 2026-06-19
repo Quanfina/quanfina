@@ -1881,6 +1881,11 @@ class WatchlistRow(BaseModel):
     # hesabı, yfinance live volumes (5dk cache). UI rozet eşikleri:
     # ≥1.5 yeşil "patlama" / 1.0-1.5 nötr / <0.7 kırmızı "sönük".
     relative_volume: Optional[float] = None
+    # P537 (19 Haz 2026): Pocket Pivot on-deck sinyali (Minervini.md s.167 + Kacher/Morales).
+    # Bazın içinde kurumsal güç dönüşü — Minervini "on-deck kanıtı" olarak izler (s.165, 218).
+    # Watchlist = izlenen aday yeri → pocket pivot tam buraya ait. Sadece detected GOOD/CANDIDATE
+    # set edilir (yoksa None → rozet yok). Kural #28: yalnızca gerçek 70+ bar (mock'ta gösterilmez).
+    pocket_pivot: Optional[Literal["GOOD", "CANDIDATE"]] = None
 
 
 def _compute_live_mark_signals(symbol: str, price: float) -> dict:
@@ -1999,6 +2004,15 @@ def _enrich_with_mark_signals(row: WatchlistRow) -> WatchlistRow:
         _real = _fetch_ohlcv_real(row.symbol)
         if _real and len(_real):
             updates["price"] = round(_real[-1].close, 2)
+            # P537: Pocket Pivot on-deck sinyali (Minervini s.167). Ayni _real (cache) reuse —
+            # ek fetch yok. Kural #28: sadece gercek 70+ bar (sentetik watchlist sinyali YOK).
+            if len(_real) >= 70:
+                pp = compute_pocket_pivot(
+                    [b.open for b in _real], [b.high for b in _real], [b.low for b in _real],
+                    [b.close for b in _real], [float(b.volume) for b in _real],
+                )
+                if pp.get("detected") and pp.get("quality") in ("GOOD", "CANDIDATE"):
+                    updates["pocket_pivot"] = pp["quality"]
     except Exception:
         pass
     if updates:
