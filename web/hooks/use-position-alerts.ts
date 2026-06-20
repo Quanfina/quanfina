@@ -21,6 +21,10 @@ import type { StockQuote } from "@/hooks/use-stock-quote";
  * 5. FREE_TRADE (warning/info) — kar başlangıç stop mesafesinin 2x/3x'ine ulaştı →
  *    stop'u breakeven'e taşı, risksiz pozisyon (Mark TTLC Böl.2; P555 —
  *    quanfina_math.should_move_to_breakeven eşikleri birebir, Kural #26). Yön-farkında.
+ * 6. SELL_HALF (warning/info) — kar +%20'ye (≥%30 geç kaldı) ulaştı → yarı sat,
+ *    "kazan-kazan" moduna gir (Mark TLSMW Böl.13; P557 — quanfina_math.should_sell_half
+ *    statik eşiği birebir, Kural #26). Yön-farkında. (RBA-dinamik eşik kullanıcı
+ *    geçmişi gerektirir — canlı alert'te statik %20 canon kullanılır.)
  *
  * Dedup: localStorage "position-alerts-dismissed" + Set<alertId>.
  * Alert ID = `${tradeId}-${type}-${YYYY-MM-DD}` (günlük yeniden bildir).
@@ -32,7 +36,8 @@ export type AlertType =
   | "stop_near"
   | "minervini_7pct"
   | "target_near"
-  | "free_trade";
+  | "free_trade"
+  | "sell_half";
 
 export interface PositionAlert {
   id: string;
@@ -264,6 +269,37 @@ export function usePositionAlerts(
               });
             }
           }
+        }
+      }
+
+      // 6. SELL_HALF — kar +%20 (>=%30 gec kaldi) -> yari sat, kazan-kazan moduna gir.
+      //    Mark TLSMW Bol 13. Esik quanfina_math.should_sell_half STATIK dal birebir
+      //    (gain>=20 INFO / >=30=20*1.5 WARNING gec; Kural #26). RBA-dinamik esik kullanici
+      //    gecmisi gerektirir -> canli alert'te statik %20 canon. Yon-farkinda.
+      {
+        const isLongSh = t.invest_type !== 2;
+        const gainPctSh = isLongSh
+          ? (price / t.entry_price - 1) * 100
+          : (1 - price / t.entry_price) * 100;
+        if (gainPctSh >= 20) {
+          const late = gainPctSh >= 30; // 20 * 1.5 (should_sell_half "gec kaldi" dali)
+          result.push({
+            id: `${t.id}-sell_half-${today}`,
+            tradeId: t.id,
+            symbol: t.symbol,
+            severity: late ? "warning" : "info",
+            type: "sell_half",
+            title: late
+              ? `🟢 ${t.symbol} — YARI SAT (gecikti)`
+              : `🟢 ${t.symbol} — YARI SAT ZAMANI`,
+            message: late
+              ? `Kar %${gainPctSh.toFixed(1)} — Sell Half büyük ölçüde gecikti (eşik %20). ` +
+                `Mark TLSMW Böl.13: yarı sat, kalanı bedavaya sür.`
+              : `Kar %${gainPctSh.toFixed(1)} — Sell Half zamanı (eşik %20). ` +
+                `Mark TLSMW Böl.13: yarı sat, "kazan-kazan" moduna gir.`,
+            current_price: price,
+            ref_price: t.entry_price,
+          });
         }
       }
     });

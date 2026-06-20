@@ -261,6 +261,50 @@ describe("usePositionAlerts — alert hesabı (saf useMemo)", () => {
       expect(ft?.ref_price).toBe(100);
     });
   });
+
+  describe("SELL_HALF (P557) — Mark TLSMW Böl.13, statik eşik %20 (≥%30 geç)", () => {
+    it("LONG price=125 (gain=25%) → SELL_HALF info (yarı sat zamanı)", () => {
+      const trades = [makeTrade({ entry_price: 100, plan_stop: 93, plan_target: 300 })];
+      const { result } = renderHook(() =>
+        usePositionAlerts(trades, [makeQuote("AAPL", 125)])
+      );
+      const sh = result.current.find((a) => a.type === "sell_half");
+      expect(sh).toBeDefined();
+      expect(sh?.severity).toBe("info");
+      expect(sh?.title).toContain("YARI SAT ZAMANI");
+    });
+
+    it("LONG price=135 (gain=35% ≥30) → SELL_HALF warning (gecikti)", () => {
+      const trades = [makeTrade({ entry_price: 100, plan_stop: 93, plan_target: 300 })];
+      const { result } = renderHook(() =>
+        usePositionAlerts(trades, [makeQuote("AAPL", 135)])
+      );
+      const sh = result.current.find((a) => a.type === "sell_half");
+      expect(sh).toBeDefined();
+      expect(sh?.severity).toBe("warning");
+      expect(sh?.title).toContain("gecikti");
+    });
+
+    it("LONG price=115 (gain=15% <20) → SELL_HALF YOK", () => {
+      const trades = [makeTrade({ entry_price: 100, plan_stop: 93, plan_target: 300 })];
+      const { result } = renderHook(() =>
+        usePositionAlerts(trades, [makeQuote("AAPL", 115)])
+      );
+      expect(result.current.some((a) => a.type === "sell_half")).toBe(false);
+    });
+
+    it("SHORT (invest_type=2) entry=100 price=75 (gain=25%) → SELL_HALF info", () => {
+      const trades = [
+        makeTrade({ invest_type: 2, entry_price: 100, plan_stop: 107, plan_target: 40 }),
+      ];
+      const { result } = renderHook(() =>
+        usePositionAlerts(trades, [makeQuote("AAPL", 75)])
+      );
+      const sh = result.current.find((a) => a.type === "sell_half");
+      expect(sh).toBeDefined();
+      expect(sh?.severity).toBe("info");
+    });
+  });
 });
 
 describe("usePositionAlerts — toast tetik (useEffect)", () => {
