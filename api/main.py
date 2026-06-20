@@ -2104,23 +2104,41 @@ def get_watchlist() -> list[WatchlistRow]:
 _STATUS_HIERARCHY = ["watch", "on_deck", "focus", "buy"]
 
 
-def _mock_rs(symbol: str) -> int:
-    stock = _STOCK_BY_SYM.get(symbol)
-    if stock:
-        return int(stock.rs_ibd)
-    seed = sum(ord(c) for c in symbol)
-    return 60 + (seed % 31)
+# P564 (20 Haz 2026 — Kural #28): seeded _mock_rs / _mock_price KALDIRILDI. Watchlist'e
+# ekleme artık GERÇEK RS + fiyat saklar (sahte "60+(seed%31)" RS + sahte fiyat paper-trade
+# liderlik kararı için tehlikeliydi). Gerçek yoksa 0 (dürüst "veri yok" — hisse detay /rs
+# canlı persentil hesaplar; scanner sonraki taramada doldurur).
+def _resolve_rs_real(symbol: str) -> Optional[int]:
+    """Gerçek RS: scan/watchlist (P547) > canlı cross-sectional persentil (P561) > None.
+    Uydurma (seeded) RS YOK — Kural #28."""
+    r = _resolve_rs_ibd(symbol)
+    if r is not None:
+        return r
+    # Taranmamış sembol → canlı cross-sectional (P561 mantığı, MOCK guard: gerçek yfinance)
+    rb = _fetch_ohlcv_real(symbol, 252)
+    uni = universe_perf_year_values()
+    if rb and len(rb) >= 200 and uni and rb[0].close > 0:
+        stock_1y = (rb[-1].close - rb[0].close) / rb[0].close * 100
+        return compute_rs_percentile(stock_1y, uni)
+    return None
 
 
-def _mock_price(symbol: str) -> float:
-    stock = _STOCK_BY_SYM.get(symbol)
-    if stock:
-        return stock.price
+def _resolve_price_real(symbol: str) -> float:
+    """Gerçek fiyat: scan > mevcut watchlist snapshot > canlı yfinance quote > 0.0.
+    Uydurma (seeded) fiyat YOK — Kural #28. 0.0 = veri yok (UI canlı quote ile current_price gösterir)."""
+    scan_md = _fetch_scan_symbol_data(symbol)
+    if scan_md and scan_md.get("price"):
+        return float(scan_md["price"])
     existing = [r for r in watchlist_get_all() if r["symbol"] == symbol]
-    if existing:
+    if existing and existing[0].get("price"):
         return float(existing[0]["price"])
-    seed = sum(ord(c) * (i + 1) for i, c in enumerate(symbol))
-    return round(20.0 + (seed % 500) * 1.5, 2)
+    try:
+        q = get_stock_quote(symbol)
+        if q.source == "yfinance":
+            return float(q.price)
+    except Exception:
+        pass
+    return 0.0
 
 
 def _promote_status(current: str) -> str:
@@ -2161,12 +2179,12 @@ def add_watchlist_row(body: WatchlistRowCreate) -> WatchlistRow:
         "symbol": sym,
         "strategy": body.strategy,
         "status": body.status,
-        "price": _mock_price(sym),
+        "price": _resolve_price_real(sym),
         "added_date": date.today().isoformat(),
         "setup_type": body.setup_type,
         "pivot_price": body.pivot_price,
         "note": body.note,
-        "rs_rating": _mock_rs(sym),
+        "rs_rating": _resolve_rs_real(sym) or 0,
         "consensus_count": 1,
         "consensus_strategies": [body.strategy],
     }

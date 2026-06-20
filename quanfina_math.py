@@ -6371,7 +6371,12 @@ def compute_relative_strength_rating(
     bench_ret = weighted_return(b)
     outperform = stock_ret - bench_ret
 
-    # IBD-mimic 1-99 skor — outperform aralık bazlı
+    # ⚠️ QUANFINA HEURİSTİK (Kural #26 dürüstlük, P564): Bu vs-SPY outperform->1-99 bantları
+    # KİTAP CANONU DEĞİL — Quanfina yaklaşığı. Gerçek IBD RS = tüm evrene göre CROSS-SECTIONAL
+    # persentil (P561 compute_rs_percentile bunu yapar). Bu fonksiyon yalnızca DERİN FALLBACK:
+    # taranmamış sembol + yfinance erişilemez + evren yok (çok nadir). Çıktı source="computed" +
+    # "yerel yaklaşık, cross-sectional değil" ile UI'da işaretli (Kural #28). Eşikler heuristik
+    # olduğu için sayfa atfı yok — uydurma DEĞİL, açıkça "yaklaşık" etiketli.
     # +50% outperform -> 99, +20% -> 80, 0% -> 50, -20% -> 30, -50% -> 1
     if outperform >= 50:
         rs = 99
