@@ -136,9 +136,11 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
     const newTradeValue = ep * sh;
 
     // Mevcut portfolio sektör değerleri (canlı fiyat × shares)
+    // P566 (Kural #28): SADECE gerçek yfinance quote — mock fiyat sektör %'sini bozmasın
+    // (mock olan t.entry_price gerçek değerine düşer, sentetik quote değil).
     const quoteMap = new Map<string, number>();
     openQuotesAll.forEach((r) => {
-      if (r.data) quoteMap.set(r.data.symbol.toUpperCase(), r.data.price);
+      if (r.data && r.data.source === "yfinance") quoteMap.set(r.data.symbol.toUpperCase(), r.data.price);
     });
 
     const sectorMap = new Map<string, number>();
@@ -820,6 +822,16 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
                 )}
               </Label>
               <Input id="at-eprice" type="number" value={entryPrice} onChange={(e) => { userEditedEntryRef.current = true; setEntryPrice(e.target.value); }} placeholder="700.00" step="0.01" min="0" />
+              {/* P566 (Kural #28): mock quote uyarısı — yfinance erişilemezse sentetik fiyat sessiz kalmasın */}
+              {quoteData?.source === "mock" && trimmedSym.length >= 2 && (
+                <span
+                  className="text-[10px] leading-tight"
+                  style={{ color: "#92400E" }}
+                  data-testid="entry-mock-quote-warning"
+                >
+                  ⚠️ Canlı fiyat yok (yfinance erişilemez → sentetik). Entry&apos;yi manuel doğrula — paper trade gerçek fiyat ister.
+                </span>
+              )}
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="at-shares">Adet *</Label>

@@ -34,6 +34,10 @@ const h = vi.hoisted(() => ({
   groupRs: undefined as
     | undefined
     | { available: boolean; tier: string; sector: string; rs_rank: number },
+  // P566: stock quote (mock-quote uyarısı testi için)
+  quote: undefined as
+    | undefined
+    | { symbol: string; price: number; change_dollar: number; change_pct: number; source: string },
 }));
 
 vi.mock("@/hooks/use-trades", () => ({
@@ -55,7 +59,7 @@ vi.mock("@/hooks/use-atr-volatility", () => ({ useAtrVolatility: () => ({ data: 
 vi.mock("@/hooks/use-earnings", () => ({ useEarnings: () => ({ data: h.earnings }) }));
 vi.mock("@/hooks/use-symbol-search", () => ({ useSymbolSearch: () => ({ data: undefined }) }));
 vi.mock("@/hooks/use-stock-quote", () => ({
-  useStockQuote: () => ({ data: undefined }),
+  useStockQuote: () => ({ data: h.quote }),
   useStockQuotes: () => [],
 }));
 vi.mock("@/lib/mindset-read-state", () => ({ isReadTodayAny: () => true }));
@@ -72,6 +76,7 @@ beforeEach(() => {
   h.earnings = undefined;
   h.rsData = undefined;
   h.groupRs = undefined;
+  h.quote = undefined;
 });
 
 /** Geçerli açık trade için tüm zorunlu alanları doldurur. */
@@ -321,6 +326,34 @@ describe("AddTradeDialog — Lider Pilot İstisnası (P560, Fikir 5, KARAR #488)
     render(<AddTradeDialog open onOpenChange={vi.fn()} />);
     fireEvent.change(screen.getByLabelText(/Hisse/), { target: { value: "NVDA" } });
     expect(screen.queryByTestId("leader-pilot-exception")).toBeNull();
+  });
+});
+
+describe("AddTradeDialog — mock-quote uyarısı (P566, Kural #28)", () => {
+  function fillSymbol(sym = "ZZZ") {
+    fireEvent.change(screen.getByLabelText(/Hisse/), { target: { value: sym } });
+  }
+
+  it("mock quote + sembol → sentetik fiyat uyarısı görünür", () => {
+    h.quote = { symbol: "ZZZ", price: 100, change_dollar: 0, change_pct: 0, source: "mock" };
+    render(<AddTradeDialog open onOpenChange={vi.fn()} />);
+    fillSymbol();
+    expect(screen.getByTestId("entry-mock-quote-warning")).toBeInTheDocument();
+    expect(screen.getByText(/Canlı fiyat yok/)).toBeInTheDocument();
+  });
+
+  it("yfinance quote → uyarı YOK (gerçek fiyat)", () => {
+    h.quote = { symbol: "ZZZ", price: 100, change_dollar: 0, change_pct: 0, source: "yfinance" };
+    render(<AddTradeDialog open onOpenChange={vi.fn()} />);
+    fillSymbol();
+    expect(screen.queryByTestId("entry-mock-quote-warning")).toBeNull();
+  });
+
+  it("quote yok → uyarı YOK", () => {
+    h.quote = undefined;
+    render(<AddTradeDialog open onOpenChange={vi.fn()} />);
+    fillSymbol();
+    expect(screen.queryByTestId("entry-mock-quote-warning")).toBeNull();
   });
 });
 
