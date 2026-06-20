@@ -26,6 +26,7 @@ import { useCarrStage } from "@/hooks/use-carr-stage";
 import { usePivotBreakout } from "@/hooks/use-pivot-breakout";
 import { useClimaxRun } from "@/hooks/use-climax-run";
 import { useRsRating } from "@/hooks/use-rs-rating";
+import { useGroupRS } from "@/hooks/use-group-rs";
 import { useStageTransition } from "@/hooks/use-stage-transition";
 import { useAtrVolatility } from "@/hooks/use-atr-volatility";
 import { useEarnings } from "@/hooks/use-earnings";
@@ -178,6 +179,8 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
   const { data: pivotData } = usePivotBreakout(markPreCheckSymbol);
   const { data: climaxData } = useClimaxRun(markPreCheckSymbol);
   const { data: rsData } = useRsRating(markPreCheckSymbol);
+  // P560 (Fikir 5): Grup RS — defansif "Lider Pilot İstisnası" (KARAR #488) için sektör liderliği
+  const { data: groupRsData } = useGroupRS(markPreCheckSymbol);
   const { data: stageData } = useStageTransition(markPreCheckSymbol);
   // KARAR #733 alt-paket (Paket 128, 26 May 2026): ATR Stop auto-fill
   // Mark TLSMW Ch 11: ATR-based stop "give the stock room to breathe"
@@ -369,6 +372,36 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
               </span>
               <span className="block mt-1 italic">{tradingMode.reason}</span>
               <span className="block mt-1 text-[10px] opacity-90">{tradingMode.uiBehavior}</span>
+            </div>
+          </div>
+        )}
+
+        {/* P560 (Fikir 5 — KARAR #488 pilotOverride): Defansif modda LİDER hisse pilot istisnası.
+            Canon (Mark TTLC): defansif modda bile lider hisse %1-2 ULTRA-DÜŞÜK pilot deler.
+            Lider = RS≥80 (Minervini) + LİDER sektör (O'Neil 'L', Group RS P553). Yeni NotebookLM
+            GEREKMEZ — kural zaten tescil. Bilgilendirir, BLOK/override'ı değiştirmez (Kural #4). */}
+        {!isShort && tradingMode.mode === "defansif" &&
+          (rsData?.rs_rating ?? 0) >= 80 && groupRsData?.tier === "LEADING" && (
+          <div
+            className="rounded-md border px-3 py-2 flex items-start gap-2 text-xs"
+            style={{
+              background: "rgba(40,167,69,0.08)",
+              borderColor: "rgba(40,167,69,0.45)",
+              color: "var(--mtp-excellent)",
+            }}
+            data-testid="leader-pilot-exception"
+          >
+            <span aria-hidden="true" className="text-base leading-none">🎯</span>
+            <div className="flex-1">
+              <span className="font-semibold">Lider Pilot İstisnası (KARAR #488)</span>
+              <span className="block mt-1 italic">
+                {trimmedSymbol} lider: RS {rsData?.rs_rating} + {groupRsData.sector} #
+                {groupRsData.rs_rank} lider sektör. Mark canon (TTLC): defansif modda bile
+                lider hisse %1-2 ULTRA-DÜŞÜK pilot alımı serbest.
+              </span>
+              <span className="block mt-1 text-[10px] opacity-90">
+                Pilot = küçük başlangıç (tam pozisyon DEĞİL). Override&apos;ı bilinçli kullan.
+              </span>
             </div>
           </div>
         )}

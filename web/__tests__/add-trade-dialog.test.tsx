@@ -29,6 +29,11 @@ const h = vi.hoisted(() => ({
   earnings: undefined as
     | undefined
     | { has_data: boolean; within_blackout: boolean; days_to_earnings: number; earnings_date: string },
+  // P560: RS rating + Group RS (Lider Pilot İstisnası testi için)
+  rsData: undefined as undefined | { rs_rating: number },
+  groupRs: undefined as
+    | undefined
+    | { available: boolean; tier: string; sector: string; rs_rank: number },
 }));
 
 vi.mock("@/hooks/use-trades", () => ({
@@ -43,7 +48,8 @@ vi.mock("@/hooks/use-trading-mode", () => ({
 vi.mock("@/hooks/use-carr-stage", () => ({ useCarrStage: () => ({ data: undefined }) }));
 vi.mock("@/hooks/use-pivot-breakout", () => ({ usePivotBreakout: () => ({ data: undefined }) }));
 vi.mock("@/hooks/use-climax-run", () => ({ useClimaxRun: () => ({ data: undefined }) }));
-vi.mock("@/hooks/use-rs-rating", () => ({ useRsRating: () => ({ data: undefined }) }));
+vi.mock("@/hooks/use-rs-rating", () => ({ useRsRating: () => ({ data: h.rsData }) }));
+vi.mock("@/hooks/use-group-rs", () => ({ useGroupRS: () => ({ data: h.groupRs }) }));
 vi.mock("@/hooks/use-stage-transition", () => ({ useStageTransition: () => ({ data: undefined }) }));
 vi.mock("@/hooks/use-atr-volatility", () => ({ useAtrVolatility: () => ({ data: undefined }) }));
 vi.mock("@/hooks/use-earnings", () => ({ useEarnings: () => ({ data: h.earnings }) }));
@@ -64,6 +70,8 @@ beforeEach(() => {
   h.tradingMode.mode = "normal";
   h.tradingMode.recommendedSizingPct = 1;
   h.earnings = undefined;
+  h.rsData = undefined;
+  h.groupRs = undefined;
 });
 
 /** Geçerli açık trade için tüm zorunlu alanları doldurur. */
@@ -274,6 +282,45 @@ describe("AddTradeDialog — Defansif mod BLOK (Vizyon İLKE #10)", () => {
     h.tradingMode.mode = "defansif";
     render(<AddTradeDialog open onOpenChange={vi.fn()} />);
     expect(screen.getByText(/Trade Modu: DEFANSIF/)).toBeInTheDocument();
+  });
+});
+
+describe("AddTradeDialog — Lider Pilot İstisnası (P560, Fikir 5, KARAR #488)", () => {
+  it("defansif + LİDER (RS≥80 + LEADING sektör) → pilot istisna notu görünür", () => {
+    h.tradingMode.mode = "defansif";
+    h.rsData = { rs_rating: 92 };
+    h.groupRs = { available: true, tier: "LEADING", sector: "Technology", rs_rank: 1 };
+    render(<AddTradeDialog open onOpenChange={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText(/Hisse/), { target: { value: "NVDA" } });
+    expect(screen.getByTestId("leader-pilot-exception")).toBeInTheDocument();
+    expect(screen.getByText(/Lider Pilot İstisnası/)).toBeInTheDocument();
+  });
+
+  it("defansif + zayıf sektör (LAGGING) → pilot istisna notu YOK (yalnız kurt)", () => {
+    h.tradingMode.mode = "defansif";
+    h.rsData = { rs_rating: 92 };
+    h.groupRs = { available: true, tier: "LAGGING", sector: "Energy", rs_rank: 9 };
+    render(<AddTradeDialog open onOpenChange={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText(/Hisse/), { target: { value: "XOM" } });
+    expect(screen.queryByTestId("leader-pilot-exception")).toBeNull();
+  });
+
+  it("defansif + düşük RS (<80) + LEADING → pilot istisna notu YOK", () => {
+    h.tradingMode.mode = "defansif";
+    h.rsData = { rs_rating: 55 };
+    h.groupRs = { available: true, tier: "LEADING", sector: "Technology", rs_rank: 1 };
+    render(<AddTradeDialog open onOpenChange={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText(/Hisse/), { target: { value: "ABC" } });
+    expect(screen.queryByTestId("leader-pilot-exception")).toBeNull();
+  });
+
+  it("NORMAL mod + lider → pilot istisna notu YOK (sadece defansif)", () => {
+    h.tradingMode.mode = "normal";
+    h.rsData = { rs_rating: 92 };
+    h.groupRs = { available: true, tier: "LEADING", sector: "Technology", rs_rank: 1 };
+    render(<AddTradeDialog open onOpenChange={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText(/Hisse/), { target: { value: "NVDA" } });
+    expect(screen.queryByTestId("leader-pilot-exception")).toBeNull();
   });
 });
 
