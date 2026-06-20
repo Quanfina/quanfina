@@ -795,8 +795,10 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
           </div>
 
           {/* Mark Risk Advisor — Sprint 4-bis.7 Faz 1 B paket (KARAR #914+#969+#970)
-              KARAR #727 (24 May 2026): RBA gerçek veri bağı — strategy prop ile filtre */}
-          <MarkRiskAdvisor entryPrice={entryPrice} shares={shares} strategy={strategy} />
+              KARAR #727 (24 May 2026): RBA gerçek veri bağı — strategy prop ile filtre
+              P559 (20 Haz 2026): portföy değeri MarkRiskAdvisor içinde gerçek (usePortfolioValue,
+              Kural #28) + totalPositions gerçek açık trade sayısı (6-kural 4-12 stok doğruluğu) */}
+          <MarkRiskAdvisor entryPrice={entryPrice} shares={shares} strategy={strategy} totalPositions={openTradesAll.length} />
 
           {/* Paket 202 (27 May 2026): Sektör konsantrasyon önizleme — Mark TTLC s.85
               Sn. Ferit yeni trade kayıt ederken sembol + entry + shares girince

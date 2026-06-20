@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRiskAdvisor, type RiskAdvisorResponse } from "@/hooks/use-risk-advisor";
 import { useRbaMetrics } from "@/hooks/use-rba-metrics";
+import { usePortfolioValue } from "@/hooks/use-portfolio-value";
 
 /**
  * Sprint 4-bis.7 Faz 1 B paket — Mark Risk Advisor UI komponenti
@@ -21,31 +22,34 @@ interface Props {
   shares: string;
   // KARAR #727: RBA filtre için strategy (Minervini/Carr istatistikleri ayrı analiz)
   strategy?: string;
-  // Opsiyonel — gelecek extension
-  portfolioValue?: number;        // varsayılan $100K (placeholder Sn. Ferit ayarı gelene kadar)
+  // P559: prop verilmezse gerçek portföy değeri (usePortfolioValue) kullanılır.
+  portfolioValue?: number;        // explicit override; yoksa kullanıcının kayıtlı değeri
   totalPositions?: number;        // mevcut açık trade sayısı
   isBestName?: boolean;
 }
-
-const DEFAULT_PORTFOLIO_VALUE = 100000;
 
 export function MarkRiskAdvisor({
   entryPrice,
   shares,
   strategy,
-  portfolioValue = DEFAULT_PORTFOLIO_VALUE,
+  portfolioValue,
   totalPositions = 0,
   isBestName = false,
 }: Props) {
   const [data, setData] = useState<RiskAdvisorResponse | null>(null);
   const { mutate, isPending, error } = useRiskAdvisor();
+  // P559 (20 Haz 2026 — Kural #28): hardcoded $100K placeholder KALDIRILDI. Gerçek portföy
+  // değeri (PortfolioValueEditor ile düzenlenebilir, localStorage). "Toplam Portföye göre"
+  // pozisyon % + Mark tier artık sahte değil — Sn. Ferit'in gerçek sermayesine dayanır.
+  const { value: storedPortfolioValue } = usePortfolioValue();
+  const effectivePortfolioValue = portfolioValue ?? storedPortfolioValue;
   // KARAR #727 — RBA gerçek veri (compute_dynamic_stop için)
   const { data: rbaData } = useRbaMetrics({ strategy });
 
   const ep = parseFloat(entryPrice);
   const sh = parseInt(shares);
   const positionValue = !isNaN(ep) && !isNaN(sh) && ep > 0 && sh > 0 ? ep * sh : 0;
-  const positionPctActual = portfolioValue > 0 ? (positionValue / portfolioValue) * 100 : 0;
+  const positionPctActual = effectivePortfolioValue > 0 ? (positionValue / effectivePortfolioValue) * 100 : 0;
 
   // RBA istatistik anlamlı ise (>= 1 kapanmış trade) Mark Dynamic Stop'a beslenir
   const rbaPayload =
@@ -67,7 +71,7 @@ export function MarkRiskAdvisor({
     // KARAR #727: RBA varsa Mark Dynamic Stop avg_gain/2 hesabı kullanır
     mutate(
       {
-        portfolio_value: portfolioValue,
+        portfolio_value: effectivePortfolioValue,
         target_risk_pct: 2.0,
         max_stop_pct: 7.0,
         total_positions: totalPositions,
@@ -79,7 +83,7 @@ export function MarkRiskAdvisor({
       }
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entryPrice, shares, portfolioValue, totalPositions, isBestName, mutate, positionValue, rbaData?.metrics.num_trades]);
+  }, [entryPrice, shares, effectivePortfolioValue, totalPositions, isBestName, mutate, positionValue, rbaData?.metrics.num_trades]);
 
   if (positionValue <= 0) {
     return (
