@@ -2633,7 +2633,7 @@ def _fetch_scan_symbol_data(sym: str) -> dict | None:
         try:
             with engine.connect() as conn:
                 result = conn.execute(sql_text(f"""
-                    SELECT ticker, price, rs_ibd, company, sector, industry
+                    SELECT ticker, price, rs_ibd, company, sector, industry, market_cap
                     FROM {table}
                     WHERE ticker = :sym
                       AND scan_date = (SELECT MAX(scan_date) FROM {table})
@@ -2641,6 +2641,7 @@ def _fetch_scan_symbol_data(sym: str) -> dict | None:
                 """), {"sym": sym})
                 row = result.first()
                 if row:
+                    mc = row[6] if len(row) > 6 else None
                     return {
                         "ticker": row[0],
                         "price": float(row[1]) if row[1] is not None else 100.0,
@@ -2648,10 +2649,27 @@ def _fetch_scan_symbol_data(sym: str) -> dict | None:
                         "company": row[3] or sym,
                         "sector": row[4] or "—",
                         "industry": row[5] or "—",
+                        # P563: gercek market_cap (milyon USD; NaN/None guard caller'da)
+                        "market_cap": float(mc) if mc is not None else None,
                     }
         except Exception:  # P480 (#20): OperationalError zaten Exception alt-sinifi (redundant kaldirildi). 3-tablo best-effort fallback — biri yoksa/patlarsa sonrakine gec.
             continue
     return None
+
+
+def _format_market_cap(v: Optional[float]) -> Optional[str]:
+    """Milyon USD market_cap → '$X.XXT' / '$XXXB' / '$XXM' (P563, gerçek scan verisi).
+
+    minervini_scans.market_cap milyon biriminde. NaN/None/<=0 → None (caller stale hardcoded
+    fallback'e düşer; uydurma YOK — Kural #26/#28). Örn: 5049087 → '$5.05T', 322211 → '$322B'."""
+    if v is None or v != v or v <= 0:  # None / NaN (v!=v) / non-pozitif
+        return None
+    if v >= 1_000_000:                  # >= $1T
+        return f"${v / 1_000_000:.2f}T"
+    if v >= 1_000:                      # >= $1B
+        b = v / 1_000
+        return f"${b:.1f}B" if b < 10 else f"${b:.0f}B"
+    return f"${v:.0f}M"
 
 
 @app.get("/api/stock/{symbol}/info", response_model=StockInfo)
@@ -2659,6 +2677,11 @@ def get_stock_info(symbol: str) -> StockInfo:
     sym = symbol.upper()
     stock = _STOCK_BY_SYM.get(sym)
     meta  = _STOCK_META.get(sym, {})
+    # P563 (Kural #28): GERÇEK market_cap (minervini_scans) — hardcoded stale "$2.2T" yerine.
+    # Tek scan lookup tüm branch'lerde paylaşılır. Gerçek yoksa meta hardcoded fallback (işaretsiz
+    # display string — name/industry gibi stabil metadata). NVDA gerçek $5.05T vs hardcoded $2.2T.
+    _scan_md = _fetch_scan_symbol_data(sym)
+    _real_mcap = _format_market_cap(_scan_md.get("market_cap")) if _scan_md else None
     # KARAR ADAY #723 + #735 — Mark Profili rozetleri (gerçek minervini_scans).
     # P548 (Kural #28): MOCK _STOCK_MARK_SIGNALS fallback kaldırıldı — DB yoksa rozet yok
     # (dürüst), sahte climax/stage gösterilmez.
@@ -2685,7 +2708,7 @@ def get_stock_info(symbol: str) -> StockInfo:
             name=meta.get("name", stock.company),
             sector=meta.get("sector", stock.sector),
             industry=meta.get("industry", stock.sector),
-            market_cap=meta.get("market_cap", f"${stock.market_cap:.0f}B"),
+            market_cap=_real_mcap or meta.get("market_cap", f"${stock.market_cap:.0f}B"),
             price=live[0] if live else stock.price,
             change_pct=live[1] if live else stock.change_pct,
             price_source="yfinance" if live else "mock",
@@ -2702,7 +2725,7 @@ def get_stock_info(symbol: str) -> StockInfo:
             name=meta.get("name", sym),
             sector=meta.get("sector", "—"),
             industry=meta.get("industry", "—"),
-            market_cap=meta.get("market_cap", "—"),
+            market_cap=_real_mcap or meta.get("market_cap", "—"),
             price=live[0] if live else row.price,
             change_pct=live[1] if live else 0.0,
             price_source="yfinance" if live else "watchlist",
@@ -2714,14 +2737,15 @@ def get_stock_info(symbol: str) -> StockInfo:
         )
     # 24 May 2026 — Tarama sonucu sembollerinde fallback (KARAR ADAY #498)
     # Sn. Ferit raporu: "hisselere tıklandığında grafik açılmıyor"
-    scan_data = _fetch_scan_symbol_data(sym)
+    # P563: _scan_md yukarıda tek sefer çekildi (DRY — ikinci sorgu yok).
+    scan_data = _scan_md
     if scan_data:
         return StockInfo(
             symbol=sym,
             name=scan_data["company"],
             sector=scan_data["sector"],
             industry=scan_data["industry"],
-            market_cap=meta.get("market_cap", "—"),
+            market_cap=_real_mcap or meta.get("market_cap", "—"),
             price=live[0] if live else scan_data["price"],
             change_pct=live[1] if live else 0.0,
             price_source="yfinance" if live else "scan",
