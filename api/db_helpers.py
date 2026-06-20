@@ -160,21 +160,28 @@ _INVEST_TYPE_COL: Optional[bool] = None
 
 
 def _web_trades_has_invest_type() -> bool:
-    """P538: web_trades.invest_type var mi (Migration 013 uygulandi mi). Bir kez sorgulanir,
-    cache'lenir. Kolon yoksa: SHORT engellenir (endpoint) + INSERT/SELECT invest_type'siz
-    calisir -> migration oncesi LONG-only davranis korunur, kirilma yok."""
+    """P538: web_trades.invest_type var mi (Migration 013 uygulandi mi). Kolon yoksa SHORT
+    endpoint'te bloklu + INSERT/SELECT invest_type'siz (LONG-only, kirilma yok).
+
+    P567 (20 Haz 2026): SADECE pozitif (True) sonuc kalici cache'lenir; False/hata her cagri
+    yeniden sorgular. Boylece Migration 013 calistirilinca SHORT API RESTART GEREKMEDEN aktif
+    olur (kolon sadece ADD edilir, asla DROP — Kodlama Standardi #2 -> True kalici guvenli).
+    Pre-migration maliyet: trades cagrisinda kucuk information_schema sorgusu (gecici, ucuz)."""
     global _INVEST_TYPE_COL
-    if _INVEST_TYPE_COL is None:
-        try:
-            with engine.connect() as conn:
-                r = conn.execute(text(
-                    "SELECT 1 FROM information_schema.columns "
-                    "WHERE table_name='web_trades' AND column_name='invest_type'"
-                ))
-                _INVEST_TYPE_COL = r.first() is not None
-        except Exception:
-            _INVEST_TYPE_COL = False
-    return _INVEST_TYPE_COL
+    if _INVEST_TYPE_COL:        # zaten True -> kalici (kolon dusmez), sorgu yok
+        return True
+    try:
+        with engine.connect() as conn:
+            r = conn.execute(text(
+                "SELECT 1 FROM information_schema.columns "
+                "WHERE table_name='web_trades' AND column_name='invest_type'"
+            ))
+            if r.first() is not None:
+                _INVEST_TYPE_COL = True
+                return True
+    except Exception:
+        pass
+    return False
 
 
 def trades_get_all() -> list[dict]:
