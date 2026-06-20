@@ -2542,6 +2542,7 @@ Yeni oturum başında **son 100 satırı** okumak yeterlidir. Eski kararlar değ
 |------|--------------|-----|
 | Yeni chat bootstrap | `notebook/_BASLAT.md` | Sistem |
 | Yol haritası | `notebook/_ROADMAP.md` | Sistem |
+| Fikir/TODO backlog (yapılmamış fikirler) | `notebook/_YAPILACAKLAR.md` | Sistem |
 | Hesap/araç + URL matrisi | `notebook/_LINKLER.md` | Sistem |
 | Devir notu (Web↔Code handoff) | `notebook/_DEVIR.md` | Sistem |
 | Hata günlüğü | `notebook/_HATALAR.md` | Sistem |
