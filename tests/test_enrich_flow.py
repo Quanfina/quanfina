@@ -1,8 +1,8 @@
 """
 KARAR #733 alt-paket (Paket 171): yfinance enrich + cache flow regresyon testi.
 
-Paper trading altyapısı (P144+P145+P146+P147):
-- _compute_live_mark_signals MOCK + live overlay
+Paper trading altyapısı (P144+P145+P146+P147; P548 sonrası MOCK base kaldırıldı):
+- _compute_live_mark_signals DB base (gerçek) + yfinance live overlay (MOCK YOK)
 - _MARK_SIGNALS_CACHE 5dk TTL davranışı
 - _enrich_watchlist_batch / _enrich_trade_batch flow
 - db_health_check 30s cache (P145 alt-katman)
@@ -68,16 +68,16 @@ def _make_long_bars(n: int = 252, start: float = 100.0, trend: float = 0.001):
 
 
 # =====================================================================
-# _compute_live_mark_signals — MOCK + cache
+# _compute_live_mark_signals — DB base + yfinance overlay + cache (P548: MOCK YOK)
 # =====================================================================
 
 class TestComputeLiveMarkSignals:
-    def test_returns_mock_when_bars_missing(self):
-        """OHLCV cache boş + yfinance fail → MOCK _STOCK_MARK_SIGNALS only."""
-        # NVDA MOCK base var
+    def test_returns_db_or_empty_when_bars_missing(self):
+        """P548 (Kural #28): OHLCV cache boş + yfinance fail → DB base (gerçek
+        mark_signals_get_by_symbol) VEYA boş dict. _STOCK_MARK_SIGNALS MOCK KALDIRILDI
+        — artık sahte carr_stage/vcp dönmez (dürüst: gerçek DB ya da boş, MOCK uydurmaz)."""
         result = api_main._compute_live_mark_signals("NVDA", 200.0)
-        # MOCK base mevcut olmalı (carr_stage, vcp_quality_score gibi)
-        # Live overlay yok ama MOCK var
+        # Gerçek DB base veya boş dict — MOCK base YOK (P548 sonrası)
         assert isinstance(result, dict)
 
     def test_returns_empty_for_unknown_no_mock_no_bars(self):
