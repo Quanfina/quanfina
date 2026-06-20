@@ -2714,7 +2714,9 @@ def get_stock_info(symbol: str) -> StockInfo:
             price=live[0] if live else stock.price,
             change_pct=live[1] if live else stock.change_pct,
             price_source="yfinance" if live else "mock",
-            rs_rating=int(stock.rs_ibd),
+            # P547 (Kural #28): gerçek RS öncelik (scan/watchlist); MOCK rs_ibd yalnız
+            # son çare (taranmamış MOCK sembol). Header = RS kartı tutarlı (P441).
+            rs_rating=_resolve_rs_ibd(sym) or int(round(stock.rs_ibd)),
             active_strategies=active,
             mark_signals=mark_signals,
         )
@@ -2729,7 +2731,9 @@ def get_stock_info(symbol: str) -> StockInfo:
             price=live[0] if live else row.price,
             change_pct=live[1] if live else 0.0,
             price_source="yfinance" if live else "watchlist",
-            rs_rating=row.rs_rating,
+            # P547: scan authoritative RS öncelik; watchlist rs_rating snapshot (stale
+            # olabilir) yalnız scan yoksa. /rs kartı ile tutarlı (P441, scan-first).
+            rs_rating=_resolve_rs_ibd(sym) or row.rs_rating,
             active_strategies=active,
             mark_signals=mark_signals,
         )
@@ -3114,23 +3118,20 @@ class RsRatingInfo(BaseModel):
 
 
 def _resolve_rs_ibd(sym: str) -> Optional[int]:
-    """get_stock_info ile AYNI öncelikten cross-sectional IBD RS (rs_ibd) çöz.
-    Amaç: /hisse RS kartı (RsRatingCard/MarkProfileBar) header (info.rs_rating)
-    ile BİREBİR tutarlı olsun (P441 — RS 97 scan vs 55 compute tutarsızlığı fix).
-    Öncelik get_stock_info ile aynı: MOCK_STOCKS > watchlist > scan DB. Bulunamazsa
-    None → yerel compute yaklaşığı fallback (source=computed)."""
-    stock = _STOCK_BY_SYM.get(sym)
-    if stock is not None:
-        return int(round(stock.rs_ibd))
+    """Cross-sectional IBD RS (rs_ibd) — GERÇEK kaynak öncelik: scan DB > watchlist
+    (P547, Kural #28: MOCK_STOCKS hardcoded rs KALDIRILDI — sahte RS source="scan"
+    olarak mis-etiketleniyordu, paper-trade için yanıltıcı). Scan = authoritative
+    cross-sectional. get_stock_info header ile birebir tutarlı (P441). Bulunamazsa
+    None → yerel compute yaklaşığı fallback (source=computed, UI işaretli)."""
+    scan_data = _fetch_scan_symbol_data(sym)
+    if scan_data and scan_data.get("rs_ibd") is not None:
+        return int(scan_data["rs_ibd"])
     try:
         wl = [r for r in watchlist_get_all() if r["symbol"] == sym]
     except OperationalError:
         wl = []
     if wl and wl[0].get("rs_rating") is not None:
         return int(round(float(wl[0]["rs_rating"])))
-    scan_data = _fetch_scan_symbol_data(sym)
-    if scan_data and scan_data.get("rs_ibd") is not None:
-        return int(scan_data["rs_ibd"])
     return None
 
 
