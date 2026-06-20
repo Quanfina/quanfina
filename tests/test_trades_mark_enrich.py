@@ -116,21 +116,26 @@ class TestMarkCanonGuard:
                 if sig and sig.get("carr_stage") is not None:
                     assert sig["carr_stage"] in {1, 2, 3, 4}
 
-    def test_nvda_stage_2(self, trades):
-        """NVDA Stage 2 (Advancing — Mark+Carr alim fazi)."""
+    def test_nvda_stage_valid(self, trades):
+        """NVDA carr_stage geçerli (1-4). P548 (Kural #28): MOCK _STOCK_MARK_SIGNALS
+        kaldırıldı — eski sabit MOCK 2 değil, DB/yfinance GERÇEK değer (canon aralık).
+        carr_stage yoksa atla (gerçek overlay her zaman hesaplamaz)."""
         nvda = [t for t in trades if t["symbol"] == "NVDA"]
-        assert len(nvda) >= 1
-        for t in nvda:
-            assert t["mark_signals"] is not None
-            assert t["mark_signals"]["carr_stage"] == 2
+        if nvda:
+            for t in nvda:
+                sig = t["mark_signals"]
+                if sig and sig.get("carr_stage") is not None:
+                    assert sig["carr_stage"] in {1, 2, 3, 4}
 
-    def test_meta_stage_3(self, trades):
-        """META Stage 3 (Topping — cikis hazirlik)."""
+    def test_meta_stage_valid(self, trades):
+        """META carr_stage geçerli (1-4). P548: MOCK kaldırıldı — eski sabit MOCK 3
+        değil, gerçek değer (yoksa atla, sahte 3 göstermez)."""
         meta = [t for t in trades if t["symbol"] == "META"]
-        assert len(meta) >= 1
-        for t in meta:
-            assert t["mark_signals"] is not None
-            assert t["mark_signals"]["carr_stage"] == 3
+        if meta:
+            for t in meta:
+                sig = t["mark_signals"]
+                if sig and sig.get("carr_stage") is not None:
+                    assert sig["carr_stage"] in {1, 2, 3, 4}
 
 
 # =====================================================================

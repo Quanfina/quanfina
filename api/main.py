@@ -1915,13 +1915,9 @@ def _compute_live_mark_signals(symbol: str, price: float) -> dict:
     db_signals = mark_signals_get_by_symbol(symbol)
     if db_signals:
         result.update(db_signals)
-    else:
-        # Gecis donemi fallback: DB henuz Mark kolonlarini doldurmadiysa MOCK.
-        # scanner.py sonraki run'da kolonlari doldurunca DB otomatik one gecer,
-        # MOCK gereksizlesir (KARAR ADAY #735 — MOCK->DB tam gecis).
-        mock = _STOCK_MARK_SIGNALS.get(symbol, {})
-        if mock:
-            result.update(mock)
+    # P548 (Kural #28): MOCK _STOCK_MARK_SIGNALS fallback KALDIRILDI (sahte climax/stage
+    # as-real sızıntısı). DB yoksa boş base; yfinance overlay (RS/Stage/Climax) gerçek
+    # doldurur; o da yoksa boş (rozet yok, dürüst — sahte göstermez).
 
     # 2. yfinance OHLCV çek (cache varsa 0s)
     bars = _fetch_ohlcv_real(symbol, 252)
@@ -2414,56 +2410,11 @@ def search_symbols(q: str, limit: int = 10) -> list[SymbolSearchResult]:
 
     return combined[:limit]
 
-# KARAR ADAY #723 (24 May 2026) — Hisse detay Mark Profil rozetleri MOCK feed.
-# Cloud SQL Migration 004-007 uygulanana kadar UI'in canli gosterimi icin
-# ornek sembollere Mark sinyalleri assign edilir. Production'da scanner.py
-# minervini_scans tablo kolonlarindan okunacak (KARAR #470 paten).
-_STOCK_MARK_SIGNALS: dict[str, dict] = {
-    "NVDA": {
-        "vcp_quality_score": "EXCELLENT",
-        "vcp_ready_score": 85,
-        "power_play_pass": True,
-        "tennis_ball_pattern": "TENNIS_BALL",
-        "volume_asymmetry_tier": "healthy",
-        "carr_stage": 2,  # Advancing - Mark+Carr alim fazi
-        # KARAR #733 alt-paket (Paket 95): Climax category MOCK — Mark TLSMW Ch 9
-        # CLIMAX_TOP = parabolic + exhaustion gap (Mark "SAT" sinyali).
-        "climax_category": "CLIMAX_TOP",
-        # KARAR #733 alt-paket (Paket 123, 26 May 2026): Stage Transition MOCK
-        # Mark TLSMW Ch 4 — 30W MA bazli Stage 1->2 gecis.
-        "stage_category": "STAGE_2_MATURE",
-    },
-    "MSFT": {
-        "vcp_quality_score": "PASS",
-        "vcp_ready_score": 72,
-        "power_play_pass": False,
-        "volume_asymmetry_tier": "healthy",
-        "carr_stage": 2,
-        "stage_category": "CONFIRMED_STAGE_2",
-    },
-    "AVGO": {
-        "vcp_quality_score": "EXCELLENT",
-        "power_play_pass": True,
-        "tennis_ball_pattern": "TENNIS_BALL",
-        "carr_stage": 2,
-        "stage_category": "EARLY_STAGE_2",
-    },
-    "AMD": {
-        "vcp_ready_score": 78,
-        "tennis_ball_pattern": "TENNIS_BALL",
-        "volume_asymmetry_tier": "healthy",
-        "carr_stage": 2,
-    },
-    "META": {
-        "vcp_quality_score": "PASS",
-        "volume_asymmetry_tier": "neutral",
-        "carr_stage": 3,  # Topping - cikis hazirlik
-    },
-    "TSLA": {
-        "volume_asymmetry_tier": "distribution",  # uyari rozet
-        "carr_stage": 4,  # Declining - uzak dur
-    },
-}
+# P548 (20 Haz 2026, Kural #28): _STOCK_MARK_SIGNALS MOCK feed KALDIRILDI — sahte
+# climax/stage/vcp as-real sızıntısıydı (NVDA CLIMAX_TOP, META stage 3 vb. hardcoded).
+# Mark Profili rozetleri artık YALNIZ gerçek kaynak: mark_signals_get_by_symbol
+# (minervini_scans) + _compute_live_mark_signals yfinance overlay. Gerçek yoksa rozet
+# gösterilmez (dürüst). MarkSignalsBlock Optional alanlarla zaten zarif (undefined → rozet yok).
 
 
 class MarkSignalsBlock(BaseModel):
@@ -2685,9 +2636,10 @@ def get_stock_info(symbol: str) -> StockInfo:
     sym = symbol.upper()
     stock = _STOCK_BY_SYM.get(sym)
     meta  = _STOCK_META.get(sym, {})
-    # KARAR ADAY #723 + #735 — Mark Profili rozetleri.
-    # Migration 004-009 sonrasi DB-oncelik (minervini_scans), DB bos ise MOCK fallback.
-    raw_signals = mark_signals_get_by_symbol(sym) or _STOCK_MARK_SIGNALS.get(sym)
+    # KARAR ADAY #723 + #735 — Mark Profili rozetleri (gerçek minervini_scans).
+    # P548 (Kural #28): MOCK _STOCK_MARK_SIGNALS fallback kaldırıldı — DB yoksa rozet yok
+    # (dürüst), sahte climax/stage gösterilmez.
+    raw_signals = mark_signals_get_by_symbol(sym)
     mark_signals = MarkSignalsBlock(**raw_signals) if raw_signals else None
 
     # DB down ortamda hisse detay sayfasi calismali — watchlist bos liste fallback
