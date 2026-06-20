@@ -81,6 +81,15 @@ class TestScreenResults:
         assert isinstance(data, list)
         json.dumps(data, allow_nan=False)  # NaN/inf yok
 
+    @pytest.mark.parametrize("slug", ["cup_handle", "flat_base", "double_bottom", "high_tight_flag"])
+    def test_base_detector_slugs_valid_200(self, client, slug):
+        """P551: O'Neil base detector bulk screen slug'lari gecerli (404 DEGIL) + JSON-safe."""
+        r = client.get(f"/api/screens/{slug}?limit=5")
+        assert r.status_code == 200, f"{slug} -> {r.status_code}: {r.text[:200]}"
+        data = r.json()
+        assert isinstance(data, list)
+        json.dumps(data, allow_nan=False)
+
 
 class TestScreenResilience:
     """Paket 381 — Transient DB hatasi (OperationalError) graceful MOCK fallback.

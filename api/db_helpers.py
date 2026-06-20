@@ -1103,6 +1103,28 @@ def _carr_pvh_screen_specs() -> dict:
     }
 
 
+def _base_pvh_screen_specs() -> dict:
+    """P551: O'Neil base detector'lari (Cup/Flat/Double/HTF) bulk compute-screen.
+    slug -> (wrapped_fn, min_bar). Base detector imzasi (highs,lows,closes,volumes) —
+    Carr generic helper (opens,highs,lows,closes,volumes) cagiriyor; wrapper opens'i atar.
+    valid_base (SQL scanner-kolon) ile fark: detector-bazli (canli pvh compute) + HTF dahil +
+    per-pattern + scanner base-kolonundan bagimsiz (P455-463 derin-arastirma detector'lari)."""
+    import sys as _sys
+    _root = str(Path(__file__).resolve().parent.parent)
+    if _root not in _sys.path:
+        _sys.path.insert(0, _root)
+    from quanfina_math import (
+        compute_cup_with_handle, compute_flat_base,
+        compute_double_bottom, compute_high_tight_flag,
+    )
+    return {
+        "cup_handle": (lambda o, h, lo, c, v: compute_cup_with_handle(h, lo, c, v), 60),
+        "flat_base": (lambda o, h, lo, c, v: compute_flat_base(h, lo, c, v), 60),
+        "double_bottom": (lambda o, h, lo, c, v: compute_double_bottom(h, lo, c, v), 55),
+        "high_tight_flag": (lambda o, h, lo, c, v: compute_high_tight_flag(h, lo, c, v), 60),
+    }
+
+
 def screen_carr_summary(top_n: int = 6) -> list[dict]:
     """Carr 9 setup ozet (P523) — son scan pvh TEK PASS, 9 detector per ticker.
 
@@ -1215,6 +1237,10 @@ def screen_get_results_dispatch(slug: str, limit: int = 500) -> list[dict]:
     if slug in _carr_specs:
         fn, min_bar, needs_vol = _carr_specs[slug]
         return _screen_carr_pvh_compute(fn, min_bar, needs_vol, limit)
+    _base_specs = _base_pvh_screen_specs()   # P551: O'Neil base detector bulk screen'leri
+    if slug in _base_specs:
+        fn, min_bar = _base_specs[slug]
+        return _screen_carr_pvh_compute(fn, min_bar, True, limit)  # base detector volumes alir
     if slug in SCREENS_READY_8:
         return screen_get_results(slug, limit)
     if slug in SCREENS_PARSE_7:

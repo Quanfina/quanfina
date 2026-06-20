@@ -113,6 +113,12 @@ export const SCREEN_CATEGORIES: Record<string, string> = {
   // P534 (18 Haz 2026) — Pocket Pivot bulk (Minervini.md s.167 + Kacher/Morales). Bazın
   // içinde kurumsal güç dönüşü; on-deck/ekleme sinyali (s.165, 218). 70-bar compute-screen.
   pocket_pivot: "Pocket Pivot (Minervini)",  // s.167: yukarı gün hacmi > son 10g en yüksek aşağı hacim
+  // P551 (20 Haz 2026) — O'Neil base detector bulk compute-screen'leri (Cup/Flat/Double/HTF).
+  // valid_base (SQL scanner-kolon) ile fark: detector-bazlı (canlı pvh) + HTF dahil + per-pattern.
+  cup_handle: "Cup & Handle (detector)",       // O'Neil s.162-178: kupa %12-33, kulp ≤%15 üst yarı
+  flat_base: "Flat Base (detector)",           // IBD/MarketSmith: yatay ≤%15, ≥5 hafta
+  double_bottom: "Double Bottom W (detector)", // O'Neil/IBD: 2.dip undercut, pivot=orta tepe
+  high_tight_flag: "High Tight Flag / Power Play", // Minervini s.255: flagpole ≥%100 ≤8hf + tight flag
   // 18 Haz 2026 — Carr Mean Reversion bulk screen (P502). pvh-hesap, scanner/deploy yok.
   mean_reversion: "Mean Reversion (Carr)",   // Carr 2.baskı s.356 countertrend LONG — çekirdek setup
   // 18 Haz 2026 — Carr Coiled Spring bulk screen (P511). pvh 80≥60 → bulk mümkün.
@@ -149,6 +155,12 @@ export const SCREEN_GROUPS: ScreenGroup[] = [
     slugs: ["top5_rpr", "power_play_ready", "tight_low_vol_excellent", "new_top5_rpr",
             "healthy_accumulation", "rpr_89_tpr_c", "vcp_ready_high", "tennis_ball_active",
             "pocket_pivot"],
+  },
+  {
+    // P551: O'Neil base detector compute-screen'leri (valid_base SQL kombine'den ayrı —
+    // detector-bazlı, per-pattern, HTF dahil)
+    label: "O'Neil — Baz Paternleri (detector)",
+    slugs: ["cup_handle", "flat_base", "double_bottom", "high_tight_flag"],
   },
   {
     label: "Carr — LONG / Countertrend",
@@ -320,6 +332,24 @@ export const SCREEN_CONDITIONS: Record<string, ScreenCondition[]> = {
   pocket_pivot: [
     { source: "mark", text: "Bazın içinde kurumsal güç (Minervini.md s.167): bugün YUKARI gün + hacmi son 10 günün en yüksek AŞAĞI-gün hacminden büyük" },
     { source: "mark", text: "Stage 2 ön-şart (s.186): close > 50-DMA + 50-DMA yükselen. 10-DMA dönüşü → GOOD, extended → CANDIDATE (Kacher/Morales). Birincil AL DEĞİL — on-deck/ekleme sinyali (s.165, 218)" },
+  ],
+  // P551 (20 Haz 2026) — O'Neil base detector compute-screen'leri. valid_base (SQL kombine)
+  // ile fark: detector-bazlı (canlı pvh), per-pattern, HTF dahil. EXCELLENT+GOOD döner.
+  cup_handle: [
+    { source: "mark", text: "Cup & Handle (O'Neil s.162-178): kupa derinlik %12-33 + süre ≥7 hafta + önceki advance ≥%30 + kulp ≤%15 (üst yarı + 200MA üstü), wedging fault YOK" },
+    { source: "mark", text: "Pivot = kulp zirvesi (çanak zirvesi DEĞİL). Kırılım hacmi +%40-50 (50g ort). EXCELLENT/GOOD döner (MARGINAL hariç)" },
+  ],
+  flat_base: [
+    { source: "mark", text: "Flat Base (IBD/MarketSmith): yatay konsolidasyon derinlik ≤%15 + süre ≥5 hafta + önceki advance ≥%20 (later-stage). Dar bant 'walk-back'" },
+    { source: "mark", text: "Kırılım hacmi +%40 (50g). Genelde 2.+ baz (Stage 2 ilerlemiş). EXCELLENT/GOOD döner" },
+  ],
+  double_bottom: [
+    { source: "mark", text: "Double Bottom W (O'Neil/IBD): 2 dip + ARALARINDAKI orta tepe. 2.dip 1.dibi UNDERCUT eder (shakeout) — tanımlayıcı şart. Derinlik ≤%35" },
+    { source: "mark", text: "Pivot = orta tepe (kulp varsa kulp). 2.dip hacim dry-up + önceki advance ≥%30. EXCELLENT (hacim dry-up + ≤%30) / GOOD döner" },
+  ],
+  high_tight_flag: [
+    { source: "mark", text: "High Tight Flag = Minervini Power Play (s.255): flagpole ≥%100 yükseliş ≤8 hafta (40g) + flag (bayrak) sığ geri çekilme ≤%25 (ideal ≤%20) 3-6 hafta + hacim dry-up" },
+    { source: "mark", text: "Pivot = flag (konsolidasyon) zirvesi. EN GÜÇLÜ + EN NADİR + EN RİSKLİ patern (O'Neil). EXCELLENT/GOOD döner (pole <%100 / flag >%25 = NONE)" },
   ],
 
   // 24 May 2026 — Tam Minervini Tarama (Hibrit Pipeline: 10 Hard + 5 Soft)

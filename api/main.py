@@ -595,7 +595,9 @@ def get_screen_results(slug: str, limit: int = 500, nocache: bool = False) -> li
         {"blue_sea"} |                 # P518: Carr SHORT bulk (Blue Sky aynasi, 261 bar)
         {"gap_down"} |                 # P520: Carr SHORT bulk (ralli-sonu reversal, 110 bar)
         {"rising_wedge"} |             # P522: Carr SHORT bulk (kama kirilimi, 90 bar)
-        {"pocket_pivot"}               # P534: Pocket Pivot bulk (Minervini s.167 + Kacher/Morales, 70 bar)
+        {"pocket_pivot"} |             # P534: Pocket Pivot bulk (Minervini s.167 + Kacher/Morales, 70 bar)
+        # P551: O'Neil base detector bulk (Cup/Flat/Double/HTF — detector-bazli, valid_base'den ayri)
+        {"cup_handle", "flat_base", "double_bottom", "high_tight_flag"}
     )
     if slug not in valid_slugs:
         from fastapi import HTTPException
