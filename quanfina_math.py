@@ -6269,6 +6269,30 @@ def rs_rating_category(rs: int) -> str:
     return "LAGGARD"
 
 
+def compute_rs_percentile(
+    stock_return_pct: Optional[float],
+    universe_returns: list[float],
+) -> Optional[int]:
+    """IBD canon RS Rating (1-99) — hissenin getirisinin EVREN dagilimindaki persentil rank'i.
+
+    IBD Relative Strength Rating = bir hissenin fiyat performansinin TUM evrene gore
+    cross-sectional persentili (mutlak getiri veya vs-SPY DEGIL). Bu fonksiyon taranmamis
+    sembol icin gercek persentil hesaplar (P561) — onceki hardcoded vs-SPY bant yerine.
+
+    Args:
+        stock_return_pct: Hissenin donem getirisi % (orn. 1y). None ise None doner.
+        universe_returns: Tarama evreninin ayni metrik getiri listesi (minervini_scans.perf_year).
+
+    Returns: int 1-99 (persentil rank) veya None (getiri/evren yok). Uydurma YOK —
+    gercek rank (Kural #26); evren bossa None (Kural #28, caller isaretli fallback)."""
+    if stock_return_pct is None or not universe_returns:
+        return None
+    n = len(universe_returns)
+    below = sum(1 for u in universe_returns if u < stock_return_pct)
+    pct = round(below / n * 99)
+    return max(1, min(99, int(pct)))
+
+
 def compute_relative_strength_rating(
     stock_closes: list[float],
     benchmark_closes: list[float],

@@ -1450,6 +1450,28 @@ def stock_sectors_map_latest(symbols: list[str]) -> dict[str, str]:
         return {}
 
 
+def universe_perf_year_values() -> list[float]:
+    """Son taramadaki evrenin perf_year (1y getiri %) dagilimi — RS cross-sectional
+    persentil hesabi icin (P561, IBD canon RS = performans persentili).
+
+    Sadece gercek scan verisi (MOCK YOK — Kural #28). Bos liste = veri yok (caller
+    eski yaklasik fallback'e duser)."""
+    try:
+        with engine.connect() as conn:
+            last = conn.execute(
+                text("SELECT MAX(scan_date) FROM minervini_scans")
+            ).scalar()
+            if not last:
+                return []
+            result = conn.execute(text("""
+                SELECT perf_year FROM minervini_scans
+                WHERE scan_date = :d AND perf_year IS NOT NULL
+            """), {"d": last})
+            return [float(r[0]) for r in result]
+    except Exception:
+        return []
+
+
 def breadth_history_from_scans(days: int = 25) -> list[tuple[int, int]]:
     """Paket 409: Quanfina kendi günlük tarama verisinden A/D (advance/decline) sayım.
 

@@ -34,6 +34,7 @@ from db_helpers import (  # noqa: E402
     sector_rank_map_latest,
     stock_sector_latest,
     stock_sectors_map_latest,
+    universe_perf_year_values,
     breadth_history_from_scans,
     minervini_stocks_get_latest,
     scan_latest_date,
@@ -86,6 +87,7 @@ from quanfina_math import (  # noqa: E402
     compute_high_tight_flag,
     compute_pocket_pivot,
     compute_group_rs_confirmation,
+    compute_rs_percentile,
     compute_stage_transition,
     compute_faber_timing,
     compute_mcclellan_oscillator,
@@ -3186,10 +3188,33 @@ def get_rs_rating(symbol: str) -> RsRatingInfo:
         }[cat]
         return RsRatingInfo(rs_rating=rs_ibd, category=cat, source="scan", mark_says=cat_say)
 
-    # Fallback: taranmamış sembol — yerel compute yaklaşığı. compute_relative_
-    # strength_rating cross-sectional DEĞİL (vs-SPY hardcoded bant) → source=
-    # "computed" ile UI'da işaretlenir (Kural #28). Tam cross-sectional persentil
-    # (evren batch percentileofscore) follow-up (Kural #26 GELİŞTİRİLMESİ LAZIM).
+    # P561 (20 Haz 2026 — Kural #26/#28): Taranmamış sembol için GERÇEK cross-sectional
+    # persentil. Eski hardcoded vs-SPY bant KALDIRILDI. IBD canon RS = hissenin getirisinin
+    # tüm evrene göre persentil rank'ı. yfinance gerçek 1y getiri → minervini_scans.perf_year
+    # evren dağılımında persentil. MOCK GUARD: SADECE gerçek yfinance (_fetch_ohlcv_real) ile
+    # hesapla — sentetik bar'la sahte RS üretme (Kural #28). Veri yoksa eski yaklaşık (işaretli).
+    real_bars = _fetch_ohlcv_real(sym, 252)
+    universe = universe_perf_year_values()
+    if real_bars and len(real_bars) >= 200 and universe:
+        closes = [b.close for b in real_bars]
+        stock_1y = (closes[-1] - closes[0]) / closes[0] * 100 if closes[0] > 0 else None
+        pct = compute_rs_percentile(stock_1y, universe)
+        if pct is not None:
+            cat = rs_rating_category(pct)
+            return RsRatingInfo(
+                rs_rating=pct,
+                category=cat,
+                stock_return_pct=round(stock_1y, 1) if stock_1y is not None else None,
+                source="computed",
+                mark_says=(
+                    f"Cross-sectional RS {pct} — {len(universe)} hisselik tarama evrenine göre "
+                    f"1 yıllık getiri persentili (IBD canon). Taranmamış sembol, canlı hesap "
+                    f"(scan rs_ibd kadar otoriter değil ama gerçek persentil)."
+                ),
+            )
+
+    # Son fallback: yfinance erişilemez VEYA evren yok — yerel yaklaşık (cross-sectional
+    # DEĞİL, source="computed" UI işaretli, Kural #28). Nadir: untracked + yfinance down.
     stock_bars = _get_ohlcv(sym, 100.0)
     bench_bars = _get_ohlcv("SPY", 450.0)
     result = compute_relative_strength_rating(
@@ -3202,7 +3227,7 @@ def get_rs_rating(symbol: str) -> RsRatingInfo:
         benchmark_return_pct=result.get("benchmark_return_pct"),
         outperform_pct=result.get("outperform_pct"),
         source="computed",
-        mark_says="(Taranmamış — yerel yaklaşık, cross-sectional değil) "
+        mark_says="(Taranmamış + canlı veri yok — yerel yaklaşık, cross-sectional değil) "
         + result.get("mark_says", ""),
     )
 
