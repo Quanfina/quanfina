@@ -71,6 +71,21 @@ export const TRADE_COL_DEFS: ColDef<Trade>[] = [
     valueFormatter: (p) => SETUP_LABELS[p.value as string] ?? String(p.value ?? ""),
     cellStyle: { fontSize: 12 },
   },
+  // P541 (20 Haz 2026): Pozisyon yönü — LONG (yeşil) / SHORT (kırmızı). Carr SHORT setupları
+  // (Blue Sea/Gap Down/Rising Wedge). invest_type yoksa LONG (geriye uyum — eski trade'ler).
+  {
+    field: "invest_type",
+    headerName: "YÖN",
+    width: 80,
+    minWidth: 64,
+    valueFormatter: (p: ValueFormatterParams<Trade, number>) => (p.value === 2 ? "SHORT" : "LONG"),
+    cellStyle: (p: CellClassParams<Trade, number>): CellStyle => ({
+      fontSize: 12,
+      fontWeight: 600,
+      color: p.value === 2 ? "var(--mtp-danger)" : "var(--mtp-excellent)",
+    }),
+    headerTooltip: "Pozisyon yönü — LONG (al, fiyat yükselince kâr) / SHORT (sat, fiyat düşünce kâr). Carr SHORT setupları için.",
+  },
   {
     field: "entry_date",
     headerName: "GİRİŞ TARİH",
