@@ -7,6 +7,7 @@ import { ModeSuggestionCard } from "@/components/market/ModeSuggestionCard";
 import { SectorSummaryCard } from "@/components/market/SectorSummaryCard";
 import { MarketStatusBadge } from "@/components/market/MarketStatusBadge";
 import { MarkRegimeCard } from "@/components/market/MarkRegimeCard";
+import { PullbackReliefCard } from "@/components/market/PullbackReliefCard";
 import { MarketDataMockBanner } from "@/components/market/MarketDataMockBanner";
 import { ModBadge } from "@/components/mark/ModBadge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -187,6 +188,11 @@ export default function PiyasaDurumuPage() {
           topSectors={data.top_sectors}
           bottomSectors={data.bottom_sectors}
         />
+      </div>
+
+      {/* P570: Carr Pullback/Relief Rally oranı — piyasa rejim/aşırılık (s.280) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <PullbackReliefCard />
       </div>
 
       {/* Sektör Rotasyonu notu — P446 (review): iç-geliştirme referansları

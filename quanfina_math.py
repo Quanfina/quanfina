@@ -4891,6 +4891,98 @@ def compute_carr_pullback(
     return d
 
 
+def compute_carr_relief_rally(
+    opens: list[float],
+    highs: list[float],
+    lows: list[float],
+    closes: list[float],
+) -> dict:
+    """Carr Relief Rally (TLFAL 2.baski Bolum 15, s.275-280) — WEAK_BEAR trend-takip SHORT.
+
+    Pullback'in TAM AYNASI (s.280 "pullback to relief rally ratio" cifti). SINYAL gunu
+    (6 kural HEPSI gerekli, pullback'in tersi):
+      (1) SMA20 < SMA50, (2) SMA50 < SMA200 (uzun dusus trendi),
+      (3) SMA50 bugun < SMA50 10g once (50 dusuyor),
+      (4) SMA20 bugun < SMA20 5g once (20 dusuyor),
+      (5) Stoch %K(5,3,3) > 80 (overbought relief rally tetigi),
+      (6) bugun close < open (reddetme/bearish mum).
+    ENTRY (short, s.248 ayna): sinyal gunu ertesi, fiyat sinyal gunu LOW'u ALTINA
+    dustugunde acilir (sell-stop). entry = signal_low (= lows[bugun]).
+    STOP (s.321-322 ayna): 50 MA × (1 + %2) yapisal; evrensel %8 hard cap. Target = entry
+    - 2.0R. TIME STOP YOK (trend-takip). Gosterge: Stochastics. On-filtre: Bearish Watch List.
+
+    Returns: compute_carr_pullback ile ayni sekil (direction='SHORT').
+    """
+    def _none(msg: str) -> dict:
+        return {
+            'detected': False, 'direction': None, 'quality': 'NONE',
+            'signal_close': None, 'entry': None, 'stop': None, 'target': None,
+            'risk_pct': None, 'rr': None,
+            'sma20': None, 'sma50': None, 'sma200': None, 'stoch_k': None,
+            'rules': {}, 'mark_says': msg,
+        }
+
+    if not opens or not highs or not lows or not closes:
+        return _none('Yetersiz veri — Carr Relief Rally hesaplanamiyor.')
+    n = len(closes)
+    if not (len(opens) == len(highs) == len(lows) == n):
+        return _none('Carr Relief Rally: OHLC uzunluk farkli.')
+    if n < PULLBACK_SMA_SLOW:
+        return _none(f'Yetersiz veri — en az {PULLBACK_SMA_SLOW} bar gerek (SMA200).')
+
+    i = n - 1
+    sma20_t = _sma_at(closes, i, PULLBACK_SMA_FAST)
+    sma50_t = _sma_at(closes, i, PULLBACK_SMA_MID)
+    sma200_t = _sma_at(closes, i, PULLBACK_SMA_SLOW)
+    sma50_prev = _sma_at(closes, i - PULLBACK_MID_RISING_LOOKBACK, PULLBACK_SMA_MID)
+    sma20_prev = _sma_at(closes, i - PULLBACK_FAST_RISING_LOOKBACK, PULLBACK_SMA_FAST)
+    stoch_k = _stochastic_k(highs, lows, closes, i,
+                            PULLBACK_STOCH_PERIOD, PULLBACK_STOCH_SMOOTH)
+    if None in (sma20_t, sma50_t, sma200_t, sma50_prev, sma20_prev, stoch_k):
+        return _none('Carr Relief Rally: gosterge hesaplanamadi (yetersiz veri).')
+
+    overbought = 100 - PULLBACK_STOCH_OVERSOLD   # 80 (Stoch 20/80 simetrik, Carr standardi)
+    rules = {
+        'sma20_alti_sma50': sma20_t < sma50_t,
+        'sma50_alti_sma200': sma50_t < sma200_t,
+        'sma50_falling_10g': sma50_t < sma50_prev,
+        'sma20_falling_5g': sma20_t < sma20_prev,
+        'stoch_k_overbought': stoch_k > overbought,
+        'bugun_bearish': closes[i] < opens[i],
+    }
+    base = {
+        'sma20': round(sma20_t, 2), 'sma50': round(sma50_t, 2),
+        'sma200': round(sma200_t, 2), 'stoch_k': round(stoch_k, 1), 'rules': rules,
+    }
+    if not all(rules.values()):
+        d = _none(f'Carr Relief Rally sinyali yok ({sum(rules.values())}/6 kosul).')
+        d.update(base)
+        return d
+
+    # ENTRY (short) = sinyal gunu LOW altinda sell-stop. Stop = 50 MA × (1+%2) yapisal,
+    # %8 hard cap. Target = entry - 2.0R. Time stop YOK (trend-takip). Pullback'in aynasi.
+    entry = lows[i]
+    structural = sma50_t * (1 + PULLBACK_STOP_MA_BUFFER_PCT / 100)
+    hard_cap = entry * (1 + PULLBACK_HARD_CAP_PCT / 100)
+    stop = min(structural, hard_cap)  # entry'ye yakin (dusuk) olan = %8 cap asilmaz
+    risk = stop - entry
+    target = entry - PULLBACK_TARGET_R_MULTIPLE * risk
+    risk_pct = round(risk / entry * 100, 2) if entry else None
+    cap_note = ' (%8 cap)' if stop == hard_cap else ' (50MA +%2)'
+    says = (f'✓ Carr Relief Rally SHORT (WEAK_BEAR trend-takip) — sinyal ${round(closes[i], 2)}, '
+            f'giris ${round(entry, 2)} (ertesi gun signal low alti), stop ${round(stop, 2)}'
+            f'{cap_note}, hedef ${round(target, 2)} (2R). Stoch %K {round(stoch_k, 1)}>{overbought} '
+            f'overbought, SMA20<SMA50<SMA200 + ikisi dusuyor. Time stop YOK (Carr s.280).')
+    d = {
+        'detected': True, 'direction': 'SHORT', 'quality': 'GOOD',
+        'signal_close': round(closes[i], 2), 'entry': round(entry, 2),
+        'stop': round(stop, 2), 'target': round(target, 2),
+        'risk_pct': risk_pct, 'rr': PULLBACK_TARGET_R_MULTIPLE, 'mark_says': says,
+    }
+    d.update(base)
+    return d
+
+
 # ======================================================================
 # CARR BLUE SKY BREAKOUT (TLFAL 2.baski Bolum 12, s.257-265 + s.335) — P507 (18 Haz 2026)
 # STRONG+WEAK_BULL trend-takip LONG breakout. Cift danisma (Carr NotebookLM, verbatim teyit).

@@ -35,6 +35,7 @@ from db_helpers import (  # noqa: E402
     stock_sector_latest,
     stock_sectors_map_latest,
     universe_perf_year_values,
+    pullback_relief_ratio_series,
     breadth_history_from_scans,
     minervini_stocks_get_latest,
     scan_latest_date,
@@ -614,6 +615,7 @@ def get_screen_results(slug: str, limit: int = 500, nocache: bool = False) -> li
         {"coiled_spring"} |            # P511: pvh-hesap compute-screen (Carr s.250, 60 bar)
         # P516: pvh 280 bar -> 200-261 bar Carr setup'lari bulk (sonraki scan'de dolar)
         {"pullback", "blue_sky", "bullish_base", "bullish_divergence"} |
+        {"relief_rally"} |             # P570: Carr SHORT (pullback aynasi, s.280 oran cifti)
         {"blue_sea"} |                 # P518: Carr SHORT bulk (Blue Sky aynasi, 261 bar)
         {"gap_down"} |                 # P520: Carr SHORT bulk (ralli-sonu reversal, 110 bar)
         {"rising_wedge"} |             # P522: Carr SHORT bulk (kama kirilimi, 90 bar)
@@ -4771,6 +4773,87 @@ def get_sector_rotation() -> list[SectorRotationEntry]:
     """Sektör Rotasyonu — son tarama 11 SPDR sektör ETF, RS rank sıralı.
     DB bos/erisilmezse bos liste (graceful)."""
     return sector_rotation_get_latest()
+
+
+# P570 (20 Haz 2026): Carr Pullback/Relief Rally ratio — piyasa rejim göstergesi (s.280).
+# Carr "cool pro tip": günlük Pullback aday / Relief Rally aday. >1 ve yükseliyor = boğa
+# rejimi aşırı satıma kayıyor (AL dip); <1 ve düşüyor = ayı rejimi aşırı alıma kayıyor (SHORT
+# tepki). Kanon: Trade Trading for a Living 2.baski Böl.15 s.280 (kullanıcı NotebookLM doğrulama).
+class PullbackReliefPoint(BaseModel):
+    scan_date: str
+    ratio: Optional[float] = None
+    pullback: int = 0
+    relief: int = 0
+
+
+class PullbackReliefRatioInfo(BaseModel):
+    available: bool = False
+    ratio: Optional[float] = None
+    pullback_count: int = 0
+    relief_count: int = 0
+    direction: Optional[Literal["rising", "falling", "flat"]] = None
+    regime: Optional[Literal["BULLISH_OVERSOLD", "BEARISH_OVERBOUGHT", "NEUTRAL"]] = None
+    scan_date: Optional[str] = None
+    series: list[PullbackReliefPoint] = []
+    mark_says: str
+
+
+@app.get("/api/market/pullback-relief-ratio", response_model=PullbackReliefRatioInfo)
+def get_pullback_relief_ratio() -> PullbackReliefRatioInfo:
+    """Carr Pullback/Relief Rally oranı — piyasa rejim/aşırılık göstergesi (s.280).
+
+    Günlük Pullback aday / Relief Rally aday. Carr s.280 yorum: >1 ve yükseliyor → boğa
+    rejimi aşırı satıma kayıyor (buyable dip); <1 ve düşüyor → ayı rejimi aşırı alıma kayıyor
+    (shortable bounce). Son 5 scan_date trend. Veri yok → available=False (Kural #28)."""
+    series = pullback_relief_ratio_series(days=5)
+    if not series:
+        return PullbackReliefRatioInfo(
+            available=False,
+            mark_says="Veri yok — tarama pvh erişilemez (Pullback/Relief oranı hesaplanamadı).",
+        )
+    pts = [PullbackReliefPoint(**s) for s in series]
+    today = series[0]
+    ratio = today["ratio"]
+
+    if ratio is None:
+        # Relief aday = 0 (payda) → oran tanımsız; pullback>0 ise aşırı-boğa işareti
+        says = ("Relief Rally adayı yok (payda 0). Pullback adayı "
+                f"{today['pullback']} — aşırı boğa rejim işareti (Carr s.280)."
+                if today["pullback"] > 0 else
+                "Ne Pullback ne Relief Rally adayı var — nötr/düşük volatilite.")
+        return PullbackReliefRatioInfo(
+            available=True, ratio=None, pullback_count=today["pullback"],
+            relief_count=today["relief"], direction="flat", regime="NEUTRAL",
+            scan_date=today["scan_date"], series=pts, mark_says=says,
+        )
+
+    prior = next((s for s in series[1:] if s["ratio"] is not None), None)
+    direction = "flat"
+    if prior:
+        if ratio > prior["ratio"]:
+            direction = "rising"
+        elif ratio < prior["ratio"]:
+            direction = "falling"
+
+    # Carr s.280 rejim: >1 + yükseliyor = boğa/oversold (AL) ; <1 + düşüyor = ayı/overbought (SHORT)
+    if ratio > 1 and direction != "falling":
+        regime = "BULLISH_OVERSOLD"
+        says = (f"Oran {ratio} (>1{', yükseliyor' if direction == 'rising' else ''}) — boğa rejimi, "
+                f"aşırı satıma kayıyor. Carr s.280: dipten alım (buyable dip) için iyi zaman.")
+    elif ratio < 1 and direction != "rising":
+        regime = "BEARISH_OVERBOUGHT"
+        says = (f"Oran {ratio} (<1{', düşüyor' if direction == 'falling' else ''}) — ayı rejimi, "
+                f"aşırı alıma kayıyor. Carr s.280: tepki yükselişinde short (shortable bounce).")
+    else:
+        regime = "NEUTRAL"
+        says = (f"Oran {ratio} (yön: {direction}) — geçiş/nötr. Carr s.280: net sinyal için "
+                f">1 yükseliş (boğa) veya <1 düşüş (ayı) teyidi bekle.")
+
+    return PullbackReliefRatioInfo(
+        available=True, ratio=ratio, pullback_count=today["pullback"],
+        relief_count=today["relief"], direction=direction, regime=regime,
+        scan_date=today["scan_date"], series=pts, mark_says=says,
+    )
 
 
 # ── Trade Journal ─────────────────────────────────────────────────────────────

@@ -1097,10 +1097,11 @@ def _carr_pvh_screen_specs() -> dict:
         compute_carr_pullback, compute_blue_sky_breakout,
         compute_bullish_base_breakout, compute_bullish_divergence,
         compute_blue_sea_breakdown, compute_gap_down,
-        compute_rising_wedge_breakdown,
+        compute_rising_wedge_breakdown, compute_carr_relief_rally,
     )
     return {
         "pullback": (compute_carr_pullback, 200, False),           # SMA200
+        "relief_rally": (compute_carr_relief_rally, 200, False),   # P570: SMA200 SHORT (pullback aynasi, s.280)
         "blue_sky": (compute_blue_sky_breakout, 261, True),        # 260g 52-hafta
         "bullish_base": (compute_bullish_base_breakout, 200, True),  # SMA200
         "bullish_divergence": (compute_bullish_divergence, 201, True),  # SMA200 + dun
@@ -1132,6 +1133,78 @@ def _base_pvh_screen_specs() -> dict:
     }
 
 
+_PR_RATIO_CACHE: dict = {}   # scan_date(str) -> (pullback_count, relief_count)
+
+
+def pullback_relief_ratio_series(days: int = 5) -> list[dict]:
+    """P570: Carr Pullback/Relief Rally günlük oran serisi (Carr 2.baski s.280).
+
+    Oran = günlük Pullback aday / Relief Rally aday. Son `days` scan_date için sayar
+    (rising/falling trend icin). Carr on-filtre (Fiyat>$5 + ort hacim>=100k, SMA200 >=200 bar).
+    Sayim scan_date basina cache'lenir (stabil — gecmis scan degismez). EN YENI ONCE.
+
+    Returns: [{scan_date, pullback, relief, ratio}, ...] (ratio: relief=0 ise None).
+    """
+    import sys as _sys
+    import json as _json
+    _root = str(Path(__file__).resolve().parent.parent)
+    if _root not in _sys.path:
+        _sys.path.insert(0, _root)
+    from quanfina_math import compute_carr_pullback, compute_carr_relief_rally
+
+    out: list[dict] = []
+    try:
+        with engine.connect() as conn:
+            dates = [r[0] for r in conn.execute(text(
+                "SELECT DISTINCT scan_date FROM minervini_scans "
+                "ORDER BY scan_date DESC LIMIT :n"
+            ), {"n": days})]
+            for sd in dates:
+                sd_str = str(sd)
+                if sd_str in _PR_RATIO_CACHE:
+                    pb, rr = _PR_RATIO_CACHE[sd_str]
+                else:
+                    pb = rr = 0
+                    rows = conn.execute(text("""
+                        SELECT price_volume_history FROM minervini_scans
+                        WHERE scan_date = :d AND price_volume_history IS NOT NULL
+                    """), {"d": sd})
+                    for row in rows:
+                        pvh = row[0]
+                        try:
+                            arr = pvh if isinstance(pvh, list) else _json.loads(pvh)
+                        except Exception:
+                            continue
+                        if not arr or len(arr) < 200:   # SMA200 gerek
+                            continue
+                        try:
+                            if float(arr[-1]["close"]) <= 5.0:   # Carr Fiyat>$5
+                                continue
+                            recent_vols = [float(b["volume"]) for b in arr[-20:] if b.get("volume") is not None]
+                            if (sum(recent_vols) / len(recent_vols) if recent_vols else 0.0) < 100_000:
+                                continue
+                            o = [b["open"] for b in arr]; h = [b["high"] for b in arr]
+                            lo = [b["low"] for b in arr]; c = [b["close"] for b in arr]
+                        except (KeyError, TypeError, ValueError):
+                            continue
+                        try:
+                            if compute_carr_pullback(o, h, lo, c).get("detected"):
+                                pb += 1
+                        except Exception:
+                            pass
+                        try:
+                            if compute_carr_relief_rally(o, h, lo, c).get("detected"):
+                                rr += 1
+                        except Exception:
+                            pass
+                    _PR_RATIO_CACHE[sd_str] = (pb, rr)
+                ratio = round(pb / rr, 2) if rr > 0 else None
+                out.append({"scan_date": sd_str, "pullback": pb, "relief": rr, "ratio": ratio})
+    except Exception:
+        return []
+    return out
+
+
 def screen_carr_summary(top_n: int = 6) -> list[dict]:
     """Carr 9 setup ozet (P523) — son scan pvh TEK PASS, 9 detector per ticker.
 
@@ -1148,6 +1221,7 @@ def screen_carr_summary(top_n: int = 6) -> list[dict]:
         compute_carr_pullback, compute_mean_reversion, compute_blue_sky_breakout,
         compute_coiled_spring, compute_bullish_base_breakout, compute_bullish_divergence,
         compute_blue_sea_breakdown, compute_gap_down, compute_rising_wedge_breakdown,
+        compute_carr_relief_rally,
     )
     # (slug, label, direction, fn, min_bar, needs_volume)
     specs = [
@@ -1157,6 +1231,7 @@ def screen_carr_summary(top_n: int = 6) -> list[dict]:
         ("coiled_spring", "Coiled Spring", "LONG", compute_coiled_spring, 60, False),
         ("bullish_base", "Bullish Base", "LONG", compute_bullish_base_breakout, 200, True),
         ("bullish_divergence", "Bullish Divergence", "LONG", compute_bullish_divergence, 201, True),
+        ("relief_rally", "Relief Rally", "SHORT", compute_carr_relief_rally, 200, False),
         ("blue_sea", "Blue Sea Breakdown", "SHORT", compute_blue_sea_breakdown, 261, True),
         ("gap_down", "Gap Down", "SHORT", compute_gap_down, 111, False),
         ("rising_wedge", "Rising Wedge", "SHORT", compute_rising_wedge_breakdown, 90, True),
