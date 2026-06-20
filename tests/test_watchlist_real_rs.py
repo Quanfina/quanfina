@@ -96,3 +96,30 @@ class TestAddWatchlistRealData:
         # Veri yok → 0 (dürüst), seeded uydurma DEĞİL
         assert captured["rs_rating"] == 0
         assert captured["price"] == 0.0
+
+
+@pytest.mark.skipif(not _HAS_API, reason="fastapi yok")
+class TestWatchlistInfoMeta:
+    """P565: /api/watchlist/info — DB-down MOCK_WATCHLIST şeffaflık (banner besler)."""
+    @pytest.fixture(scope="class")
+    def client(self):
+        return TestClient(api_main.app)
+
+    def test_db_up_not_mock(self, client, monkeypatch):
+        monkeypatch.setattr(api_main, "db_health_check", lambda: True)
+        monkeypatch.setattr(api_main, "watchlist_get_all", lambda: [{"symbol": "X"}])
+        d = client.get("/api/watchlist/info").json()
+        assert d["is_mock"] is False
+        assert d["source"] == "db"
+
+    def test_db_down_is_mock(self, client, monkeypatch):
+        monkeypatch.setattr(api_main, "db_health_check", lambda: False)
+        d = client.get("/api/watchlist/info").json()
+        assert d["is_mock"] is True
+        assert d["source"] == "mock_fallback"
+
+    def test_info_not_shadowed_by_symbol_route(self, client, monkeypatch):
+        # "info" 2-segment /{symbol}/{strategy} route'larını gölgelememeli (200, 404 değil)
+        monkeypatch.setattr(api_main, "db_health_check", lambda: True)
+        monkeypatch.setattr(api_main, "watchlist_get_all", lambda: [])
+        assert client.get("/api/watchlist/info").status_code == 200

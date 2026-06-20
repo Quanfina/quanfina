@@ -37,11 +37,15 @@ import type { WatchlistRow } from "@/types/watchlist";
 import { demoteStatus } from "@/lib/watchlist-status";
 import { GridLoadingOverlay } from "@/components/ag-grid/LoadingOverlay";
 import { MarkRegimeBanner } from "@/components/mark/MarkRegimeBanner";
+import { useWatchlistInfo } from "@/hooks/use-watchlist-info";
+import { MockDataBanner } from "@/components/shared/MockDataBanner";
 import { ModBadge } from "@/components/mark/ModBadge";
 import { useTradingMode } from "@/hooks/use-trading-mode";
 
 export default function WatchlistPage() {
   const { gridClass } = useGridTheme();
+  // P565 (Kural #28): DB-down MOCK_WATCHLIST fallback şeffaflığı (banner)
+  const { data: wlInfo } = useWatchlistInfo();
 
   // P407: URL query param ile view modu + sembol seçimi (deep-link)
   // `?view=split&symbol=NVDA` → split-pane modu, NVDA aktif
@@ -270,6 +274,9 @@ export default function WatchlistPage() {
         totalCount={data?.length ?? 0}
         climaxTopCount={(data ?? []).filter((r) => r.mark_signals?.climax_category === "CLIMAX_TOP").length}
       />
+
+      {/* P565 (Kural #28): DB-down MOCK_WATCHLIST fallback — sessiz mock kalmasın */}
+      <MockDataBanner isMock={wlInfo?.is_mock} context="izleme listesi (RS/fiyat)" testId="watchlist-mock-banner" />
 
       <div className="px-6 py-3 border-b">
         <WatchlistFilters

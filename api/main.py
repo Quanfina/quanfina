@@ -2099,6 +2099,29 @@ def get_watchlist() -> list[WatchlistRow]:
         ) from e
 
 
+# P565 (20 Haz 2026 — Kural #28): Watchlist veri kaynağı meta (DB vs MOCK fallback).
+# get_watchlist DB-down'da MOCK_WATCHLIST döner ("banner sadece API'da" notu) — bu endpoint
+# /api/trades/info pattern'i ile UI banner'ı besler (sessiz mock kalmasın). "info" tek-segment,
+# /{symbol}/{strategy} (2-segment) route'larını gölgelemez.
+class WatchlistInfo(BaseModel):
+    source: Literal["db", "mock_fallback"]
+    count: int
+    is_mock: bool
+
+
+@app.get("/api/watchlist/info", response_model=WatchlistInfo)
+def get_watchlist_info() -> WatchlistInfo:
+    """Watchlist veri kaynağı meta — DB sağlam mı yoksa MOCK_WATCHLIST fallback mi?
+    Kural #28: İzleme Listesi sayfa başında UI banner (is_mock=true → sarı MOCK uyarısı)."""
+    if not db_health_check():
+        return WatchlistInfo(source="mock_fallback", count=10, is_mock=True)
+    try:
+        rows = watchlist_get_all()
+        return WatchlistInfo(source="db", count=len(rows), is_mock=False)
+    except Exception:
+        return WatchlistInfo(source="mock_fallback", count=10, is_mock=True)
+
+
 # ── Watchlist CRUD helpers ────────────────────────────────────────────────────
 
 _STATUS_HIERARCHY = ["watch", "on_deck", "focus", "buy"]
