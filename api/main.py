@@ -2789,11 +2789,11 @@ def _parse_pct(v) -> Optional[float]:
 
 
 def _fetch_fundamental_raw(sym: str) -> tuple:
-    """(eps_qoq, sales_qoq) ham — once MOCK stock, sonra minervini_scans son scan.
-    Bulunamazsa (None, None). Fundamental ceyreklik (stabil) -> EOD scan uygun."""
-    stock = _STOCK_BY_SYM.get(sym)
-    if stock is not None:
-        return getattr(stock, "eps_qoq", None), getattr(stock, "sales_qoq", None)
+    """(eps_qoq, sales_qoq) — SADECE gerçek minervini_scans son scan (P546, Kural #28).
+
+    MOCK_STOCKS hardcoded eps (NVDA 88.5 vb.) KALDIRILDI — sahte fundamental paper-trade
+    kararı için tehlikeli. Tarama dışı sembol / eps bildirilmemiş -> (None, None) ->
+    kart 'veri yok' (dürüst). Fundamental çeyreklik (stabil) -> EOD scan uygun kaynak."""
     try:
         from api.db_helpers import engine
         from sqlalchemy import text as sql_text
