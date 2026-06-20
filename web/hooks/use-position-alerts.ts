@@ -13,18 +13,26 @@ import type { StockQuote } from "@/hooks/use-stock-quote";
  * - TLSMW Ch 12: "Never let a winner turn into a loser, never sell below stop"
  * - TTLC Sec 1.6: "Without a written plan, you have only hope" → plan_stop ZORUNLU
  *
- * Alert 4 tip:
+ * Alert 5 tip:
  * 1. STOP_HIT (critical) — current_price <= plan_stop → kırmızı toast, kapat
  * 2. STOP_NEAR (warning) — plan_stop'a +%1 yakın (hazır ol)
  * 3. MINERVINI_7PCT (warning) — entry'den -%7 düştü (Mark mutlak kural)
  * 4. TARGET_NEAR (info) — plan_target'a +%2 yakın (kar al hazırlığı)
+ * 5. FREE_TRADE (warning/info) — kar başlangıç stop mesafesinin 2x/3x'ine ulaştı →
+ *    stop'u breakeven'e taşı, risksiz pozisyon (Mark TTLC Böl.2; P555 —
+ *    quanfina_math.should_move_to_breakeven eşikleri birebir, Kural #26). Yön-farkında.
  *
  * Dedup: localStorage "position-alerts-dismissed" + Set<alertId>.
  * Alert ID = `${tradeId}-${type}-${YYYY-MM-DD}` (günlük yeniden bildir).
  */
 
 export type AlertSeverity = "critical" | "warning" | "info";
-export type AlertType = "stop_hit" | "stop_near" | "minervini_7pct" | "target_near";
+export type AlertType =
+  | "stop_hit"
+  | "stop_near"
+  | "minervini_7pct"
+  | "target_near"
+  | "free_trade";
 
 export interface PositionAlert {
   id: string;
@@ -212,6 +220,51 @@ export function usePositionAlerts(
           current_price: price,
           ref_price: t.plan_target,
         });
+      }
+
+      // 5. FREE_TRADE — kar baslangic stop mesafesinin 2x/3x'ine ulasti -> breakeven'e tasi
+      //    Mark "Think and Trade Like a Champion" Bol 2. Esikler quanfina_math.
+      //    should_move_to_breakeven BIREBIR (>=3 WARNING tasi / >=2 INFO yaklasiyor; Kural #26).
+      //    Yon-farkinda. Stop zaten breakeven'da/ustundeyse uyarma.
+      if (t.plan_stop != null) {
+        const isLong = t.invest_type !== 2;
+        const stopBelowEntry = isLong
+          ? t.plan_stop < t.entry_price
+          : t.plan_stop > t.entry_price;
+        if (stopBelowEntry) {
+          const initialStopPct =
+            (Math.abs(t.entry_price - t.plan_stop) / t.entry_price) * 100;
+          const gainPct = isLong
+            ? (price / t.entry_price - 1) * 100
+            : (1 - price / t.entry_price) * 100;
+          if (initialStopPct > 0 && gainPct > 0) {
+            const mult = gainPct / initialStopPct;
+            if (mult >= 2) {
+              const hot = mult >= 3;
+              result.push({
+                id: `${t.id}-free_trade-${today}`,
+                tradeId: t.id,
+                symbol: t.symbol,
+                severity: hot ? "warning" : "info",
+                type: "free_trade",
+                title: hot
+                  ? `🟢 ${t.symbol} — FREE TRADE: STOP'U BREAKEVEN'E TAŞI`
+                  : `🟢 ${t.symbol} — BREAKEVEN YAKLAŞIYOR`,
+                message: hot
+                  ? `Kar %${gainPct.toFixed(1)} (${mult.toFixed(
+                      1
+                    )}x stop mesafesi). Stop'u entry $${t.entry_price.toFixed(
+                      2
+                    )}'a taşı — risksiz pozisyon (Mark TTLC Böl.2 Free Trade).`
+                  : `Kar %${gainPct.toFixed(1)} (${mult.toFixed(
+                      1
+                    )}x stop mesafesi) — 3x'te breakeven taşıma zamanı (Mark TTLC Böl.2).`,
+                current_price: price,
+                ref_price: t.entry_price,
+              });
+            }
+          }
+        }
       }
     });
 

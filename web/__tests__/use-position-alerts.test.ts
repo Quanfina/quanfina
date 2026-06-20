@@ -205,6 +205,62 @@ describe("usePositionAlerts — alert hesabı (saf useMemo)", () => {
       expect(result.current.some((a) => a.type === "target_near")).toBe(false);
     });
   });
+
+  describe("FREE_TRADE (P555) — Mark TTLC Böl.2, eşik quanfina_math birebir (2x/3x)", () => {
+    // Varsayılan: entry=100, plan_stop=93 → initialStopPct=%7. mult=gain%/7.
+    // (Sınır-dışı net değer — float kenar hassasiyetinden kaçın; Python compute de epsilonsuz.)
+    it("LONG price=116 (gain≈16% ≈ 2.3x) → FREE_TRADE info (yaklaşıyor)", () => {
+      const trades = [makeTrade({ entry_price: 100, plan_stop: 93 })];
+      const { result } = renderHook(() =>
+        usePositionAlerts(trades, [makeQuote("AAPL", 116)])
+      );
+      const ft = result.current.find((a) => a.type === "free_trade");
+      expect(ft).toBeDefined();
+      expect(ft?.severity).toBe("info");
+      expect(ft?.title).toContain("BREAKEVEN YAKLAŞIYOR");
+      expect(ft?.ref_price).toBe(100); // breakeven = entry
+    });
+
+    it("LONG price=123 (gain≈23% ≈ 3.3x) → FREE_TRADE warning (TAŞI)", () => {
+      const trades = [makeTrade({ entry_price: 100, plan_stop: 93, plan_target: 200 })];
+      const { result } = renderHook(() =>
+        usePositionAlerts(trades, [makeQuote("AAPL", 123)])
+      );
+      const ft = result.current.find((a) => a.type === "free_trade");
+      expect(ft).toBeDefined();
+      expect(ft?.severity).toBe("warning");
+      expect(ft?.title).toContain("BREAKEVEN'E TAŞI");
+    });
+
+    it("LONG price=110 (gain=10% = 1.43x < 2x) → FREE_TRADE YOK", () => {
+      const trades = [makeTrade({ entry_price: 100, plan_stop: 93 })];
+      const { result } = renderHook(() =>
+        usePositionAlerts(trades, [makeQuote("AAPL", 110)])
+      );
+      expect(result.current.some((a) => a.type === "free_trade")).toBe(false);
+    });
+
+    it("stop zaten breakeven'da (plan_stop=entry) → FREE_TRADE YOK", () => {
+      const trades = [makeTrade({ entry_price: 100, plan_stop: 100, plan_target: 300 })];
+      const { result } = renderHook(() =>
+        usePositionAlerts(trades, [makeQuote("AAPL", 130)])
+      );
+      expect(result.current.some((a) => a.type === "free_trade")).toBe(false);
+    });
+
+    it("SHORT (invest_type=2) entry=100 stop=107 price=84 (gain≈16% ≈ 2.3x) → FREE_TRADE info", () => {
+      const trades = [
+        makeTrade({ invest_type: 2, entry_price: 100, plan_stop: 107, plan_target: 50 }),
+      ];
+      const { result } = renderHook(() =>
+        usePositionAlerts(trades, [makeQuote("AAPL", 84)])
+      );
+      const ft = result.current.find((a) => a.type === "free_trade");
+      expect(ft).toBeDefined();
+      expect(ft?.severity).toBe("info");
+      expect(ft?.ref_price).toBe(100);
+    });
+  });
 });
 
 describe("usePositionAlerts — toast tetik (useEffect)", () => {
