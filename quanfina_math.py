@@ -6269,6 +6269,91 @@ def rs_rating_category(rs: int) -> str:
     return "LAGGARD"
 
 
+def compute_earnings_acceleration(
+    revenues: list[Optional[float]],
+    net_incomes: list[Optional[float]],
+    min_growth_pct: float = 25.0,
+) -> dict:
+    """Minervini CANSLIM 'C' — ceyreklik kazanc + satis HIZLANMASI (TLSMW fundamentals).
+
+    Mark canon (CANSLIM-C / Trade Like a Wizard fundamentals): ceyreklik EPS ve satis YoY
+    buyumesi >= %25 + HIZLANIYOR (son YoY > onceki YoY). Hizlanma 'C' faktorunun ozu —
+    sabit %25 degil, ARTAN buyume aranir.
+
+    Args:
+        revenues: Ceyreklik toplam gelir, EN YENI ONCE (yfinance quarterly_income_stmt sirasi).
+        net_incomes: Ceyreklik net kar, ayni sira/uzunluk.
+        min_growth_pct: Mark CANSLIM-C esigi (varsayilan %25; MINERVINI_FUND_QOQ_MIN ile ayni).
+
+    YoY: q[i] vs q[i+4] (mevsimsellik notr). Negatif baz (zarar) -> 'n/m' (anlamli degil),
+    yon notu. Veri yetersiz (<5 ceyrek) veya None -> available=False (uydurma YOK, Kural #28).
+
+    Returns: dict {available, revenue_yoy_pct, earnings_yoy_pct, revenue_accelerating,
+                   earnings_accelerating, both_pass, quarters_used, mark_says}.
+    Kaynak: Trade Like a Stock Market Wizard — CANSLIM 'C' (kazanc hizlanmasi).
+    """
+    def _clean(xs):
+        return [float(x) if (x is not None and x == x) else None for x in (xs or [])]
+
+    rev = _clean(revenues)
+    ni = _clean(net_incomes)
+
+    def _yoy(series, i):
+        # series[i] (yeni) vs series[i+4] (1 yil once). Negatif/0 baz -> None (n/m).
+        if i + 4 >= len(series):
+            return None
+        cur, base = series[i], series[i + 4]
+        if cur is None or base is None or base <= 0:
+            return None
+        return (cur - base) / base * 100
+
+    if len([x for x in rev if x is not None]) < 5:
+        return {
+            'available': False, 'revenue_yoy_pct': None, 'earnings_yoy_pct': None,
+            'revenue_accelerating': False, 'earnings_accelerating': False,
+            'both_pass': False, 'quarters_used': len([x for x in rev if x is not None]),
+            'mark_says': ('Yetersiz ceyreklik veri (>=5 ceyrek gerekir, YoY icin). '
+                          'CANSLIM-C kazanc hizlanmasi hesaplanamadi.'),
+        }
+
+    rev_yoy = _yoy(rev, 0)
+    earn_yoy = _yoy(ni, 0)
+    rev_yoy_prior = _yoy(rev, 1)   # 6+ ceyrek varsa hizlanma icin
+    earn_yoy_prior = _yoy(ni, 1)
+
+    rev_accel = rev_yoy is not None and rev_yoy_prior is not None and rev_yoy > rev_yoy_prior
+    earn_accel = earn_yoy is not None and earn_yoy_prior is not None and earn_yoy > earn_yoy_prior
+
+    rev_pass = rev_yoy is not None and rev_yoy >= min_growth_pct
+    earn_pass = earn_yoy is not None and earn_yoy >= min_growth_pct
+    both_pass = rev_pass and earn_pass
+
+    parts = []
+    parts.append(f"Satis YoY {('%' + format(rev_yoy, '.0f')) if rev_yoy is not None else 'n/m'}"
+                 + (" ✓" if rev_pass else (" ✗" if rev_yoy is not None else "")))
+    parts.append(f"Kazanc YoY {('%' + format(earn_yoy, '.0f')) if earn_yoy is not None else 'n/m'}"
+                 + (" ✓" if earn_pass else (" ✗" if earn_yoy is not None else "")))
+    accel_note = ""
+    if rev_accel or earn_accel:
+        accel_note = f" HIZLANIYOR ({'satis' if rev_accel else ''}{' + ' if rev_accel and earn_accel else ''}{'kazanc' if earn_accel else ''})."
+    elif rev_yoy_prior is not None or earn_yoy_prior is not None:
+        accel_note = " Hizlanma yok (buyume yavasliyor/sabit)."
+    says = (f"Minervini CANSLIM-C (TLSMW, >=%{min_growth_pct:.0f} YoY + hizlanma): "
+            f"{', '.join(parts)}.{accel_note} "
+            f"{'Guclu C faktoru.' if both_pass else 'Kismi/zayif C faktoru — teknik trend asil gate.'}")
+
+    return {
+        'available': True,
+        'revenue_yoy_pct': round(rev_yoy, 1) if rev_yoy is not None else None,
+        'earnings_yoy_pct': round(earn_yoy, 1) if earn_yoy is not None else None,
+        'revenue_accelerating': rev_accel,
+        'earnings_accelerating': earn_accel,
+        'both_pass': both_pass,
+        'quarters_used': len([x for x in rev if x is not None]),
+        'mark_says': says,
+    }
+
+
 def compute_rs_percentile(
     stock_return_pct: Optional[float],
     universe_returns: list[float],

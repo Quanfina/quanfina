@@ -88,6 +88,7 @@ from quanfina_math import (  # noqa: E402
     compute_pocket_pivot,
     compute_group_rs_confirmation,
     compute_rs_percentile,
+    compute_earnings_acceleration,
     compute_stage_transition,
     compute_faber_timing,
     compute_mcclellan_oscillator,
@@ -3002,6 +3003,79 @@ def get_earnings(symbol: str) -> EarningsInfo:
     return EarningsInfo(
         symbol=sym, has_data=True, earnings_date=ed, days_to_earnings=days,
         within_blackout=within, mark_says=says,
+    )
+
+
+# P569 (20 Haz 2026): Earnings Acceleration — CANSLIM 'C' derin fundamental (#75 pipeline).
+# Minervini TLSMW CANSLIM-C: çeyreklik EPS+satış YoY büyümesi >= %25 + HIZLANIYOR. Veri:
+# yfinance quarterly_income_stmt (yapısal finansal tablo — .info skalar alanlardan güvenilir).
+# Scan eps_qoq (tek çeyrek Q/Q) yetersiz; bu çok-çeyrek YoY + hızlanma. Fail -> available=False
+# (Kural #28 — uydurma yok, yfinance erişilemezse dürüst "veri yok").
+_QFIN_CACHE: dict[str, tuple[float, tuple]] = {}
+_QFIN_CACHE_TTL_SEC = 6 * 3600   # çeyreklik veri gün-içi değişmez
+
+
+def _fetch_quarterly_financials(symbol: str) -> tuple[list, list]:
+    """yfinance quarterly_income_stmt -> (revenues, net_incomes) EN YENİ ÖNCE. Cache 6h.
+    Fail/yok -> ([], []) (Kural #28: graceful, uydurma yok)."""
+    global _YF_DISABLED
+    if _YF_DISABLED:
+        return [], []
+    sym = symbol.upper()
+    now = _time_module.time()
+    if sym in _QFIN_CACHE:
+        ts, val = _QFIN_CACHE[sym]
+        if now - ts < _QFIN_CACHE_TTL_SEC:
+            return val
+    rev: list = []
+    ni: list = []
+    try:
+        import yfinance as yf
+        q = yf.Ticker(sym).quarterly_income_stmt
+        if q is not None and not q.empty:
+            if "Total Revenue" in q.index:
+                rev = [None if (v != v) else float(v) for v in q.loc["Total Revenue"].tolist()]
+            if "Net Income" in q.index:
+                ni = [None if (v != v) else float(v) for v in q.loc["Net Income"].tolist()]
+    except ImportError:
+        _YF_DISABLED = True
+    except Exception:
+        pass
+    _QFIN_CACHE[sym] = (now, (rev, ni))
+    return rev, ni
+
+
+class EarningsGrowthInfo(BaseModel):
+    symbol: str
+    available: bool = False
+    revenue_yoy_pct: Optional[float] = None      # son çeyrek satış YoY büyüme %
+    earnings_yoy_pct: Optional[float] = None      # son çeyrek net kâr YoY büyüme %
+    revenue_accelerating: bool = False            # son YoY > önceki YoY
+    earnings_accelerating: bool = False
+    both_pass: bool = False                        # ikisi de >= %25 (Minervini C)
+    quarters_used: int = 0
+    mark_says: str
+
+
+@app.get("/api/stock/{symbol}/earnings-growth", response_model=EarningsGrowthInfo)
+def get_earnings_growth(symbol: str) -> EarningsGrowthInfo:
+    """Minervini CANSLIM 'C' — çeyreklik kazanç + satış HIZLANMASI (#75 derin fundamental).
+
+    yfinance quarterly income statement → çok-çeyrek YoY büyüme + hızlanma (son YoY > önceki).
+    Scan tek-çeyrek eps_qoq'tan derin. yfinance erişilemez → available=False (Kural #28)."""
+    sym = symbol.upper()
+    rev, ni = _fetch_quarterly_financials(sym)
+    res = compute_earnings_acceleration(rev, ni)
+    return EarningsGrowthInfo(
+        symbol=sym,
+        available=res["available"],
+        revenue_yoy_pct=res["revenue_yoy_pct"],
+        earnings_yoy_pct=res["earnings_yoy_pct"],
+        revenue_accelerating=res["revenue_accelerating"],
+        earnings_accelerating=res["earnings_accelerating"],
+        both_pass=res["both_pass"],
+        quarters_used=res["quarters_used"],
+        mark_says=res["mark_says"],
     )
 
 

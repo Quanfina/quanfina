@@ -36,6 +36,7 @@ import { HighTightFlagCard } from "@/components/stock/HighTightFlagCard";
 import { PocketPivotCard } from "@/components/stock/PocketPivotCard";
 import { GroupRSCard } from "@/components/stock/GroupRSCard";
 import { FundamentalCard } from "@/components/stock/FundamentalCard";
+import { EarningsGrowthCard } from "@/components/stock/EarningsGrowthCard";
 import { EarningsCard } from "@/components/stock/EarningsCard";
 import { CardSection } from "@/components/stock/CardSection";
 import { BaseSummaryCard } from "@/components/stock/BaseSummaryCard";
@@ -388,6 +389,8 @@ export default function HissePage({
           <CardSection title="Fundamental & Earnings (CANSLIM C/A)">
             {/* Minervini s.26 EPS/satış Q/Q soft teyit + s.249 earnings 5g blackout */}
             <FundamentalCard symbol={sym} />
+            {/* P569: Kazanç ivmesi (CANSLIM-C) — çok-çeyrek YoY + hızlanma (yfinance) */}
+            <EarningsGrowthCard symbol={sym} />
             <EarningsCard symbol={sym} />
           </CardSection>
         </div>
