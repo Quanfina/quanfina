@@ -182,3 +182,27 @@ export const SETUP_LABELS: Record<string, string> = {
   gap_down:           'Gap Down',
   rising_wedge:       'Rising Wedge',
 };
+
+// P558 (20 Haz 2026): Carr SHORT setup'ları (kanonik — backend P518/P520/P522 bulk SHORT
+// slug'larıyla birebir). Bu 3 setup dışındaki her setup LONG (Minervini + Carr LONG setupları).
+// Sinyaller sayfası YÖN sütunu setup_type'tan yön türetir (invest_type pre-trade'de yok).
+export const SHORT_SETUPS: ReadonlySet<string> = new Set([
+  "blue_sea",
+  "gap_down",
+  "rising_wedge",
+]);
+
+// DİKKAT (P558, gerçek-veri doğrulaması): /api/signals setup_type KARIŞIK gelir — bazı
+// kayıtlar slug ("vcp"), bazıları label ("Bullish Divergence"). Bu yüzden SHORT eşleşmesi
+// hem slug hem label formunu (case-insensitive) tanımalı, yoksa label-formlu SHORT sinyal
+// yanlışlıkla LONG görünür. SHORT label'ları SETUP_LABELS'ten türetilir (DRY, uydurma yok).
+const _SHORT_NORM: ReadonlySet<string> = new Set([
+  ...[...SHORT_SETUPS].map((s) => s.toLowerCase()),
+  ...[...SHORT_SETUPS].map((s) => SETUP_LABELS[s].toLowerCase()),
+]);
+
+/** setup_type'tan pozisyon yönü (slug VEYA label formu). SHORT dışı / null → "LONG". */
+export function setupDirection(setupType: string | null | undefined): "LONG" | "SHORT" {
+  if (!setupType) return "LONG";
+  return _SHORT_NORM.has(setupType.trim().toLowerCase()) ? "SHORT" : "LONG";
+}

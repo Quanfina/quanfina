@@ -23,6 +23,7 @@ import { formatDateTR, formatDayLabel, todayLocalISO } from "@/lib/format-date";
 import { getPassedSignals, setPassedSignals, clearPassedSignals, signalKey } from "@/lib/passed-signals";
 import { toast } from "sonner";
 import type { Signal } from "@/types/signal";
+import { setupDirection } from "@/types/trade";
 import { MarkBadgeStrip } from "@/components/mark/MarkBadgeStrip";
 import { MarkRegimeBanner } from "@/components/mark/MarkRegimeBanner";
 import { ModBadge } from "@/components/mark/ModBadge";
@@ -188,6 +189,24 @@ export default function SignalsPage() {
       headerName: "Setup",
       width: 160,
       valueFormatter: (p) => (p.value as string | null) ?? "—",
+    },
+    // P558 (20 Haz 2026): YÖN — setup_type'tan türetilir (Sinyaller pre-trade, invest_type yok).
+    // Carr SHORT setupları (Blue Sea/Gap Down/Rising Wedge) SHORT (kırmızı), diğerleri LONG (yeşil).
+    // Journal YÖN kolonu (P541) ile aynı görsel dil. setupDirection helper DRY (types/trade).
+    {
+      colId: "direction",
+      headerName: "YÖN",
+      width: 80,
+      minWidth: 64,
+      sortable: true,
+      filter: false,
+      valueGetter: (p) => setupDirection(p.data?.setup_type),
+      headerTooltip: "Pozisyon yönü — LONG (al, fiyat yükselince kâr) / SHORT (sat, fiyat düşünce kâr). Carr SHORT setupları için.",
+      cellStyle: (p: CellClassParams<Signal, string>) => ({
+        fontSize: 12,
+        fontWeight: 600,
+        color: p.value === "SHORT" ? "var(--mtp-danger)" : "var(--mtp-excellent)",
+      }),
     },
     // KARAR #733 alt-paket (Paket 99, 26 May 2026): RS Rating kategori rozet
     // (Watchlist P98 paten birebir — Mark TLSMW Ch 3-5 / IBD canon visual).
