@@ -34,6 +34,7 @@ import { FlatBaseCard } from "@/components/stock/FlatBaseCard";
 import { DoubleBottomCard } from "@/components/stock/DoubleBottomCard";
 import { HighTightFlagCard } from "@/components/stock/HighTightFlagCard";
 import { PocketPivotCard } from "@/components/stock/PocketPivotCard";
+import { FundamentalCard } from "@/components/stock/FundamentalCard";
 import { BaseSummaryCard } from "@/components/stock/BaseSummaryCard";
 import { RiskSummaryCard } from "@/components/stock/RiskSummaryCard";
 import { SellStrengthCard } from "@/components/stock/SellStrengthCard";
@@ -387,6 +388,8 @@ export default function HissePage({
           <HighTightFlagCard symbol={sym} />
           {/* Paket 533 (18 Haz 2026): Pocket Pivot — Minervini s.167 + Kacher/Morales (on-deck güç) */}
           <PocketPivotCard symbol={sym} />
+          {/* Paket 542 (20 Haz 2026): Temel (CANSLIM C/A) — Minervini s.26 EPS/satış Q/Q soft teyit */}
+          <FundamentalCard symbol={sym} />
         </div>
 
         {/* Setup notes (only when notes exist) */}

@@ -2766,6 +2766,96 @@ def get_stock_info(symbol: str) -> StockInfo:
     )
 
 
+# P542 (20 Haz 2026): Fundamental kart (#834/#855 EPS wire) — Minervini CANSLIM "C/A".
+# Mevcut eps_qoq/sales_qoq scan verisi (+ MOCK stock) /hisse'ye baglanir. Kanon:
+# Minervini.md s.26 "Kâr ve Satış İvmesi %25-%30+ Q/Q" -> ESIK %25. SOFT score (s.1152:
+# "EPS %200 olsa bile fiyat 200-MA altiysa listeye giremez" -> teknik gate, fundamental
+# TEYIT). Kural #26: esik kaynak-atifli (UYDURMA YOK).
+MINERVINI_FUND_QOQ_MIN: float = 25.0   # Minervini.md s.26 "%25-%30+ Q/Q" alt sinir
+
+
+def _parse_pct(v) -> Optional[float]:
+    """eps_qoq/sales_qoq TEXT veya float -> float. '%','+',',' temizlenir. Bos/'N/A'/'-'
+    -> None (veri yok). Sayiya cevrilemezse None."""
+    if v is None:
+        return None
+    s = str(v).strip().replace("%", "").replace("+", "").replace(",", "").strip()
+    if s.lower() in {"", "-", "n/a", "na", "none", "nan", "—", "null"}:
+        return None
+    try:
+        return float(s)
+    except ValueError:
+        return None
+
+
+def _fetch_fundamental_raw(sym: str) -> tuple:
+    """(eps_qoq, sales_qoq) ham — once MOCK stock, sonra minervini_scans son scan.
+    Bulunamazsa (None, None). Fundamental ceyreklik (stabil) -> EOD scan uygun."""
+    stock = _STOCK_BY_SYM.get(sym)
+    if stock is not None:
+        return getattr(stock, "eps_qoq", None), getattr(stock, "sales_qoq", None)
+    try:
+        from api.db_helpers import engine
+        from sqlalchemy import text as sql_text
+        with engine.connect() as conn:
+            row = conn.execute(sql_text("""
+                SELECT eps_qoq, sales_qoq FROM minervini_scans
+                WHERE ticker = :sym AND scan_date = (SELECT MAX(scan_date) FROM minervini_scans)
+                LIMIT 1
+            """), {"sym": sym}).first()
+            if row:
+                return row[0], row[1]
+    except Exception:
+        pass
+    return None, None
+
+
+class FundamentalInfo(BaseModel):
+    symbol: str
+    has_data: bool = False
+    eps_qoq: Optional[float] = None      # çeyreklik EPS büyüme % (Q/Q)
+    sales_qoq: Optional[float] = None    # çeyreklik satış büyüme % (Q/Q)
+    eps_pass: Optional[bool] = None      # ≥%25 (Minervini s.26)
+    sales_pass: Optional[bool] = None
+    threshold_pct: float = MINERVINI_FUND_QOQ_MIN
+    mark_says: str
+
+
+@app.get("/api/stock/{symbol}/fundamental", response_model=FundamentalInfo)
+def get_fundamental(symbol: str) -> FundamentalInfo:
+    """Minervini CANSLIM "C/A" — çeyreklik EPS + satış büyümesi (Minervini.md s.26 %25-30 Q/Q).
+
+    SOFT score (s.1152: fundamental TEYIT, teknik trend asıl gate). Veri: scan
+    (minervini_scans) + MOCK stock. Veri yoksa has_data=False (grade zaten 'D=veri yok'
+    ayrımı yapar — Kural #28 yanıltıcı zayıf-vs-yok ayrımı). #834/#855 EPS wire.
+    """
+    sym = symbol.upper()
+    eps = _parse_pct(_fetch_fundamental_raw(sym)[0])
+    sales = _parse_pct(_fetch_fundamental_raw(sym)[1])
+    if eps is None and sales is None:
+        return FundamentalInfo(
+            symbol=sym, has_data=False,
+            mark_says="Temel veri yok (tarama dışı sembol veya EPS/satış bildirilmemiş). "
+                      "Minervini: fundamental SOFT teyit — eksikliği tek başına eleme sebebi "
+                      "değil (s.1152: teknik trend asıl gate).",
+        )
+    eps_pass = (eps >= MINERVINI_FUND_QOQ_MIN) if eps is not None else None
+    sales_pass = (sales >= MINERVINI_FUND_QOQ_MIN) if sales is not None else None
+    parts = []
+    if eps is not None:
+        parts.append(f"EPS Q/Q %{eps:.0f} {'✓' if eps_pass else '✗'}")
+    if sales is not None:
+        parts.append(f"Satış Q/Q %{sales:.0f} {'✓' if sales_pass else '✗'}")
+    both_strong = bool(eps_pass) and bool(sales_pass)
+    verdict = "güçlü temel ivme" if both_strong else "kısmi/zayıf temel ivme"
+    says = (f"Minervini C/A (s.26 ≥%{MINERVINI_FUND_QOQ_MIN:.0f} Q/Q): {', '.join(parts)}. "
+            f"{verdict}. SOFT teyit — teknik trend asıl gate (s.1152).")
+    return FundamentalInfo(
+        symbol=sym, has_data=True, eps_qoq=eps, sales_qoq=sales,
+        eps_pass=eps_pass, sales_pass=sales_pass, mark_says=says,
+    )
+
+
 # KARAR #733 alt-paket (Paket 77, 25 May 2026): overhead_supply endpoint
 class OverheadSupplyInfo(BaseModel):
     category: Optional[Literal["HEAVY", "MODERATE", "NONE"]] = None
