@@ -36,6 +36,7 @@ import { HighTightFlagCard } from "@/components/stock/HighTightFlagCard";
 import { PocketPivotCard } from "@/components/stock/PocketPivotCard";
 import { FundamentalCard } from "@/components/stock/FundamentalCard";
 import { EarningsCard } from "@/components/stock/EarningsCard";
+import { CardSection } from "@/components/stock/CardSection";
 import { BaseSummaryCard } from "@/components/stock/BaseSummaryCard";
 import { RiskSummaryCard } from "@/components/stock/RiskSummaryCard";
 import { SellStrengthCard } from "@/components/stock/SellStrengthCard";
@@ -329,70 +330,63 @@ export default function HissePage({
           )}
         </div>
 
-        {/* Mark canon profili — responsive grid (P436): 256px dar sütunda 10
-            dikey kart (≈10 satır scroll) yerine 2 kolon (md) / 3 kolon (xl)
-            grid → ≈4 satır, yan yana tarama kolay, grafik takibi bozulmaz.
-            items-start: değişken yükseklikli kartlar üstten hizalı. */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 items-start">
-          {/* P438-M2: Risk-Özeti ilk sırada — Mark "Risk first" (TTLC Sec 1).
-              Karar akışının başı: stop nerede, kaç R, pivota mesafe. */}
-          <RiskSummaryCard symbol={sym} />
-          {/* P475 (#976): Mark satış sinyalleri — Risk-Özeti ile eşleşir ("ne zaman SAT") */}
-          <SellStrengthCard symbol={sym} />
-          <ActiveStrategies strategies={info.active_strategies} symbol={sym} />
-          <CarrStageCard symbol={sym} />
-          {/* Paket 500 (18 Haz 2026): Carr Mean Reversion — countertrend çekirdek setup (s.356)
-              P529: LONG sinyalde "Paper Trade'e aktar" köprüsü (MR kart LONG iken gösterir) */}
-          <MeanReversionCard symbol={sym} onPaperTrade={tradeFromCarr} />
-          {/* Paket 506 (18 Haz 2026): Carr Pullback — WEAK_BULL trend-takip LONG (s.249) */}
-          <PullbackCard symbol={sym} onPaperTrade={tradeFromCarr} />
-          {/* Paket 508 (18 Haz 2026): Carr Blue Sky Breakout — STRONG+WEAK_BULL breakout (s.264) */}
-          <BlueSkyCard symbol={sym} onPaperTrade={tradeFromCarr} />
-          {/* Paket 510 (18 Haz 2026): Carr Coiled Spring — TIER-2 daralan yay ADAYI (s.250) */}
-          <CoiledSpringCard symbol={sym} onPaperTrade={tradeFromCarr} />
-          {/* Paket 513 (18 Haz 2026): Carr Bullish Base Breakout — CONTRARIAN downtrend baz (s.291) */}
-          <BullishBaseCard symbol={sym} onPaperTrade={tradeFromCarr} />
-          {/* Paket 515 (18 Haz 2026): Carr Bullish Divergence — uptrend-dip 2+ gösterge (s.258) */}
-          <BullishDivergenceCard symbol={sym} onPaperTrade={tradeFromCarr} />
-          {/* Paket 518 (18 Haz 2026): Carr Blue Sea Breakdown — strong-bear SHORT (s.289)
-              P540: SHORT köprü (invest_type=2) — dialog yön-farkında (P539) */}
-          <BlueSeaCard symbol={sym} onPaperTrade={tradeFromCarr} />
-          {/* Paket 520 (18 Haz 2026): Carr Gap Down — ralli-sonu reversal SHORT (s.273) */}
-          <GapDownCard symbol={sym} onPaperTrade={tradeFromCarr} />
-          {/* Paket 522 (18 Haz 2026): Carr Rising Wedge Breakdown — kama kırılımı SHORT (Böl.19) */}
-          <RisingWedgeCard symbol={sym} onPaperTrade={tradeFromCarr} />
-          {/* KARAR #733 alt-paket (Paket 72): Pivot Breakout Card */}
-          <PivotBreakoutCard symbol={sym} />
-          {/* KARAR #733 alt-paket (Paket 78): Overhead Supply Card */}
-          <OverheadSupplyCard symbol={sym} />
-          {/* KARAR #733 alt-paket (Paket 88): Climax Run Card — Mark TLSMW Ch 9 */}
-          <ClimaxRunCard symbol={sym} />
-          {/* KARAR #733 alt-paket (Paket 94): RS Rating Card — Mark TLSMW Ch 3-5 / IBD */}
-          <RsRatingCard symbol={sym} />
-          {/* KARAR #733 alt-paket (Paket 103): ATR Volatility Card — Mark TLSMW Ch 11 / Wilder */}
-          <AtrVolatilityCard symbol={sym} />
-          {/* KARAR #733 alt-paket (Paket 122): Stage Transition — Mark TLSMW Ch 4 / Weinstein */}
-          <StageTransitionCard symbol={sym} />
-          {/* KARAR #733 alt-paket (Paket 133): Relative Volume — Mark TLSMW Ch 6 */}
-          <RelativeVolumeCard symbol={sym} />
-          {/* KARAR #733 alt-paket (Paket 134): Breakout Quality — Mark TLSMW Ch 10 */}
-          <BreakoutQualityCard symbol={sym} />
-          {/* Paket 467 (12 Haz 2026): Base Detector Özeti — 4 O'Neil baz tek bakışta (konsolide) */}
-          <BaseSummaryCard symbol={sym} />
-          {/* Paket 456 (11 Haz 2026): Cup-with-Handle — O'Neil CAN SLIM Bol.15 */}
-          <CupHandleCard symbol={sym} />
-          {/* Paket 458 (11 Haz 2026): Flat Base — O'Neil/IBD later-stage */}
-          <FlatBaseCard symbol={sym} />
-          {/* Paket 460 (11 Haz 2026): Double Bottom (W) — O'Neil/IBD */}
-          <DoubleBottomCard symbol={sym} />
-          {/* Paket 462 (11 Haz 2026): High Tight Flag (= Minervini Power Play) */}
-          <HighTightFlagCard symbol={sym} />
-          {/* Paket 533 (18 Haz 2026): Pocket Pivot — Minervini s.167 + Kacher/Morales (on-deck güç) */}
-          <PocketPivotCard symbol={sym} />
-          {/* Paket 542 (20 Haz 2026): Temel (CANSLIM C/A) — Minervini s.26 EPS/satış Q/Q soft teyit */}
-          <FundamentalCard symbol={sym} />
-          {/* Paket 543 (20 Haz 2026): Earnings Takvimi — Minervini s.249 "5g blackout, crapshoot" */}
-          <EarningsCard symbol={sym} />
+        {/* P545 (20 Haz 2026): 29 kart düz grid → 6 mantıksal bölüm (research cockpit).
+            Bir hisseyi değerlendirirken "Carr setupları" / "Baz paternleri" / "Fundamental"
+            bölümüne hızlı atlama. Kart mantığı/props değişmedi — sadece gruplama + başlık.
+            Her bölüm responsive grid (P436: md 2 / xl 3 kolon, items-start). */}
+        <div className="flex flex-col gap-5">
+          <CardSection title="Karar & Risk">
+            {/* P438-M2: Risk-Özeti ilk — Mark "Risk first" (TTLC Sec 1). P475: ne zaman SAT */}
+            <RiskSummaryCard symbol={sym} />
+            <SellStrengthCard symbol={sym} />
+            <ActiveStrategies strategies={info.active_strategies} symbol={sym} />
+          </CardSection>
+
+          <CardSection title="Trend & Stage">
+            <CarrStageCard symbol={sym} />
+            {/* Stage Transition — Mark TLSMW Ch 4 / Weinstein */}
+            <StageTransitionCard symbol={sym} />
+          </CardSection>
+
+          <CardSection title="Teknik Sinyaller (Minervini / O'Neil)">
+            {/* Pivot / RS / Breakout / Hacim / Climax / Overhead / ATR — Mark TLSMW canon */}
+            <PivotBreakoutCard symbol={sym} />
+            <RsRatingCard symbol={sym} />
+            <BreakoutQualityCard symbol={sym} />
+            <RelativeVolumeCard symbol={sym} />
+            <ClimaxRunCard symbol={sym} />
+            <OverheadSupplyCard symbol={sym} />
+            <AtrVolatilityCard symbol={sym} />
+          </CardSection>
+
+          <CardSection title="Baz Paternleri (O'Neil / Minervini)">
+            {/* Konsolide özet + 4 O'Neil baz + Power Play + Pocket Pivot */}
+            <BaseSummaryCard symbol={sym} />
+            <CupHandleCard symbol={sym} />
+            <FlatBaseCard symbol={sym} />
+            <DoubleBottomCard symbol={sym} />
+            <HighTightFlagCard symbol={sym} />
+            <PocketPivotCard symbol={sym} />
+          </CardSection>
+
+          <CardSection title="Carr Setupları (Trend Trading 2.baskı)">
+            {/* 9 Carr setup — LONG/SHORT köprü (P529/P540): detected'da "Paper Trade'e aktar" */}
+            <MeanReversionCard symbol={sym} onPaperTrade={tradeFromCarr} />
+            <PullbackCard symbol={sym} onPaperTrade={tradeFromCarr} />
+            <BlueSkyCard symbol={sym} onPaperTrade={tradeFromCarr} />
+            <CoiledSpringCard symbol={sym} onPaperTrade={tradeFromCarr} />
+            <BullishBaseCard symbol={sym} onPaperTrade={tradeFromCarr} />
+            <BullishDivergenceCard symbol={sym} onPaperTrade={tradeFromCarr} />
+            <BlueSeaCard symbol={sym} onPaperTrade={tradeFromCarr} />
+            <GapDownCard symbol={sym} onPaperTrade={tradeFromCarr} />
+            <RisingWedgeCard symbol={sym} onPaperTrade={tradeFromCarr} />
+          </CardSection>
+
+          <CardSection title="Fundamental & Earnings (CANSLIM C/A)">
+            {/* Minervini s.26 EPS/satış Q/Q soft teyit + s.249 earnings 5g blackout */}
+            <FundamentalCard symbol={sym} />
+            <EarningsCard symbol={sym} />
+          </CardSection>
         </div>
 
         {/* Setup notes (only when notes exist) */}
