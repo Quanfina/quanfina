@@ -156,22 +156,45 @@ def watchlist_recompute_consensus() -> None:
 # web_trades CRUD
 # =============================================================
 
+_INVEST_TYPE_COL: Optional[bool] = None
+
+
+def _web_trades_has_invest_type() -> bool:
+    """P538: web_trades.invest_type var mi (Migration 013 uygulandi mi). Bir kez sorgulanir,
+    cache'lenir. Kolon yoksa: SHORT engellenir (endpoint) + INSERT/SELECT invest_type'siz
+    calisir -> migration oncesi LONG-only davranis korunur, kirilma yok."""
+    global _INVEST_TYPE_COL
+    if _INVEST_TYPE_COL is None:
+        try:
+            with engine.connect() as conn:
+                r = conn.execute(text(
+                    "SELECT 1 FROM information_schema.columns "
+                    "WHERE table_name='web_trades' AND column_name='invest_type'"
+                ))
+                _INVEST_TYPE_COL = r.first() is not None
+        except Exception:
+            _INVEST_TYPE_COL = False
+    return _INVEST_TYPE_COL
+
+
 def trades_get_all() -> list[dict]:
+    _it = ", invest_type" if _web_trades_has_invest_type() else ""  # P538 kolon-guard
     with engine.connect() as conn:
-        result = conn.execute(text("""
+        result = conn.execute(text(f"""
             SELECT id, symbol, strategy, setup_type,
                    entry_date, entry_price, exit_date, exit_price,
                    shares, status, pl_dollar, pl_pct,
                    grade, exit_reason, lessons, signal_source,
                    plan_entry_trigger, plan_stop, plan_target,
                    plan_size_pct, plan_exit_strategy, plan_time_horizon,
-                   stop_loss, target_price, audible_reason
+                   stop_loss, target_price, audible_reason{_it}
             FROM web_trades
             ORDER BY id DESC
         """))
         rows = []
         for row in result:
             d = dict(row._mapping)
+            d.setdefault("invest_type", 1)  # P538: kolon yoksa LONG default
             for df in ("entry_date", "exit_date"):
                 if d[df] is not None:
                     d[df] = d[df].isoformat()
@@ -204,10 +227,16 @@ def trades_insert(trade: dict) -> int:
         "audible_reason": None,
         # Migration 012 (#477, P482): trade kokeni (sinyal kaynagi)
         "signal_source": None,
+        "invest_type": 1,   # P538: default LONG (geriye uyum)
         **trade,
     }
+    # P538 kolon-guard: Migration 013 uygulanmadiysa invest_type kolonu yok -> INSERT'ten cikar
+    # (LONG-only davranis korunur). SHORT zaten endpoint'te 400 ile bloklanir (veri bozulmaz).
+    _has_it = _web_trades_has_invest_type()
+    _it_col = ", invest_type" if _has_it else ""
+    _it_val = ", :invest_type" if _has_it else ""
     with engine.begin() as conn:
-        result = conn.execute(text("""
+        result = conn.execute(text(f"""
             INSERT INTO web_trades (
                 symbol, strategy, setup_type,
                 entry_date, entry_price, exit_date, exit_price,
@@ -215,7 +244,7 @@ def trades_insert(trade: dict) -> int:
                 grade, exit_reason, lessons, signal_source,
                 plan_entry_trigger, plan_stop, plan_target,
                 plan_size_pct, plan_exit_strategy, plan_time_horizon,
-                stop_loss, target_price, audible_reason
+                stop_loss, target_price, audible_reason{_it_col}
             ) VALUES (
                 :symbol, :strategy, :setup_type,
                 :entry_date, :entry_price, :exit_date, :exit_price,
@@ -223,7 +252,7 @@ def trades_insert(trade: dict) -> int:
                 :grade, :exit_reason, :lessons, :signal_source,
                 :plan_entry_trigger, :plan_stop, :plan_target,
                 :plan_size_pct, :plan_exit_strategy, :plan_time_horizon,
-                :stop_loss, :target_price, :audible_reason
+                :stop_loss, :target_price, :audible_reason{_it_val}
             )
             RETURNING id
         """), trade_with_plan)
@@ -250,16 +279,17 @@ def trades_delete(trade_id: int) -> bool:
 
 
 def trades_get_by_id(trade_id: int) -> Optional[dict]:
+    _it = ", invest_type" if _web_trades_has_invest_type() else ""  # P538 kolon-guard
     with engine.connect() as conn:
         result = conn.execute(
-            text("""
+            text(f"""
                 SELECT id, symbol, strategy, setup_type,
                        entry_date, entry_price, exit_date, exit_price,
                        shares, status, pl_dollar, pl_pct,
                        grade, exit_reason, lessons, signal_source,
                        plan_entry_trigger, plan_stop, plan_target,
                        plan_size_pct, plan_exit_strategy, plan_time_horizon,
-                       stop_loss, target_price, audible_reason
+                       stop_loss, target_price, audible_reason{_it}
                 FROM web_trades WHERE id = :id
             """),
             {"id": trade_id},
@@ -268,6 +298,7 @@ def trades_get_by_id(trade_id: int) -> Optional[dict]:
         if not row:
             return None
         d = dict(row._mapping)
+        d.setdefault("invest_type", 1)  # P538: kolon yoksa LONG default
         for df in ("entry_date", "exit_date"):
             if d[df] is not None:
                 d[df] = d[df].isoformat()

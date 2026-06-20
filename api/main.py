@@ -27,6 +27,7 @@ from db_helpers import (  # noqa: E402
     watchlist_recompute_consensus,
     trades_get_all, trades_get_by_id,
     trades_insert, trades_update, trades_delete,
+    _web_trades_has_invest_type,
     mark_signals_get_by_symbol,
     pattern_library_get_all,
     sector_rotation_get_latest,
@@ -114,7 +115,7 @@ from typing import Literal, Optional
 
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.exc import OperationalError
 
 logging.basicConfig(
@@ -4403,8 +4404,13 @@ def get_sector_rotation() -> list[SectorRotationEntry]:
 from decimal import Decimal as _D, ROUND_HALF_UP as _RHU
 
 
-def _calc_pl(entry_price: float, exit_price: float, shares: int) -> tuple[float, float]:
+def _calc_pl(entry_price: float, exit_price: float, shares: int,
+             invest_type: int = 1) -> tuple[float, float]:
     """Trade P&L hesabı — Decimal precision (float arithmetic tuzağı yok).
+
+    P538 (20 Haz 2026): yön-farkında. invest_type=1 LONG -> (exit-entry)*qty (fiyat
+    yükselince kazanç). invest_type=2 SHORT -> (entry-exit)*qty (fiyat DÜŞÜNCE kazanç).
+    Carr SHORT setupları (Blue Sea / Gap Down / Rising Wedge) için.
 
     Defensive (P385): entry_price=0 -> (0.0, 0.0) graceful (ZeroDivisionError
     yerine). Caller path: add_trade endpoint Pydantic gt=0 ile entry=0 zaten
@@ -4416,8 +4422,9 @@ def _calc_pl(entry_price: float, exit_price: float, shares: int) -> tuple[float,
     entry = _D(str(entry_price))
     exit_ = _D(str(exit_price))
     qty   = _D(str(shares))
-    pl_dollar = float(((exit_ - entry) * qty).quantize(_D("0.01"), rounding=_RHU))
-    pl_pct    = float(((exit_ - entry) / entry * 100).quantize(_D("0.01"), rounding=_RHU))
+    sign  = _D("-1") if invest_type == 2 else _D("1")   # SHORT: kâr/zarar tersine
+    pl_dollar = float((sign * (exit_ - entry) * qty).quantize(_D("0.01"), rounding=_RHU))
+    pl_pct    = float((sign * (exit_ - entry) / entry * 100).quantize(_D("0.01"), rounding=_RHU))
     return pl_dollar, pl_pct
 
 
@@ -4429,6 +4436,9 @@ class Trade(BaseModel):
     symbol: str
     strategy: str
     setup_type: str
+    # P538 (20 Haz 2026): pozisyon yönü — 1=LONG (default, geriye uyum) / 2=SHORT.
+    # Carr SHORT setupları (Blue Sea/Gap Down/Rising Wedge) paper-trade. P&L yön-farkında.
+    invest_type: int = 1
     # KARAR #477 (20 May 2026, UX Bölüm 7): Sinyal Kaynağı zorunlu.
     # Disiplin: trade kökeni izlenir, analiz kabiliyeti.
     signal_source: Optional[Literal["strategy", "manual_self", "manual_external"]] = None
@@ -4478,6 +4488,9 @@ class TradeCreate(BaseModel):
     symbol: str
     strategy: str
     setup_type: str
+    # P538 (20 Haz 2026): pozisyon yönü — 1=LONG (default, geriye uyum) / 2=SHORT.
+    # SHORT'ta plan_stop > entry > plan_target (yön-farkında validation aşağıda).
+    invest_type: Literal[1, 2] = 1
     # KARAR #477: ZORUNLU (UX Bölüm 7) — trade kayıt formunda Sinyal Kaynağı default yok.
     # DB'de eski trades NULL kalabilir (geriye uyum), yeni kayıtlar zorunlu doldurur.
     signal_source: Literal["strategy", "manual_self", "manual_external"]
@@ -4503,6 +4516,19 @@ class TradeCreate(BaseModel):
     plan_size_pct: float = Field(gt=0, le=100, description="Portfoy yuzdesi (0, 100] araliginda")
     plan_exit_strategy: str
     plan_time_horizon: TimeHorizon
+
+    @model_validator(mode="after")
+    def _check_short_plan_direction(self):
+        """P538: SHORT (invest_type=2) plan yön tutarlılığı — Mark Risk-first.
+        SHORT'ta stop ÜSTTE (entry'den yüksek), hedef ALTTA (entry'den düşük). Aksi =
+        koruma yok / anlamsız. LONG (1) eski davranış (gt=0 yeter, geriye uyum bozulmaz)."""
+        if self.invest_type == 2:
+            if not (self.plan_stop > self.entry_price > self.plan_target):
+                raise ValueError(
+                    "SHORT pozisyon: plan_stop > giriş > plan_target olmalı "
+                    "(stop üstte koruma, hedef altta kâr). Mark Risk-first."
+                )
+        return self
 
 
 class TradeUpdate(BaseModel):
@@ -4767,14 +4793,23 @@ def get_trades_expectancy(strategy: Optional[str] = None) -> BrandonExpectancyIn
 
 @app.post("/api/trades", response_model=Trade, status_code=201)
 def add_trade(body: TradeCreate) -> Trade:
+    # P538: SHORT, web_trades.invest_type kolonu gerektirir (Migration 013). Kolon yoksa
+    # SHORT bloklanir (LONG olarak sessizce kaydetmek = veri bozulmasi). LONG normal akar.
+    if body.invest_type == 2 and not _web_trades_has_invest_type():
+        raise HTTPException(
+            status_code=400,
+            detail="SHORT pozisyon icin Migration 013 (web_trades.invest_type) gerekli — "
+                   "scripts/sql/013_web_trades_invest_type.sql calistirin.",
+        )
     pl_dollar, pl_pct = None, None
     status = body.status
     if status == "closed" and body.exit_price is not None:
-        pl_dollar, pl_pct = _calc_pl(body.entry_price, body.exit_price, body.shares)
+        pl_dollar, pl_pct = _calc_pl(body.entry_price, body.exit_price, body.shares, body.invest_type)
     trade_data = {
         "symbol": body.symbol.strip().upper(),
         "strategy": body.strategy,
         "setup_type": body.setup_type,
+        "invest_type": body.invest_type,   # P538: pozisyon yonu (1=LONG/2=SHORT)
         "entry_date": body.entry_date,
         "entry_price": body.entry_price,
         "exit_date": body.exit_date,
@@ -4824,7 +4859,8 @@ def update_trade(trade_id: int, body: TradeUpdate) -> Trade:
     merged = {**current, **updates}
     if merged.get("status") == "closed" and merged.get("exit_price") is not None:
         updates["pl_dollar"], updates["pl_pct"] = _calc_pl(
-            merged["entry_price"], merged["exit_price"], merged["shares"]
+            merged["entry_price"], merged["exit_price"], merged["shares"],
+            merged.get("invest_type", 1),   # P538: SHORT close P&L yön-farkında
         )
     else:
         updates["pl_dollar"] = None
