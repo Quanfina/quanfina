@@ -4,7 +4,7 @@
  * is_mock + loading/error.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { BlueSeaCard } from "@/components/stock/BlueSeaCard";
 import type { BlueSeaResponse } from "@/hooks/use-blue-sea";
 
@@ -83,5 +83,32 @@ describe("BlueSeaCard (Carr s.289 SHORT)", () => {
     mockBS.mockReturnValue({ data: bsData({ is_mock: true }), isLoading: false, isError: false });
     render(<BlueSeaCard symbol="SLB" />);
     expect(screen.getByText(/Sentetik/)).toBeInTheDocument();
+  });
+
+  // P540: SHORT paper trade köprü wiring (invest_type=2 + isMock guard)
+  it("detected + gerçek veri + onPaperTrade → paper trade butonu görünür, SHORT (invest_type=2)", () => {
+    mockBS.mockReturnValue({
+      data: bsData({ detected: true, direction: "SHORT", quality: "GOOD",
+        entry: 249.5, stop: 264.47, target: 219.56, risk_pct: 6.0, rr: 2.0, is_mock: false }),
+      isLoading: false, isError: false,
+    });
+    const onPaperTrade = vi.fn();
+    render(<BlueSeaCard symbol="SLB" onPaperTrade={onPaperTrade} />);
+    const btn = screen.getByTestId("carr-paper-trade-btn");
+    expect(btn).toBeInTheDocument();
+    fireEvent.click(btn);
+    expect(onPaperTrade).toHaveBeenCalledTimes(1);
+    expect(onPaperTrade.mock.calls[0][0].invest_type).toBe(2);
+    expect(onPaperTrade.mock.calls[0][0].setup_type).toBe("blue_sea");
+  });
+
+  it("detected + is_mock + onPaperTrade → paper trade butonu GİZLİ (Kural #28)", () => {
+    mockBS.mockReturnValue({
+      data: bsData({ detected: true, direction: "SHORT", quality: "GOOD",
+        entry: 249.5, stop: 264.47, target: 219.56, risk_pct: 6.0, rr: 2.0, is_mock: true }),
+      isLoading: false, isError: false,
+    });
+    render(<BlueSeaCard symbol="SLB" onPaperTrade={vi.fn()} />);
+    expect(screen.queryByTestId("carr-paper-trade-btn")).toBeNull();
   });
 });

@@ -352,12 +352,13 @@ export default function HissePage({
           <BullishBaseCard symbol={sym} onPaperTrade={tradeFromCarr} />
           {/* Paket 515 (18 Haz 2026): Carr Bullish Divergence — uptrend-dip 2+ gösterge (s.258) */}
           <BullishDivergenceCard symbol={sym} onPaperTrade={tradeFromCarr} />
-          {/* Paket 518 (18 Haz 2026): Carr Blue Sea Breakdown — strong-bear SHORT (s.289) */}
-          <BlueSeaCard symbol={sym} />
+          {/* Paket 518 (18 Haz 2026): Carr Blue Sea Breakdown — strong-bear SHORT (s.289)
+              P540: SHORT köprü (invest_type=2) — dialog yön-farkında (P539) */}
+          <BlueSeaCard symbol={sym} onPaperTrade={tradeFromCarr} />
           {/* Paket 520 (18 Haz 2026): Carr Gap Down — ralli-sonu reversal SHORT (s.273) */}
-          <GapDownCard symbol={sym} />
+          <GapDownCard symbol={sym} onPaperTrade={tradeFromCarr} />
           {/* Paket 522 (18 Haz 2026): Carr Rising Wedge Breakdown — kama kırılımı SHORT (Böl.19) */}
-          <RisingWedgeCard symbol={sym} />
+          <RisingWedgeCard symbol={sym} onPaperTrade={tradeFromCarr} />
           {/* KARAR #733 alt-paket (Paket 72): Pivot Breakout Card */}
           <PivotBreakoutCard symbol={sym} />
           {/* KARAR #733 alt-paket (Paket 78): Overhead Supply Card */}

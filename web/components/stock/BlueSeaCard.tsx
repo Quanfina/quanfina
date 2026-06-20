@@ -3,6 +3,8 @@
 import { TrendingDown, Minus } from "lucide-react";
 import { useBlueSea } from "@/hooks/use-blue-sea";
 import { fmtUsd } from "@/lib/format-currency";
+import { CarrPaperTradeButton } from "@/components/stock/CarrPaperTradeButton";
+import type { InitialData } from "@/components/journal/AddTradeDialog";
 
 /**
  * Paket 518 (18 Haz 2026): Carr Blue Sea Breakdown paneli (/hisse/[symbol]).
@@ -12,7 +14,7 @@ import { fmtUsd } from "@/lib/format-currency";
  * düşük + kırmızı mum. Sinyal varsa giriş(signal low)/stop(%6 üstte)/hedef(2R aşağı); yoksa
  * 40g/52h düşük + 52h zirve bağlamı. SHORT → kırmızı/danger ton (Quanfina long-biased; bilgi).
  */
-export function BlueSeaCard({ symbol }: { symbol: string }) {
+export function BlueSeaCard({ symbol, onPaperTrade }: { symbol: string; onPaperTrade?: (d: InitialData) => void }) {
   const { data, isLoading, isError } = useBlueSea(symbol);
 
   if (isLoading) {
@@ -76,6 +78,14 @@ export function BlueSeaCard({ symbol }: { symbol: string }) {
             Risk %{data.risk_pct} · R:R 1:{data.rr} · SADECE strong-bear · 52h zirve %20 altında
             (Carr s.283/286)
           </p>
+          <CarrPaperTradeButton
+            data={{ symbol, strategy: "carr", setup_type: "blue_sea", invest_type: 2,
+              entry_price: data.entry ?? undefined, plan_stop: data.stop ?? undefined,
+              plan_target: data.target ?? undefined,
+              plan_entry_trigger: "Carr Blue Sea Breakdown SHORT (s.289) — 40g yeni düşük + OBV/MACD teyit, ertesi gün signal low altı" }}
+            onPaperTrade={onPaperTrade}
+            isMock={data.is_mock}
+          />
         </>
       ) : (
         <div className="grid grid-cols-3 gap-2 text-xs pt-1 border-t border-muted-foreground/15">

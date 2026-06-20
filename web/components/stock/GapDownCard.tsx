@@ -3,6 +3,8 @@
 import { TrendingDown, Minus } from "lucide-react";
 import { useGapDown } from "@/hooks/use-gap-down";
 import { fmtUsd } from "@/lib/format-currency";
+import { CarrPaperTradeButton } from "@/components/stock/CarrPaperTradeButton";
+import type { InitialData } from "@/components/journal/AddTradeDialog";
 
 /**
  * Paket 520 (18 Haz 2026): Carr Gap Down paneli (/hisse/[symbol]).
@@ -12,7 +14,7 @@ import { fmtUsd } from "@/lib/format-currency";
  * 3 ay uptrend. ENTRY=close (market emri, s.270). HABER TEYİDİ şart (s.272) → quality=CANDIDATE.
  * SHORT → kırmızı/danger ton (Quanfina long-biased; bilgi amaçlı).
  */
-export function GapDownCard({ symbol }: { symbol: string }) {
+export function GapDownCard({ symbol, onPaperTrade }: { symbol: string; onPaperTrade?: (d: InitialData) => void }) {
   const { data, isLoading, isError } = useGapDown(symbol);
 
   if (isLoading) {
@@ -82,6 +84,14 @@ export function GapDownCard({ symbol }: { symbol: string }) {
           <p className="text-[10px] text-muted-foreground">
             Risk %{data.risk_pct} · R:R 1:{data.rr} · %{data.gap_pct} gap · Bullish/Range piyasa (s.266)
           </p>
+          <CarrPaperTradeButton
+            data={{ symbol, strategy: "carr", setup_type: "gap_down", invest_type: 2,
+              entry_price: data.entry ?? undefined, plan_stop: data.stop ?? undefined,
+              plan_target: data.target ?? undefined,
+              plan_entry_trigger: `Carr Gap Down SHORT (s.273) — ralli-sonu unfilled gap %${data.gap_pct}; HABER TEYİDİ şart (s.272)` }}
+            onPaperTrade={onPaperTrade}
+            isMock={data.is_mock}
+          />
         </>
       ) : (
         <div className="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-muted-foreground/15">

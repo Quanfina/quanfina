@@ -3,6 +3,8 @@
 import { TrendingDown, Minus } from "lucide-react";
 import { useRisingWedge } from "@/hooks/use-rising-wedge";
 import { fmtUsd } from "@/lib/format-currency";
+import { CarrPaperTradeButton } from "@/components/stock/CarrPaperTradeButton";
+import type { InitialData } from "@/components/journal/AddTradeDialog";
 
 /**
  * Paket 522 (18 Haz 2026): Carr Rising Wedge Breakdown paneli (/hisse/[symbol]).
@@ -12,7 +14,7 @@ import { fmtUsd } from "@/lib/format-currency";
  * kırmızı. ENTRY=close (OBV trendline kırılımı sonrası, eyeball). TIER-2 → quality=CANDIDATE.
  * SHORT → kırmızı/danger ton (Quanfina long-biased; bilgi amaçlı). Carr catalog SON setup.
  */
-export function RisingWedgeCard({ symbol }: { symbol: string }) {
+export function RisingWedgeCard({ symbol, onPaperTrade }: { symbol: string; onPaperTrade?: (d: InitialData) => void }) {
   const { data, isLoading, isError } = useRisingWedge(symbol);
 
   if (isLoading) {
@@ -82,6 +84,14 @@ export function RisingWedgeCard({ symbol }: { symbol: string }) {
           <p className="text-[10px] text-muted-foreground">
             Risk %{data.risk_pct} · R:R 1:{data.rr} · MACD/OBV bearish divergence · Bullish/Range
           </p>
+          <CarrPaperTradeButton
+            data={{ symbol, strategy: "carr", setup_type: "rising_wedge", invest_type: 2,
+              entry_price: data.entry ?? undefined, plan_stop: data.stop ?? undefined,
+              plan_target: data.target ?? undefined,
+              plan_entry_trigger: "Carr Rising Wedge Breakdown SHORT (Böl.19) — kama + MACD/OBV bearish divergence; göz kararı: OBV trendline kırılımı" }}
+            onPaperTrade={onPaperTrade}
+            isMock={data.is_mock}
+          />
         </>
       ) : (
         <div className="grid grid-cols-3 gap-2 text-xs pt-1 border-t border-muted-foreground/15">
