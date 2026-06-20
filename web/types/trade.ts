@@ -49,6 +49,8 @@ export interface Trade {
   symbol: string;
   strategy: string;
   setup_type: string;
+  // P539 (20 Haz 2026): pozisyon yönü — 1=LONG (default) / 2=SHORT (Carr SHORT setupları)
+  invest_type?: 1 | 2;
   signal_source?: SignalSource | null;  // KARAR #477: UX Bölüm 7 (geriye dönük uyum için optional)
   entry_date: string;
   entry_price: number;
@@ -104,6 +106,7 @@ export interface TradeCreate {
   symbol: string;
   strategy: string;
   setup_type: string;
+  invest_type?: 1 | 2;          // P539: pozisyon yönü (1=LONG default / 2=SHORT)
   signal_source: SignalSource;  // KARAR #477: ZORUNLU — UX Bölüm 7
   entry_date: string;
   entry_price: number;

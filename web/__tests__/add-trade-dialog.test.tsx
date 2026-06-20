@@ -261,3 +261,65 @@ describe("AddTradeDialog — P&L preview (kapalı trade)", () => {
     expect(screen.getByText(/1[.,]?000/)).toBeInTheDocument();
   });
 });
+
+describe("AddTradeDialog — SHORT yön (P539)", () => {
+  function selectShort() {
+    fireEvent.change(screen.getByLabelText(/Yön/), { target: { value: "2" } });
+  }
+  function fillShort() {
+    fireEvent.change(screen.getByLabelText(/Hisse/), { target: { value: "GME" } });
+    fireEvent.change(screen.getByLabelText(/Giriş Tarihi/), { target: { value: "2026-06-20" } });
+    fireEvent.change(screen.getByLabelText(/Giriş \$/), { target: { value: "100" } });
+    fireEvent.change(screen.getByLabelText(/Adet/), { target: { value: "10" } });
+    fireEvent.change(screen.getByLabelText(/Giriş Tetikleyicisi/), { target: { value: "Blue Sea SHORT" } });
+    fireEvent.change(screen.getByLabelText(/Stop \$/), { target: { value: "106" } });
+    fireEvent.change(screen.getByLabelText(/Hedef \$/), { target: { value: "88" } });
+    fireEvent.change(screen.getByLabelText(/Pozisyon %/), { target: { value: "5" } });
+    fireEvent.change(screen.getByLabelText(/Çıkış Stratejisi/), { target: { value: "2R asagi" } });
+  }
+
+  it("Yön=SHORT → 'stop ÜSTTE' uyarı hint görünür", () => {
+    render(<AddTradeDialog open onOpenChange={vi.fn()} />);
+    selectShort();
+    expect(screen.getByText(/stop ÜSTTE/)).toBeInTheDocument();
+  });
+
+  it("LONG default → mutate invest_type=1", () => {
+    render(<AddTradeDialog open onOpenChange={vi.fn()} />);
+    fillRequired();
+    fireEvent.submit(document.querySelector("form")!);
+    const [body] = h.mockMutate.mock.calls[0];
+    expect(body.invest_type).toBe(1);
+  });
+
+  it("SHORT geçerli sıralama (stop>giriş>hedef) → mutate invest_type=2", () => {
+    render(<AddTradeDialog open onOpenChange={vi.fn()} />);
+    selectShort();
+    fillShort();
+    fireEvent.submit(document.querySelector("form")!);
+    expect(h.mockMutate).toHaveBeenCalledTimes(1);
+    const [body] = h.mockMutate.mock.calls[0];
+    expect(body.invest_type).toBe(2);
+    expect(body.plan_stop).toBe(106);
+    expect(body.plan_target).toBe(88);
+  });
+
+  it("SHORT yanlış sıralama (stop<giriş) → hata, mutate çağrılmaz", () => {
+    render(<AddTradeDialog open onOpenChange={vi.fn()} />);
+    selectShort();
+    fillShort();
+    fireEvent.change(screen.getByLabelText(/Stop \$/), { target: { value: "94" } });  // ALTTA -> yanlış
+    fireEvent.submit(document.querySelector("form")!);
+    expect(screen.getByText(/SHORT: stop > giriş > hedef/)).toBeInTheDocument();
+    expect(h.mockMutate).not.toHaveBeenCalled();
+  });
+
+  it("SHORT Mark Otomatik Plan → stop %6 üstte (106), hedef 2R altta (88)", () => {
+    render(<AddTradeDialog open onOpenChange={vi.fn()} />);
+    selectShort();
+    fireEvent.change(screen.getByLabelText(/Giriş \$/), { target: { value: "100" } });
+    fireEvent.click(screen.getByText(/Mark Otomatik Plan/));
+    expect((screen.getByLabelText(/Stop \$/) as HTMLInputElement).value).toBe("106.00");
+    expect((screen.getByLabelText(/Hedef \$/) as HTMLInputElement).value).toBe("88.00");
+  });
+});

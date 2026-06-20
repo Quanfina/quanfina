@@ -26,6 +26,24 @@ describe("calcPL — Decimal.js tam-doğruluk P&L", () => {
     expect(r.plPct).toBe(0);
   });
 
+  // P539: SHORT (invest_type=2) — fiyat DÜŞÜNCE kâr (yön-farkında)
+  it("SHORT entry=100 exit=90 shares=10 → +$100 +%10 (fiyat düştü, kâr)", () => {
+    const r = calcPL(100, 90, 10, 2);
+    expect(r.plDollar).toBe(100);
+    expect(r.plPct).toBe(10);
+  });
+
+  it("SHORT entry=100 exit=110 shares=10 → -$100 -%10 (fiyat yükseldi, zarar)", () => {
+    const r = calcPL(100, 110, 10, 2);
+    expect(r.plDollar).toBe(-100);
+    expect(r.plPct).toBe(-10);
+  });
+
+  it("invest_type default=1 (LONG) — eski çağrılar değişmez", () => {
+    const r = calcPL(100, 110, 10);
+    expect(r.plDollar).toBe(100);
+  });
+
   it("String input ('100', '110', '100') de çalışır", () => {
     const r = calcPL("100", "110", "100");
     expect(r.plDollar).toBe(1000);

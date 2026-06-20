@@ -48,6 +48,9 @@ export interface InitialData {
   plan_stop?: number;
   plan_target?: number;
   plan_entry_trigger?: string;
+  // P539 (20 Haz 2026): pozisyon yönü — 1=LONG (default) / 2=SHORT. Carr SHORT
+  // setupları (Blue Sea/Gap Down/Rising Wedge) köprüsünde 2 ile gelir.
+  invest_type?: 1 | 2;
 }
 
 interface Props {
@@ -63,6 +66,10 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
   const [symbol, setSymbol]         = useState("");
   const [strategy, setStrategy]     = useState("minervini");
   const [setupType, setSetupType]   = useState("vcp");
+  // P539 (20 Haz 2026): pozisyon yönü (1=LONG default / 2=SHORT). SHORT'ta R/R, otomatik
+  // plan, validation ve Mark-LONG advisory (Stage4/Defansif/checklist) yön-farkında çalışır.
+  const [investType, setInvestType] = useState<1 | 2>(1);
+  const isShort = investType === 2;
   // KARAR #477: Sinyal Kaynağı zorunlu (UX Bölüm 7) — initialData varsa
   // genelde Sinyaller sayfasından AL ile gelir → default "strategy"
   const [signalSource, setSignalSource] = useState<SignalSource>("strategy");
@@ -177,10 +184,12 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
 
   // ATR Stop suggestion → planStop default (sadece kullanıcı henüz girmediyse)
   useEffect(() => {
-    if (open && !planStop && atrData?.suggested_stop_normal != null) {
+    // P539: ATR suggested_stop_normal = entry−2.5×ATR (LONG, stop ALTTA). SHORT'ta stop
+    // ÜSTTE olmalı → SHORT'ta ATR auto-fill atlanır (yanlış yön doldurmasın).
+    if (open && !planStop && !isShort && atrData?.suggested_stop_normal != null) {
       setPlanStop(String(atrData.suggested_stop_normal));
     }
-  }, [open, planStop, atrData?.suggested_stop_normal]);
+  }, [open, planStop, isShort, atrData?.suggested_stop_normal]);
 
   // P437: initialData prefill SADECE open false->true geçişinde uygulanır.
   // Eski hali [open, initialData] idi; initialData her sayfa render'ında yeni obje
@@ -211,6 +220,7 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
     if (initialData.plan_stop !== undefined) setPlanStop(String(initialData.plan_stop));
     if (initialData.plan_target !== undefined) setPlanTarget(String(initialData.plan_target));
     if (initialData.plan_entry_trigger !== undefined) setPlanEntryTrigger(initialData.plan_entry_trigger);
+    if (initialData.invest_type !== undefined) setInvestType(initialData.invest_type);  // P539 yön
     // KARAR #477: Sinyaller sayfasından AL ile geldiyse default "strategy" (sistem sinyali)
     setSignalSource("strategy");
   }, [open, initialData]);
@@ -235,11 +245,12 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
     const xp = parseFloat(exitPrice);
     const sh = parseInt(shares);
     if (isNaN(ep) || isNaN(xp) || isNaN(sh) || ep <= 0 || sh <= 0) return null;
-    return calcPL(ep, xp, sh);
-  }, [isClosed, entryPrice, exitPrice, shares]);
+    return calcPL(ep, xp, sh, investType);   // P539: SHORT kapanış P&L yön-farkında
+  }, [isClosed, entryPrice, exitPrice, shares, investType]);
 
   function reset() {
     setSymbol(""); setStrategy("minervini"); setSetupType("vcp");
+    setInvestType(1);   // P539: yön LONG default
     setSignalSource("strategy");
     setEntryDate(""); setEntryPrice(""); setShares("");
     setStatus("open"); setExitDate(""); setExitPrice("");
@@ -275,6 +286,9 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
     if (!planEntryTrigger.trim()) { setError("Plan: Giriş tetikleyicisi gerekli (Mark TTLC Sec 1)"); return; }
     if (isNaN(pStop)   || pStop   <= 0) { setError("Plan: Geçerli stop $ gerekli (Mark)"); return; }
     if (isNaN(pTarget) || pTarget <= 0) { setError("Plan: Geçerli hedef $ gerekli (Mark)"); return; }
+    // P539: yön-farkında plan tutarlılığı (Mark Risk-first). SHORT stop üstte/hedef altta.
+    if (isShort && !(pStop > ep && ep > pTarget)) { setError("SHORT: stop > giriş > hedef olmalı (stop üstte koruma, hedef altta kâr)"); return; }
+    if (!isShort && !(pStop < ep && ep < pTarget)) { setError("LONG: stop < giriş < hedef olmalı (stop altta koruma, hedef üstte kâr)"); return; }
     if (isNaN(pSize)   || pSize   <= 0 || pSize > 100) { setError("Plan: Pozisyon % (0-100 arası) gerekli"); return; }
     if (!planExitStrategy.trim()) { setError("Plan: Çıkış stratejisi gerekli (Mark)"); return; }
 
@@ -282,7 +296,9 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
     // Mark TTLC s.187: Defansif modda yeni AL pozisyonu YASAK. Sn. Ferit explicit
     // onay vermezse submit BLOK (görsel uyarıdan AKSİYON disiplinine evrim).
     // Sadece açık (open) trade'ler için — kapalı kayıt geçmiş için override gerekmez.
-    if (!isClosed && tradingMode.mode === "defansif" && !defansifOverride) {
+    // P539: Defansif BLOK SADECE LONG. Defansif piyasa (Stage 3-4 + MH<30) SHORT için
+    // uygun ortam (düşüşte satılır) → SHORT'ta yeni AL bloğu uygulanmaz.
+    if (!isClosed && !isShort && tradingMode.mode === "defansif" && !defansifOverride) {
       // Paket 264 (P233 helper DRY): getDefansifBlockMessage tek kaynak mesaj
       const baseMsg = getDefansifBlockMessage(tradingMode.mode);
       setError(`${baseMsg} Aşağıdaki "Riski biliyorum" kutusunu işaretleyin.`);
@@ -291,6 +307,7 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
 
     const body: TradeCreate = {
       symbol: sym, strategy, setup_type: setupType,
+      invest_type: investType,      // P539: pozisyon yönü (1=LONG/2=SHORT)
       signal_source: signalSource,  // KARAR #477 zorunlu (UX Bölüm 7)
       entry_date: entryDate, entry_price: ep, shares: sh, status,
       // KARAR ADAY #717 — Mark TTLC Sec 1 6 alan
@@ -355,7 +372,9 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
         {/* KARAR #733 alt (Paket 33): Stage 4 'UZAK DUR' Mark uyarısı.
             P413 (31 May 2026 — Kural #28 audit): is_mock=true ise MOCK rozet
             ekle. Paper trading kararı MOCK veriyle alınmasın diye şeffaflık. */}
-        {carrStage && carrStage.stage === 4 && (
+        {/* P539: Stage 4 "UZAK DUR" SADECE LONG'da. SHORT'ta Stage 4 (declining) = short-dostu
+            (düşen trendde satılır) → ters uyarı gösterme. */}
+        {!isShort && carrStage && carrStage.stage === 4 && (
           <div
             className="rounded-md border px-3 py-2 flex items-start gap-2 text-xs"
             style={{
@@ -399,7 +418,9 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
         {/* Paket 239 (27 May 2026): PreTradeChecklist Mark canon 7 koşul pre-flight
             Sembol girince + plan alanları dolduruldukça canlı yenilenir.
             Disiplin: AddTradeDialog 5 katmanlı zinciri tamamlar (görme→submit→pre-flight). */}
-        {markPreCheckSymbol && !isClosed && (
+        {/* P539: PreTradeChecklist = Mark 7 LONG koşulu (Stage 2, RS, pivot AL...) — SHORT'ta
+            yanıltıcı (short kriterleri farklı). SHORT'ta gizle. */}
+        {markPreCheckSymbol && !isClosed && !isShort && (
           <PreTradeChecklist
             symbol={trimmedSymbol}
             stage={carrStage?.stage}
@@ -667,6 +688,27 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
             </select>
           </div>
 
+          {/* P539 — Pozisyon Yönü (LONG/SHORT). SHORT = Carr SHORT setupları (Blue Sea/
+              Gap Down/Rising Wedge). R/R, otomatik plan, validation, advisory yön-farkında. */}
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="at-direction">Yön *</Label>
+            <select
+              id="at-direction"
+              value={investType}
+              onChange={(e) => setInvestType(Number(e.target.value) === 2 ? 2 : 1)}
+              className={SELECT}
+              style={isShort ? { borderColor: "var(--mtp-danger)", color: "var(--mtp-danger)" } : undefined}
+            >
+              <option value={1}>LONG (al — fiyat yükselince kâr)</option>
+              <option value={2}>SHORT (sat — fiyat düşünce kâr)</option>
+            </select>
+            {isShort && (
+              <span className="text-xs" style={{ color: "var(--mtp-danger)" }}>
+                SHORT: stop ÜSTTE (giriş&apos;ten yüksek), hedef ALTTA. Carr SHORT setupları için.
+              </span>
+            )}
+          </div>
+
           {/* Row 2.5 — Sinyal Kaynağı (KARAR #477, UX Bölüm 7 ZORUNLU) */}
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="at-source">
@@ -847,11 +889,20 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
                 onClick={() => {
                   const ep = parseFloat(entryPrice);
                   if (!ep || ep <= 0) return;
-                  const markStop = (ep * 0.94).toFixed(2);   // %6 stop (TTLC s.131 %7 marjı içinde)
-                  const risk = ep - parseFloat(markStop);
-                  const markTarget = (ep + 2 * risk).toFixed(2);  // 2R minimum
-                  setPlanStop(markStop);
-                  setPlanTarget(markTarget);
+                  if (isShort) {
+                    // P539 SHORT: stop %6 ÜSTTE (koruma), hedef 2R AŞAĞI (kâr)
+                    const markStop = (ep * 1.06).toFixed(2);
+                    const risk = parseFloat(markStop) - ep;
+                    const markTarget = (ep - 2 * risk).toFixed(2);
+                    setPlanStop(markStop);
+                    setPlanTarget(markTarget);
+                  } else {
+                    const markStop = (ep * 0.94).toFixed(2);   // %6 stop (TTLC s.131 %7 marjı içinde)
+                    const risk = ep - parseFloat(markStop);
+                    const markTarget = (ep + 2 * risk).toFixed(2);  // 2R minimum
+                    setPlanStop(markStop);
+                    setPlanTarget(markTarget);
+                  }
                 }}
                 className="text-xs px-3 py-1.5 rounded-md border self-start font-medium hover:bg-accent transition-colors"
                 style={{
@@ -859,9 +910,11 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
                   borderColor: "rgba(75,156,211,0.4)",
                   color: "var(--mtp-neutral)",
                 }}
-                title="Mark canon: stop = entry × 0.94 (%6 — TTLC s.131 %7 marjı), target = entry + 2R"
+                title={isShort
+                  ? "Mark canon SHORT: stop = entry × 1.06 (%6 üstte), target = entry − 2R (aşağı)"
+                  : "Mark canon: stop = entry × 0.94 (%6 — TTLC s.131 %7 marjı), target = entry + 2R"}
               >
-                ⚡ Mark Otomatik Plan (%6 stop + 2R target)
+                {isShort ? "⚡ Mark Otomatik Plan (%6 stop üstte + 2R aşağı)" : "⚡ Mark Otomatik Plan (%6 stop + 2R target)"}
               </button>
             )}
 
@@ -874,9 +927,10 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
               const ps = parseFloat(planStop);
               const pt = parseFloat(planTarget);
               if (!ep || !ps || !pt || ep <= 0 || ps <= 0 || pt <= 0) return null;
-              const risk = ep - ps;
-              const reward = pt - ep;
-              if (risk <= 0) return null;
+              // P539: yön-farkında R/R. SHORT risk=stop−entry, reward=entry−target.
+              const risk = isShort ? (ps - ep) : (ep - ps);
+              const reward = isShort ? (ep - pt) : (pt - ep);
+              if (risk <= 0 || reward <= 0) return null;
               const rr = reward / risk;
               const stopPct = (risk / ep) * 100;
               const rrColor = rr >= 2 ? "var(--mtp-excellent)" : rr >= 1 ? "#F59E0B" : "var(--mtp-danger)";
@@ -1042,7 +1096,7 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
               checkbox. Mark TTLC s.187 disiplini AKSİYON kilidi. Sadece açık trade
               + defansif modda görünür. Sn. Ferit "Riski biliyorum" işaretlemeden
               Kaydet butonu disabled. */}
-          {!isClosed && tradingMode.mode === "defansif" && (
+          {!isClosed && !isShort && tradingMode.mode === "defansif" && (
             <label
               className="flex items-start gap-2 rounded-md border px-3 py-2 text-xs cursor-pointer"
               style={{
@@ -1071,10 +1125,10 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
               type="submit"
               disabled={
                 addMutation.isPending ||
-                (!isClosed && tradingMode.mode === "defansif" && !defansifOverride)
+                (!isClosed && !isShort && tradingMode.mode === "defansif" && !defansifOverride)
               }
               title={
-                !isClosed && tradingMode.mode === "defansif" && !defansifOverride
+                !isClosed && !isShort && tradingMode.mode === "defansif" && !defansifOverride
                   ? "Defansif modda yeni AL BLOK — 'Riski biliyorum' kutusunu işaretle"
                   : undefined
               }
