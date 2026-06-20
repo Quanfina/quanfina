@@ -2,6 +2,7 @@
 
 import { TrendingUp } from "lucide-react";
 import { useSectorRotation } from "@/hooks/use-sector-rotation";
+import { SectorRotationQuadrant } from "@/components/market/SectorRotationQuadrant";
 
 /**
  * Sektör Rotasyonu sayfası — 11 SPDR sektör ETF RS rank.
@@ -59,6 +60,7 @@ export default function SektorRotasyonuPage() {
             Sektör rotasyonu verisi yok (scanner henüz doldurmamış olabilir).
           </p>
         ) : (
+          <div className="flex flex-col gap-6">
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
               <thead>
@@ -117,6 +119,10 @@ export default function SektorRotasyonuPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+
+          {/* Görsel rotasyon yorumlama — tabloyu bozmadan altına (P554) */}
+          <SectorRotationQuadrant data={data} />
           </div>
         )}
       </div>
