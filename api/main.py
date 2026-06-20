@@ -2856,6 +2856,111 @@ def get_fundamental(symbol: str) -> FundamentalInfo:
     )
 
 
+# P543 (20 Haz 2026): Earnings tarih farkındalığı (#843) — Minervini "earnings crapshoot".
+# Kanon (Kural #26): Minervini.md s.249 "Earnings'e 5 gün veya daha az kala ASLA yeni
+# breakout alımı yapılmaz" + s.251 "earnings crapshoot" + s.286-289 pseudo-kod
+# (days_to_earnings <= 5). Eşik 5 gün. yfinance calendar (sürümlere göre dict/DataFrame ->
+# defansif parse). 6h cache (earnings tarihi sık değişmez). SOFT uyarı (block değil —
+# paper trading'de Sn. Ferit test edebilsin; Kural #28: yfinance kaynak şeffaf).
+MINERVINI_EARNINGS_BLACKOUT_DAYS: int = 5   # Minervini.md s.249
+
+_EARNINGS_CACHE: dict[str, tuple[float, Optional[str]]] = {}
+_EARNINGS_CACHE_TTL_SEC = 6 * 3600   # 6 saat
+
+
+def _fetch_earnings_date(symbol: str) -> Optional[str]:
+    """yfinance sonraki earnings tarihi (ISO 'YYYY-MM-DD') veya None. Cache 6h.
+    yfinance calendar sürümlere göre dict veya DataFrame -> defansif. En yakın GELECEK
+    tarihi seçilir; yoksa son bilinen (geçmiş -> days negatif). Fail -> None."""
+    global _YF_DISABLED
+    if _YF_DISABLED:
+        return None
+    sym = symbol.upper()
+    now = _time_module.time()
+    if sym in _EARNINGS_CACHE:
+        ts, val = _EARNINGS_CACHE[sym]
+        if now - ts < _EARNINGS_CACHE_TTL_SEC:
+            return val
+    result: Optional[str] = None
+    try:
+        import yfinance as yf
+        cal = yf.Ticker(sym).calendar
+        dates = None
+        if isinstance(cal, dict):
+            dates = cal.get("Earnings Date")
+        else:  # DataFrame (eski yfinance)
+            try:
+                dates = list(cal.loc["Earnings Date"].values)
+            except Exception:
+                dates = None
+        cand = []
+        if dates is not None:
+            seq = dates if isinstance(dates, (list, tuple)) else [dates]
+            for d in seq:
+                try:
+                    dd = d.date() if hasattr(d, "date") else d
+                    if isinstance(dd, date):
+                        cand.append(dd)
+                except Exception:
+                    continue
+        today = date.today()
+        future = sorted([d for d in cand if d >= today])
+        if future:
+            result = future[0].isoformat()
+        elif cand:
+            result = sorted(cand)[-1].isoformat()  # son bilinen (geçmiş)
+    except ImportError:
+        _YF_DISABLED = True
+        result = None
+    except Exception:
+        result = None
+    _EARNINGS_CACHE[sym] = (now, result)
+    return result
+
+
+class EarningsInfo(BaseModel):
+    symbol: str
+    has_data: bool = False
+    earnings_date: Optional[str] = None       # ISO 'YYYY-MM-DD'
+    days_to_earnings: Optional[int] = None     # negatif = geçmiş
+    within_blackout: bool = False              # 0 <= days <= 5 (Minervini s.249)
+    blackout_days: int = MINERVINI_EARNINGS_BLACKOUT_DAYS
+    mark_says: str
+
+
+@app.get("/api/stock/{symbol}/earnings", response_model=EarningsInfo)
+def get_earnings(symbol: str) -> EarningsInfo:
+    """Earnings tarih farkındalığı (#843) — Minervini s.249 "5 gün blackout, earnings crapshoot".
+
+    yfinance calendar. ≤5 gün kala YENİ breakout alımı YAPMA (s.249/251). SOFT uyarı (block
+    değil). Veri yoksa has_data=False (Kural #28: bilinmiyor dürüst, manuel teyit önerisi).
+    """
+    sym = symbol.upper()
+    ed = _fetch_earnings_date(sym)
+    if not ed:
+        return EarningsInfo(
+            symbol=sym, has_data=False,
+            mark_says="Earnings tarihi bilinmiyor (yfinance veri yok). Trade öncesi manuel teyit önerilir.",
+        )
+    try:
+        d = date.fromisoformat(ed)
+    except Exception:
+        return EarningsInfo(symbol=sym, has_data=False, mark_says="Earnings tarihi okunamadı.")
+    days = (d - date.today()).days
+    within = 0 <= days <= MINERVINI_EARNINGS_BLACKOUT_DAYS
+    if within:
+        says = (f"⚠️ Earnings {days} gün sonra ({ed}) — Minervini s.249: 5 gün veya daha az kala "
+                f"YENİ breakout alımı YAPMA ('earnings crapshoot', s.251). Açık pozisyonda riski yönet.")
+    elif days < 0:
+        says = f"Son earnings {abs(days)} gün önceydi ({ed}). Sonraki tarih yfinance'te henüz yok."
+    else:
+        says = f"Earnings {days} gün sonra ({ed}). Blackout dışı (>{MINERVINI_EARNINGS_BLACKOUT_DAYS} gün) — Minervini s.249 alım serbest."
+    return EarningsInfo(
+        symbol=sym, has_data=True, earnings_date=ed, days_to_earnings=days,
+        within_blackout=within, mark_says=says,
+    )
+
+
 # KARAR #733 alt-paket (Paket 77, 25 May 2026): overhead_supply endpoint
 class OverheadSupplyInfo(BaseModel):
     category: Optional[Literal["HEAVY", "MODERATE", "NONE"]] = None

@@ -35,6 +35,7 @@ import { DoubleBottomCard } from "@/components/stock/DoubleBottomCard";
 import { HighTightFlagCard } from "@/components/stock/HighTightFlagCard";
 import { PocketPivotCard } from "@/components/stock/PocketPivotCard";
 import { FundamentalCard } from "@/components/stock/FundamentalCard";
+import { EarningsCard } from "@/components/stock/EarningsCard";
 import { BaseSummaryCard } from "@/components/stock/BaseSummaryCard";
 import { RiskSummaryCard } from "@/components/stock/RiskSummaryCard";
 import { SellStrengthCard } from "@/components/stock/SellStrengthCard";
@@ -390,6 +391,8 @@ export default function HissePage({
           <PocketPivotCard symbol={sym} />
           {/* Paket 542 (20 Haz 2026): Temel (CANSLIM C/A) — Minervini s.26 EPS/satış Q/Q soft teyit */}
           <FundamentalCard symbol={sym} />
+          {/* Paket 543 (20 Haz 2026): Earnings Takvimi — Minervini s.249 "5g blackout, crapshoot" */}
+          <EarningsCard symbol={sym} />
         </div>
 
         {/* Setup notes (only when notes exist) */}
