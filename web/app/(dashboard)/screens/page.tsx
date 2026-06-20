@@ -240,6 +240,49 @@ export default function ScreensPage() {
         filter: false,
         cellRenderer: PivotBadgeCell,
       },
+      // P556 (20 Haz 2026): GRUP kolonu — hissenin sektörü lider mi? (Minervini s.95 +
+      // O'Neil 'L' "leading stock in leading group"). sector_rotation RS rank. LAGGING =
+      // "yalnız kurt" riski (güçlü hisse, zayıf sektör). Veri yoksa "—" (Kural #28 dürüst).
+      {
+        headerName: "GRUP",
+        field: "group_tier",
+        width: 96,
+        minWidth: 80,
+        sortable: true,
+        filter: false,
+        headerTooltip: "Sektör RS (Minervini s.95 + O'Neil 'L'): Lider/Nötr/Zayıf. Zayıf = yalnız kurt riski.",
+        cellRenderer: (p: { value: string | null | undefined; data?: ScreenResultRow }) => {
+          if (!p.value) return <span style={{ color: "#888" }}>—</span>;
+          const meta: Record<string, { label: string; tint: string; color: string }> = {
+            LEADING: { label: "Lider", tint: "rgba(40,167,69,0.10)", color: "var(--mtp-excellent)" },
+            NEUTRAL: { label: "Nötr", tint: "rgba(245,158,11,0.10)", color: "#92400E" },
+            LAGGING: { label: "Zayıf", tint: "rgba(220,53,69,0.10)", color: "var(--mtp-danger)" },
+          };
+          const m = meta[p.value];
+          if (!m) return <span style={{ color: "#888" }}>—</span>;
+          const sektor = p.data?.sector ?? "";
+          return (
+            <span
+              style={{
+                display: "inline-block",
+                padding: "2px 8px",
+                borderRadius: 4,
+                background: m.tint,
+                color: m.color,
+                border: `1px solid color-mix(in srgb, ${m.color} 33%, transparent)`,
+                fontWeight: 600,
+                fontSize: 11,
+                fontFamily: "var(--font-jetbrains-mono, monospace)",
+              }}
+              title={`${sektor} — ${m.label} sektör (Minervini s.95 + O'Neil 'L'). ${
+                p.value === "LAGGING" ? "Yalnız kurt riski: güçlü hisse, zayıf sektör." : ""
+              }`}
+            >
+              {m.label}
+            </span>
+          );
+        },
+      },
       // P419 (31 May 2026): TARİH ve MARK PROFİLİ gizlendi.
       // - scan_date hep aynı gün (tek tarama, tüm satırlar aynı tarih) → sayfa
       //   üstüne tek bilgi olarak yazılıyor (DataFreshnessBanner P375 zaten var)

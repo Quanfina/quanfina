@@ -1430,6 +1430,26 @@ def stock_sector_latest(symbol: str) -> Optional[str]:
         return None
 
 
+def stock_sectors_map_latest(symbols: list[str]) -> dict[str, str]:
+    """Verilen sembollerin son taramadaki Finviz sektor adi haritasi (P556 — toplu).
+
+    Tek sorgu (N+1 yok) — bulk tarama grup RS zenginlestirme icin. {SYMBOL: sector}.
+    Tarama disi sembol haritada yer almaz. Sadece gercek scan (MOCK YOK — Kural #28)."""
+    if not symbols:
+        return {}
+    syms = [s.upper() for s in symbols]
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT ticker, sector FROM minervini_scans
+                WHERE scan_date = (SELECT MAX(scan_date) FROM minervini_scans)
+                  AND ticker = ANY(:syms) AND sector IS NOT NULL AND sector <> ''
+            """), {"syms": syms})
+            return {row[0].upper(): row[1] for row in result}
+    except Exception:
+        return {}
+
+
 def breadth_history_from_scans(days: int = 25) -> list[tuple[int, int]]:
     """Paket 409: Quanfina kendi günlük tarama verisinden A/D (advance/decline) sayım.
 

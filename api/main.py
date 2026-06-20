@@ -33,6 +33,7 @@ from db_helpers import (  # noqa: E402
     sector_rotation_get_latest,
     sector_rank_map_latest,
     stock_sector_latest,
+    stock_sectors_map_latest,
     breadth_history_from_scans,
     minervini_stocks_get_latest,
     scan_latest_date,
@@ -356,6 +357,11 @@ class ScreenResultRow(BaseModel):
     # "D" + "veri yok" tooltip gosterir; gercek zayif D kirmizi kalir. db_helpers
     # _grade_no_data hesabi (eps/sales bos -> True).
     grade_no_data: Optional[bool] = None
+    # P556 (20 Haz 2026): Grup RS — hissenin sektoru lider mi? (P553 compute tarama olceginde)
+    # Minervini s.95 + O'Neil 'L': "leading stock in leading group". sector_rotation RS rank.
+    # Veri yoksa None (MOCK YOK — Kural #28). SEKTOR proxy (197 IBD grup degil).
+    sector: Optional[str] = None       # SPDR sektor adi (normalize)
+    group_tier: Optional[Literal["LEADING", "NEUTRAL", "LAGGING"]] = None
 
 
 @app.get("/api/screens", response_model=list[ScreenMeta])
@@ -533,11 +539,21 @@ def _compute_screen_results(slug: str, limit: int) -> list[ScreenResultRow]:
                                  "vcp_quality_score", "vcp_ready_score", "power_play_pass",
                                  "grade_no_data")})  # P423: TEMEL "D" veri-yok ayrimi
             for r in rows]
+    # P556: Grup RS zenginlestirme — sektor haritasi + RS rank tek sefer (N+1 yok).
+    # compute_group_rs_confirmation (P553) tarama olceginde. Veri yoksa None (Kural #28).
+    try:
+        _sectors = stock_sectors_map_latest([r.symbol for r in db_results])
+        _rank_map = sector_rank_map_latest()
+    except Exception:
+        _sectors, _rank_map = {}, {}
     # KARAR #733 alt-paket (Paket 83): pivot_status enrichment (paralel 20 worker)
     from concurrent.futures import ThreadPoolExecutor
     def _enrich_one(row):
+        grp = compute_group_rs_confirmation(_sectors.get(row.symbol.upper()), _rank_map)
         return row.model_copy(update={
             "pivot_status": _compute_signal_pivot_status(row.symbol, row.price or 100.0),
+            "sector": grp["sector_spdr"] if grp["available"] else None,
+            "group_tier": grp["tier"] if grp["available"] else None,
         })
     with ThreadPoolExecutor(max_workers=20) as pool:
         enriched = list(pool.map(_enrich_one, db_results))

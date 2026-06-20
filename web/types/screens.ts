@@ -77,6 +77,10 @@ export interface ScreenResultRow {
   // true (gerçekten zayıf DEĞİL). UI gri "D" + "veri yok" tooltip; gerçek zayıf
   // D kırmızı kalır. Backend db_helpers._grade_no_data hesabı.
   grade_no_data?: boolean | null;
+  // P556 (20 Haz 2026) — Grup RS: hissenin sektörü lider mi? (Minervini s.95 + O'Neil 'L')
+  // "leading stock in leading group". sector_rotation RS rank. Veri yoksa null (Kural #28).
+  sector?: string | null; // SPDR sektör adı (normalize)
+  group_tier?: "LEADING" | "NEUTRAL" | "LAGGING" | null;
 }
 
 /**
