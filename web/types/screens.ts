@@ -138,6 +138,8 @@ export const SCREEN_CATEGORIES: Record<string, string> = {
   gap_down: "Gap Down (Carr SHORT)",            // Carr s.273 ralli-sonu reversal SHORT
   // 18 Haz 2026 — Carr SHORT katalog SON (P522). Yükselen kama kırılımı.
   rising_wedge: "Rising Wedge (Carr SHORT)",    // Carr Böl.19 kama kırılımı SHORT (TIER-2)
+  // 20 Haz 2026 — Carr Relief Rally SHORT (P570). Pullback aynası; s.280 oran çifti.
+  relief_rally: "Relief Rally (Carr SHORT)",    // Carr Böl.15 s.280 WEAK_bear trend-takip SHORT
 };
 
 // P524 (18 Haz 2026): /screens dropdown strateji-bazlı gruplama (21 ekran düz liste hantaldı,
@@ -173,7 +175,7 @@ export const SCREEN_GROUPS: ScreenGroup[] = [
   },
   {
     label: "Carr — SHORT",
-    slugs: ["blue_sea", "gap_down", "rising_wedge"],
+    slugs: ["relief_rally", "blue_sea", "gap_down", "rising_wedge"],
   },
 ];
 
@@ -304,6 +306,11 @@ export const SCREEN_CONDITIONS: Record<string, ScreenCondition[]> = {
   pullback: [
     { source: "carr", text: "WEAK_bull trend-takip LONG (Carr 2.baskı s.249): SMA20>SMA50>SMA200 + 50/20 yükseliyor + Stoch %K(5,3,3)<20 (oversold pullback) + bugün close>open" },
     { source: "carr", text: "ENTRY ertesi gün signal high üstü buy-stop (s.248). Stop 50MA-%2 / %8 cap (s.321), hedef 2R (s.324). Time stop YOK (trend trailing)" },
+  ],
+  // 20 Haz 2026 — Carr Relief Rally SHORT (P570). Pullback'in tam aynası; s.280 oran çifti.
+  relief_rally: [
+    { source: "carr", text: "WEAK_bear trend-takip SHORT (Carr 2.baskı Böl.15 s.280): SMA20<SMA50<SMA200 + 50/20 düşüyor + Stoch %K(5,3,3)>80 (overbought relief) + bugün close<open" },
+    { source: "carr", text: "ENTRY ertesi gün signal low altı sell-stop. Stop 50MA+%2 / %8 cap, hedef -2R. Time stop YOK. Pullback/Relief oranı: piyasa rejim göstergesi (s.280)" },
   ],
   blue_sky: [
     { source: "carr", text: "STRONG+WEAK breakout LONG (Carr 2.baskı s.264): 40g yeni yüksek + 52h zirve ALTI + close≤260g min low×2 + OBV/MACD 40g yeni yüksek + bugün yeşil. SMA YOK" },
