@@ -28,6 +28,7 @@ import { useClimaxRun } from "@/hooks/use-climax-run";
 import { useRsRating } from "@/hooks/use-rs-rating";
 import { useStageTransition } from "@/hooks/use-stage-transition";
 import { useAtrVolatility } from "@/hooks/use-atr-volatility";
+import { useEarnings } from "@/hooks/use-earnings";
 import { useSymbolSearch } from "@/hooks/use-symbol-search";
 import { useStockQuote } from "@/hooks/use-stock-quote";
 import { useTradingMode, getDefansifBlockMessage } from "@/hooks/use-trading-mode";
@@ -181,6 +182,9 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
   // KARAR #733 alt-paket (Paket 128, 26 May 2026): ATR Stop auto-fill
   // Mark TLSMW Ch 11: ATR-based stop "give the stock room to breathe"
   const { data: atrData } = useAtrVolatility(markPreCheckSymbol);
+  // P544 (20 Haz 2026): Earnings blackout pre-check (Minervini s.249 "earnings crapshoot").
+  // ≤5 gün kala YENİ pozisyon = risk → trade-karar anında uyarı (#843).
+  const { data: earningsData } = useEarnings(markPreCheckSymbol);
 
   // ATR Stop suggestion → planStop default (sadece kullanıcı henüz girmediyse)
   useEffect(() => {
@@ -410,6 +414,34 @@ export function AddTradeDialog({ open, onOpenChange, initialData }: Props) {
                     almadan önce manuel grafik doğrulama yap.
                   </span>
                 )}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* P544 (20 Haz 2026): Earnings blackout uyarısı (Minervini s.249 "earnings crapshoot").
+            ≤5 gün kala YENİ pozisyon açma riski — her iki yönde (earnings gap çift yönlü).
+            Açık pozisyon kaydı için (kapanış değil). SOFT uyarı (block değil). */}
+        {!isClosed && earningsData?.has_data && earningsData.within_blackout && (
+          <div
+            className="rounded-md border px-3 py-2 flex items-start gap-2 text-xs"
+            style={{
+              background: "rgba(220, 53, 69, 0.08)",
+              borderColor: "rgba(220, 53, 69, 0.4)",
+              color: "var(--mtp-danger)",
+            }}
+            data-testid="earnings-blackout-warning"
+          >
+            <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+            <div className="flex-1">
+              <span className="font-semibold">
+                ⛔ {trimmedSymbol} Earnings {earningsData.days_to_earnings} gün sonra
+                {earningsData.earnings_date ? ` (${earningsData.earnings_date})` : ""}
+              </span>
+              <span className="block mt-1 italic">
+                Minervini s.249: 5 gün veya daha az kala <b>YENİ breakout alımı YAPMA</b> —
+                &quot;earnings crapshoot&quot; (s.251). Beklentiyi aşsa bile gap-down olabilir;
+                earnings sonrası pivottan değerlendir. <span className="text-muted-foreground">(yfinance tarihi — manuel teyit önerilir)</span>
               </span>
             </div>
           </div>

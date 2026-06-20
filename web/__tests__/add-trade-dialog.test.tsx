@@ -25,6 +25,10 @@ const h = vi.hoisted(() => ({
     consecutiveLosses: 0,
     totalClosedTrades: 0,
   },
+  // P544: earnings pre-check mock state (default undefined = veri yok)
+  earnings: undefined as
+    | undefined
+    | { has_data: boolean; within_blackout: boolean; days_to_earnings: number; earnings_date: string },
 }));
 
 vi.mock("@/hooks/use-trades", () => ({
@@ -42,6 +46,7 @@ vi.mock("@/hooks/use-climax-run", () => ({ useClimaxRun: () => ({ data: undefine
 vi.mock("@/hooks/use-rs-rating", () => ({ useRsRating: () => ({ data: undefined }) }));
 vi.mock("@/hooks/use-stage-transition", () => ({ useStageTransition: () => ({ data: undefined }) }));
 vi.mock("@/hooks/use-atr-volatility", () => ({ useAtrVolatility: () => ({ data: undefined }) }));
+vi.mock("@/hooks/use-earnings", () => ({ useEarnings: () => ({ data: h.earnings }) }));
 vi.mock("@/hooks/use-symbol-search", () => ({ useSymbolSearch: () => ({ data: undefined }) }));
 vi.mock("@/hooks/use-stock-quote", () => ({
   useStockQuote: () => ({ data: undefined }),
@@ -58,6 +63,7 @@ beforeEach(() => {
   h.mockMutate.mockReset();
   h.tradingMode.mode = "normal";
   h.tradingMode.recommendedSizingPct = 1;
+  h.earnings = undefined;
 });
 
 /** Geçerli açık trade için tüm zorunlu alanları doldurur. */
@@ -93,6 +99,27 @@ describe("AddTradeDialog — render", () => {
   it("normal mod → Trade Modu uyarı banner'ı yok", () => {
     render(<AddTradeDialog open onOpenChange={vi.fn()} />);
     expect(screen.queryByText(/Trade Modu:/)).not.toBeInTheDocument();
+  });
+});
+
+describe("AddTradeDialog — earnings blackout uyarısı (P544, Minervini s.249)", () => {
+  it("within_blackout (3 gün) → kırmızı uyarı banner ('breakout YAPMA')", () => {
+    h.earnings = { has_data: true, within_blackout: true, days_to_earnings: 3, earnings_date: "2026-06-23" };
+    render(<AddTradeDialog open onOpenChange={vi.fn()} />);
+    expect(screen.getByTestId("earnings-blackout-warning")).toBeInTheDocument();
+    expect(screen.getByText(/breakout alımı YAPMA/)).toBeInTheDocument();
+  });
+
+  it("blackout dışı (>5 gün) → banner yok", () => {
+    h.earnings = { has_data: true, within_blackout: false, days_to_earnings: 20, earnings_date: "2026-07-10" };
+    render(<AddTradeDialog open onOpenChange={vi.fn()} />);
+    expect(screen.queryByTestId("earnings-blackout-warning")).toBeNull();
+  });
+
+  it("earnings verisi yok → banner yok", () => {
+    h.earnings = undefined;
+    render(<AddTradeDialog open onOpenChange={vi.fn()} />);
+    expect(screen.queryByTestId("earnings-blackout-warning")).toBeNull();
   });
 });
 
