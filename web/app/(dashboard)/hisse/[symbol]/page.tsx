@@ -34,6 +34,7 @@ import { FlatBaseCard } from "@/components/stock/FlatBaseCard";
 import { DoubleBottomCard } from "@/components/stock/DoubleBottomCard";
 import { HighTightFlagCard } from "@/components/stock/HighTightFlagCard";
 import { PocketPivotCard } from "@/components/stock/PocketPivotCard";
+import { GroupRSCard } from "@/components/stock/GroupRSCard";
 import { FundamentalCard } from "@/components/stock/FundamentalCard";
 import { EarningsCard } from "@/components/stock/EarningsCard";
 import { CardSection } from "@/components/stock/CardSection";
@@ -352,6 +353,8 @@ export default function HissePage({
             {/* Pivot / RS / Breakout / Hacim / Climax / Overhead / ATR — Mark TLSMW canon */}
             <PivotBreakoutCard symbol={sym} />
             <RsRatingCard symbol={sym} />
+            {/* Grup RS — hisse RS'in yanında: lider hisse + lider grup teyidi (P553) */}
+            <GroupRSCard symbol={sym} />
             <BreakoutQualityCard symbol={sym} />
             <RelativeVolumeCard symbol={sym} />
             <ClimaxRunCard symbol={sym} />

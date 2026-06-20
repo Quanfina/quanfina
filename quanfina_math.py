@@ -3740,6 +3740,99 @@ POCKET_PIVOT_MA_RISING_LOOKBACK = 20  # 50-DMA ~1 ay once ile karsilastir (Stage
 POCKET_PIVOT_MIN_BARS = 70            # 50-DMA + 20g rising lookback + buffer
 
 
+# --- Grup/Endustri RS Onayi (P553, 20 Haz 2026) ---
+# Finviz sektor adi -> SPDR sector_rotation.sector_name normalizasyonu.
+# DB-dogrulanmis (uydurma YOK — Kural #26): minervini_scans.sector distinct degerleri
+# ile scanner.py SECTOR_ETFS (11 SPDR) DB sorgusuyla 11/11 eslesme dogrulandi.
+_FINVIZ_TO_SPDR_SECTOR: dict[str, str] = {
+    "Basic Materials": "Materials",
+    "Communication Services": "Communication Services",
+    "Consumer Cyclical": "Consumer Discretionary",
+    "Consumer Defensive": "Consumer Staples",
+    "Energy": "Energy",
+    "Financial": "Financials",
+    "Healthcare": "Health Care",
+    "Industrials": "Industrials",
+    "Real Estate": "Real Estate",
+    "Technology": "Technology",
+    "Utilities": "Utilities",
+}
+
+
+def normalize_sector_to_spdr(finviz_sector: Optional[str]) -> Optional[str]:
+    """Finviz sektor adini SPDR sector_rotation adina cevirir (11/11 DB-dogrulanmis).
+
+    Zaten SPDR adi gelirse (sector_rotation kaynagi) passthrough. Bilinmeyen -> None
+    (eslesme uydurma YASAK — Kural #26)."""
+    if not finviz_sector:
+        return None
+    key = finviz_sector.strip()
+    if key in _FINVIZ_TO_SPDR_SECTOR:
+        return _FINVIZ_TO_SPDR_SECTOR[key]
+    if key in _FINVIZ_TO_SPDR_SECTOR.values():
+        return key
+    return None
+
+
+def compute_group_rs_confirmation(
+    stock_sector: Optional[str],
+    sector_rank_map: dict[str, int],
+    total_sectors: int = 11,
+) -> dict:
+    """Hissenin sektoru lider mi? sector_rotation RS rank ile grup teyidi.
+
+    Minervini "Trade Like a Stock Market Wizard" s.95: guclu hisse guclu grupta olmali —
+    "leading stocks in leading groups". O'Neil CAN SLIM 'L' (Leader): bir hissenin fiyat
+    hareketinin yaklasik yarisi endustri grubundan gelir -> grup teyidi (2 uzman convergence,
+    P553).
+
+    DURUSTLUK NOTU (Kural #26): Bu SEKTOR seviyesi teyit (11 SPDR sektor). Gercek IBD
+    endustri-grup RS (197 grup) DEGIL — daha kaba bir proxy. Tier esikleri 11 sektorun
+    simetrik tercil bolunmesi (ust ~3'te-1 / orta / alt ~3'te-1) — keyfi sayi degil.
+    GELISTIRILMESI LAZIM: gercek endustri-grup RS-Line yeni-yuksek (Finviz industry RS).
+
+    Args:
+        stock_sector: hissenin Finviz veya SPDR sektor adi.
+        sector_rank_map: {sector_name(SPDR): rs_rank} — 1 = en guclu sektor.
+        total_sectors: toplam sektor (default 11; map'ten de turetilir).
+
+    Returns: dict {available, sector_spdr, rs_rank, total, tier, is_confirmed,
+                   is_lone_wolf, mark_says}. Veri yoksa available=False (MOCK YOK — Kural #28).
+    """
+    spdr = normalize_sector_to_spdr(stock_sector)
+    total = len(sector_rank_map) if sector_rank_map else total_sectors
+    if not spdr or not sector_rank_map or spdr not in sector_rank_map:
+        return {
+            'available': False, 'sector_spdr': spdr, 'rs_rank': None,
+            'total': total, 'tier': None, 'is_confirmed': False,
+            'is_lone_wolf': False,
+            'mark_says': ("Sektor RS verisi yok (sektor bilinmiyor veya sector_rotation "
+                          "taramasi erisilmez). Grup teyidi yapilamadi."),
+        }
+    rank = int(sector_rank_map[spdr])
+    third = max(1, round(total / 3))      # 11 -> 4 (simetrik tercil, keyfi degil)
+    lead_cutoff = third                   # rank <= 4 -> LEADING
+    lag_start = total - third + 1         # rank >= 8 -> LAGGING
+    if rank <= lead_cutoff:
+        tier, confirmed, lone = 'LEADING', True, False
+        verdict = (f"Sektor LIDER ({spdr} #{rank}/{total}). Guclu hisse + guclu grup = "
+                   f"Minervini s.95 + O'Neil 'L' teyidi tam.")
+    elif rank >= lag_start:
+        tier, confirmed, lone = 'LAGGING', False, True
+        verdict = (f"Sektor ZAYIF ({spdr} #{rank}/{total}). 'Yalniz kurt' riski — O'Neil: "
+                   f"fiyat hareketinin ~yarisi gruptan gelir; zayif grupta guclu hisse "
+                   f"surdurulebilir degil (s.95).")
+    else:
+        tier, confirmed, lone = 'NEUTRAL', False, False
+        verdict = (f"Sektor ORTA ({spdr} #{rank}/{total}). Ne lider ne zayif — grup teyidi "
+                   f"notr, hisse RS'i tek basina degerlendirilmeli.")
+    return {
+        'available': True, 'sector_spdr': spdr, 'rs_rank': rank, 'total': total,
+        'tier': tier, 'is_confirmed': confirmed, 'is_lone_wolf': lone,
+        'mark_says': verdict,
+    }
+
+
 def compute_pocket_pivot(
     opens: list[float],
     highs: list[float],

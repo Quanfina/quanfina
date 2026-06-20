@@ -1391,6 +1391,45 @@ def sector_rotation_get_latest() -> list[dict]:
         return []
 
 
+def sector_rank_map_latest() -> dict[str, int]:
+    """Son scan_date {sector_name: rs_rank} haritasi (P553 — grup RS onayi).
+
+    sector_rotation'dan; 1 = en guclu sektor. Bos dict = veri yok (MOCK YOK — Kural #28).
+    """
+    try:
+        with engine.connect() as conn:
+            last = conn.execute(
+                text("SELECT MAX(scan_date) FROM sector_rotation")
+            ).scalar()
+            if not last:
+                return {}
+            result = conn.execute(text("""
+                SELECT sector_name, rs_rank FROM sector_rotation
+                WHERE scan_date = :d
+            """), {"d": last})
+            return {row[0]: int(row[1]) for row in result if row[1] is not None}
+    except Exception:
+        return {}
+
+
+def stock_sector_latest(symbol: str) -> Optional[str]:
+    """Hissenin son taramadaki Finviz sektor adi (P553). None = tarama disi.
+
+    minervini_scans.sector (Finviz adlandirma) — normalize_sector_to_spdr ile SPDR'ye
+    cevrilir. Sadece gercek tarama verisi (MOCK YOK — Kural #28)."""
+    try:
+        with engine.connect() as conn:
+            row = conn.execute(text("""
+                SELECT sector FROM minervini_scans
+                WHERE ticker = :sym AND scan_date = (SELECT MAX(scan_date) FROM minervini_scans)
+                  AND sector IS NOT NULL AND sector <> ''
+                LIMIT 1
+            """), {"sym": symbol.upper()}).first()
+            return row[0] if row else None
+    except Exception:
+        return None
+
+
 def breadth_history_from_scans(days: int = 25) -> list[tuple[int, int]]:
     """Paket 409: Quanfina kendi günlük tarama verisinden A/D (advance/decline) sayım.
 

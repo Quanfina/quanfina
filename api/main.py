@@ -31,6 +31,8 @@ from db_helpers import (  # noqa: E402
     mark_signals_get_by_symbol,
     pattern_library_get_all,
     sector_rotation_get_latest,
+    sector_rank_map_latest,
+    stock_sector_latest,
     breadth_history_from_scans,
     minervini_stocks_get_latest,
     scan_latest_date,
@@ -82,6 +84,7 @@ from quanfina_math import (  # noqa: E402
     compute_rising_wedge_breakdown,
     compute_high_tight_flag,
     compute_pocket_pivot,
+    compute_group_rs_confirmation,
     compute_stage_transition,
     compute_faber_timing,
     compute_mcclellan_oscillator,
@@ -2916,6 +2919,47 @@ def get_earnings(symbol: str) -> EarningsInfo:
     return EarningsInfo(
         symbol=sym, has_data=True, earnings_date=ed, days_to_earnings=days,
         within_blackout=within, mark_says=says,
+    )
+
+
+# P553 (20 Haz 2026): Grup/Endustri RS onayi (#sektor-teyit) — 2 uzman convergence
+# (Minervini TLSMW s.95 "leading stocks in leading groups" + O'Neil CAN SLIM 'L':
+# fiyatin ~yarisi gruptan). sector_rotation (11 SPDR, gercek scanner verisi) RS rank ile
+# hissenin sektoru lider/notr/zayif teyidi. SEKTOR seviyesi proxy (gercek IBD 197 endustri
+# grubu DEGIL — Kural #26 durustluk). MOCK YOK (Kural #28): veri yoksa available=False.
+class GroupRSInfo(BaseModel):
+    symbol: str
+    available: bool = False
+    sector: Optional[str] = None          # SPDR sektor adi (normalize edilmis)
+    rs_rank: Optional[int] = None         # 1 = en guclu sektor
+    total: int = 11
+    tier: Optional[Literal["LEADING", "NEUTRAL", "LAGGING"]] = None
+    is_confirmed: bool = False            # LEADING -> grup teyidi tam
+    is_lone_wolf: bool = False            # LAGGING -> "yalniz kurt" riski
+    mark_says: str
+
+
+@app.get("/api/stock/{symbol}/group-rs", response_model=GroupRSInfo)
+def get_group_rs(symbol: str) -> GroupRSInfo:
+    """Grup/Endustri RS onayi (P553) — hissenin sektoru lider mi?
+
+    Minervini s.95 + O'Neil 'L' convergence: guclu hisse guclu grupta olmali. sector_rotation
+    (11 SPDR, gunluk gercek tarama) RS rank ile teyit. SEKTOR proxy (197 IBD endustri grubu
+    DEGIL — daha kaba). Veri yoksa available=False (MOCK YOK — Kural #28)."""
+    sym = symbol.upper()
+    finviz_sector = stock_sector_latest(sym)
+    rank_map = sector_rank_map_latest()
+    res = compute_group_rs_confirmation(finviz_sector, rank_map)
+    return GroupRSInfo(
+        symbol=sym,
+        available=res["available"],
+        sector=res["sector_spdr"],
+        rs_rank=res["rs_rank"],
+        total=res["total"],
+        tier=res["tier"],
+        is_confirmed=res["is_confirmed"],
+        is_lone_wolf=res["is_lone_wolf"],
+        mark_says=res["mark_says"],
     )
 
 
