@@ -141,6 +141,38 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# P573 (21 Haz 2026): HTTP Basic Auth — Cloud Run public deploy koruması. Web middleware ile
+# AYNI kimlik (next rewrite Authorization header'ını iletir → web+api tek parola). APP_PASSWORD
+# tanımsızsa gate KAPALI (lokal dev). /api/health muaf (Cloud Run + monitoring). OPTIONS muaf
+# (CORS preflight). Direkt api erişimi (web dışı) parolasız → 401.
+import base64 as _b64
+import os as _os
+_APP_USER = _os.getenv("APP_USER", "")
+_APP_PASSWORD = _os.getenv("APP_PASSWORD", "")
+_AUTH_EXEMPT_PATHS = {"/api/health"}
+
+
+@app.middleware("http")
+async def _basic_auth_mw(request, call_next):
+    if not _APP_PASSWORD:                                  # gate kapalı (lokal)
+        return await call_next(request)
+    if request.method == "OPTIONS" or request.url.path in _AUTH_EXEMPT_PATHS:
+        return await call_next(request)
+    auth = request.headers.get("authorization", "")
+    if auth.startswith("Basic "):
+        try:
+            u, _, p = _b64.b64decode(auth[6:]).decode("utf-8").partition(":")
+            if u == _APP_USER and p == _APP_PASSWORD:
+                return await call_next(request)
+        except Exception:
+            pass
+    from starlette.responses import Response
+    return Response(
+        "Quanfina API — kimlik dogrulama gerekli.",
+        status_code=401,
+        headers={"WWW-Authenticate": 'Basic realm="Quanfina"'},
+    )
+
 
 class HealthResponse(BaseModel):
     status: str
