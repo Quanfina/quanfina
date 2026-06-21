@@ -2127,6 +2127,49 @@ def detect_tennis_ball(
     }
 
 
+def find_recent_breakout_idx(
+    closes: list[float],
+    pivot_lookback: Optional[int] = None,
+    max_cycle: Optional[int] = None,
+) -> Optional[int]:
+    """Tennis Ball anchor — pullback'i baslatan ILK breakout (pivot) gunu index'i (P578).
+
+    Mark Minervini birebir (X + Trade Like a Stock Market Wizard s.253-254):
+        "Tennis ball action will generally occur after two to five days or even one to
+        two weeks of pullback, followed by the stock bouncing back up again, taking out
+        the most recent highs."
+
+    Anchor pullback'i ONCELEYEN breakout olmali — recovery (yeni yuksek) SONRADAN gelir.
+    detect_tennis_ball'a son barlarin max-close gununu vermek HATALI: o gunden sonraki her
+    kapanis <= breakout_close <= breakout_high oldugundan recovery (close > breakout_high)
+    matematiksel imkansiz -> TENNIS_BALL asla uretilmez (P577 bug kaniti).
+
+    Algoritma: son `max_cycle` (pullback_max + recovery_max = 7+14 = 21 gun, KANON SABIT-
+    LERINDEN tureli — uydurma yok, Kural #26) bar icinde, kapanisin onceki `pivot_lookback`
+    (20g, compute_pivot_breakout ile AYNI pivot tanimi) gun tepesini yukari kirdigi gun
+    pivot breakout'tur. En ESKI breakout (advance'i baslatan) anchor -> sonrasinda pullback
+    + recovery gozlemlenebilir.
+
+    Returns: breakout index | None (recent advance'ta pivot kirilim yoksa).
+    """
+    if pivot_lookback is None:
+        pivot_lookback = PIVOT_PRICE_LOOKBACK_DAYS
+    if max_cycle is None:
+        max_cycle = TENNIS_BALL_PULLBACK_MAX_DAYS + TENNIS_BALL_RECOVERY_MAX_DAYS
+    n = len(closes) if closes else 0
+    if n < pivot_lookback + 3:
+        return None
+    start = max(pivot_lookback, n - max_cycle)
+    for i in range(start, n):
+        prior = closes[i - pivot_lookback:i]
+        if not prior:
+            continue
+        pivot = max(prior)
+        if closes[i] > pivot and closes[i - 1] <= pivot:
+            return i  # en eski (advance baslangici) breakout — recovery sonra gelir
+    return None
+
+
 def compute_volume_asymmetry(daily_history: list[dict], lookback_days: int = 20) -> dict:
     """KARAR ADAY #882 — Mark Volume Asymmetry Tracker (TLSMW s.234 + TTLC Sec 1).
 

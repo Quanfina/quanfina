@@ -1756,6 +1756,7 @@ class TestDetectCode33:
 
 from quanfina_math import (
     detect_tennis_ball,
+    find_recent_breakout_idx,
     compute_volume_asymmetry,
     detect_leader_fingerprint,
     TENNIS_BALL_PULLBACK_MAX_DAYS,
@@ -1817,6 +1818,53 @@ class TestDetectTennisBall:
     def test_invalid_index(self):
         result = detect_tennis_ball(-1, [_make_day(100)])
         assert result["pattern"] == "INVALID"
+
+
+# =============================================================================
+# P578 — find_recent_breakout_idx (Tennis Ball anchor fix, Kural #26 kanon)
+# P577 bug: scanner max-close anchor -> recovery imkansiz -> TENNIS_BALL hic uretilmiyordu.
+# Anchor = pullback'i onceleyen ILK pivot kirilimi (Mark X/TLSMW s.253).
+# =============================================================================
+
+
+class TestFindRecentBreakoutIdx:
+    """Tennis Ball anchor — pullback'i onceleyen ilk pivot breakout gunu."""
+
+    def _flat_base_then(self, after: list[float], base: float = 100.0,
+                        base_days: int = 25) -> list[float]:
+        """base_days flat taban (pivot ~base) + sonrasi `after` kapanislar."""
+        return [base] * base_days + after
+
+    def test_none_short_history(self):
+        assert find_recent_breakout_idx([100.0] * 10) is None
+        assert find_recent_breakout_idx([]) is None
+        assert find_recent_breakout_idx(None) is None
+
+    def test_none_when_no_breakout(self):
+        # Tamamen flat -> pivot kirilim yok
+        assert find_recent_breakout_idx([100.0] * 40) is None
+
+    def test_finds_breakout_day(self):
+        # 25 gun flat 100, sonra 103 breakout (prior pivot=100 yukari kirildi)
+        closes = self._flat_base_then([103.0, 101.0, 99.5, 104.0, 106.0])
+        idx = find_recent_breakout_idx(closes)
+        assert idx == 25, f"breakout gunu idx 25 beklendi, {idx}"
+        # idx-1 (24) pivot altinda, idx (25) ustunde
+        assert closes[idx] > max(closes[idx - 20:idx])
+        assert closes[idx - 1] <= max(closes[idx - 20:idx])
+
+    def test_anchor_yields_tennis_ball_end_to_end(self):
+        # Anchor + detect_tennis_ball zinciri TENNIS_BALL uretebiliyor (P577 bug fix kaniti)
+        # 25g flat 100 -> breakout 103 (gun25) -> pullback 3g (99) -> recovery >103.5 (gun29)
+        closes = self._flat_base_then([103.0, 101.0, 100.0, 99.0, 105.0, 106.0])
+        idx = find_recent_breakout_idx(closes)
+        assert idx is not None
+        pvh = [_make_day(c, high=c + 0.5, low=c - 0.5) for c in closes]
+        result = detect_tennis_ball(idx, pvh)
+        assert result["pattern"] == "TENNIS_BALL", (
+            f"P577 fix: TENNIS_BALL beklendi, {result['pattern']} ({result['mark_says']})"
+        )
+        assert result["recovered"] is True
 
     def test_empty_history(self):
         result = detect_tennis_ball(0, [])

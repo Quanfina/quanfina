@@ -34,7 +34,7 @@ from quanfina_math import (
     compute_power_play_pass,
     compute_cup_with_handle, compute_flat_base, compute_double_bottom,
     # Sprint 4-bis.7 Faz 2 (Vizyon v22.03 + Migration 007)
-    detect_tennis_ball, compute_volume_asymmetry,
+    detect_tennis_ball, find_recent_breakout_idx, compute_volume_asymmetry,
     # KARAR #733 (Paket 272 — 28 May 2026): Carr Stage 4-Stage detector
     compute_carr_stage,
 )
@@ -1077,16 +1077,19 @@ def _upsert_minervini_scan_row(c, scan_date, ticker, row, slope_info):
     power_play_pass = compute_power_play_pass(pvh)
 
     # Tennis Ball (pvh'den) — KARAR ADAY #893
+    # P578 (21 Haz 2026): breakout anchor FIX. Eski heuristik (son 10 barin max-close)
+    # recovery'yi (close > breakout_high) matematiksel imkansiz kiliyordu -> TENNIS_BALL
+    # asla uretilmiyordu, tennis_ball_active kalici bos (P577 bug). find_recent_breakout_idx
+    # pullback'i ONCELEYEN ilk pivot kirilimini bulur (Mark X/TLSMW s.253 kanon). Anchor
+    # None ise pattern None (recent advance'ta breakout yok).
     tennis_ball_pattern = None
-    if pvh and len(pvh) >= 10:
+    if pvh:
         try:
-            recent_window = min(10, len(pvh))
-            breakout_idx = len(pvh) - recent_window + max(
-                range(recent_window),
-                key=lambda i: pvh[-recent_window + i].get('close', 0)
-            )
-            tb_result = detect_tennis_ball(breakout_idx, pvh)
-            tennis_ball_pattern = tb_result.get('pattern')
+            closes_tb = [b.get('close', 0) for b in pvh]
+            breakout_idx = find_recent_breakout_idx(closes_tb)
+            if breakout_idx is not None:
+                tb_result = detect_tennis_ball(breakout_idx, pvh)
+                tennis_ball_pattern = tb_result.get('pattern')
         except Exception:
             tennis_ball_pattern = None
 
