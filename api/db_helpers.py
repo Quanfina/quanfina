@@ -340,10 +340,11 @@ SCREENS_READY_9 = {
     # Sn. Ferit talimati (22 May 2026): "A yap" — filter'a rs_ibd >= 70 ekle.
     # Etki: 724 satir -> ~225 satir (RS<70 olan 499 hisse cikar). Kitap birebir.
     "stage2_10p":       {"label": "Stage 2 ($10+)",            "filter": "passed = 1 AND price >= 10 AND rs_ibd >= 70"},
-    "stage2_below_10":  {"label": "Stage 2 (Below $10)",       "filter": "passed = 1 AND price < 10"},
+    # P579 (22 Haz 2026): stage2_below_10 + mom_below_10 KALDIRILDI (Kural #18 olu ekran).
+    # Evren kalici $10+ (Finviz universe price<10 = 0, min $10.10) -> bu ekranlar kalici bos.
+    # Minervini penny-stock'tan kacinir, evren bilincli $10+. Karar: Sn. Ferit onayi (8 olu ekran).
     "top5_rpr":         {"label": "Top 5% RPR",                "filter": "rs_ibd >= 95"},
     "mom_10p":          {"label": "Minervini Momentum ($10+)", "filter": "passed = 1 AND price >= 10"},
-    "mom_below_10":     {"label": "Momentum (Below $10)",      "filter": "passed = 1 AND price < 10"},
     # KARAR #461 — Master Pre-Compute (VCP scanner.py'de hesap, DB sade BOOLEAN okur)
     "tight_low_volume": {"label": "Tight Price Low Vol (VCP)", "filter": "tight_low_vol_pass = TRUE"},
     # KARAR #466 (20 May 2026) — VCP A+ Kalite (Mark canon "%50 alti en siki" + Bonus FMP altin)
@@ -559,42 +560,11 @@ def screen_list_available() -> list[dict]:
 # =============================================================
 
 SCREENS_PARSE_7 = {
-    "stage2_loose_10p": {
-        "label": "Stage 2 Loose ($10+)",
-        "filter": "passed=1 AND price>=10 AND confirmations>=6",
-        "sql": """
-            passed = 1
-            AND price >= 10
-            AND COALESCE(array_length(string_to_array(NULLIF(confirmations, ''), ','), 1), 0) >= 6
-        """,
-    },
-    "stage2_loose_below": {
-        "label": "Stage 2 Loose (Below $10)",
-        "filter": "passed=1 AND price<10 AND confirmations>=6",
-        "sql": """
-            passed = 1
-            AND price < 10
-            AND COALESCE(array_length(string_to_array(NULLIF(confirmations, ''), ','), 1), 0) >= 6
-        """,
-    },
-    "stage2_vloose_10p": {
-        "label": "Stage 2 Very Loose ($10+)",
-        "filter": "passed=1 AND price>=10 AND confirmations>=4",
-        "sql": """
-            passed = 1
-            AND price >= 10
-            AND COALESCE(array_length(string_to_array(NULLIF(confirmations, ''), ','), 1), 0) >= 4
-        """,
-    },
-    "stage2_vloose_below": {
-        "label": "Stage 2 Very Loose (Below $10)",
-        "filter": "passed=1 AND price<10 AND confirmations>=4",
-        "sql": """
-            passed = 1
-            AND price < 10
-            AND COALESCE(array_length(string_to_array(NULLIF(confirmations, ''), ','), 1), 0) >= 4
-        """,
-    },
+    # P579 (22 Haz 2026): stage2_loose_10p/below + stage2_vloose_10p/below KALDIRILDI
+    # (Kural #18 olu ekran, Sn. Ferit onayi). Sebep: confirmations = bonus sinyal
+    # (Higher High/Inside Day), evrende max 4 -> conf>=6/4 kalici ~0. Ustelik passed=1
+    # ZORUNLU oldugundan "loose" strict'ten DAR (semantik ters). "Loose Stage 2" konsepti
+    # istenirse partial trend-template kolonu (scanner) ile DOGRU kurulur (backlog 🔬).
     "buy_risk_green": {
         "label": "Buy Risk Green",
         "filter": "(conf_count - viol_count) >= 2",
@@ -603,16 +573,8 @@ SCREENS_PARSE_7 = {
             COALESCE(array_length(string_to_array(NULLIF(violations, ''), ','), 1), 0) >= 2
         """,
     },
-    "momentum_5x_rpr_70": {
-        "label": "Momentum 5x (RPR 70+)",  # Quanfina-ozgu adlandirma (clean-room)
-        "filter": "passed=1 AND rs_ibd>=70 AND conf>=3 AND price>=10",
-        "sql": """
-            passed = 1
-            AND rs_ibd >= 70
-            AND price >= 10
-            AND COALESCE(array_length(string_to_array(NULLIF(confirmations, ''), ','), 1), 0) >= 3
-        """,
-    },
+    # P579 (22 Haz 2026): momentum_5x_rpr_70 KALDIRILDI (Kural #18, Sn. Ferit onayi).
+    # Ayni confirmations-bug: conf>=3 isterken evrende max 4 confirmation -> kalici ~0.
     "mom_qualifier": {
         "label": "Minervini Qualifier",
         "filter": "passed=1 AND rs_ibd>=80 (siki momentum)",
@@ -799,11 +761,8 @@ SCREENS_DIFF_6 = {
         "filter": "7g onceki rs<95, simdi rs>=95, $10+",
         "where": "g.price >= 10 AND p7.prev_7d_rs_ibd < 95 AND g.rs_ibd >= 95 AND p7.prev_7d_rs_ibd IS NOT NULL",
     },
-    "new_7d_rpr_below": {
-        "label": "New 7D RPR (Below $10)",
-        "filter": "Ayni, $10 alti",
-        "where": "g.price < 10 AND p7.prev_7d_rs_ibd < 95 AND g.rs_ibd >= 95 AND p7.prev_7d_rs_ibd IS NOT NULL",
-    },
+    # P579 (22 Haz 2026): new_7d_rpr_below KALDIRILDI (Kural #18, Sn. Ferit onayi).
+    # Evren kalici $10+ (price<10 = 0) -> bu ekran kalici bos (sub-$10 grubu temizligi).
 }
 
 
