@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useCallback } from "react";
+import { Suspense, useMemo, useRef, useState, useCallback } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { LayoutList, Columns2 } from "lucide-react";
 import { useGridTheme } from "@/hooks/use-grid-theme";
@@ -42,7 +42,16 @@ import { MockDataBanner } from "@/components/shared/MockDataBanner";
 import { ModBadge } from "@/components/mark/ModBadge";
 import { useTradingMode } from "@/hooks/use-trading-mode";
 
+// P572 deploy: useSearchParams Suspense boundary (Next 16 prerender CSR-bailout gereksinimi).
 export default function WatchlistPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">İzleme listesi yükleniyor...</div>}>
+      <WatchlistPageInner />
+    </Suspense>
+  );
+}
+
+function WatchlistPageInner() {
   const { gridClass } = useGridTheme();
   // P565 (Kural #28): DB-down MOCK_WATCHLIST fallback şeffaflığı (banner)
   const { data: wlInfo } = useWatchlistInfo();

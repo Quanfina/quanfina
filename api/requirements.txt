@@ -7,3 +7,6 @@ psycopg2-binary==2.9.12
 SQLAlchemy==2.0.49
 pandas==3.0.2
 pytz==2025.2
+# P572 (20 Haz 2026 deploy): canlı quote/earnings/market/P569 earnings-growth için yfinance
+# (lokal 1.4.0). Olmadan _YF_DISABLED -> canlı veri çalışmaz (Cloud Run deploy şartı).
+yfinance==1.4.0

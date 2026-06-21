@@ -1,0 +1,20 @@
+# P572: Cloud Build upload haricleri — image sadece Dockerfile COPY'lerini icerir;
+# bu liste UPLOAD boyutunu kucultur (hizli build). Agir/alakasiz dizinler haric.
+.git/
+.gcloudignore
+venv/
+.venv/
+api/.venv/
+**/.venv/
+**/node_modules/
+web/.next/
+web/out/
+notebook/
+ux_tarama/
+test-screenshots/
+_archive/
+**/__pycache__/
+*.pyc
+*.backup_*
+*.db
+*.log

@@ -1,0 +1,7 @@
+# P572 (20 Haz 2026 deploy): pnpm 11 build-script onayı (ERR_PNPM_IGNORED_BUILDS fix).
+# pnpm 10.15+/11 'onlyBuiltDependencies' ayarını package.json yerine BURADAN okur.
+# sharp = Next image optimization (runtime); msw/unrs-resolver = build script onayı.
+onlyBuiltDependencies:
+  - sharp
+  - msw
+  - unrs-resolver

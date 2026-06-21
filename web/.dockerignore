@@ -1,0 +1,7 @@
+node_modules
+.next
+.git
+*.log
+test-screenshots
+__tests__
+.env*
