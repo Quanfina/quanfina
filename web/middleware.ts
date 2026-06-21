@@ -1,36 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
 
 /**
- * P573 (21 Haz 2026): HTTP Basic Auth gate — Cloud Run public deploy koruması.
+ * P575 (21 Haz 2026): Çerez-tabanlı oturum gate (Basic Auth → cookie + Çıkış butonu).
  *
- * Web sayfaları + /api/* proxy'sini parola ile kapatır (tarayıcı native prompt — login sayfası
- * gerekmez). next.config rewrite Authorization header'ını api'ye iletir → api de aynı parolayla
- * korunur (tek kimlik). APP_PASSWORD tanımsızsa gate KAPALI (lokal dev). Statik asset'ler hariç.
+ * qf_session çerezi == SESSION_TOKEN (env, Secret Manager) → erişim. Login/auth handler'ları +
+ * statik muaf. Yetkisiz: sayfa → /login redirect; /api/* → 401. next.config rewrite Cookie
+ * header'ını api'ye iletir → api de aynı token'ı kontrol eder. SESSION_TOKEN tanımsızsa gate
+ * KAPALI (lokal dev). Çıkış: /auth/logout çerezi siler (Basic Auth'ın çözemediği logout).
  */
-export function middleware(req: NextRequest) {
-  const user = process.env.APP_USER || "";
-  const pass = process.env.APP_PASSWORD || "";
-  if (!pass) return NextResponse.next(); // gate kapalı (lokal/dev)
+const COOKIE = "qf_session";
 
-  const auth = req.headers.get("authorization") || "";
-  if (auth.startsWith("Basic ")) {
-    try {
-      const decoded = atob(auth.slice(6));
-      const i = decoded.indexOf(":");
-      const u = decoded.slice(0, i);
-      const p = decoded.slice(i + 1);
-      if (u === user && p === pass) return NextResponse.next();
-    } catch {
-      /* malformed header → 401 below */
-    }
+export function middleware(req: NextRequest) {
+  const token = process.env.SESSION_TOKEN || "";
+  if (!token) return NextResponse.next(); // gate kapalı (lokal/dev)
+
+  const { pathname } = req.nextUrl;
+  if (pathname === "/login" || pathname.startsWith("/auth/")) {
+    return NextResponse.next();
   }
-  return new NextResponse("Quanfina — kimlik doğrulama gerekli.", {
-    status: 401,
-    headers: { "WWW-Authenticate": 'Basic realm="Quanfina", charset="UTF-8"' },
-  });
+
+  const session = req.cookies.get(COOKIE)?.value;
+  if (session === token) return NextResponse.next();
+
+  // Yetkisiz
+  if (pathname.startsWith("/api/")) {
+    return new NextResponse("Yetkisiz", { status: 401 });
+  }
+  const url = req.nextUrl.clone();
+  url.pathname = "/login";
+  url.searchParams.set("next", pathname);
+  return NextResponse.redirect(url);
 }
 
 export const config = {
-  // Statik asset + favicon hariç her şey (sayfalar + /api/* proxy dahil)
   matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };

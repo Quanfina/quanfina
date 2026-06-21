@@ -141,37 +141,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# P573 (21 Haz 2026): HTTP Basic Auth — Cloud Run public deploy koruması. Web middleware ile
-# AYNI kimlik (next rewrite Authorization header'ını iletir → web+api tek parola). APP_PASSWORD
-# tanımsızsa gate KAPALI (lokal dev). /api/health muaf (Cloud Run + monitoring). OPTIONS muaf
-# (CORS preflight). Direkt api erişimi (web dışı) parolasız → 401.
-import base64 as _b64
+# P575 (21 Haz 2026): Çerez-tabanlı oturum gate (P573 Basic Auth → cookie + Çıkış).
+# qf_session çerezi == SESSION_TOKEN (Secret Manager). Web middleware aynı token'ı kontrol eder;
+# next rewrite Cookie header'ını api'ye iletir (Authorization gibi). SESSION_TOKEN tanımsızsa gate
+# KAPALI (lokal dev). /api/health muaf (Cloud Run + monitoring). OPTIONS muaf (CORS preflight).
+# Direkt api erişimi (web dışı, çerezsiz) → 401. Login/logout web tarafında (/auth/*).
 import os as _os
-_APP_USER = _os.getenv("APP_USER", "")
-_APP_PASSWORD = _os.getenv("APP_PASSWORD", "")
+_SESSION_TOKEN = _os.getenv("SESSION_TOKEN", "")
 _AUTH_EXEMPT_PATHS = {"/api/health"}
 
 
 @app.middleware("http")
-async def _basic_auth_mw(request, call_next):
-    if not _APP_PASSWORD:                                  # gate kapalı (lokal)
+async def _session_auth_mw(request, call_next):
+    if not _SESSION_TOKEN:                                 # gate kapalı (lokal)
         return await call_next(request)
     if request.method == "OPTIONS" or request.url.path in _AUTH_EXEMPT_PATHS:
         return await call_next(request)
-    auth = request.headers.get("authorization", "")
-    if auth.startswith("Basic "):
-        try:
-            u, _, p = _b64.b64decode(auth[6:]).decode("utf-8").partition(":")
-            if u == _APP_USER and p == _APP_PASSWORD:
-                return await call_next(request)
-        except Exception:
-            pass
+    if request.cookies.get("qf_session", "") == _SESSION_TOKEN:
+        return await call_next(request)
     from starlette.responses import Response
-    return Response(
-        "Quanfina API — kimlik dogrulama gerekli.",
-        status_code=401,
-        headers={"WWW-Authenticate": 'Basic realm="Quanfina"'},
-    )
+    return Response("Quanfina API — kimlik dogrulama gerekli.", status_code=401)
 
 
 class HealthResponse(BaseModel):

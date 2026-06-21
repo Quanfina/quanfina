@@ -1,7 +1,8 @@
 # Quanfina FastAPI — Cloud Run deploy pipeline (P572, 20 Haz 2026).
 # Scanner pattern mirror (cloudbuild.yaml): build (api/Dockerfile, context koku) -> push -> deploy.
 # DB: Cloud SQL connector quanfina:us-central1:quanfina-db + Secret Manager PG_* (scanner birebir).
-# Erisim: --allow-unauthenticated (public — Sn. Ferit karari, dusuk-hassasiyet kagit/piyasa verisi).
+# Erisim: --allow-unauthenticated + P575 cerez gate (SESSION_TOKEN). Web rewrite Cookie
+# header'ini iletir; direkt api erisimi (cerezsiz) → 401. Login/logout web tarafinda.
 steps:
   - name: "gcr.io/cloud-builders/docker"
     id: build-api
@@ -33,7 +34,7 @@ steps:
       - --platform=managed
       - --allow-unauthenticated
       - --add-cloudsql-instances=quanfina:us-central1:quanfina-db
-      - --set-secrets=PG_HOST=PG_HOST:latest,PG_PORT=PG_PORT:latest,PG_DATABASE=PG_DATABASE:latest,PG_USER=PG_USER:latest,PG_PASSWORD=PG_PASSWORD:latest,APP_USER=APP_USER:latest,APP_PASSWORD=APP_PASSWORD:latest
+      - --set-secrets=PG_HOST=PG_HOST:latest,PG_PORT=PG_PORT:latest,PG_DATABASE=PG_DATABASE:latest,PG_USER=PG_USER:latest,PG_PASSWORD=PG_PASSWORD:latest,SESSION_TOKEN=SESSION_TOKEN:latest
       - --memory=1Gi
       - --cpu=1
       - --min-instances=0

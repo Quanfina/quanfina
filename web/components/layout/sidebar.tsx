@@ -15,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { LogoutButton } from "@/components/layout/logout-button";
 import { NavLink } from "@/components/layout/nav-link";
 
 // KARAR #486 (20 May 2026): Sn. Ferit talimat - "minervini ve carr stratejiler basligi
@@ -147,8 +148,9 @@ function SidebarContent() {
         })}
       </nav>
 
-      <div className="px-4 py-4 border-t">
+      <div className="px-4 py-4 border-t flex flex-col gap-1">
         <ThemeToggle />
+        <LogoutButton />
       </div>
     </div>
   );

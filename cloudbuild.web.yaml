@@ -1,7 +1,7 @@
 # Quanfina Next.js — Cloud Run deploy pipeline (P572, 20 Haz 2026).
 # Context = web/ (self-contained). API_URL build-arg (rewrites build-time gomulur).
-# Erisim: --allow-unauthenticated (browser erisimi; IAM allUsers binding deploy sonrasi
-# manuel — Cloud Build SA setIamPolicy yetkisi yok, api'de oldugu gibi).
+# Erisim: --allow-unauthenticated (browser erisimi; uygulama-ici gate P575 cerez-tabanli
+# oturum — /login parola + Cikis butonu. APP_PASSWORD login dogrular, SESSION_TOKEN cerez).
 steps:
   - name: "gcr.io/cloud-builders/docker"
     id: build-web
@@ -35,7 +35,7 @@ steps:
       - --platform=managed
       - --allow-unauthenticated
       - --set-env-vars=API_URL=${_API_URL}
-      - --set-secrets=APP_USER=APP_USER:latest,APP_PASSWORD=APP_PASSWORD:latest
+      - --set-secrets=APP_PASSWORD=APP_PASSWORD:latest,SESSION_TOKEN=SESSION_TOKEN:latest
       - --memory=512Mi
       - --cpu=1
       - --min-instances=0
