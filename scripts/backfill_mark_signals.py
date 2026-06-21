@@ -27,6 +27,7 @@ from quanfina_math import (  # noqa: E402
     compute_vcp_ready_score,
     compute_power_play_pass,
     detect_tennis_ball,
+    find_recent_breakout_idx,
     compute_volume_asymmetry,
     compute_carr_stage,
 )
@@ -76,16 +77,17 @@ def compute_mark_fields(df):
     out["vcp_ready_score"] = compute_vcp_ready_score(pvh)
     out["power_play_pass"] = compute_power_play_pass(pvh)
 
-    # Tennis ball (breakout_idx = son 20 gun en yuksek close)
+    # Tennis ball — P578 FIX: anchor = pullback'i onceleyen ilk pivot kirilimi
+    # (find_recent_breakout_idx). Eski max-close heuristik recovery'yi imkansiz
+    # kiliyordu -> TENNIS_BALL hic uretilmiyordu (scanner.py ile DRY).
     tb_pattern = None
-    if pvh and len(pvh) >= 20:
+    if pvh:
         try:
-            window = min(20, len(pvh))
-            seg = pvh[-window:]
-            local_idx = max(range(window), key=lambda i: seg[i].get("close", 0))
-            breakout_idx = len(pvh) - window + local_idx
-            tb = detect_tennis_ball(breakout_idx, pvh)
-            tb_pattern = tb.get("pattern")
+            closes_tb = [b.get("close", 0) for b in pvh]
+            breakout_idx = find_recent_breakout_idx(closes_tb)
+            if breakout_idx is not None:
+                tb = detect_tennis_ball(breakout_idx, pvh)
+                tb_pattern = tb.get("pattern")
         except Exception:
             pass
     out["tennis_ball_pattern"] = tb_pattern
