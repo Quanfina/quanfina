@@ -2151,6 +2151,21 @@ def find_recent_breakout_idx(
     + recovery gozlemlenebilir.
 
     Returns: breakout index | None (recent advance'ta pivot kirilim yoksa).
+
+    KANON DOGRULAMA (P578, 21 Haz 2026 — Quanfina Minervini NotebookLM kaynakli):
+      ✓ Anchor = breakout gunu DOGRULANDI. Video "Reversal Recovery": anchor (Gun 0) =
+        "fiyatin ilk kez pivot/breakout seviyesini denedigi gun". Bu fonksiyon birebir bunu
+        bulur (pivot crossing day). find_recent_breakout_idx canon-uyumlu.
+      ✓ Gun sayilari: Minervini birebir (X): "two to five days or even one to two weeks of
+        pullback" -> TENNIS_BALL_PULLBACK_MAX_DAYS=7 / RECOVERY_MAX_DAYS=14 ile uyumlu.
+
+    GELISTIRILMESI LAZIM (kitapta birebir alinti YOK — Kural #26, uydurma yapilmadi):
+      - recovery seviyesi: kanon "yeniden PIVOT ustune" der; detector close > breakout_high
+        kullanir (muhafazakar — crossing-day anchor'da breakout_high ~ pivot oldugundan pratik
+        fark kucuk). Birebir kitap alintisi gelince netlesir.
+      - pullback DERINLIK kontrolu: Brandon "Begrudgingly Pull Back" ideal <=%10 / max %25
+        (VCP_PULLBACK_GOOD=0.25 sabiti mevcut) — detect_tennis_ball su an SADECE gun kontrol
+        eder, derinlik kontrolu eklenebilir (tennis-ball ozelinde kaynak "GELISTIRILMESI LAZIM").
     """
     if pivot_lookback is None:
         pivot_lookback = PIVOT_PRICE_LOOKBACK_DAYS
