@@ -43,6 +43,8 @@ from quanfina_math import (
     compute_vcp_quality,
     VCP_VOL_DRY_RATIO,
     VCP_VOL_DRY_RATIO_EXCELLENT,
+    # P576 — V-Dry hacim kurumasi siniflandirma (Minervini s.150 "Quiet Action")
+    compute_v_dry_class,
     # Sprint 4-bis.5 KARAR #465 — Inside/Outside Day + Ready Score
     compute_inside_day,
     compute_outside_day_negative_reversal,
@@ -1030,6 +1032,71 @@ class TestComputeVcpQuality:
     def test_threshold_constants_exposed(self):
         assert VCP_VOL_DRY_RATIO == 0.70
         assert VCP_VOL_DRY_RATIO_EXCELLENT == 0.50
+
+
+# ===========================================================================
+# P576 — V-Dry hacim kurumasi siniflandirma (Minervini s.150 "Quiet Action")
+# compute_vcp_quality'ye PARALEL ama SADECE hacim boyutu; 3 seviyeli enum
+# (STRONG/IDEAL/WEAK) ayni kanon esikleri (0.50 / 0.70) ile.
+# ===========================================================================
+
+
+class TestComputeVDryClass:
+    """V-Dry hacim kurumasi: son 5 gun ort. hacim / 50g ort. -> 3 seviye."""
+
+    def _build_pvh_vol(self, days: int, recent_vol: int,
+                       base_vol: int = 1_000_000) -> list[dict]:
+        """Son VCP_LOOKBACK_DAYS (5) gun recent_vol, oncesi base_vol."""
+        pvh = []
+        for i in range(days):
+            volume = recent_vol if i >= days - 5 else base_vol
+            pvh.append({
+                "date": f"2026-04-{i+1:02d}",
+                "open": 100.0, "high": 100.5, "low": 99.5,
+                "close": 100.0, "volume": volume,
+            })
+        return pvh
+
+    def test_strong_when_recent_below_50pct(self):
+        # 50g ort ~ (45*1M + 5*400K)/50 = 940K; recent ort = 400K; ratio ~0.43 -> STRONG
+        pvh = self._build_pvh_vol(60, recent_vol=400_000)
+        res = compute_v_dry_class(pvh)
+        assert res["v_dry_class"] == "STRONG"
+        assert res["label"] == "Guclu"
+        assert res["vol_ratio"] < VCP_VOL_DRY_RATIO_EXCELLENT
+
+    def test_ideal_when_recent_between_50_and_70(self):
+        # recent 600K, 50g ort ~ (45*1M+5*600K)/50 = 960K; ratio 0.625 -> IDEAL
+        pvh = self._build_pvh_vol(60, recent_vol=600_000)
+        res = compute_v_dry_class(pvh)
+        assert res["v_dry_class"] == "IDEAL"
+        assert res["label"] == "Ideal"
+        assert VCP_VOL_DRY_RATIO_EXCELLENT <= res["vol_ratio"] < VCP_VOL_DRY_RATIO
+
+    def test_weak_when_recent_above_70pct(self):
+        # recent 900K, ratio ~0.94 -> WEAK
+        pvh = self._build_pvh_vol(60, recent_vol=900_000)
+        res = compute_v_dry_class(pvh)
+        assert res["v_dry_class"] == "WEAK"
+        assert res["label"] == "Zayif"
+        assert res["vol_ratio"] >= VCP_VOL_DRY_RATIO
+
+    def test_none_for_short_history(self):
+        res = compute_v_dry_class(self._build_pvh_vol(20, recent_vol=400_000))
+        assert res["v_dry_class"] is None
+
+    def test_none_for_none_and_empty(self):
+        assert compute_v_dry_class(None)["v_dry_class"] is None
+        assert compute_v_dry_class([])["v_dry_class"] is None
+
+    def test_graceful_on_zero_volume(self):
+        pvh = [{"date": f"2026-04-{i+1:02d}", "open": 100.0, "high": 100.5,
+                "low": 99.5, "close": 100.0, "volume": 0} for i in range(60)]
+        assert compute_v_dry_class(pvh)["v_dry_class"] is None
+
+    def test_graceful_on_malformed(self):
+        pvh = [{"date": "x", "close": 100.0} for _ in range(60)]  # volume yok
+        assert compute_v_dry_class(pvh)["v_dry_class"] is None
 
 
 # ===========================================================================

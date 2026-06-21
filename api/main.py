@@ -64,6 +64,7 @@ from quanfina_math import (  # noqa: E402
     compute_pivot_breakout,
     compute_overhead_supply,
     compute_vcp_pass,
+    compute_v_dry_class,
     compute_climax_run,
     compute_brandon_expectancy,
     compute_relative_strength_rating,
@@ -3487,6 +3488,57 @@ def get_relative_volume(symbol: str) -> RelativeVolumeInfo:
         avg_volume=result.get("avg_volume"),
         category=result.get("category"),
         mark_says=result.get("mark_says", ""),
+    )
+
+
+# P576 (21 Haz 2026): V-Dry hacim kurumasi siniflandirma endpoint
+# Minervini "Trade Like a Stock Market Wizard" s.150 "Quiet Action" — base olgunlasirken
+# hacmin SUREKLI kurumasi (5g pencere ort. / 50g ort.). compute_relative_volume'dan FARKLI
+# (CIFTLEME DEGIL — Kural #14 alt-bolum 4-kontrol): relative-volume TEK GUN spot (DRYING/
+# QUIET/NORMAL/HIGH/SURGE); v-dry SURDURULEN 5g pencere + VCP kanon esikleri (0.50/0.70) ile
+# base-olgunluk (STRONG/IDEAL/WEAK). compute_vcp_quality'den de FARKLI (o TUM VCP sartlarini
+# AND'ler; bu SADECE hacim boyutunu izole eder).
+class VDryInfo(BaseModel):
+    v_dry_class: Optional[Literal["STRONG", "IDEAL", "WEAK"]] = None
+    label: Optional[str] = None
+    vol_ratio: Optional[float] = None
+    says: str
+
+
+@app.get("/api/stock/{symbol}/v-dry", response_model=VDryInfo)
+def get_v_dry(symbol: str) -> VDryInfo:
+    """V-Dry hacim kurumasi siniflandirmasi (Minervini s.150 "Quiet Action", P576).
+
+    Son 5g ortalama hacim / 50g ortalama hacim -> 3 seviye (STRONG/IDEAL/WEAK).
+    Esikler kanon (0.50 Mark "%50 alti en siki", 0.70 Brandon PASS — compute_vcp_quality
+    ile birebir, Kural #26). OHLCV ACIK KONU #75 production yfinance.
+    """
+    sym = symbol.upper()
+    stock = _STOCK_BY_SYM.get(sym)
+    if stock:
+        price = stock.price
+    else:
+        try:
+            wl = [r for r in watchlist_get_all() if r["symbol"] == sym]
+        except OperationalError:
+            wl = []
+        if wl:
+            price = float(wl[0]["price"])
+        else:
+            scan_data = _fetch_scan_symbol_data(sym)
+            price = scan_data["price"] if scan_data else 100.0
+
+    bars = _get_ohlcv(sym, price)
+    pvh = [
+        {"open": b.open, "high": b.high, "low": b.low, "close": b.close, "volume": b.volume}
+        for b in bars
+    ]
+    result = compute_v_dry_class(pvh)
+    return VDryInfo(
+        v_dry_class=result.get("v_dry_class"),
+        label=result.get("label"),
+        vol_ratio=result.get("vol_ratio"),
+        says=result.get("says", ""),
     )
 
 

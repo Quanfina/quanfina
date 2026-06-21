@@ -28,6 +28,7 @@ import { AtrVolatilityCard } from "@/components/stock/AtrVolatilityCard";
 import { StageTransitionCard } from "@/components/stock/StageTransitionCard";
 import { MarkProfileBar } from "@/components/stock/MarkProfileBar";
 import { RelativeVolumeCard } from "@/components/stock/RelativeVolumeCard";
+import { VDryCard } from "@/components/stock/VDryCard";
 import { BreakoutQualityCard } from "@/components/stock/BreakoutQualityCard";
 import { CupHandleCard } from "@/components/stock/CupHandleCard";
 import { FlatBaseCard } from "@/components/stock/FlatBaseCard";
@@ -358,6 +359,7 @@ export default function HissePage({
             <GroupRSCard symbol={sym} />
             <BreakoutQualityCard symbol={sym} />
             <RelativeVolumeCard symbol={sym} />
+            <VDryCard symbol={sym} />
             <ClimaxRunCard symbol={sym} />
             <OverheadSupplyCard symbol={sym} />
             <AtrVolatilityCard symbol={sym} />

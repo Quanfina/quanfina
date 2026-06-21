@@ -782,6 +782,80 @@ def compute_vcp_quality(price_volume_history: Optional[list[dict]]) -> Optional[
         return None
 
 
+# Minervini "Quiet Action" — V-Dry hacim kurumasi siniflandirmasi (P576, 21 Haz 2026)
+# Kaynak: Mark Minervini "Trade Like a Stock Market Wizard" s.150 "Quiet Action" —
+# base olgunlasirken hacmin kurumasi (arz tukenmesi, kurumsal birikim tamamlanmasi).
+# compute_vcp_quality TUM VCP sartlarini (small drops + tight closes + volume) AND'ler;
+# bu fonksiyon SADECE hacim-kurumasi boyutunu izole eder (trader'a "hacim ne kadar kurudu"
+# tek basina gosterilir). Esikler compute_vcp_quality ile AYNI kanon sabitleri (Kural #26 —
+# uydurma sayi yok): 0.50 Mark "%50 alti en siki", 0.70 Brandon muhafazakar PASS.
+# Olcum: son VCP_LOOKBACK_DAYS gun ORTALAMA hacmi / 50-gun ortalama (sureli kuruma — tek
+# gunluk dalgalanma degil, "quiet action" sadakatli).
+V_DRY_LABELS = {"STRONG": "Guclu", "IDEAL": "Ideal", "WEAK": "Zayif"}
+
+
+def compute_v_dry_class(price_volume_history: Optional[list[dict]]) -> dict:
+    """V-Dry hacim kurumasi siniflandirmasi (Minervini s.150 "Quiet Action").
+
+    Son VCP_LOOKBACK_DAYS gun ortalama hacmi / 50-gun ortalama hacim oranina gore
+    3 seviyeli enum. compute_vcp_quality'ye PARALEL ama SADECE hacim boyutu (small
+    drops / tight closes sarti aranmaz).
+
+    Args:
+        price_volume_history: list[dict] — [{"date","open","high","low","close","volume"}, ...]
+
+    Returns:
+        dict:
+          {
+            'v_dry_class': 'STRONG'|'IDEAL'|'WEAK'|None,  # stabil anahtar (None = yetersiz veri)
+            'label': 'Guclu'|'Ideal'|'Zayif'|None,         # UI Turkce etiket
+            'vol_ratio': float|None,                       # son pencere ort. / 50g ort.
+            'says': str,                                   # aciklama (kanon atifli)
+          }
+
+    Esikler (compute_vcp_quality ile birebir kanon — Kural #26):
+        STRONG (Guclu): vol_ratio < 0.50  — Mark "%50 alti en siki gun"
+        IDEAL:          0.50 <= ratio < 0.70 — Brandon muhafazakar PASS bandi
+        WEAK (Zayif):   vol_ratio >= 0.70 — hacim yeterince kurumadi (arz hala var)
+    """
+    fail = {'v_dry_class': None, 'label': None, 'vol_ratio': None,
+            'says': 'Yetersiz veri (50+ gun OHLCV gerekli).'}
+    if not price_volume_history or len(price_volume_history) < VCP_MIN_HISTORY:
+        return fail
+    try:
+        recent = price_volume_history[-VCP_LOOKBACK_DAYS:]
+        last_50 = price_volume_history[-VCP_MIN_HISTORY:]
+        if len(recent) < VCP_LOOKBACK_DAYS:
+            return fail
+
+        avg_50d_volume = sum(d["volume"] for d in last_50) / len(last_50)
+        if avg_50d_volume <= 0:
+            return fail
+        avg_recent_volume = sum(d["volume"] for d in recent) / len(recent)
+        vol_ratio = avg_recent_volume / avg_50d_volume
+
+        if vol_ratio < VCP_VOL_DRY_RATIO_EXCELLENT:        # < 0.50
+            key = "STRONG"
+            says = (f"Guclu kuruma — son {VCP_LOOKBACK_DAYS}g ort. hacim 50g ort.'nin "
+                    f"%{vol_ratio*100:.0f}'i (<%50). Mark s.150 'en siki gun' / arz tukendi.")
+        elif vol_ratio < VCP_VOL_DRY_RATIO:                # [0.50, 0.70)
+            key = "IDEAL"
+            says = (f"Ideal kuruma — son {VCP_LOOKBACK_DAYS}g ort. hacim 50g ort.'nin "
+                    f"%{vol_ratio*100:.0f}'i (%50-70). Brandon muhafazakar PASS bandi.")
+        else:                                              # >= 0.70
+            key = "WEAK"
+            says = (f"Zayif kuruma — son {VCP_LOOKBACK_DAYS}g ort. hacim 50g ort.'nin "
+                    f"%{vol_ratio*100:.0f}'i (>=%70). Arz hala var, 'quiet action' yok.")
+        return {
+            'v_dry_class': key,
+            'label': V_DRY_LABELS[key],
+            'vol_ratio': round(vol_ratio, 3),
+            'says': says,
+        }
+    except (KeyError, TypeError, ValueError, ZeroDivisionError):
+        return fail
+
+
 # =============================================================================
 # Sprint 4-bis.5 — Inside Day + Outside Day + VCP Ready Score
 # KARAR #465 (Minervini Uzmani onerisi, 20 May 2026)
