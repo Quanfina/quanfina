@@ -21,7 +21,8 @@
  * çıkarıldı. AÇIK KONU #70 ile bağlı, sonra çözülecek.
  */
 
-import { useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useGridTheme } from "@/hooks/use-grid-theme";
 import "@/lib/ag-grid-setup"; // AG Grid modül kaydı (Paket 355 — bundle split)
 import { AgGridReact } from "ag-grid-react";
@@ -59,12 +60,27 @@ const GRADE_STYLE: Record<string, { bg: string; color: string }> = {
 const SCREEN_SLUGS = Object.keys(SCREEN_CATEGORIES) as ScreenSlug[];
 const DEFAULT_SLUG: ScreenSlug | null = SCREEN_SLUGS[0] ?? null;
 
-export default function ScreensPage() {
+function ScreensPageInner() {
   const { gridClass: themeGridClass } = useGridTheme();
   const gridRef = useRef<AgGridReact<ScreenResultRow>>(null);
   // Sprint 4.8 — Column Preferences: sütun düzeni (sıra/görünür/genişlik/sort) persist
   const gridColumnState = useGridColumnState("quanfina-screens-cols");
-  const [selectedSlug, setSelectedSlug] = useState<ScreenSlug | null>(DEFAULT_SLUG);
+  // P583 (22 Haz 2026): ?screen= URL param oku → Carr Sinyalleri "setup başlığına tıkla →
+  // ilgili tarama ekranı" akışı bozuktu (param yok sayılıp ilk Minervini açılıyordu).
+  // Carr-sinyalleri /screens?screen=pullback linkler; param geçerli slug ise onu seç.
+  const searchParams = useSearchParams();
+  const screenParam = searchParams.get("screen");
+  const initialSlug: ScreenSlug | null =
+    screenParam && (SCREEN_SLUGS as string[]).includes(screenParam)
+      ? (screenParam as ScreenSlug)
+      : DEFAULT_SLUG;
+  const [selectedSlug, setSelectedSlug] = useState<ScreenSlug | null>(initialSlug);
+  // Aynı sayfadayken farklı ?screen= ile gelinirse (client-side nav) senkron tut.
+  useEffect(() => {
+    if (screenParam && (SCREEN_SLUGS as string[]).includes(screenParam)) {
+      setSelectedSlug(screenParam as ScreenSlug);
+    }
+  }, [screenParam]);
   // Paket 253 (27 May 2026): Defansif mod farkındalığı (Mark TTLC s.187)
   const tradingMode = useTradingMode();
 
@@ -536,5 +552,14 @@ export default function ScreensPage() {
         )}
       </div>
     </div>
+  );
+}
+
+// Next 16: useSearchParams() <Suspense> sınırı gerektirir (P572 watchlist pateni).
+export default function ScreensPage() {
+  return (
+    <Suspense fallback={<div className="px-6 py-4 text-sm text-muted-foreground">Yükleniyor…</div>}>
+      <ScreensPageInner />
+    </Suspense>
   );
 }
