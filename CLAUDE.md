@@ -355,7 +355,8 @@ azaltma felsefesiyle çelişti.
 **Otonom Hijyen Modu kapsamı (Sn. Ferit yatınca AI yapar):**
 - Bölüm A — Anayasa update (Vizyon sürüm, YAPILANLAR, _DEVIR, _OZET refresh)
 - Bölüm B — Hijyen scriptleri (saglik_kontrol, pattern_ogren,
-  proaktif_oneri, build_index v3.1 sayım refresh)
+  proaktif_oneri, build_index v3.1 sayım refresh, **temp_temizle** —
+  lokal `_*.mjs` debug clutter + log + eski backup temizliği, P581)
 - Bölüm C — AÇIK KONU semantik tarama (Kural #18 ile pasif aday)
 - Bölüm D — Cross-reference doğrulama (KARAR/AÇIK KONU/İLKE numara
   tutarlılık)

@@ -36,7 +36,8 @@ $scripts = @(
     @{ Ad = "satir_sayim_otomatik"; Yol = "satir_sayim_otomatik.ps1"; Kritik = $false; Acik = "Satir sayim refresh (H#9)"; ExtraArg = if ($KuruCalisma) { @() } else { @("-Uygula") } },
     @{ Ad = "saglik_kontrol"; Yol = "saglik_kontrol.ps1"; Kritik = $true; Acik = "Sistem saglik raporu"; ExtraArg = if ($KuruCalisma) { @() } else { @("-Uygula") } },
     @{ Ad = "pattern_ogren"; Yol = "pattern_ogren.ps1"; Kritik = $false; Acik = "Pattern ogrenme + Kural #14 destek" },
-    @{ Ad = "proaktif_oneri"; Yol = "proaktif_oneri.ps1"; Kritik = $false; Acik = "Proaktif oneri raporu" }
+    @{ Ad = "proaktif_oneri"; Yol = "proaktif_oneri.ps1"; Kritik = $false; Acik = "Proaktif oneri raporu" },
+    @{ Ad = "temp_temizle"; Yol = "temp_temizle.ps1"; Kritik = $false; Acik = "Lokal temp debug clutter temizligi (P581, Kural #18)"; ExtraArg = if ($KuruCalisma) { @() } else { @("-Uygula") } }
 )
 
 $basariliSayisi = 0
