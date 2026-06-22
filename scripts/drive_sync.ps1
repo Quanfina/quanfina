@@ -15,6 +15,9 @@
 #   .\scripts\drive_sync.ps1 -ScheduledTask   # Windows task kayit (saatlik)
 #   .\scripts\drive_sync.ps1 -UnregisterTask  # Task sil
 #
+# Versiyon: v2.6 (22 Haz 2026, P581 KRITIK: /XD _txt — H#A10 kok neden fix.
+#            /MIR her run _txt'yi purge edip 53 .txt'yi yeni file-ID ile yeniden
+#            yaratiyordu -> NotebookLM kaynak linkleri her saat kiriliyordu. /XD ile coz.)
 # Versiyon: v2.5 (22 May 2026 ~21:00, A: CLAUDE.md de _txt'e yansir + B: alt klasor prefix)
 # Kural uyumu: #15 (ASCII-only), #16 (native exe 2>&1 yok)
 #
@@ -177,6 +180,12 @@ if (-not (Test-Path $Hedef)) {
 # /NFL = log'ta dosya listesi yok (sadece ozet)
 # /L   = dry-run (sadece liste)
 # /XO  = sadece daha yeni dosyalari kopyala
+# /XD _txt = v2.6 KRITIK FIX (P581, H#A10 kok neden): _txt/ kaynak notebook/'ta YOK,
+#   bu yuzden /MIR onu "ekstra dizin" sayip HER RUN SILIYORDU. /XF *.txt dosyalari
+#   korur ama DIZINI kurtarmaz -> _txt her sync silinip yeniden yaratiliyor -> 53 .txt
+#   yeni Drive file-ID aliyor -> NotebookLM kaynak linkleri HER SAAT kiriliyordu. /XD ile
+#   _txt purge'den muaf; .txt'ler Copy-Item -Force ile yerinde guncellenir (file-ID stabil).
+$txtKlasorYol = Join-Path $Hedef "_txt"
 $robocopyArgs = @(
     $notebookDir,
     $Hedef,
@@ -185,7 +194,8 @@ $robocopyArgs = @(
     "/W:5",
     "/NDL",
     "/NFL",
-    "/XF", "*.txt"  # v2.1: hedef .txt'leri extra sayilmaz - NotebookLM kaynaklari korunur
+    "/XF", "*.txt",  # v2.1: hedef .txt'leri extra sayilmaz - NotebookLM kaynaklari korunur
+    "/XD", $txtKlasorYol  # v2.6: _txt dizinini /MIR purge'den koru (H#A10 fix)
 )
 if ($KuruCalisma) {
     $robocopyArgs += "/L"
