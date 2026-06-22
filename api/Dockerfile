@@ -11,7 +11,10 @@ COPY api/requirements.txt ./api/requirements.txt
 RUN pip install --no-cache-dir -r api/requirements.txt
 
 # Kök modüller (api/main.py bunları import eder) + api paketi
-COPY quanfina_math.py db_connection.py ./
+# P582 (22 Haz 2026): market_calendar.py eklendi — /api/market/calendar/status import
+# ediyordu (main.py:1829) ama imajda yoktu -> "No module named market_calendar" -> takvim
+# rozeti (MarketStatusBadge) bozuk fallback. Kural #28: gercek modul prod'da olmali.
+COPY quanfina_math.py db_connection.py market_calendar.py ./
 COPY api/ ./api/
 
 WORKDIR /app/api
