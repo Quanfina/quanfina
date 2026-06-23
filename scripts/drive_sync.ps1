@@ -124,9 +124,14 @@ if ($ScheduledTask -or $UnregisterTask) {
         -Argument ($argList -join " ")
 
     # Saatlik tetik (her 1 saat, baslangic 09:00, gunde maksimum 14 kez)
-    $trigger = New-ScheduledTaskTrigger -Once -At "09:00" `
+    # P584 (22 Haz 2026) KRITIK FIX: eski -Once trigger gunde BIR KEZ (kayit gunu)
+    # calisip duruyordu -> NextRunTime bos -> saatlik sync 18 May'den beri UYKUDAYDI.
+    # -Daily gunluk tekrar saglar; repetition gunluk trigger'a graft edilir (her gun
+    # 09:00-23:00 saatlik). Boylece notebook -> Drive otomatik akar (felaket dayanikiligi).
+    $trigger = New-ScheduledTaskTrigger -Daily -At "09:00"
+    $trigger.Repetition = (New-ScheduledTaskTrigger -Once -At "09:00" `
         -RepetitionInterval (New-TimeSpan -Hours 1) `
-        -RepetitionDuration (New-TimeSpan -Hours 14)
+        -RepetitionDuration (New-TimeSpan -Hours 14)).Repetition
 
     $settings = New-ScheduledTaskSettingsSet `
         -StartWhenAvailable `
