@@ -21,10 +21,15 @@ import {
  * sadece listener kayıt).
  */
 export function usePortfolioValue() {
-  // Lazy initial state — SSR güvenli, useEffect-de set yok (anti-pattern önlendi)
-  const [value, setValueState] = useState<number>(() => getPortfolioValue());
+  // P586 (22 Haz 2026) #418 FIX: initial state SABİT default (localStorage OKUNMAZ).
+  // Eski lazy-init `() => getPortfolioValue()` SSR'da window-yok → default, client'ta →
+  // localStorage değeri → SSR≠client hydration mismatch (#418). Kanonik SSR-safe pattern:
+  // SSR + client-first-render ikisi de DEFAULT (eşleşir), gerçek değer mount sonrası gelir.
+  const [value, setValueState] = useState<number>(DEFAULT_PORTFOLIO_VALUE);
 
   useEffect(() => {
+    // Mount sonrası localStorage'dan gerçek değeri al (hydration-safe)
+    setValueState(getPortfolioValue());
     function onStorage(e: StorageEvent) {
       if (e.key === PORTFOLIO_VALUE_STORAGE_KEY) {
         setValueState(getPortfolioValue());
