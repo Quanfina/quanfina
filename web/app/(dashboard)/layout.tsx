@@ -3,6 +3,13 @@ import { DbStatusBanner } from "@/components/layout/DbStatusBanner";
 import { DataFreshnessBanner } from "@/components/layout/DataFreshnessBanner";
 import { QuickSummaryBar } from "@/components/layout/QuickSummaryBar";
 
+// P587 (23 Haz 2026) #418 deneyi: Dashboard segment'i force-dynamic. Tüm sayfalar
+// build-time STATIK prerender (○) yerine per-request render (ƒ). Gözlenen fresh-browser
+// #418 prod-build-static-prerender'a özgüydü (TZ/frozen-date elendi). Bu segment zaten
+// auth-gated + tamamen client-query-driven (SSR sadece skeleton) → static prerender sıfır
+// değer; force-dynamic doğru tercih. #418 elenirse kalır, elenmezse geri alınır.
+export const dynamic = "force-dynamic";
+
 // KARAR ADAY (22 May 2026): DbStatusBanner — Cloud SQL erişilemez ise sarı
 // uyarı banner'ı gösterir. Sn. Ferit talimat "Mockdan gerçek veriye geçmeyi
 // ayarla" → Seçenek B (MOCK koru + frontend banner). useDbStatus hook
