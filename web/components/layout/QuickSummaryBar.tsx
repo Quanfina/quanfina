@@ -6,6 +6,7 @@ import { useMarketStatus } from "@/hooks/use-market-status";
 import { useTradingMode } from "@/hooks/use-trading-mode";
 import { usePortfolioValue } from "@/hooks/use-portfolio-value";
 import { MARKET_HEALTH_LABEL_TR, type MarketHealthLabel } from "@/types/market";
+import { riskDollar } from "@/lib/risk";
 
 /**
  * Paket 404: Tüm sayfalarda görünür kompakt sticky özet bar.
@@ -49,11 +50,11 @@ export function QuickSummaryBar() {
     const closed = all.filter((t) => t.status === "closed");
     const realizedPlDollar = closed.reduce((s, t) => s + (t.pl_dollar ?? 0), 0);
 
-    // Toplam dolar risk: sum((entry - plan_stop) × shares) açık trade'lerde
+    // Toplam dolar risk: açık trade'lerde paylaşımlı helper (B3-01 — SHORT sign+max)
     let totalDollarRisk = 0;
     for (const t of open) {
       if (t.plan_stop != null && t.plan_stop > 0) {
-        totalDollarRisk += (t.entry_price - t.plan_stop) * t.shares;
+        totalDollarRisk += riskDollar(t.entry_price, t.plan_stop, t.shares, t.invest_type);
       }
     }
     const totalPctRisk = portfolioValue > 0 ? (totalDollarRisk / portfolioValue) * 100 : 0;

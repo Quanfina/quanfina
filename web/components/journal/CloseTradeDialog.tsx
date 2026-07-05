@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { useUpdateTrade, useTrades } from "@/hooks/use-trades";
 import { calcPL, fmtPLDollar, fmtPLPct } from "@/lib/math";
+import { riskDollar } from "@/lib/risk";
 import type { Trade, TradeGrade, ExitReason, TradeUpdate } from "@/types/trade";
 import { GRADE_OPTIONS, EXIT_REASON_LABELS } from "@/types/trade";
 import { PlanVsRealityCard } from "./PlanVsRealityCard";
@@ -52,17 +53,19 @@ export function CloseTradeDialog({ trade, open, onOpenChange }: Props) {
     if (!trade || !exitPrice) return null;
     const xp = parseFloat(exitPrice);
     if (isNaN(xp)) return null;
-    return calcPL(trade.entry_price, xp, trade.shares);
+    // B3-01 ŞERH (05 Tem 2026): invest_type geçilmiyordu → calcPL default LONG'a düşüyor,
+    // SHORT'ta pay ters işaret. calcPL zaten sign'lı (lib/math.ts:12); eksik argüman düzeltildi.
+    return calcPL(trade.entry_price, xp, trade.shares, trade.invest_type);
   }, [trade, exitPrice]);
 
   // Paket 218 (27 May 2026): Mark canon kapanış analizi
   // R-Multiple = pl_dollar / risk_dollar (Mark TTLC Sec 4 — RBA temel metrik)
-  // risk_dollar = (entry - plan_stop) × shares
+  // B3-01 (05 Tem 2026): risk_dollar paylaşımlı helper (SHORT sign+max); pay calcPL (sign'lı)
   const rMultiple = useMemo(() => {
     if (!trade || !plPreview || !trade.plan_stop) return null;
-    const riskDollar = (trade.entry_price - trade.plan_stop) * trade.shares;
-    if (riskDollar <= 0) return null;
-    return plPreview.plDollar / riskDollar;
+    const riskD = riskDollar(trade.entry_price, trade.plan_stop, trade.shares, trade.invest_type);
+    if (riskD <= 0) return null;
+    return plPreview.plDollar / riskD;
   }, [trade, plPreview]);
 
   // Mevcut trading mod + bu kapanış sonrası mod öngörüsü

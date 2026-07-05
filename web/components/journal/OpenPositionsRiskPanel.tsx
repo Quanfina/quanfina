@@ -6,6 +6,8 @@ import { ShieldAlert, TrendingDown } from "lucide-react";
 import { useTrades } from "@/hooks/use-trades";
 import { usePortfolioValue } from "@/hooks/use-portfolio-value";
 import type { Trade } from "@/types/trade";
+import { riskDollar } from "@/lib/risk";
+import { calcPL } from "@/lib/math";
 
 /**
  * KARAR ADAY #455 — Risk-Merkez UI: Açık Pozisyon Risk Dağılımı.
@@ -30,7 +32,7 @@ interface PositionRisk {
   strategy: string;
   dollarRisk: number | null;     // (entry - plan_stop) × shares
   pctRisk: number | null;        // dollarRisk / portfolio
-  unrealizedR: number | null;    // (current - entry) / (entry - stop)
+  unrealizedR: number | null;    // B3-01b: unrealized P/L ÷ dolar risk (sign'lı, LONG+SHORT)
   hasStop: boolean;
 }
 
@@ -49,20 +51,21 @@ export function OpenPositionsRiskPanel({ portfolioValue: portfolioValueProp }: P
     const open = (trades.data ?? []).filter((t: Trade) => t.status === "open");
     const rows: PositionRisk[] = open.map((t) => {
       const hasStop = t.plan_stop != null && t.plan_stop > 0;
+      // B3-01 (05 Tem 2026): paylaşımlı helper — SHORT'ta sign+max (backend risk_dollars birebir)
       const dollarRisk = hasStop
-        ? (t.entry_price - (t.plan_stop as number)) * t.shares
+        ? riskDollar(t.entry_price, t.plan_stop as number, t.shares, t.invest_type)
         : null;
       const pctRisk =
         dollarRisk != null && portfolioValue > 0
           ? (dollarRisk / portfolioValue) * 100
           : null;
-      // Unrealized R: (current - entry) / (entry - stop)
+      // B3-01b (05 Tem 2026): Unrealized R = unrealized P/L ÷ dolar risk — her ikisi sign'lı.
+      // Payda dollarRisk (riskDollar, SHORT sign+max) yeniden kullanılır; pay calcPL (SHORT'ta
+      // entry-current). Eskiden (current-entry)/(entry-stop) — SHORT'ta guard>0 ile sessiz null'dı.
       let unrealizedR: number | null = null;
-      if (hasStop && t.current_price != null) {
-        const riskPerShare = t.entry_price - (t.plan_stop as number);
-        if (riskPerShare > 0) {
-          unrealizedR = (t.current_price - t.entry_price) / riskPerShare;
-        }
+      if (dollarRisk != null && dollarRisk > 0 && t.current_price != null) {
+        const unrealizedPl = calcPL(t.entry_price, t.current_price, t.shares, t.invest_type).plDollar;
+        unrealizedR = unrealizedPl / dollarRisk;
       }
       return {
         id: t.id,  // P399: trade PRIMARY KEY -> React unique key garanti
