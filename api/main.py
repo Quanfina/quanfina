@@ -120,6 +120,7 @@ from quanfina_math import (  # noqa: E402
     LEADER_ADVANCE_MAX_PCT,
     LEADER_PULLBACK_MIN_PCT,
     LEADER_PULLBACK_MAX_PCT,
+    VCP_READY_SCORE_HIGH_THRESHOLD,   # B3-02 (05 Tem 2026): vcp_ready inline eşik tek kaynağı
 )
 
 from typing import Literal, Optional
@@ -512,7 +513,7 @@ def _screens_mock_results(slug: str, limit: int) -> list[ScreenResultRow]:
         mock_rows = [r for r in mock_rows if r.vcp_quality_score == "EXCELLENT"]
     elif slug == "vcp_ready_high":
         mock_rows = [r for r in mock_rows
-                     if r.vcp_ready_score is not None and r.vcp_ready_score >= 70]
+                     if r.vcp_ready_score is not None and r.vcp_ready_score >= VCP_READY_SCORE_HIGH_THRESHOLD]
     elif slug == "power_play_ready":
         mock_rows = [r for r in mock_rows if r.power_play_pass is True]
     # KARAR #733 alt-paket (Paket 83): pivot_status enrichment

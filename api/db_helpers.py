@@ -11,6 +11,12 @@ from urllib.parse import quote_plus
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 
+# B3-02 (05 Tem 2026): RS/VCP eşik tek kaynağı. SCREENS SQL literal'leri (rs_ibd>=70,
+# vcp_ready_score>=70) constant'tan f-string ile üretilir → değer değişirse tek yerde
+# (H#A1 DRY landmine önleme). main.py root'u sys.path'e db_helpers importundan ÖNCE ekler
+# (main.py:19); quanfina_math circular değil → top-level import güvenli.
+from quanfina_math import RS_THRESHOLD_STRONG, VCP_READY_SCORE_HIGH_THRESHOLD
+
 load_dotenv(Path(__file__).parent.parent / ".env")
 
 _HOST = os.getenv("PG_HOST", "")
@@ -339,7 +345,7 @@ SCREENS_READY_9 = {
     # Resmi Kural (RS Rating >= 70 IBD, Trade Like Wizard s.79) backend'de UYGULANMIYORDU.
     # Sn. Ferit talimati (22 May 2026): "A yap" — filter'a rs_ibd >= 70 ekle.
     # Etki: 724 satir -> ~225 satir (RS<70 olan 499 hisse cikar). Kitap birebir.
-    "stage2_10p":       {"label": "Stage 2 ($10+)",            "filter": "passed = 1 AND price >= 10 AND rs_ibd >= 70"},
+    "stage2_10p":       {"label": "Stage 2 ($10+)",            "filter": f"passed = 1 AND price >= 10 AND rs_ibd >= {RS_THRESHOLD_STRONG}"},
     # P579 (22 Haz 2026): stage2_below_10 + mom_below_10 KALDIRILDI (Kural #18 olu ekran).
     # Evren kalici $10+ (Finviz universe price<10 = 0, min $10.10) -> bu ekranlar kalici bos.
     # Minervini penny-stock'tan kacinir, evren bilincli $10+. Karar: Sn. Ferit onayi (8 olu ekran).
@@ -355,7 +361,7 @@ SCREENS_READY_9 = {
     # KARAR #465 (20 May 2026) — Minervini Uzmani: VCP Ready Score 70+ Inside Day + V-Dry + Tight
     "vcp_ready_high": {
         "label": "VCP Ready Score 70+",
-        "filter": "vcp_ready_score >= 70",
+        "filter": f"vcp_ready_score >= {VCP_READY_SCORE_HIGH_THRESHOLD}",
     },
     # KARAR #467 (20 May 2026) — Power Play (HTF) Mark canon: POLE %100+ FLAG %10-25
     "power_play_ready": {
