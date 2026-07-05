@@ -1274,23 +1274,6 @@ def _upsert_minervini_scan_row(c, scan_date, ticker, row, slope_info):
     ))
 
 
-def save_results(df_finviz, slopes, scan_date):
-    conn = get_connection()
-    c = conn.cursor()
-    saved = 0
-    
-    for _, row in df_finviz.iterrows():
-        try:
-            _upsert_minervini_scan_row(c, scan_date, row["Ticker"], row, slopes.get(row["Ticker"]))
-            saved += 1
-        except Exception as e:
-            print(f"  Kayit hatasi {row['Ticker']}: {e}")
-            break  # ilk hatada dur
-
-    conn.commit()
-    conn.close()
-    return saved
-
 # --- ANA AKIŞ ---
 def run_scan(scan_date_override: str = None, force: bool = False):
     """
