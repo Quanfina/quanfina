@@ -87,19 +87,28 @@ def watchlist_insert(row: dict) -> None:
         })
 
 
-def watchlist_update(symbol: str, strategy: str, updates: dict) -> None:
+def watchlist_update(symbol: str, strategy: str, updates: dict) -> bool:
+    """B1-04 (05 Tem 2026): trades_update deseninin aynasi — `result.rowcount > 0` (bool)
+    doner (eskiden None; delete/trades_update konvansiyonuna aykiriydi). Bos updates veya
+    sadece PK -> False (yazim yok). WHERE 0 satir eslesir (yok/race) -> False → caller
+    sessiz-0-satir'i tespit edip temiz hata donebilir (B4-01 None-unpack onleme)."""
     if not updates:
-        return
+        return False
     clean = {k: v for k, v in updates.items() if k not in ("symbol", "strategy")}
     if not clean:
-        return
+        return False
+    # B4-07 (mitige): set_clauses f-string'i B608 tarafindan isaretlenir ama `clean` anahtarlari
+    # WatchlistRowUpdate Pydantic model alanlari (status/note/setup_type) — sabit, kullanici
+    # kolon-adi enjekte edemez. Degerler :param ile bind edilir (guvenli).
     set_clauses = ", ".join(f"{k} = :{k}" for k in clean)
     with engine.begin() as conn:
-        conn.execute(text(f"""
+        result = conn.execute(text(f"""
             UPDATE web_watchlist
             SET {set_clauses}
             WHERE symbol = :_sym AND strategy = :_strat
         """), {**clean, "_sym": symbol, "_strat": strategy})
+        rc = result.rowcount
+    return rc > 0
 
 
 def watchlist_get_one(symbol: str, strategy: str) -> Optional[dict]:

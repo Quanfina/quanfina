@@ -2260,6 +2260,17 @@ class WatchlistRowUpdate(BaseModel):
     setup_type: Optional[str] = None
 
 
+def _require_row(row: Optional[dict], detail: str, status_code: int = 404) -> dict:
+    """B4-01 (05 Tem 2026): write-endpoint'lerde final get_one/get_by_id None dönerse
+    `WatchlistRow(**None)` / `Trade(**None)` opak TypeError→500 yerine temiz HTTP hatası.
+    None yolu near-imkansız (tek-kullanıcı; yalnız TOCTOU race — final get'ten önce
+    eş-zamanlı DELETE) → defansif hardening. PATCH/promote→404 (satır silinmiş), POST→500
+    (insert doğrulandı sanıldı ama satır yok = sunucu hatası)."""
+    if row is None:
+        raise HTTPException(status_code=status_code, detail=detail)
+    return row
+
+
 # ── Watchlist CRUD endpoints ──────────────────────────────────────────────────
 
 @app.post("/api/watchlist", response_model=WatchlistRow, status_code=201)
@@ -2284,7 +2295,9 @@ def add_watchlist_row(body: WatchlistRowCreate) -> WatchlistRow:
     }
     watchlist_insert(row_data)
     watchlist_recompute_consensus()
-    return WatchlistRow(**watchlist_get_one(sym, body.strategy))
+    return WatchlistRow(**_require_row(
+        watchlist_get_one(sym, body.strategy),
+        f"{sym}-{body.strategy} eklendi ama okunamadı (insert doğrulanamadı)", 500))
 
 
 @app.patch("/api/watchlist/{symbol}/{strategy}", response_model=WatchlistRow)
@@ -2294,7 +2307,8 @@ def update_watchlist_row(symbol: str, strategy: str, body: WatchlistRowUpdate) -
         raise HTTPException(status_code=404, detail=f"{sym}-{strategy} bulunamadı")
     updates = {k: v for k, v in body.model_dump(include=body.model_fields_set).items()}
     watchlist_update(sym, strategy, updates)
-    return WatchlistRow(**watchlist_get_one(sym, strategy))
+    return WatchlistRow(**_require_row(
+        watchlist_get_one(sym, strategy), f"{sym}-{strategy} bulunamadı", 404))
 
 
 @app.delete("/api/watchlist/{symbol}/{strategy}", status_code=204)
@@ -2314,7 +2328,8 @@ def promote_watchlist_row(symbol: str, strategy: str) -> WatchlistRow:
         raise HTTPException(status_code=404, detail=f"{sym}-{strategy} bulunamadı")
     new_status = _promote_status(row["status"])
     watchlist_update(sym, strategy, {"status": new_status})
-    return WatchlistRow(**watchlist_get_one(sym, strategy))
+    return WatchlistRow(**_require_row(
+        watchlist_get_one(sym, strategy), f"{sym}-{strategy} bulunamadı", 404))
 
 
 # ── Hisse Detay ─────────────────────────────────────────────────────────────
@@ -5412,7 +5427,9 @@ def add_trade(body: TradeCreate) -> Trade:
         "audible_reason": None,
     }
     new_id = trades_insert(trade_data)
-    return Trade(**trades_get_by_id(new_id))
+    return Trade(**_require_row(
+        trades_get_by_id(new_id),
+        f"Trade {new_id} eklendi ama okunamadı (insert doğrulanamadı)", 500))
 
 
 @app.patch("/api/trades/{trade_id}", response_model=Trade)
@@ -5442,7 +5459,8 @@ def update_trade(trade_id: int, body: TradeUpdate) -> Trade:
         updates["pl_dollar"] = None
         updates["pl_pct"] = None
     trades_update(trade_id, updates)
-    return Trade(**trades_get_by_id(trade_id))
+    return Trade(**_require_row(
+        trades_get_by_id(trade_id), f"Trade {trade_id} bulunamadı", 404))
 
 
 @app.delete("/api/trades/{trade_id}", status_code=204)
