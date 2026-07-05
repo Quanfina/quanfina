@@ -24,6 +24,7 @@ if str(PROJECT_ROOT) not in sys.path:
 try:
     import scanner
     import scanner_server
+    import market_calendar
 except ImportError as e:  # pragma: no cover
     pytest.skip(f"scanner/scanner_server import edilemedi: {e}", allow_module_level=True)
 
@@ -124,3 +125,83 @@ class TestScanSectorEndpointStatus:
         assert data["sectors"]["status"] == "ok"
         assert data["sectors"]["count"] == 11
         assert data["status"] == "ok"
+
+
+def _sentinel_conn():
+    """scan_sectors guard'i GECERSE get_connection cagirilir -> sentinel raise = 'guard gecti'."""
+    raise RuntimeError("REACHED_DB")
+
+
+class TestSectorGuard:
+    """B6-03 (05 Tem 2026): scan_sectors self-guard (run_scan B6-01 aynasi). Guard atlarsa
+    get_connection'a ULASMAZ (sentinel raise olmaz); gecerse ULASIR (sentinel raise)."""
+
+    def test_weekend_skip(self, monkeypatch):
+        monkeypatch.setattr(market_calendar, "should_scan_today",
+                            lambda t=None: (False, "Hafta sonu (ABD borsa kapalı)"), raising=False)
+        monkeypatch.setattr(scanner, "get_connection", _sentinel_conn, raising=False)
+        r = scanner.scan_sectors("2026-07-03")
+        assert r == {"saved": 0, "failed": 0, "total": 0, "skipped": "Hafta sonu (ABD borsa kapalı)"}
+
+    def test_intraday_block(self, monkeypatch):
+        monkeypatch.setattr(market_calendar, "should_scan_today",
+                            lambda t=None: (True, "trading"), raising=False)
+        monkeypatch.setattr(market_calendar, "is_us_market_open", lambda dt=None: True, raising=False)
+        monkeypatch.setattr(scanner, "get_connection", _sentinel_conn, raising=False)
+        r = scanner.scan_sectors("2026-07-03")
+        assert r["skipped"] and "intraday" in r["skipped"]
+
+    def test_nightly_hour_passes_guard(self, monkeypatch):
+        # trading day + market KAPALI (kapanis sonrasi / nightly 22:00 UTC) -> guard gecer
+        monkeypatch.setattr(market_calendar, "should_scan_today",
+                            lambda t=None: (True, "trading"), raising=False)
+        monkeypatch.setattr(market_calendar, "is_us_market_open", lambda dt=None: False, raising=False)
+        monkeypatch.setattr(scanner, "get_connection", _sentinel_conn, raising=False)
+        with pytest.raises(RuntimeError, match="REACHED_DB"):
+            scanner.scan_sectors("2026-07-03")
+
+    def test_force_bypasses_weekend(self, monkeypatch):
+        monkeypatch.setattr(market_calendar, "should_scan_today",
+                            lambda t=None: (False, "Hafta sonu"), raising=False)
+        monkeypatch.setattr(scanner, "get_connection", _sentinel_conn, raising=False)
+        with pytest.raises(RuntimeError, match="REACHED_DB"):
+            scanner.scan_sectors("2026-07-03", force=True)
+
+
+class TestSectorCallerDateAndBypass:
+    """B6-03: caller scan_sectors'a ham date.today() DEGIL scan_date (last-trading-day) gecer;
+    date_override -> force bypass + override tarihi."""
+
+    def test_caller_passes_last_trading_day_not_raw_today(self, client, monkeypatch):
+        # Pazar cagrisi simulasyonu: _today_scan_date() = CUMA (last_trading_day_before(Pazar)).
+        # Kanit: scan_sectors'a gecen scan_date CUMA olmali (dunku tarih tutarsizligi fix).
+        calls = {}
+        def _spy(scan_date, force=False):
+            calls["scan_date"] = scan_date
+            calls["force"] = force
+            return {"saved": 11, "failed": 0, "total": 11}
+        monkeypatch.setattr(scanner_server, "_today_scan_date", lambda: "2026-07-03", raising=False)
+        monkeypatch.setattr(scanner, "scan_sectors", _spy, raising=False)
+        client.post("/scan")
+        assert calls["scan_date"] == "2026-07-03"   # CUMA (last-trading-day), ham today DEGIL
+        assert calls["force"] is False
+
+    def test_date_override_bypasses_guard_and_uses_override_date(self, client, monkeypatch):
+        calls = {}
+        def _spy(scan_date, force=False):
+            calls["scan_date"] = scan_date
+            calls["force"] = force
+            return {"saved": 11, "failed": 0, "total": 11}
+        monkeypatch.setattr(scanner, "scan_sectors", _spy, raising=False)
+        client.post("/scan?date=2026-06-15")
+        assert calls["scan_date"] == "2026-06-15"   # override tarihi (ham today DEGIL)
+        assert calls["force"] is True                # force or bool(date_override) -> bypass
+
+    def test_endpoint_sector_skipped_status_no_escalation(self, client, monkeypatch):
+        # guard skip -> sektor status "skipped"; normal (hata degil) -> top-level escalation YOK
+        monkeypatch.setattr(scanner, "scan_sectors",
+                            lambda *a, **k: {"saved": 0, "failed": 0, "total": 0, "skipped": "Hafta sonu"},
+                            raising=False)
+        data = client.post("/scan").get_json()
+        assert data["sectors"]["status"] == "skipped"
+        assert data["status"] == "ok"   # stock ok kalir, skip escalation tetiklemez

@@ -196,26 +196,33 @@ def scan():
             with _scan_lock:
                 _scan_running = False
 
-    # --- 2. Sektör taraması (her zaman çalışır, hisse sonucundan bağımsız) ---
+    # --- 2. Sektör taraması ---
+    # B6-03 (05 Tem 2026): scan_sectors artik self-guard'li (run_scan B6-01 aynasi). YAZIM
+    # tarihi = scan_date (last_trading_day; ham today DEGIL -> Pazar'da CUMA'ya yazar, tarih
+    # tutarsizligi fix). force=force or bool(date_override): explicit backfill de guard bypass.
+    _sector_scan_date = date_override if date_override else scan_date
     try:
-        sector_result = scan_sectors(today)
-        # B1-02 (05 Tem 2026): scan_sectors artik {saved, failed, total} dict doner
-        # (per-sektor SAVEPOINT + kismi basari gorunurlugu, H#17 Kok#4). Geriye-uyum:
-        # eski/mock int donusu de kabul (int -> saved); None -> tam DB hatasi.
+        sector_result = scan_sectors(_sector_scan_date, force=force or bool(date_override))
+        # B1-02: scan_sectors {saved, failed, total} (per-sektor SAVEPOINT). B6-03: guard
+        # atladiysa {..., "skipped": sebep}. Geriye-uyum: int -> saved; None -> tam DB hatasi.
         if isinstance(sector_result, dict):
             s_saved = sector_result.get("saved", 0)
             s_failed = sector_result.get("failed", 0)
             s_total = sector_result.get("total", s_saved + s_failed)
+            if sector_result.get("skipped"):
+                sector_status = "skipped"    # B6-03 guard (weekend/tatil/intraday) — normal, hata degil
+            elif s_saved == 0:
+                sector_status = "failed"     # hic sektor yazilmadi (guard degil, gercek fail)
+            elif s_failed > 0:
+                sector_status = "warning"    # kismi basari (H#17 Kok#4 gorunurluk)
+            else:
+                sector_status = "ok"
         elif isinstance(sector_result, int):
             s_saved, s_failed, s_total = sector_result, 0, sector_result
+            sector_status = "ok" if sector_result else "failed"
         else:  # None
             s_saved, s_failed, s_total = 0, 0, 0
-        if s_saved == 0:
-            sector_status = "failed"        # hic sektor yazilmadi
-        elif s_failed > 0:
-            sector_status = "warning"       # kismi basari (H#17 Kok#4 gorunurluk)
-        else:
-            sector_status = "ok"
+            sector_status = "failed"
     except Exception as e:
         log.error("Sektör tarama hatası: %s", e)
         s_saved, s_failed, s_total = 0, 0, 0

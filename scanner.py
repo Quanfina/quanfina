@@ -805,17 +805,51 @@ def _write_sector_rows(cursor, scan_date, sectors_data):
     return saved, failed
 
 
-def scan_sectors(scan_date):
+def scan_sectors(scan_date, force=False):
     """
     11 SPDR sektör ETF'i için Finviz'den performance verilerini çeker,
     çoklu periyot ağırlıklı RS Score hesaplar ve sector_rotation tablosuna yazar.
 
     RS Score = (perf_1m * 0.4) + (perf_3m * 0.2) + (perf_6m * 0.2) + (perf_1y * 0.2)
 
-    Returns (B1-02, 05 Tem 2026): {"saved": int, "failed": int, "total": int} — per-sektor
-    SAVEPOINT ile kismi basari gorunur (H#17 Kok#4). Tam DB hatasi (baglanti/commit) -> None.
-    (Onceki hali int veya None donuyordu; caller isinstance ile geriye-uyumlu.)
+    Args:
+        scan_date: YAZILACAK tarih. Caller last_trading_day_before(today) gecirir (run_scan
+            tarih davranisinin aynasi — Pazar'da CUMA'ya yazilir, ham date.today() DEGIL).
+        force: True ise BILEREK ZORLAMA — takvim guard (hafta sonu/tatil) + intraday guard
+            (ABD seansi acikken partial Finviz perf%) bypass edilir. Caller `force=force or
+            bool(date_override)` gecirir: explicit backfill (date_override) de bypass sayilir.
+
+    Guard (B6-03, 05 Tem 2026 — run_scan B6-01 deseninin aynasi): force=False iken GERCEK now'a
+    gore: hafta sonu/tatil -> SKIP; ABD seansi acik -> BLOCK. Guard karari now'a bakar; yazim
+    tarihi scan_date'tir (ikisi ayri — nightly kapanistan sonra bugune yazar, hafta sonu manuel
+    force ise CUMA'ya yazar).
+
+    Returns:
+        - {"saved": int, "failed": int, "total": int} — normal (B1-02 per-sektor SAVEPOINT,
+          kismi basari gorunur, H#17 Kok#4).
+        - {"saved": 0, "failed": 0, "total": 0, "skipped": <sebep>} — guard atladi (B6-03).
+          Caller bunu "skipped" status yapar (warning/failed DEGIL, escalation yok).
+        - None — tam DB hatasi (baglanti/commit).
+        (Onceki hali int veya None donuyordu; caller isinstance ile geriye-uyumlu.)
     """
+    # B6-03 (05 Tem 2026): self-guard — run_scan B6-01 guard zincirinin aynasi. scan_sectors
+    # eskiden koşulsuz calisiyordu (scanner_server "her zaman çalışır") -> manuel /scan hafta
+    # sonu Pazar tarihli sector_rotation satiri, intraday partial Finviz perf% yazardi. force/
+    # override -> bypass.
+    if not force:
+        try:
+            from market_calendar import should_scan_today, is_us_market_open, now_et
+            ok, reason = should_scan_today()
+            if not ok:
+                print(f"[SKIP] Sektor taramasi atlandi (takvim): {reason}")
+                return {"saved": 0, "failed": 0, "total": 0, "skipped": reason}
+            if is_us_market_open():
+                et = now_et().strftime("%Y-%m-%d %H:%M %Z")
+                print(f"[BLOCK] ABD seansi acik ({et}) — sektor bar'i partial, atlandi.")
+                return {"saved": 0, "failed": 0, "total": 0, "skipped": "intraday (seans acik)"}
+        except ImportError:
+            print("[WARN] market_calendar bulunamadi — sektor guard atlandi.")
+
     conn = get_connection()
     try:
         cursor = conn.cursor()
