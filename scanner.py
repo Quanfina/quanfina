@@ -751,12 +751,70 @@ SECTOR_ETFS = {
 }
 
 
+def _write_sector_rows(cursor, scan_date, sectors_data):
+    """sector_rotation'a per-sektor SAVEPOINT ile yazar (B1-02, 05 Tem 2026).
+
+    P490 minervini per-ticker loop deseninin BIREBIR aynasi: SAVEPOINT -> INSERT ->
+    RELEASE; hata -> ROLLBACK TO SAVEPOINT + continue. Eski scan_sectors tek commit +
+    rollback: bir sektor INSERT'i patlarsa TUM sector_rotation yazimi 0'a dusuyordu
+    (H#17 Kok#3 all-or-nothing / cascade abort). Savepoint ile yalniz bozuk sektor
+    rollback, gerisi devam. commit CALLER'da (scan_sectors).
+
+    Returns: (saved, failed) — kismi basari gorunurlugu (H#17 Kok#4).
+    """
+    saved = 0
+    failed = 0
+    for s in sectors_data:
+        try:
+            cursor.execute("SAVEPOINT sector_sp")
+            cursor.execute(
+                """
+                INSERT INTO sector_rotation
+                    (scan_date, ticker, sector_name, perf_1w, perf_1m, perf_3m, perf_6m, perf_1y, rs_score, rs_rank)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (scan_date, ticker) DO UPDATE SET
+                    sector_name = EXCLUDED.sector_name,
+                    perf_1w     = EXCLUDED.perf_1w,
+                    perf_1m     = EXCLUDED.perf_1m,
+                    perf_3m     = EXCLUDED.perf_3m,
+                    perf_6m     = EXCLUDED.perf_6m,
+                    perf_1y     = EXCLUDED.perf_1y,
+                    rs_score    = EXCLUDED.rs_score,
+                    rs_rank     = EXCLUDED.rs_rank
+                """,
+                (
+                    scan_date,
+                    s["ticker"],
+                    s["sector_name"],
+                    s["perf_1w"],
+                    s["perf_1m"],
+                    s["perf_3m"],
+                    s["perf_6m"],
+                    s["perf_1y"],
+                    s["rs_score"],
+                    s["rs_rank"],
+                ),
+            )
+            cursor.execute("RELEASE SAVEPOINT sector_sp")
+            saved += 1
+        except Exception as e:
+            cursor.execute("ROLLBACK TO SAVEPOINT sector_sp")
+            print(f"  Sektor kayit hatasi {s.get('ticker')}: {e}")
+            failed += 1
+            continue  # tek bozuk sektor tumunu dusurmesin
+    return saved, failed
+
+
 def scan_sectors(scan_date):
     """
     11 SPDR sektör ETF'i için Finviz'den performance verilerini çeker,
     çoklu periyot ağırlıklı RS Score hesaplar ve sector_rotation tablosuna yazar.
 
     RS Score = (perf_1m * 0.4) + (perf_3m * 0.2) + (perf_6m * 0.2) + (perf_1y * 0.2)
+
+    Returns (B1-02, 05 Tem 2026): {"saved": int, "failed": int, "total": int} — per-sektor
+    SAVEPOINT ile kismi basari gorunur (H#17 Kok#4). Tam DB hatasi (baglanti/commit) -> None.
+    (Onceki hali int veya None donuyordu; caller isinstance ile geriye-uyumlu.)
     """
     conn = get_connection()
     try:
@@ -851,38 +909,16 @@ def scan_sectors(scan_date):
     conn = get_connection()
     try:
         cursor = conn.cursor()
-        for s in sectors_data:
-            cursor.execute(
-                """
-                INSERT INTO sector_rotation
-                    (scan_date, ticker, sector_name, perf_1w, perf_1m, perf_3m, perf_6m, perf_1y, rs_score, rs_rank)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (scan_date, ticker) DO UPDATE SET
-                    sector_name = EXCLUDED.sector_name,
-                    perf_1w     = EXCLUDED.perf_1w,
-                    perf_1m     = EXCLUDED.perf_1m,
-                    perf_3m     = EXCLUDED.perf_3m,
-                    perf_6m     = EXCLUDED.perf_6m,
-                    perf_1y     = EXCLUDED.perf_1y,
-                    rs_score    = EXCLUDED.rs_score,
-                    rs_rank     = EXCLUDED.rs_rank
-                """,
-                (
-                    scan_date,
-                    s["ticker"],
-                    s["sector_name"],
-                    s["perf_1w"],
-                    s["perf_1m"],
-                    s["perf_3m"],
-                    s["perf_6m"],
-                    s["perf_1y"],
-                    s["rs_score"],
-                    s["rs_rank"],
-                ),
-            )
+        saved, failed = _write_sector_rows(cursor, scan_date, sectors_data)
         conn.commit()
-        print(f"Sektör rotasyonu kaydedildi: {len(sectors_data)} sektör, scan_date={scan_date}")
-        return len(sectors_data)
+        # Sessiz kismi basari YASAK (H#17 Kok#4): saved/failed disari tasinir; caller
+        # kismi fail'de scan() status'unu "warning" yapar.
+        if failed:
+            print(f"Sektor rotasyonu KISMI: {saved} yazildi, {failed} basarisiz "
+                  f"(toplam {len(sectors_data)}), scan_date={scan_date}")
+        else:
+            print(f"Sektör rotasyonu kaydedildi: {saved} sektör, scan_date={scan_date}")
+        return {"saved": saved, "failed": failed, "total": len(sectors_data)}
     except Exception as e:
         conn.rollback()
         print(f"Sektör DB yazma hatası: {e}")

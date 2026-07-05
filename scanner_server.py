@@ -198,14 +198,41 @@ def scan():
 
     # --- 2. Sektör taraması (her zaman çalışır, hisse sonucundan bağımsız) ---
     try:
-        sector_count = scan_sectors(today)
-        sector_status = "ok" if sector_count else "failed"
+        sector_result = scan_sectors(today)
+        # B1-02 (05 Tem 2026): scan_sectors artik {saved, failed, total} dict doner
+        # (per-sektor SAVEPOINT + kismi basari gorunurlugu, H#17 Kok#4). Geriye-uyum:
+        # eski/mock int donusu de kabul (int -> saved); None -> tam DB hatasi.
+        if isinstance(sector_result, dict):
+            s_saved = sector_result.get("saved", 0)
+            s_failed = sector_result.get("failed", 0)
+            s_total = sector_result.get("total", s_saved + s_failed)
+        elif isinstance(sector_result, int):
+            s_saved, s_failed, s_total = sector_result, 0, sector_result
+        else:  # None
+            s_saved, s_failed, s_total = 0, 0, 0
+        if s_saved == 0:
+            sector_status = "failed"        # hic sektor yazilmadi
+        elif s_failed > 0:
+            sector_status = "warning"       # kismi basari (H#17 Kok#4 gorunurluk)
+        else:
+            sector_status = "ok"
     except Exception as e:
         log.error("Sektör tarama hatası: %s", e)
-        sector_count = None
+        s_saved, s_failed, s_total = 0, 0, 0
         sector_status = "error"
 
-    stock_response["sectors"] = {"status": sector_status, "count": sector_count}
+    stock_response["sectors"] = {
+        "status": sector_status, "count": s_saved,
+        "failed": s_failed, "total": s_total,
+    }
+    # Sessiz kismi/tam sektor basarisizligi YASAK (H#17 Kok#4): sektor sorununu TOP-LEVEL'a
+    # yansit (stock "ok"/"skipped" iken maskeleme). "error" veya mevcut "warning" ustune yazma.
+    if sector_status in ("warning", "failed") and stock_response.get("status") in ("ok", "skipped"):
+        stock_response["status"] = "warning"
+        _sec_note = f"Sektör taraması {sector_status}: {s_saved} yazıldı, {s_failed} başarısız (toplam {s_total})."
+        stock_response["warning"] = (
+            (stock_response.get("warning") + " " + _sec_note) if stock_response.get("warning") else _sec_note
+        )
     return jsonify(stock_response), stock_http
 
 
