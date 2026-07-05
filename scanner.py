@@ -1227,12 +1227,20 @@ def run_scan(scan_date_override: str = None, force: bool = False):
     Ana scan fonksiyonu.
 
     Args:
-        scan_date_override: Belirli bir tarih için scan (test/backfill)
-        force: True ise hafta sonu/tatil kontrolünü atla (manuel zorlama)
+        scan_date_override: Belirli bir tarih için scan (test/backfill). Verilirse
+            takvim + intraday guard atlanır (belirtilen tarih EOD kabul edilir).
+        force: True ise BİLEREK ZORLAMA. Tam kapsam (semantik genişleme — B6-01, 05 Tem 2026):
+            (1) mevcut günün verisini SİL + yeniden ÇALIŞTIR (HTTP /scan?force=1 yolunda
+                server tarafı — bkz. scanner_server.py),
+            (2) takvim guard bypass (hafta sonu/tatil kontrolü atlanır),
+            (3) intraday guard bypass (ABD seansı AÇIKKEN partial bar YAZILIR).
+            Sadece ne yaptığını bilerek kullan — partial/yanlış EOD verisi riski var.
 
     Sprint 4-bis.7 (22 May 2026): ABD borsa takvim entegrasyonu —
     Hafta sonu + ABD tatil günlerinde scan ATLANIR (Sn. Ferit talimat:
     "veri çekme saati ABD borsa saatleri ABD tatiller").
+    B6-01 (05 Tem 2026): intraday partial-bar guard — seans açıkken (9:30-16:00 ET)
+    bugünü taramak partial bar'ı EOD sanıp yazar (H#17 ailesi); is_us_market_open ile bloklanır.
     Manuel override için force=True veya scan_date_override kullan.
     """
     # ABD borsa takvim kısa devre (Sprint 4-bis.7 — market_calendar.py)
@@ -1252,6 +1260,23 @@ def run_scan(scan_date_override: str = None, force: bool = False):
                 return
         except ImportError:
             print("[WARN] market_calendar modulu bulunamadi - takvim kontrolu atlandi.")
+
+    # B6-01 (05 Tem 2026): Intraday partial-bar korumasi. Bugunu tararken ABD ana seansi
+    # (9:30-16:00 ET) ACIKSA gunun bar'i henuz kapanmadi (partial); EOD sanip yazmak
+    # point-in-time butunlugunu bozar (H#17 ailesi — sessiz bozuk veri). force ile bilerek
+    # atlanir; belirli tarih (scan_date_override) EOD kabul edildigi icin muaf.
+    if scan_date_override is None and not force:
+        try:
+            from market_calendar import is_us_market_open, now_et
+            if is_us_market_open():
+                et = now_et().strftime("%Y-%m-%d %H:%M %Z")
+                print("=== QUANFINA SCANNER — INTRADAY BLOCK ===")
+                print(f"ET: {et}")
+                print("[BLOCK] ABD seansi acik — bugunun bar'i partial, EOD scan atlandi.")
+                print("[INFO] Kapanistan (16:00 ET) sonra calistir VEYA run_scan(force=True) ile zorla.")
+                return
+        except ImportError:
+            print("[WARN] market_calendar modulu bulunamadi - intraday kontrolu atlandi.")
 
     try:
         health_check_finviz()

@@ -160,7 +160,9 @@ def scan():
 
         try:
             log.info("Starting scan for %s (force=%s)", scan_date, force)
-            run_scan(scan_date_override=date_override)
+            # B6-01 (05 Tem 2026): force forward. Onceden run_scan'e iletilmiyordu -> intraday
+            # guard'i force ile atlamak HTTP yolundan imkansizdi. force=takvim+intraday bypass.
+            run_scan(scan_date_override=date_override, force=force)
             log.info("Scan completed for %s", scan_date)
             # "Sessiz ok" defekti (17 Haz 2026): run_scan Finviz/yfinance/sequence
             # hatasinda sessizce return ediyordu; endpoint "ok" sanip 0 satir
