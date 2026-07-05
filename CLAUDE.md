@@ -385,6 +385,35 @@ Kural #9 v2 (Akıllı Dağılım — Web/Code paralel uygulama),
 Kural #18 (Pasif Öğe Çıkarma — Otonom Mod B/C parçası),
 [[feedback_kapanis_disiplini]] (memory karşılığı).
 
+### Kural 8 alt-bölüm — Kapanış Netliği: "Arka Plan Sessizliği" Teyidi (05 Tem 2026 yeni)
+
+> Sn. Ferit talimatı (doğrudan tescil): oturum kapanışında yanıp sönen UI göstergesi
+> (VS Code aktivite noktası) + ScheduledTask "Queued" durumu "hâlâ çalışıyor mu?"
+> kafa karışıklığı yarattı — *"onu kapatmanın yolunu bul kurallara ekle"*.
+
+**Disiplin:** Tam Kapanış'ta VEYA Sn. Ferit *"bitti mi / çalışıyor mu / ne zaman
+bitecek"* sorduğunda, AI arka plan durumunu **SOMUT kanıtla** teyit eder ve raporlar
+(varsayım YASAK):
+
+1. **Ongoing Cloud Build?** → `gcloud builds list --ongoing` (boş = yok)
+2. **Aktif sync süreci?** → `Get-Process robocopy` (drive_sync'in GERÇEK iş süreci).
+   ScheduledTask **"Queued" ≠ çalışıyor** — bir sonraki saatlik tetiği bekliyor (pasif).
+   Kanıt: `LastTaskResult=0` + `LastRunTime` = geçmiş başarılı çalışma.
+3. **Dev server?** → port 8000 (uvicorn) / 3000 (pnpm) LISTEN kontrolü
+4. **Bekleyen background Bash/task?** → yok teyidi
+
+**UI göstergesi ≠ aktif iş:** VS Code yanıp sönen nokta + Task Scheduler "Queued" =
+**pasif bekleme**. AI bunları "aktif iş DEĞİL" diye AÇIKÇA ayırır, Sn. Ferit'i UI
+göstergesiyle baş başa bırakmaz.
+
+**Tek satır hüküm (zorunlu):** "🟢 arka planda aktif iş yok" (kanıtlı) VEYA
+"🟡 X çalışıyor, ~Y'de biter (kanıt: ...)".
+
+**İlişkili:** Kural #8 v2 (Tam Kapanış — bu teyit onun ayrılmaz parçası), Kural #2
+(trafik lambası raporu), Kural #25 (mola önerme yasağı — paralel: AI durumu
+netleştirir, zamanlama kararı Sn. Ferit'te), Kural #12 (Önce Keşfet — somut kanıt
+disiplini).
+
 ### Kural 9 — Akıllı Araç Dağılımı + Handoff (17 May 2026 v1 → 18 May 2026 v2)
 
 **v1 (17 May 2026):** "Tek Araç Felsefesi — Claude Desktop ana,
