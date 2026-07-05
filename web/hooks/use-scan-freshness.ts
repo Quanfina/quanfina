@@ -12,12 +12,24 @@ import { useQuery } from "@tanstack/react-query";
  * Tarama günlük → 5dk cache + 10dk poll yeterli (canlı fiyat gibi sık gerek yok).
  */
 
-export interface ScanFreshness {
+// B1-03 (05 Tem 2026): tek bağımsız scanner yazım yolunun tazeliği.
+export interface SourceFreshness {
+  table: string;        // "minervini_scans" | "sector_rotation"
+  label: string;        // "Hisse taraması" | "Sektör rotasyonu"
   latest_scan_date: string | null;
+  calendar_days_old: number | null;
   is_stale: boolean;
+}
+
+export interface ScanFreshness {
+  latest_scan_date: string | null;   // minervini_scans (geriye-uyum)
+  is_stale: boolean;                  // minervini_scans (DEĞİŞMEZ)
   calendar_days_old: number | null;
   threshold_days: number;
-  message: string;
+  message: string;                    // B1-03 sonrası kaynak-adlı aggregate
+  // B1-03: çok-tablo. api deploy sonrası dolu; eski API'de undefined (geriye-uyum).
+  sources?: SourceFreshness[];
+  any_stale?: boolean;                // sources'un OR'u — banner sürücüsü
 }
 
 async function fetchScanFreshness(): Promise<ScanFreshness> {

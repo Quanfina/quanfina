@@ -39,6 +39,8 @@ from db_helpers import (  # noqa: E402
     breadth_history_from_scans,
     minervini_stocks_get_latest,
     scan_latest_date,
+    latest_scan_date_for,
+    freshness_source_label,
 )
 
 # Sprint 4-bis.7 Faz 1 B paket: Mark KARAR #914 + #969 + #970
@@ -1860,46 +1862,89 @@ def get_market_calendar_status() -> MarketCalendarStatus:
 SCAN_STALE_THRESHOLD_DAYS = 4  # Cuma->Sali normal max 4 takvim gun; >4 = tarama atlandi
 
 
+class SourceFreshness(BaseModel):
+    """B1-03: Tek bir bagimsiz scanner yazim yolunun (tablo) tazeligi."""
+    table: str                                # "minervini_scans" | "sector_rotation"
+    label: str                                # kullanici-dostu ad ("Hisse taraması")
+    latest_scan_date: Optional[str] = None
+    calendar_days_old: Optional[int] = None
+    is_stale: bool
+
+
 class ScanFreshness(BaseModel):
-    latest_scan_date: Optional[str] = None   # "2026-05-29" veya None
-    is_stale: bool                            # True ise UI kirmizi banner gosterir
+    latest_scan_date: Optional[str] = None   # minervini_scans (banner geriye-uyum)
+    is_stale: bool                            # minervini_scans (DEGISMEZ)
     calendar_days_old: Optional[int] = None
     threshold_days: int = SCAN_STALE_THRESHOLD_DAYS
     message: str
+    # B1-03 (05 Tem 2026): cok-tablo tazelik. Geriye-uyumlu EK — yukaridaki 5 alan
+    # minervini_scans-gudumlu AYNEN kalir. sources = her bagimsiz yol; any_stale = OR.
+    sources: list[SourceFreshness] = []
+    any_stale: bool = False
+
+
+def _source_freshness(table: str, latest) -> SourceFreshness:
+    """Bir kaynak tablo icin SourceFreshness. `latest` ham date/None DISARIDAN verilir
+    (getter'i cagiran taraf secer: minervini -> scan_latest_date [testler bunu
+    monkeypatch'ler]; sector -> latest_scan_date_for). label whitelist'ten (ValueError korumali)."""
+    from datetime import date as _date
+    label = freshness_source_label(table)
+    if latest is None:
+        return SourceFreshness(table=table, label=label, latest_scan_date=None,
+                               calendar_days_old=None, is_stale=True)
+    try:
+        scan_d = _date.fromisoformat(str(latest)[:10])
+    except ValueError:
+        return SourceFreshness(table=table, label=label, latest_scan_date=str(latest),
+                               calendar_days_old=None, is_stale=False)
+    cal_days = (_date.today() - scan_d).days
+    return SourceFreshness(table=table, label=label, latest_scan_date=str(latest)[:10],
+                           calendar_days_old=cal_days,
+                           is_stale=cal_days > SCAN_STALE_THRESHOLD_DAYS)
+
+
+def _freshness_message(sources: list[SourceFreshness]) -> str:
+    """Kaynak-adli aggregate mesaj: yalniz sector bayatsa sadece 'Sektör rotasyonu'yu
+    adlandirir (minervini mesajiyla karismaz); ikisi de bayatsa birlesik."""
+    stale = [s for s in sources if s.is_stale]
+    if not stale:
+        parts = ", ".join(
+            f"{s.label} {s.latest_scan_date} ({s.calendar_days_old} gün önce)"
+            if s.latest_scan_date and s.calendar_days_old is not None
+            else f"{s.label} {s.latest_scan_date or '—'}"
+            for s in sources
+        )
+        return f"Tarama guncel: {parts}."
+    parts = "; ".join(
+        (f"{s.label} BAYAT ({s.latest_scan_date}, {s.calendar_days_old} gün önce)"
+         if s.latest_scan_date else f"{s.label} verisi YOK")
+        for s in stale
+    )
+    return f"{parts} — esik {SCAN_STALE_THRESHOLD_DAYS} gun. Cloud Run scanner kontrol et."
 
 
 @app.get("/api/scan/freshness", response_model=ScanFreshness)
 def get_scan_freshness() -> ScanFreshness:
-    """Tarama verisi tazeligi: son minervini_scans tarihi kac gun eski.
+    """Tarama verisi tazeligi — cok-tablo (B1-03, 05 Tem 2026).
 
-    is_stale = calendar_days > 4 (hafta sonu normal Cum->Sali 4 gunu ASMAZ;
-    >4 -> islem gunu taramasi atlandi). Basit + saglam (false-positive yok).
-    Frontend DataFreshnessBanner sadece is_stale=True iken kirmizi uyari gosterir.
+    Iki bagimsiz yazim yolu ayri izlenir (H#17 Ders#5: biri taze, digeri olu olabilir):
+      - minervini_scans (run_scan) — top-level 5 alan bunu yansitir (geriye-uyum)
+      - sector_rotation (scan_sectors — AYRI fonksiyon)
+    any_stale = herhangi biri bayat. Frontend DataFreshnessBanner any_stale + kaynak-adli
+    message ile uyarir. is_stale (minervini) eski tuketiciler icin AYNEN korunur.
     """
-    from datetime import date as _date
-    latest = scan_latest_date()
-    if latest is None:
-        return ScanFreshness(
-            latest_scan_date=None, is_stale=True, calendar_days_old=None,
-            message="Tarama verisi yok (minervini_scans bos veya DB erisilemez).",
-        )
-    try:
-        scan_d = _date.fromisoformat(str(latest)[:10])
-    except ValueError:
-        return ScanFreshness(
-            latest_scan_date=latest, is_stale=False, calendar_days_old=None,
-            message=f"Son tarama: {latest} (tarih parse edilemedi).",
-        )
-    cal_days = (_date.today() - scan_d).days
-    stale = cal_days > SCAN_STALE_THRESHOLD_DAYS
-    if stale:
-        msg = (f"Tarama BAYAT: son tarama {latest}, {cal_days} gun once "
-               f"(esik {SCAN_STALE_THRESHOLD_DAYS} gun). Cloud Run scanner kontrol et.")
-    else:
-        msg = f"Tarama guncel: {latest} ({cal_days} gun once)."
+    # minervini: mevcut scan_latest_date() (testler monkeypatch'ler — geriye-uyum sart)
+    minervini = _source_freshness("minervini_scans", scan_latest_date())
+    # sector_rotation: run_scan'den AYRI yazim yolu (B1-03 kok bulgu)
+    sector = _source_freshness("sector_rotation", latest_scan_date_for("sector_rotation"))
+    sources = [minervini, sector]
     return ScanFreshness(
-        latest_scan_date=latest, is_stale=stale,
-        calendar_days_old=cal_days, message=msg,
+        latest_scan_date=minervini.latest_scan_date,   # DEGISMEZ (minervini-gudumlu)
+        is_stale=minervini.is_stale,                    # DEGISMEZ
+        calendar_days_old=minervini.calendar_days_old,  # DEGISMEZ
+        message=_freshness_message(sources),            # kaynak-adli aggregate
+        sources=sources,
+        any_stale=any(s.is_stale for s in sources),
     )
 
 

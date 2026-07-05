@@ -722,6 +722,50 @@ def scan_latest_date():
 
 
 # =============================================================
+# B1-03 (05 Tem 2026): Cok-tablo tarama tazeligi (freshness). scan_sectors
+# (sector_rotation) run_scan'den AYRI yazim yolu — H#17 Ders#5: biri taze,
+# digeri olu olabilir; her bagimsiz yol ayri izlenmeli.
+#
+# GUVENLIK: tablo adi ASLA interpolate EDILMEZ. Sabit whitelist'ten LITERAL SQL
+# secilir (SQL injection imkansiz). Whitelist disi tablo -> ValueError.
+# =============================================================
+
+_FRESHNESS_SOURCES = {
+    "minervini_scans": {
+        "label": "Hisse taraması",
+        "sql": "SELECT MAX(scan_date) AS d FROM minervini_scans",
+    },
+    "sector_rotation": {
+        "label": "Sektör rotasyonu",
+        "sql": "SELECT MAX(scan_date) AS d FROM sector_rotation",
+    },
+}
+
+
+def freshness_source_label(table: str) -> str:
+    """Freshness kaynak tablosunun kullanici-dostu adi. Whitelist disi -> ValueError."""
+    if table not in _FRESHNESS_SOURCES:
+        raise ValueError(f"Bilinmeyen freshness tablosu: {table!r}")
+    return _FRESHNESS_SOURCES[table]["label"]
+
+
+def latest_scan_date_for(table: str):
+    """MAX(scan_date) — verilen scanner tablosu icin (whitelist). Bilinmeyen tablo
+    -> ValueError. Tablo adi interpolate EDILMEZ; sabit literal SQL whitelist'ten gelir.
+
+    Returns: date | None (psycopg2 DATE -> datetime.date; bos DB / DB hata -> None).
+    """
+    if table not in _FRESHNESS_SOURCES:
+        raise ValueError(f"Bilinmeyen freshness tablosu: {table!r}")
+    try:
+        with engine.connect() as conn:
+            row = conn.execute(text(_FRESHNESS_SOURCES[table]["sql"])).fetchone()
+            return row[0] if row and row[0] else None
+    except Exception:
+        return None
+
+
+# =============================================================
 # Sprint 4-bis.3: 6 scan_diff Screen — onceki scan karsilastirma
 # Kaynak: notebook/Notebook_C1_Sprint_QuickStart.md SCREENS tuple
 #         Master NotebookLM 19 May 2026 ~08:45 danışma cevabi

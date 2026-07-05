@@ -72,3 +72,74 @@ class TestScanFreshnessEndpoint:
         d = client.get("/api/scan/freshness").json()
         assert d["is_stale"] is True
         assert d["calendar_days_old"] == 10
+
+
+class TestMultiTableFreshness:
+    """B1-03 (05 Tem 2026): sources (minervini_scans + sector_rotation) + any_stale."""
+
+    def test_sources_shape_two_legs(self, client):
+        d = client.get("/api/scan/freshness").json()
+        assert "sources" in d and "any_stale" in d
+        assert isinstance(d["any_stale"], bool)
+        tables = {s["table"] for s in d["sources"]}
+        assert tables == {"minervini_scans", "sector_rotation"}
+        for s in d["sources"]:
+            for k in ("table", "label", "latest_scan_date", "calendar_days_old", "is_stale"):
+                assert k in s
+
+    def test_both_fresh_any_stale_false(self, client, monkeypatch):
+        from datetime import date
+        today = date.today().isoformat()
+        monkeypatch.setattr(api_main, "scan_latest_date", lambda: today)
+        monkeypatch.setattr(api_main, "latest_scan_date_for", lambda table: today)
+        d = client.get("/api/scan/freshness").json()
+        assert d["any_stale"] is False
+        assert d["is_stale"] is False  # top-level = minervini (degismez)
+        assert all(s["is_stale"] is False for s in d["sources"])
+
+    def test_only_sector_stale_any_stale_true_source_named(self, client, monkeypatch):
+        # Kritik B1-03: minervini TAZE, sector BAYAT -> top-level is_stale=False (minervini)
+        # ama any_stale=True; mesaj SADECE 'Sektör rotasyonu' adlandirir (minervini karismaz)
+        from datetime import date, timedelta
+        today = date.today().isoformat()
+        old = (date.today() - timedelta(days=20)).isoformat()
+        monkeypatch.setattr(api_main, "scan_latest_date", lambda: today)             # minervini taze
+        monkeypatch.setattr(api_main, "latest_scan_date_for", lambda table: old)     # sector bayat
+        d = client.get("/api/scan/freshness").json()
+        assert d["is_stale"] is False        # minervini taze -> top-level DEGISMEZ
+        assert d["any_stale"] is True         # sector bayat -> yeni aggregate yakalar
+        assert "Sektör rotasyonu" in d["message"]
+        assert "Hisse taraması BAYAT" not in d["message"]  # minervini taze, adlandirilmaz
+        sec = next(s for s in d["sources"] if s["table"] == "sector_rotation")
+        assert sec["is_stale"] is True and sec["calendar_days_old"] == 20
+
+    def test_both_stale_combined_message(self, client, monkeypatch):
+        from datetime import date, timedelta
+        old = (date.today() - timedelta(days=15)).isoformat()
+        monkeypatch.setattr(api_main, "scan_latest_date", lambda: old)
+        monkeypatch.setattr(api_main, "latest_scan_date_for", lambda table: old)
+        d = client.get("/api/scan/freshness").json()
+        assert d["any_stale"] is True
+        assert "Hisse taraması BAYAT" in d["message"]
+        assert "Sektör rotasyonu BAYAT" in d["message"]
+
+
+class TestFreshnessWhitelist:
+    """latest_scan_date_for whitelist: bilinmeyen tablo -> ValueError (SQL injection korumasi)."""
+
+    def test_unknown_table_raises(self):
+        from db_helpers import latest_scan_date_for
+        with pytest.raises(ValueError):
+            latest_scan_date_for("web_trades; DROP TABLE minervini_scans")
+
+    def test_known_tables_no_raise(self):
+        # Gercek DB'ye vurur; date VEYA None doner, ASLA raise etmez (DB hata -> None)
+        from db_helpers import latest_scan_date_for
+        for t in ("minervini_scans", "sector_rotation"):
+            latest_scan_date_for(t)  # exception yok = pass
+
+    def test_label_whitelist(self):
+        from db_helpers import freshness_source_label
+        assert freshness_source_label("sector_rotation") == "Sektör rotasyonu"
+        with pytest.raises(ValueError):
+            freshness_source_label("bogus")
