@@ -28,8 +28,30 @@ param(
 )
 
 $ErrorActionPreference = "Continue"
-$repoRoot = (git rev-parse --show-toplevel).Trim()
-if (-not $repoRoot) { Write-Host "Git deposu degil." -ForegroundColor Red; exit 1 }
+
+# D2-01 fix (06 Tem 2026): worktree-aware repo root tespiti (H#12 deseni, build_index v2.1 birebir)
+# $PSScriptRoot pattern: script'in bulundugu yer = scripts/ klasoru,
+# onun parent'i = repo root (worktree veya ana repo)
+$scriptPath = $MyInvocation.MyCommand.Path
+$scriptsDir = Split-Path -Parent $scriptPath
+$repoRoot = Split-Path -Parent $scriptsDir
+if (-not (Test-Path (Join-Path $repoRoot "CLAUDE.md"))) {
+    Write-Host "Repo kokunde CLAUDE.md bulunamadi: $repoRoot" -ForegroundColor Red
+    exit 1
+}
+
+# worktree-aware: git common-dir uzerinden ana repoyu bul (notebook/ ana repoda)
+$gitCommonDir = (git rev-parse --git-common-dir).Trim()
+if ($gitCommonDir -and ($gitCommonDir -ne ".git")) {
+    if (-not [System.IO.Path]::IsPathRooted($gitCommonDir)) {
+        $gitCommonDir = Join-Path $repoRoot $gitCommonDir
+    }
+    $mainRepo = Split-Path -Parent $gitCommonDir
+    if (Test-Path (Join-Path $mainRepo "notebook")) {
+        Write-Host "[bilgi] worktree icindeyim, ana repo notebook/ kullaniliyor: $mainRepo" -ForegroundColor DarkCyan
+        $repoRoot = $mainRepo
+    }
+}
 
 # ============================================================
 # Otomatik baglam bilgisi
