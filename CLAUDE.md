@@ -156,19 +156,9 @@ Sürdürülebilirlik tetikleyici: bir klasörde 5+ dosya → refactor.
 
 ### Kural 8 — Akıllı Kapanış Disiplini (17 May 2026 v1 → 19 May 2026 v2)
 
-**v1 (17 May 2026):** "Adım Sonu Güncelleme" — Her büyük adım sonu
-Vizyon + YAPILANLAR + _DEVIR tam kapanış. ❌ DEPRECATED 19 May 2026.
+Gerekçe/kanıt → _KURAL_GEREKCELERI.md (Kural #8)
 
 **v2 (19 May 2026 ~02:00):** **Akıllı Kapanış Disiplini — 4 modlu.**
-
-**Tetikleyici revize (Manifesto Özellik #8 10. self-correction —
-yöntem seviyesi):** Sn. Ferit 19 May 2026 ~01:30 talimatı: *"bu
-kapanışlar yavaşlatı yo nasıl bir çözüm bulabiliriz kpanışı sonra
-yapma durumu olsa sende fikir ver tam hız almışken kapanış
-düzenlemesi için bekleme hızı düşürüyor sistemde."* Pratik gerçek:
-v1'de her küçük iş için tam kapanış (Vizyon sürüm + YAPILANLAR + _DEVIR
-+ commit + push + Drive) ~%50 chat zamanı yutuyordu. Karar yorgunluğu
-azaltma felsefesiyle çelişti.
 
 **4 Mod tasarımı:**
 
@@ -219,11 +209,6 @@ azaltma felsefesiyle çelişti.
 - **Stratejik karar YOK** — sadece uygulama + hijyen + analiz
 - Sabah özet: `_DEVIR.md` ⏳ KUYRUK'a 5-10 satırlık rapor
 
-**Kazanım ölçümü (bu chat'in verisi):**
-- v1: 22 task = ~80 dk (toplam) kapanış yüküyle
-- v2 (varsayım): aynı 22 task = ~25 dk akış modu + 5 dk batched kapanış
-- **Hız kazancı: 3-5x** akış modunda
-
 **İlişkili:** Kural #4 (Yıkıcı eylem onayı — Otonom Mod sınırı),
 Kural #9 v2 (Akıllı Dağılım — Web/Code paralel uygulama),
 Kural #18 (Pasif Öğe Çıkarma — Otonom Mod B/C parçası),
@@ -231,9 +216,7 @@ Kural #18 (Pasif Öğe Çıkarma — Otonom Mod B/C parçası),
 
 ### Kural 8 alt-bölüm — Kapanış Netliği: "Arka Plan Sessizliği" Teyidi (05 Tem 2026 yeni)
 
-> Sn. Ferit talimatı (doğrudan tescil): oturum kapanışında yanıp sönen UI göstergesi
-> (VS Code aktivite noktası) + ScheduledTask "Queued" durumu "hâlâ çalışıyor mu?"
-> kafa karışıklığı yarattı — *"onu kapatmanın yolunu bul kurallara ekle"*.
+Gerekçe/kanıt → _KURAL_GEREKCELERI.md (Kural #8 alt-bölüm)
 
 **Disiplin:** Tam Kapanış'ta VEYA Sn. Ferit *"bitti mi / çalışıyor mu / ne zaman
 bitecek"* sorduğunda, AI arka plan durumunu **SOMUT kanıtla** teyit eder ve raporlar
@@ -260,26 +243,13 @@ disiplini).
 
 ### Kural 9 — Akıllı Araç Dağılımı + Handoff (17 May 2026 v1 → 18 May 2026 v2)
 
-**v1 (17 May 2026):** "Tek Araç Felsefesi — Claude Desktop ana,
-Web Claude kullanılmaz." → ❌ DEPRECATED 18 May 2026.
+Gerekçe/kanıt → _KURAL_GEREKCELERI.md (Kural #9)
 
 **v2 (18 May 2026):** **Akıllı Dağılım + Handoff Protokolü.**
 
 Sn. Ferit'in karar yorgunluğunu azaltmak için: her araç güçlü
 olduğu işte, "hangisini seçeyim" kararı yine sıfır — ama bu
 sefer **paralel araç değil, akıllı dağılım** ile.
-
-**Tetikleyici revize (Kural #14 doğrudan tescil):**
-- 18 May 2026 ~21:00 Sn. Ferit Claude Code (Opus 4.7 1M) cevap
-  hızını "Web Claude'a göre yavaş" buldu. Gerçek: Opus 4.7 +
-  tool round-trip + 1225 satır CLAUDE.md context + 9 memory
-  dosyası → Web Claude'un Sonnet default + hafif system prompt'una
-  göre yavaş yanıt
-- Web Claude'a **Google Drive Connector** bağlandı → Quanfina
-  bağlamına Drive üzerinden erişebiliyor (Quanfina_notebook/_BASLAT.txt
-  dahil tüm yaşayan sistem)
-- Kural #9 v1'in temel varsayımı ("Web Claude bağlamsız, kullanışsız")
-  artık geçersiz
 
 **Birincil dağılım:**
 
@@ -318,20 +288,8 @@ Bir sonraki Web Claude oturumu Drive üzerinden yeni hali görür
   commit/push zinciri)
 - Karar tescili (KARAR ekleme, AÇIK KONU kapanış, sürüm bloğu)
 
-**Web Claude'un kapasitesi (18 May 2026):**
-- ✅ Drive Connector (`mcp__09e271fe-...`): list_recent_files,
-  search_files, read_file_content, get_file_metadata, copy_file,
-  create_file, download_file_content, get_file_permissions
-- ✅ Quanfina_notebook klasörüne Drive üzerinden erişim
-- ❌ Lokal dosya yazma (Edit/Write) — bu Code'un işi
-- ❌ Bash/git/commit — bu Code'un işi
-
 **Karar yorgunluğu yine sıfır:** her iş için tek doğru araç var,
 seçim yok.
-
-**Manifesto Özellik #8 (Öğrenen) zirvesi:** sistem kendi
-anayasasını revize ediyor — v1 → v2. Statik kural değil, yaşayan
-felsefe.
 
 **İlişkili:** Kural #17 (Uzman/Yorumcu Varsayılanı = NotebookLM),
 [[feedback_hibrit_arac_dagilimi]] (memory karşılığı), Aşama 5
@@ -362,13 +320,7 @@ gerekmez.
 - ...
 ```
 
-**DRY İlke #4 uyumu:** `_HANDOFF.md` iptal — `_DEVIR.md` zaten bu
-görev için var (kurulu, çalışıyor). Tek köprü dosyası.
-
-**H#10 bağlantısı:** Web Claude Drive yazma yeteneğini başta "yok"
-dedi (araç listesine kör güven). Sn. Ferit sorgusuyla tool_search
-yeniden çalıştırıldı → create_file + copy_file mevcut çıktı.
-Kural #12 (Önce Keşfet) doğrudan uygulama — bkz. `_HATALAR.md` H#10.
+Gerekçe/kanıt → _KURAL_GEREKCELERI.md (Kural #9 v2 alt-bölüm Yöntem B)
 
 **İlişkili:** Kural #8 (Adım Sonu Güncelleme), `_DEVIR.md`,
 `_HATALAR.md` H#10, [[feedback_hibrit_arac_dagilimi]].
@@ -457,8 +409,7 @@ Aşama X.Y: çoklu satır Türkçe
 '@   # ş, ğ, ı, ?, — parse'i boşluk olarak böler
 ```
 
-Bu kural [`feedback_kesfet_sor`](memory) ile birlikte yaşayan sistemin
-operasyonel disiplinine girer.
+Gerekçe/kanıt → _KURAL_GEREKCELERI.md (Kural #13)
 
 ### Kural 14 — Pattern Tespit + Otomatik Kural Önerisi (17 May 2026 yeni)
 Yaşayan sistem sürdürülebilirliği için: AI her çalışma sırasında tekrar
@@ -490,20 +441,10 @@ söyleme ihtiyacı duymuyorum artık." Yani AI pattern tespit ettiğinde:
 3. **`notebook/_BASLAT.md` güncellenir** — yeni chat hemen görür
 4. **Skill setine eklenir** → "yaşayan sistem skill kart" pattern'i
 
-Bu revize Kural #14'ün **kendi felsefesini kendine uygulamasının**
-canlı örneği — pattern (Sn. Ferit aynı talimatı 2. kez söyledi:
-"kurala ekle, ben söyleme ihtiyacı duymayayım") → otomatik tescil.
+Gerekçe/kanıt → _KURAL_GEREKCELERI.md (Kural #14)
 
 **İstisna:** Yıkıcı kural değişiklikleri (mevcut bir kuralı silme,
 büyük yön değişimi) hâlâ Sn. Ferit onayı ister (Kural #4).
-
-**Skill felsefesi:**
-`notebook/_BASLAT.md` tek bir **skill kart** gibi davranır. Yeni
-Claude Desktop chat'i bu kart ile tam iş akışını edinir. CLAUDE.md
-anayasa katmanı detaylı belgeler, _BASLAT.md ise hızlı tetikleyicidir.
-
-**Manifesto Özellik #8 (Öğrenen)** bu kuralla canlı tescile geçer —
-sistem kullanıldıkça kendi pattern kütüphanesini büyütür.
 
 **İlişkili:** Kural #8 (Adım Sonu Güncelleme), Kural #11 (Notebook
 Proaktif Tarama), Kural #12 (Önce Keşfet), Kural #13 (Commit Disiplini),
@@ -511,8 +452,7 @@ Bilgi Mimarisi İlke #3 (Yaşayan Sistem) + #5 (Klasör Bağlamı).
 
 ### Kural 14 alt-bölüm — Yeni Kural Önerisi Öncesi 4 Kontrol (22 May 2026 ~19:00 yeni, H#A1 paterninden)
 
-Sn. Ferit talimatı: *"şişme olmasın kuralı yaptığını zannetmiyorum"* +
-*"birdaha olmaması açısından iş akışı kurallarımıza ekle"*.
+Gerekçe/kanıt → _KURAL_GEREKCELERI.md (Kural #14 alt-bölüm)
 
 **AI yeni Kural öneriden ÖNCE 4 ZORUNLU kontrol** (Kural #18 + İlke #4
 ile birlikte çalışır):
@@ -538,15 +478,6 @@ gerekiyor mu? "Ekle + çıkar" çift mekanizma birlikte düşünülür.
 
 **Bu kontroller AI OTOMATİK yapar**, Sn. Ferit'e raporlar. İhlal
 tespit edilirse yeni kural önerisi geri çekilir.
-
-**Pattern keşfi (22 May 2026 ~19:00):** Kural #26 (Drive Senkron
-Disiplini) çiftleme yapıldı — Drive senkron 4 yerde zaten vardı
-(Kural #8 v2 Akış + Otonom Hijyen + Kural #9 v2 ana + alt-bölüm).
-5. tekrar Kural #26 oldu → Kural #18 negatif tescil ile ÇIKARILDI.
-Bu pattern bir daha olmaması için 4 kontrol kalıcı disiplin.
-
-**Manifesto Özellik #8:** Sistem kendi şişmesini fark edip durdurur.
-Kural #14 (ekleme) + Kural #18 (çıkarma) + Kural #14 alt-bölüm (önleme).
 
 **İlişkili:** Kural #14 ana metin (Pattern Tespit), Kural #18 (Pasif
 Çıkarma), İlke #4 (DRY/Tekrarsızlık), `_HATALAR.md` H#A1 (Kural #26
@@ -575,13 +506,7 @@ parse'i değil, Markdown render'ı kullanılır.
 **Commit mesajları:** Kural #13 — temp dosya + `git commit -F` (Türkçe
 için ASCII title + Türkçe detay OK).
 
-**Pattern keşfi:** Aşama 1 sonrası `scripts/hesap_tarama.ps1` yazımı
-sırasında tespit edildi. Kural #14'ün **ilk canlı somut uygulaması**
-— pattern → kural önerisi → tescil tek turda.
-
-**Etki:** Tüm mevcut scripts/*.ps1 ASCII-only zaten:
-- `sizma_kontrol.ps1`, `notebook_yedekle.ps1`,
-  `build_index.ps1`, `hesap_tarama.ps1`
+Gerekçe/kanıt → _KURAL_GEREKCELERI.md (Kural #15)
 
 ### Kural 16 — PowerShell Native Exe `2>&1` Yasağı (18 May 2026 yeni)
 Windows PowerShell 5.1'de bir **native executable**'in (git, gh,
@@ -607,10 +532,7 @@ $out = git status                # OK
 if ($LASTEXITCODE -ne 0) { ... } # exit kodu kontrolu
 ```
 
-**Pattern keşfi:** Önceki AI bir kez yaşadı (`_DEVIR.md` 17 May 2026
-notu), sistem prompt'umda da uyarı vardı → 2. ortaya çıkış = Kural
-#14 doğrudan tescil eşiği. Kural #15 ile birlikte PowerShell
-disiplinini tamamlar.
+Gerekçe/kanıt → _KURAL_GEREKCELERI.md (Kural #16)
 
 **İstisna:** PowerShell cmdlet'leri (`Get-*`, `Invoke-*`) için `2>&1`
 **güvenli** — sadece native .exe'lerde sorun var.
@@ -624,23 +546,7 @@ AI uzman/yorumcu rolü kurarken **varsayılan araç NotebookLM Plus**,
 Gemini Gems değil. Yeni uzman/danışman ihtiyacı doğduğunda Gems
 düşünmeden NotebookLM Plus seçilir.
 
-**Why:** Gems'in **Drive senkronu yok** — yüklenen dosya snapshot,
-kaynak güncellenince manuel re-upload gerekir. NotebookLM Plus
-**Drive linkli canlı kaynak** destekler — `drive_sync.ps1` notebook/
-→ `G:\Drive'ım\Quanfina_notebook\` her saat ayna alır, NotebookLM
-otomatik yeniden indeksler. Yaşayan sistem kaynak akışı sadece
-NotebookLM tarafında bütünleşik.
-
-**2 ortaya çıkış (Kural #14 eşiği aşıldı):**
-1. **Aşama 2.4** Vizyon Bekçisi Gem → ❌ İPTAL, NotebookLM'e taşındı
-   (18 May 2026 öğleden sonra, Aşama 2.3 (b) RESMÎ KAPANIŞ)
-2. **Aşama 4.2** Carr Yorumcu Gem → ❌ İPTAL, NotebookLM "Quanfina
-   Carr Stage Analizi" doğrudan Yorumcu rolünde (18 May 2026 akşam,
-   KARAR #445)
-
-**Canlı tescil:** 3 NotebookLM uzmanı tam rolde — Vizyon Bekçisi
-(karar tarihi denetçisi) + Minervini (kavram sözlüğü) + Carr Stage
-Analizi (Carr 1.+2. baskı + Weinstein yorumu).
+Gerekçe/kanıt → _KURAL_GEREKCELERI.md (Kural #17)
 
 **İstisna — Gems'te kalabilecek rol türleri:**
 - **Stateless skor üretici** — TradeGrader Gem (Aşama 4.1): 17
@@ -715,25 +621,7 @@ toplanır, sınırlı dikkati tüketir, AI'a gereksiz bağlam yükler.
 Kural #14 ile **eklenir**, Kural #18 ile **çıkarılır**. Sistem
 nefes alır.
 
-**Felsefi temel (22 May 2026 _FELSEFE arşivden entegre — F#NEW):**
-
-1. **Yetenek Minimalizmi** (KARAR ADAY #442): *"Çok yetenek yanlışa
-   sebep olabiliyor."* Kullanılmayan yetenek, kullanılan yeteneklerin
-   görünürlüğünü zayıflatır.
-
-2. **Karar yorgunluğu azaltma:** Pasif öğeler "hangisini seçeyim"
-   yorgunluğu yaratır. 26 kural arasından 3'ü pasif ise AI tarama
-   süresi artar, doğru kural bulma süresi düşer.
-
-3. **Yaşayan ≠ ölmeyen:** Yaşayan organizma hücre yenileler, ölmüş
-   hücreler atılır. Bir sistem **her şeyi tutarsa** yaşamaz, **sadece
-   birikir**. Yaşayan sistem = ekleyen + çıkaran çift mekanizma.
-
-**Why (Sn. Ferit talimatı 18 May 2026 ~23:00):** *"kural ekleme
-varsa kural çıkarma protokolü kuralı da eklicem masaüstüne
-yazdırcam"*. 3 günde sistem 17 Kural + 41 İLKE adayı + 447 KARAR
-+ 13 script + 11 notebook + 9 memory'e büyüdü, çıkarma mekanizması
-yoktu. Web Claude turu bu eksiği dürüstçe tespit etti.
+Gerekçe/kanıt → _KURAL_GEREKCELERI.md (Kural #18)
 
 **Kapsam (tüm sistem öğeleri):**
 - Kural (CLAUDE.md)
@@ -797,24 +685,9 @@ işaretlenir.
 **İstisna:** KARAR'lar **asla** silinmez (mimari karar geçmişi
 kanıtı). Sadece "PASİF" notu eklenir, içeriği kalır.
 
-**İlk somut canlı uygulama (KARAR #448, 19 May 2026 ~01:00):**
-Aşama 3.3 GitHub MCP iptal kararı doğrulandı — 5 dk önce `gh
-auth login` ile Bash üzerinden tam GitHub yetkisi (gist + read:org
-+ repo + workflow scopes). MCP çiftlemesi gereksizdi, `gh` CLI
-yeterli. Negatif tescil canlı — resmî iptal, gerçeklik destekledi.
-Aşama 3 RESMÎ KAPANIŞ ile aynı turda. Bu, Web Claude turunda
-yakalanan "Kural #18 metnine ilk uygulama referansı" disiplinine
-karşılık geliyor.
-
 ### Kural 9 v2 alt-bölümü — Otomatik Çift Yönlü Senkron (19 May 2026 ~01:30, KARAR #449)
 
-**Tetikleyici (Manifesto Özellik #8 9. self-correction — tasarım
-seviyesi):** Sn. Ferit talimatı: *"web claude ile sistemi
-birleştir nasıl olacaksa bana sorma sen orda yaptıklarımızı görsün
-o burda falan"*. Yöntem B handoff (KARAR #447) Web → Code yönünde
-`_DEVIR.md` üzerinden manuel handoff'a güveniyordu — eksik yarı:
-Web Claude'un Drive'a yazdıkları lokal `notebook/`'a otomatik
-yansımıyordu.
+Gerekçe/kanıt → _KURAL_GEREKCELERI.md (Kural #9 v2 alt-bölüm Çift Yönlü Senkron)
 
 **Çözüm (çift yönlü otomatik senkron):**
 
@@ -866,11 +739,7 @@ $utf8NoBom = New-Object System.Text.UTF8Encoding $false
 [System.IO.File]::WriteAllText($f, $icerik, $utf8NoBom)       # OK
 ```
 
-**Pattern keşfi:** 2 ortaya çıkış aynı gece (19 May 2026):
-1. `drive_sync.ps1` v2.1 C1 arşivleme — `_DEVIR.md` mojibake
-2. `satir_sayim_otomatik.ps1` v0.5 -Uygula — `_OZET.md` mojibake
-
-Eşik 2 aşıldı → Kural #14 doğrudan tescil. _HATALAR.md H#11 kayıt.
+Gerekçe/kanıt → _KURAL_GEREKCELERI.md (Kural #19)
 
 **Mojibake düzeltme (zaten oluşmuş için):**
 ```powershell
@@ -887,13 +756,6 @@ $utf8NoBom = New-Object System.Text.UTF8Encoding $false
 **İstisna:**
 - ASCII-only içerik → `Out-File -Encoding ascii` güvenli (Kural #15 zaten ASCII-only `scripts/*.ps1`'i kapsıyor)
 - PowerShell **7+** (Core) → `Out-File -Encoding utf8NoBOM` parametresi var, ama hâlâ console encoding bug'ı olabilir → **yine `[System.IO.File]::WriteAllText` tercih edilir**
-
-**Script audit listesi (sabah Sn. Ferit):**
-- `saglik_kontrol.ps1 -Uygula` Out-File kullanıyor mu? → kontrol et, varsa v0.5.1 fix
-- `notebook_yedekle.ps1` Out-File yok (ZIP)
-- `drive_sync.ps1` v2.2 Out-File yok (robocopy + Copy-Item)
-- `pasif_tara.ps1` Out-File yok (Write-Host only)
-- `hijyen_paketi.ps1` Out-File yok (wrapper)
 
 **İlişkili:** Kural #13 (commit mesajı + temp dosya UTF-8), Kural #15
 (scripts ASCII-only), Kural #16 (PS native exe 2>&1), Manifesto
@@ -921,33 +783,7 @@ doğrudan tescil (2 ortaya çıkış 19 May 2026):
 - JS: `notebook/B2_Markets360_main-Dis3UGIE.js` (7.36 MB)
 - Yöntem: PowerShell regex + frequency analiz (örnek paterler aşağıda)
 
-**Tarama Pattern Repertuar (19 May 2026 3 dalga sentezinden):**
-
-```powershell
-# CSS hex renk paleti
-$hex = [regex]::Matches($css, '#[0-9a-fA-F]{6}\b')
-
-# CSS class isim
-$classes = [regex]::Matches($css, '\.[a-zA-Z][a-zA-Z0-9_-]+')
-
-# CSS spacing/typography
-$padding = [regex]::Matches($css, '(?:padding|margin)[^;]*?(\d+\.?\d*)(px|rem|em)')
-
-# CSS pseudo-class
-$pseudo = [regex]::Matches($css, ':hover|:focus|:active|:disabled')
-
-# JS component pattern
-$comp = [regex]::Matches($js, '\b([A-Z][a-zA-Z]+(Panel|Drawer|Modal|Dialog|Menu))\b')
-
-# JS library frequency
-$libs = @{ "sonner" = ([regex]::Matches($js, 'sonner|toast\.')).Count; ... }
-
-# JS AG Grid pattern
-$ag = @{ "pinnedColumn" = ([regex]::Matches($js, 'pinned')).Count; ... }
-
-# JS trading sabit
-$trade = @{ "Pivot" = ([regex]::Matches($js, '\bpivot\b')).Count; ... }
-```
+Tarama pattern repertuarı (regex örnekleri) → _KURAL_GEREKCELERI.md (Kural #20)
 
 **Soyutlama Disiplini (Clean-Room — `_CLEAN_ROOM.md`):**
 - Yasaklı isim doğrudan **KOPYALANMAZ** (Markets 360, SEPA®, MonAlert,
@@ -964,14 +800,7 @@ $trade = @{ "Pivot" = ([regex]::Matches($js, '\bpivot\b')).Count; ... }
 5. **KARAR ADAY tescili** (gerekirse) — Vizyon + mimari belge
 6. **Uygula** — TypeScript + AG Grid + Tailwind
 
-**Canlı kanıt (Kural #20 doğuş anı — 19 May 2026 ~06:30→08:00):**
-- screens/page.tsx ilk versiyon (basit) Master danışılmadan + ham tarama yapılmadan yazıldı
-- Sn. Ferit dikkat çekti: "Bu tarz tasarım kodlama işlerinde Quanfina Notebook'a sorular soralım"
-- Master 5 motif + Quanfina-özgü adlandırma önerdi (Test 4 v1.1 paterni — clean-room self-correction)
-- Sn. Ferit: "Markets 360'ın css ve js de de tarama fikir çıkarmanı istiyorum"
-- 3 dalga ham tarama: 1984 class + 107 hex + 86 API endpoint + 30K+ filter operator
-- Sentez: `notebook/Sprint_4_bis_Mimari_Kararlar.md` (~310 satır, 6 KARAR ADAY #453-#458)
-- Uygulama: screens/page.tsx Katman 1 UX zirvesi (chip + RS bandı + sayaç + multi-select + 4 toast tipi)
+Gerekçe/kanıt → _KURAL_GEREKCELERI.md (Kural #20)
 
 **İstisna:** Sadece **mimari değişiklik** olmayan **küçük string/etiket
 güncelleme** (örn. button label tek satır) için çift tarama zorunlu
@@ -985,7 +814,7 @@ gitmesin), `notebook/Sprint_4_bis_Mimari_Kararlar.md`.
 
 ### Kural 20 alt-bölüm — NotebookLM Prompt Disiplini: Link Beraberlik + Resmi İsim (22 May 2026 ~16:00 yeni)
 
-Sn. Ferit talimatı: *"Çalışma protokolüne ekle promtu verdin hemen altına linkide ver linkleri boşuna kaydetmedik. Birde Master değil ismi Quanfina Notebooklm"*. Kural #14 doğrudan tescil eşiği (2 ortaya çıkış aynı turda: link verme talebi + isim düzeltme).
+Gerekçe/kanıt → _KURAL_GEREKCELERI.md (Kural #20 alt-bölüm Link Beraberlik)
 
 **Disiplin:** AI bir NotebookLM'e prompt hazırladığında:
 1. Prompt blok'unun **hemen üstünde** NotebookLM resmi adı + 🔗 emoji ile URL
@@ -1032,7 +861,6 @@ düşülür, hiçbiri çalışmıyorsa adım kapanmaz.
 - 9 sayfa otomatik dolaşma + fullPage screenshot
 - `test-screenshots/_full_site/<name>.png` → AI Read tool ile okur
 - Avantaj: permission engeli yok, otonom, repeatable, ~15 sn
-- **Sn. Ferit talimatı (20 May ~10:00):** *"VS Code yolu ile Screenshot çözdük, kalıcı iş akışına ekleyelim"* → Kural #14 doğrudan tescil
 - **Pattern:** AI Code agent (ben) `Bash` ile `node ...` çağırır, PNG'leri Read tool ile analiz eder. Manifesto Özellik #8 zafer
 
 **Kanal A — Chrome MCP (otomatik, ben yönetirim):**
@@ -1069,8 +897,6 @@ düşülür, hiçbiri çalışmıyorsa adım kapanmaz.
 **KARAR ALGORITMI (20 May 2026 ~10:30 revize — AI PROAKTİF tetik):**
 
 **AI Otonom Karar Yetkisi (Kural #23 paralel):**
-Sn. Ferit talimat 20 May ~10:30: *"Screenshot ben demicem, gerek duyduğunda otomatik sen alacaksın"*.
-
 AI screenshot için **proaktif sorumlu** — Sn. Ferit söylemesini beklemez. TETİKLEYİCİ koşullarından biri tetiklendiğinde:
 1. AI kendisi `Bash` tool ile `cd /c/Projeler/Quanfina && node visual_test_full_site.mjs` çalıştırır
 2. `test-screenshots/_full_site/*.png` PNG'lerini `Read` tool ile okur
@@ -1089,8 +915,6 @@ AI screenshot için **proaktif sorumlu** — Sn. Ferit söylemesini beklemez. TE
 **AÇIK KONU #74 (gelecek):** Chrome MCP localhost permission Sn. Ferit eli. Çözüldüğünde Kanal A devreye, Kanal C de paralel canlı kalır.
 
 **PNG Gösterme Disiplini (20 May 2026 ~10:45 yeni):**
-Sn. Ferit talimat: *"Çok gerekli olmadıkça ekran görüntülerini chate yansıtmana gerek yok"*.
-
 **Default: DOM Analiz (metin)** — Token ekonomik, chat temiz:
 - Playwright `page.evaluate()` + `get_page_text()` + `read_page()` ile metin/DOM oku
 - Console log + HTTP status JSON rapor
@@ -1105,20 +929,12 @@ Sn. Ferit talimat: *"Çok gerekli olmadıkça ekran görüntülerini chate yans�
 
 **Pratik:** AI varsayılan B (DOM) ile başlar, gerekirse C (PNG) tetikler. "PNG yapıştırayım mı?" sorusu YASAK (Kural #23).
 
-**Token ekonomisi:** Chat'te resim = ~1500 token. Smoke test 9 sayfa = 13,500 token. DOM raporu ~500 token. **27× tasarruf.**
-
 **KURAL #20 ile bağ:**
 - Kural #20 = **ne tasarlanmalı** (Master + Markets360 çift danışma)
 - Kural #21 = **tasarlanan nasıl doğrulanır** (browser test hibrit)
 - İkisi birlikte UI/UX kalite zinciri tam
 
-**Pattern keşfi (Kural #14 doğrudan tescil):**
-19 May 2026 ~19:45-20:00 — Sn. Ferit Chrome eklentisi yükledi, ben
-canlı tarayıcı testi yapacaktım; permission engeline iki kez takıldı
-ama Sn. Ferit screenshot ile asıl kanıt sundu (canlı /screens UI
-çalışıyor — MOCK fallback grade/RS bantlar render OK). Sn. Ferit
-"hibrit çalışma disiplinine ekleyelim" talimatı doğrudan tescil eşiği.
-Manifesto Özellik #8 **13. self-correction.**
+Gerekçe/kanıt → _KURAL_GEREKCELERI.md (Kural #21)
 
 **İlişkili:** Kural #1 (Tek Seferde Tek İş), Kural #5 (Prompt Tekrar
 Verilmez), Kural #12 (Önce Keşfet), Kural #14 (Pattern Tescil), Kural
@@ -1194,10 +1010,7 @@ sorduğunda resmî link bulur).
 
 ### Kural 22 — Proaktif Sistem Hafıza Taraması (19 May 2026 ~22:00 yeni)
 
-> Sn. Ferit talimatı (Kural #14 doğrudan tescil eşiği): "**böyle sana
-> hatırlatmak istemiyorum artık bu çalışmalar zamanında bugün için
-> yapıldı kendi hafızanı yani sistemin hafızasını bilgi kullanımını
-> akışa iyi oturtmalıyız**"
+Gerekçe/kanıt → _KURAL_GEREKCELERI.md (Kural #22)
 
 Manifesto Özellik #3 (Bilgi Haritası) + #4 (Proaktif Yönlendirme) +
 #8 (Öğrenen) somut anayasal disiplini. Sn. Ferit aylarca/yıllarca
@@ -1251,20 +1064,10 @@ tarayıp kullanmalı. "Şu dosyaya bak" hatırlatması ihlal.
 - Eksik kısımlar net (örn. `compute_pullback_health` yok)
 - Mimari öneri (entegrasyon yeri, refactor ihtiyacı)
 
-**PATTERN KEŞFİ — 19 May 2026 ~21:30→22:00:**
-- 1. ortaya çıkış: Sn. Ferit "sistemdeki Minervini Markets360 dosyalarını tara, etiket bazlı tarama yap direk çıkmaz çoğu zaman... bu bilgiler boşuna biriktirilmedi"
-- 2. ortaya çıkış: Sn. Ferit "matematik motoru diye birşey hatırlıyorum onuda derin tara" + "**böyle sana hatırlatmak istemiyorum artık**"
-- Doğrudan tescil eşiği aşıldı → Kural #22 doğdu
-
 **İSTİSNA:**
 - Sn. Ferit zaten net bir dosya verdiyse ("X.md'ye bak" diye) → o dosyayı önce oku
 - Yıkıcı eylem (Kural #4) hâlâ manuel onay ister
 - "Tek seferde tek iş" (Kural #1) hâlâ aktif — tarama sonrası TEK rapor + TEK öneri
-
-**MANIFESTO BAĞI:**
-- **Özellik #3 (Bilgi Haritası)** — somut canlı uygulama
-- **Özellik #4 (Proaktif Yönlendirme)** — "Şu dosyaya bakalım" demek yerine doğrudan AÇ + OKU + RAPORLA
-- **Özellik #8 (Öğrenen)** — 16. self-correction tetikleyicisi
 
 **İLİŞKİLİ:** Kural #11 (Notebook Proaktif Tarama — bu kuralın atası, sadece notebook/ kapsıyordu), Kural #12 (Önce Keşfet — registry/API tarafı), Kural #14 (Pattern Tescil), Kural #17 (NotebookLM Plus yardımcı), Kural #20 (UI/UX Çift Danışma). Memory: `feedback_proaktif_hafiza_tarama`.
 
@@ -1272,9 +1075,7 @@ tarayıp kullanmalı. "Şu dosyaya bak" hatırlatması ihlal.
 
 ### Kural 23 — Otonom İş Akışı + Araç Kullanma Yetkisi (19 May 2026 ~24:00 yeni)
 
-> Sn. Ferit talimatı (Kural #14 doğrudan tescil — 5+ ortaya çıkış eşiği,
-> son 4 saatte): *"Bu kadar bilgiden sonra artık bana ne yapacağını
-> sorma top sende artık gerek duyarsan araçları kullanalım"*
+Gerekçe/kanıt → _KURAL_GEREKCELERI.md (Kural #23)
 
 Sn. Ferit'in çoklu turlarda yetki devri pekiştirdi. **Karar yorgunluğunu
 azaltma felsefesinin operasyonel anayasa hâli**. AI artık varsayılan
@@ -1339,23 +1140,6 @@ KORUR — onay isterek olur, ama "nasıl yapacağım?" değil "yapacağım,
 onaylar mısın?" sorusu sorar. Yapılacak işin **detayı** AI'da, **izni**
 Sn. Ferit'te.
 
-**Pattern keşfi (Kural #14 — 5+ ortaya çıkış son 4 saatte):**
-- 1. "karar sende devam et" (~19:20)
-- 2. "sen karar ver" — birden fazla mesaj (~19:50)
-- 3. "top sende" (~20:30)
-- 4. "top sende otonom mod" (~21:30)
-- 5. "ne yapman gerektiğini söyledim tüm araçları kullanıcaz" (~22:00)
-- 6. **"artık bana ne yapacağını sorma top sende"** (~24:00, anayasa
-  tescil tetiği)
-
-**Manifesto bağı:**
-- **Özellik #5 (Proaktif Kayıt):** AI plan + uygulama + rapor zinciri
-  otonom
-- **Özellik #8 (Öğrenen):** 18. self-correction (yetki devri
-  operasyonelleşmesi)
-- Yetki devri Sn. Ferit'in **2 Kural birleşmiş hali** olur: Kural #4
-  (yıkıcı onay) + Kural #23 (geri kalan her şeyde otonom)
-
 **İlişkili memory:**
 - `feedback_yetki_devri_genis.md` — bu kuralın **atası** (rutin kararlar
   AI'da, yıkıcı Sn. Ferit'te)
@@ -1373,16 +1157,7 @@ Sn. Ferit'te.
 
 ### Kural 24 — Sağlam Gidelim Disiplini: Algoritma Denetiminde 6 Aşama (22 May 2026 ~17:00 yeni)
 
-> Sn. Ferit talimatı (Kural #14 doğrudan tescil — 11 hata pateni 2 oturumda):
-> *"sağlam gidelim felsefesini unutuyorsun bu doğrultuda tüm çalışma
-> sistemimizi revize etmek istiyorum"* + *"edebiyat kitabı yazmıyoruz
-> kodlama yapıyoruz"*.
-
-**Tetikleyici (2 oturum, 11 hata pateni — _HATALAR.md H#13-H#22):**
-- UI ↔ Backend ayrışması (RS≥70 SQL filter eksik, hacim filtresi UI'de yok)
-- Yüzeysel kaynak okuma (scanner.py 9 filter varken "7 teknik" diye basitleştirme)
-- NotebookLM prompt eksik kanıt (hacim filtresi prompt'ta yoktu)
-- "Devam" mesajını otonom yetki yanlış yorumlama
+Gerekçe/kanıt → _KURAL_GEREKCELERI.md (Kural #24)
 
 **FELSEFE:** "Sağlam gidelim, bir daha bir daha uğraşmayalım" disiplini
 algoritma kararlarında **ZORUNLU 6 AŞAMA**. Atlanırsa Kural #3 (Şüphede
@@ -1426,10 +1201,6 @@ filter / SQL / mimari için 6 aşama ZORUNLU.
 
 **Aşama 1 Alt-Disiplin — Tam Okuma Teyidi (22 May 2026 ~20:00 yeni, H#A3+H#A6 paterninden):**
 
-Sn. Ferit talimatı: *"arşive attığın dosyaları büyük ihtimalle tam
-okumadın onlarıda tam okusan kesin içinde kaçırdığın kurallar vardır
-iş olsun diye yapıyorsun"*.
-
 **Disiplin:** AI bir dosyayı arşivlemeden / silmeden / "tamamlandı"
 raporu vermeden ÖNCE **2 kez tam okuma** zorunlu (algoritma denetimi
 + konsolidasyon işleri için). 1 kez okuma yetersiz — özellikle:
@@ -1454,25 +1225,6 @@ raporu vermeden ÖNCE **2 kez tam okuma** zorunlu (algoritma denetimi
 - ✅ "Bu dosyada CLAUDE.md'de OLMAYAN bilgi" listesi çıkar
 - ✅ 1. okuma'dan sonra 2. okuma — Sn. Ferit "illa hata yapmışsındır" haklılığı
 
-**Pattern keşfi:** 22 May 2026 ~20:00 — 7 dosyayı arşivledim, sonra
-Sn. Ferit "tam oku" dedi → 2 kritik tablo (Quanfina Doğru Adlandırma +
-İzin verilen Genel Terimler) kaybolacaktı. 2. okuma'da yakaladım.
-Sonra Sn. Ferit "2 defa daha tam oku" dedi → 5 ek kayıp tespit
-(_SISTEM_SEMA Karar Cheat-Sheet, _CLEAN_ROOM AI Uzman pattern,
-_KOD_ENVANTERI Dependency Haritası, _SAGLIK_KONTROL Açık Yıkıcı/Borç,
-_FELSEFE-_OZET çelişki). _HATALAR.md H#A6 olarak tescil.
-
-**Pattern keşfi (Kural #14 doğrudan tescil):**
-- 1. ortaya çıkış: 21 May 2026 Sprint 4-bis.5 — UI/UX Çift Danışma (Kural #20)
-- 2. ortaya çıkış: 22 May 2026 derin kontrol Trend Template — 11 hata
-  pateni (RS filter eksik, hacim eksik, NotebookLM prompt eksik, AAOI
-  marjinal sızıntı), Sn. Ferit "edebiyat değil kodlama" + "tüm sistem
-  revize" talimatı
-
-**Manifesto Özellik #8 (Öğrenen) — sistem seviyesi self-correction:**
-Sistem 11 hatadan bir disiplin doğurdu. Kural #14 (ekleme) + Kural #18
-(çıkarma) + Kural #24 (denetim) üç ayaklı: ekle-çıkar-doğrula.
-
 **İlişkili:** Kural #1 (Tek Seferde Tek İş — 6 aşama da tek tek),
 Kural #3 (Şüphede Dur — Aşama 4'ün doğal sonucu), Kural #4 (Yıkıcı
 Onay), Kural #14 (Pattern Tescil — bu kuralın doğum kanalı), Kural #18
@@ -1484,10 +1236,7 @@ H#13-H#22 (bu kuralın kanıt günlüğü).
 
 ### Kural 25 — Mola/Kapanış Önermeme Yasağı (22 May 2026 ~18:00 yeni)
 
-Sn. Ferit talimatı: *"birdaha böyle birşeyde yazma ben nezaman
-duracağımı biliyorum bunuda kurallara ekl ben istediğim zaman dururuz
-seni ilgilendirmez"*. Kural #14 doğrudan tescil (2 ortaya çıkış aynı
-turda: güven krizinde + envanter sonrası).
+Gerekçe/kanıt → _KURAL_GEREKCELERI.md (Kural #25)
 
 **AI eylem önerirken "Mola / Yarın / Kapanış / Taze gözle" tipi
 seçenekler SUNMAZ.** Sn. Ferit mola zamanlamasını kendisi belirler,
@@ -1510,11 +1259,6 @@ AI bu konuda inisiyatif almaz.
 - Sandbox/sistem zaman aşımı → teknik durum raporu, mola önermez
 - Sn. Ferit explicit yorgunluk/duraklama belirtirse → uygula
 
-**Manifesto Özellik #8 — kullanıcı düzeyi self-correction:**
-AI'nın "yardımcı olma" eğilimi bazen yanlış inisiyatif şekline döner.
-Yetki dağılımı net: AI **eylem otonomu** (Kural #23), Sn. Ferit
-**zamanlama otonomu**. İkisi karıştırılmaz.
-
 **İlişkili:** Kural #3 (Şüphede Dur — paralel, ters yönü değil),
 Kural #4 (Yıkıcı Onay), Kural #8 v2 (Kapanış modları — Sn. Ferit
 tetikler, AI önermez), Kural #23 (Otonom Yetki — eylem otonomu,
@@ -1530,9 +1274,7 @@ zamanlama DEĞİL).
 > *"Önce kitap → Bundle → Video → bulunamazsa veya çelişiyorsa
 > 'GELİŞTİRİLMESİ LAZIM' notu düş. ASLA UYDURMA SAYI/FORMÜL"*.
 
-**Tetikleyici (Agent Vizyon tarama, 22 May 2026 ~21:00):** KALICI İLKE #4
-Vizyon'da 7 yerde atıf yapılan **en kritik felsefe** ama CLAUDE.md
-anayasa katmanında **hiçbir yerde tescil edilmemişti** — manifesto ihlali.
+Gerekçe/kanıt → _KURAL_GEREKCELERI.md (Kural #26)
 
 **Disiplin:** Her sayısal eşik, formül, resmî kuralı için kaynak zinciri:
 
@@ -1570,10 +1312,6 @@ quanfina_math.py'de `@source` decorator (gelecek)
 def compute_off_52w_low_pct(price, low52): ...
 ```
 
-**Manifesto Özellik #8 (Öğrenen) — 5 Mayıs 2026'dan beri tescil edilmemiş**
-en kritik felsefe. Anayasa nihayet 22 May 2026'da tescil etti (Agent 2-tur
-Vizyon tarama bulgusu).
-
 **İlişkili:** İLKE #4 (Vizyon resmî kaynağı), Kural #10 (Sızma + #4 yasaklı
 isim), Kural #20 (UI/UX Çift Danışma — kitap kitap birebir doğrulama), Kural #24
 (Sağlam Gidelim — 6 Aşama Aşama 1 TAM OKU), Vizyon AÇIK KONU sistemleri.
@@ -1582,16 +1320,7 @@ isim), Kural #20 (UI/UX Çift Danışma — kitap kitap birebir doğrulama), Kur
 
 ### Kural 27 — Tek Prompt Tek Cevap (Çift Danışma Sıralı Tur) (22 May 2026 ~23:00 yeni)
 
-> Sn. Ferit talimatı (Kural #14 doğrudan tescil — 2. ortaya çıkış):
-> *"bundan sonra tek promt tek cevap kuralını sabitleyelim artık
-> kaçırdım hangi promt olduğunu"*
-
-**Tetikleyici (2 ortaya çıkış aynı oturumda):**
-1. H#A7 — Çift Danışma turunda 2 prompt birden verildi, Sn. Ferit 1.'sini
-   yapıştırmadı ama AI yine de eylem aldı (adım adım atlama). Sn. Ferit:
-   "1. promtu unuttun yine adım adım kuralına uymadın".
-2. Power Play çift danışma — Gem + NotebookLM 2 prompt birden, Sn. Ferit
-   ilkini yapıştırdı ama "hangisi 2.?" kaçırdı.
+Gerekçe/kanıt → _KURAL_GEREKCELERI.md (Kural #27)
 
 **Disiplin — Çift Danışma / Çoklu Kaynak akışı:**
 
@@ -1634,21 +1363,7 @@ uygulama alanı), `_HATALAR.md` H#A7+H#A8 (ortaya çıkış zinciri).
 
 ### Kural 28 — Canlı Veri Önce, MOCK Sadece Acil Fallback (30 May 2026 ~20:00 yeni)
 
-> Sn. Ferit talimatı (Kural #14 doğrudan tescil — paper trading dürüstlük
-> dönemi): *"gerçek canlı veriye geçicez artık kural olarak ekle"*.
-
-**Tetikleyici (Paket P408-P409 zinciri, 30 May 2026):** Sn. Ferit
-`/piyasa-durumu` sayfası "bu sayfadaki verilerin hepsi gerçek mi?" diye
-sordu → P408 MOCK rozet şeffaflık → P409 minervini_scans gerçek wire.
-Canlı doğrulama: MOCK `divergence: BEARISH_DIVERGENCE` (yanıltıcı uyarı!)
-→ gerçek hesap `NEUTRAL`. Sn. Ferit'in haklılığı kanıtlandı: **MOCK paper
-trading kararı için tehlikeli.**
-
-Sonra `/watchlist` sayfasında benzer soru → `watchlist.price` field eski
-snapshot (stale). FİYAT $875.40 vs CANLI $211.14 (NVDA 17 gün) kafa
-karışıklığı.
-
-İki ortaya çıkış aynı oturumda → Kural #14 doğrudan tescil eşiği aşıldı.
+Gerekçe/kanıt → _KURAL_GEREKCELERI.md (Kural #28)
 
 **Felsefe:**
 Paper trading **gerçek piyasa kararı** verir (kağıt üzerinde olsa bile).
@@ -1680,22 +1395,7 @@ Uydurmama) ile felsefi paralel.
 - `is_mock=false` → rozet kalkar (gerçek veri akıyor)
 - Pattern: `MarketBreadthInfo.is_mock` + `BreadthDivergenceInfo.breadth_is_mock`
 
-**4. Mevcut MOCK kalıntılar — AUDIT + Sıralı Geçiş**
-
-Audit kategorisi (30 May 2026 itibarıyla):
-
-| MOCK noktası | Durum | Önerilen geçiş |
-|---|---|---|
-| `_mock_breadth_history` (A/D Line) | ✅ P409 GERÇEKLEŞTİ (minervini_scans) | Kalıyor fallback |
-| `MOCK_MARKET_STATUS.vix` | ✅ P398 yfinance ^VIX | Kalıyor fallback |
-| `MOCK_MARKET_STATUS.top/bottom_sectors` | ✅ P398 sector_rotation | Kalıyor fallback |
-| `_compute_market_health` defaults | ✅ P382 helper kategorik | Kalıyor fallback |
-| `watchlist.price` (stale snapshot) | 🔴 P411 aday — kaldır veya işaretle | UI'da CANLI $ yeterli |
-| `MOCK_STOCKS` / `_STOCK_MARK_SIGNALS` | 🟠 Scanner DB doluyorsa zaten gerçek | DB-first wire P368 yapıldı |
-| `MOCK_TRADES` (`/api/trades` fallback) | 🟠 DB doluysa gerçek | DB-first |
-| `MOCK_TERMS` | 🟢 Static-by-design (DB tablosu YOK, doğru tasarım) | Korunuyor |
-| `_generate_ohlcv` (yfinance fail) | 🟢 P144 sonrası nadir kullanım | Fallback kalıyor |
-| `_mock_price` / `_mock_rs` (watchlist fallback) | 🟠 P368 sonrası gerçek öncelikli | Fallback kalıyor |
+**4. Mevcut MOCK kalıntılar — AUDIT** → tablo: _KURAL_GEREKCELERI.md (Kural #28)
 
 **5. Yeni MOCK eklenmez kuralı**
 - Yeni endpoint/component yazılırken MOCK hardcoded değer eklenmez
@@ -1897,23 +1597,7 @@ Gün sonu push: çalışan içerik kayıpsız sabaha kalır.
 Hassas dosyalar commit'lenmez. Geçici dosyalar (*.tmp,
 *.backup_*) ignore'da. Büyük binary → Drive'a.
 
-### İlke 4 — Mevcut Durum: Quanfina Repo Public (17 May 2026)
-GitHub Teacher onayı için public. Geçici. Strateji metinleri
-açıkta — fork riski, AI eğitim verisi riski kabul edilmiş.
-
-### İlke 5 — Geçiş Planı: Public → Private
-Teacher onayı geldiğinde:
-1. Settings → visibility → Private
-2. Fork kontrolü
-3. "Include private contributions on profile" açık tut
-4. Geçişi YAPILANLAR.md'ye kaydet
-
-### İlke 6 — Ayrı Public Eğitim Repoları (Aşama 4)
-Quanfina private olduktan sonra profil aktivitesi ayrı
-public repolar üzerinden:
-- claude-code-prompts-tr
-- vibe-coding-workflow
-- notebook-driven-development
+İlke 4-6 (repo public durumu / private geçiş planı / eğitim repoları) → _KURAL_GEREKCELERI.md (GitHub İlke #4-#6)
 
 ### İlke 7 — Claude Code Git Workflow
 Standart kullanım. Yıkıcı git komutları (force push, branch
@@ -1958,9 +1642,12 @@ bağlanabilir (`.git/hooks/pre-push` — 17 May 2026 itibarıyla bağlı).
 | Step 1.2 | **Adım 1.2.5.b** | Noktalı hiyerarşi alt-adım netliği |
 | Sprint X | **Adım X.Y** veya **Aşama X.Y** | Yeni sistemde sprint kullanılmaz |
 | Phase | Aşama | Türkçe |
+| KARAR ADAY + KESİN (birlikte) | Sadece **KARAR ADAY** veya **KARAR KESİN** | İkisi birden olmaz |
 
 Eski commit mesajlarında "Faz" veya "Sprint" geçebilir — bunlar geçmiş, resmî
 değil. Yeni metinde tekrar etme.
+
+Scope prefix zorunluluğu: bağlamı net yaz ("DB-Aşama 1", "UI-Adım 2.1" gibi).
 
 ### Yasaklı İsimler ve Markalar (Sızma Kontrolü #4 ile birebir)
 | Yasak | Açıklama |
@@ -2031,7 +1718,7 @@ Her büyük adım sonu zorunlu (Kural #2). Rapor formatı: trafik lambası + kı
 >
 > - Detaylı bilgi haritası: bu dosyada "Bilgi Haritası" bölümü
 > - Tam karar günlüğü: `notebook/Notebook_A_Vizyon.md`
-> - Master indeks: `notebook/_INDEX.md` (Aşama 1.E.a — 17 May 2026 canlı)
+> - Master indeks: `scripts/build_index.ps1` üretir (`_INDEX.md` 22 May 2026 arşivlendi)
 > - İndeks doğrulayıcı: `scripts/build_index.ps1` (Manifesto Özellik #3 bakımı)
 
 ## Proje Vizyonu
@@ -2049,330 +1736,63 @@ Tek odak: Sn. Ferit'in uygulamayı kullanması ve iyileştirmesi.
 
 ---
 
-## Şu Anki Durum (Mayıs 2026)
-
-| Katman | Durum | Açıklama |
-|--------|-------|---------|
-| FastAPI (api/) | ✅ Aktif | Watchlist + Trade CRUD gerçek DB; Minervini/Market MOCK |
-| Next.js (web/) | ✅ Aktif | Watchlist, Journal, Signals, Piyasa sayfaları |
-| quanfina-scanner | ✅ Aktif | Günlük Finviz taraması, Cloud Run |
-| PostgreSQL Cloud SQL | ✅ Aktif | Tüm veri (legacy + web tabloları) |
-| Streamlit (app.py, pages/) | ⏸️ Pasif | Yakında _archive/streamlit_legacy/'e taşınacak |
-
-**Aktif Aşama:** Vizyon dosyasındaki ⚡ GÜNCEL DURUM bölümüne bakın
-→ `notebook/Notebook_A_Vizyon.md` (satır 33-95)
-
-**Statik Mimari Durumu** (değişmez): Yukarıdaki tablo (FastAPI, Next.js, PostgreSQL aktif. Streamlit pasif.)
+## Şu Anki Durum
+Katman tablosu → `notebook/Notebook_C2_EK1-8.md` (D3-01 Teknik Bağlam). Aktif Aşama: Vizyon ⚡ GÜNCEL DURUM (satır 33-95).
 
 ---
 
 ## Teknoloji Yığını
-
-| Katman | Teknoloji |
-|--------|-----------|
-| Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS, shadcn/ui, TanStack Query, ag-Grid |
-| Backend | FastAPI, Python 3.13, uvicorn |
-| Veritabanı | PostgreSQL (Google Cloud SQL) — psycopg2 + SQLAlchemy |
-| Veri çekme | scanner.py (Finviz Elite API, yfinance) |
-| Scanner runtime | Flask + gunicorn, Cloud Run (quanfina-scanner) |
-| Cloud | GCP: Cloud Run, Cloud SQL, Cloud Build, Cloud Scheduler, Artifact Registry, Secret Manager |
-| Test | pytest (Python), Playwright 1.60 (E2E, visual_test*.mjs) |
-| Python ortamı (kök) | `venv\` → `venv\Scripts\python.exe` |
-| Python ortamı (api/) | `api\.venv\` → `api\.venv\Scripts\python.exe` |
-| Node (web/) | pnpm |
+Özet: Next.js 16 + React 19 + TS + Tailwind + AG Grid (pnpm) · FastAPI + Python 3.13 (`api\.venv`) · PostgreSQL Cloud SQL · Cloud Run/Build/Scheduler · pytest + Playwright. Tam tablo → `notebook/Notebook_C2_EK1-8.md` (D3-01 Teknik Bağlam).
 
 ---
 
 ## Klasör Yapısı Haritası
-
-```
-c:\Projeler\Quanfina\
-│
-├── api/                          # FastAPI backend
-│   ├── main.py                   # Tüm API endpoint'leri (55 KB)
-│   ├── db_helpers.py             # web_watchlist + web_trades CRUD
-│   ├── requirements.txt          # fastapi, uvicorn, SQLAlchemy, psycopg2
-│   └── .venv/                    # api/ için ayrı Python ortamı
-│
-├── web/                          # Next.js 16 frontend
-│   ├── app/(dashboard)/          # App Router sayfaları
-│   │   ├── page.tsx              # Dashboard
-│   │   ├── watchlist/page.tsx
-│   │   ├── journal/page.tsx
-│   │   ├── signals/page.tsx
-│   │   ├── minervini/page.tsx
-│   │   ├── carr/page.tsx
-│   │   ├── piyasa-durumu/page.tsx
-│   │   └── hisse/[symbol]/page.tsx
-│   ├── components/               # React bileşenleri (watchlist/, journal/, market/ vb.)
-│   ├── hooks/                    # use-watchlist, use-trades, use-signals vb.
-│   ├── types/                    # TypeScript tip tanımları
-│   ├── lib/                      # Utility fonksiyonları
-│   ├── AGENTS.md                 # Next.js breaking changes uyarısı
-│   └── CLAUDE.md                 # → @AGENTS.md (import)
-│
-├── scripts/                      # Migration ve seed scriptleri
-│   ├── sql/001_web_tables.sql    # web_watchlist + web_trades şeması
-│   ├── run_migration.py          # SQL migration çalıştırıcı
-│   ├── seed_initial_data.py      # İlk veri yükleme (idempotent)
-│   └── seed_symbol_lists.py      # symbol_lists tablosu seed (tek seferlik)
-│
-├── pages/                        # ⏸️ Streamlit sayfaları (pasif, arşivlenecek)
-│   └── 2_Screens.py              # 28 screen filtreleme UI iskeleti (MVP aşamasında)
-│
-├── tests/                        # Python testleri (pytest)
-│   ├── test_trade_journal.py     # TradeJournal CRUD (50 test, savepoint/rollback)
-│   └── test_quanfina_math.py     # Matematik fonksiyonları
-│
-├── notebook/                     # Proje vizyon ve analiz belgeleri (.gitignore'da)
-├── ux_tarama/                    # UX tasarım çalışmaları (.gitignore'da)
-│
-├── scanner.py                    # Finviz Elite tarama motoru (77 KB)
-├── scanner_server.py             # Scanner için Flask HTTP wrapper (Cloud Scheduler hedefi)
-├── quanfina_math.py              # ⭐ Minervini matematik motoru — KRİTİK (31 KB)
-│                                 # R-Multiple, RBA, TradeGrader, Stop yönetimi
-│                                 # Streamlit pages + tests tarafından kullanılır
-│                                 # İleride FastAPI endpoint'lerine taşınacak
-├── db_connection.py              # PostgreSQL CRUD — Streamlit/TradeJournal için
-├── trade_journal.py              # TradeJournal class (Streamlit legacy)
-├── app.py                        # ⏸️ Streamlit ana sayfa (pasif)
-├── styles.py                     # ⏸️ Streamlit tasarım sistemi (pasif)
-│
-├── Dockerfile.scanner            # quanfina-scanner Cloud Run imajı
-├── Dockerfile.app                # ⏸️ quanfina-app Streamlit imajı (durdurulacak)
-├── cloudbuild.yaml               # GCP Cloud Build pipeline
-└── visual_test*.mjs              # Playwright E2E testleri (aktif, bazı testler fail)
-```
-
-### Durumu Belirsiz Dosyalar (Adım 1.8'de netleşecek)
-
-| Dosya | Araştırma Sonucu |
-|-------|-----------------|
-| `quanfina_math.py` | **Aktif** — Minervini matematik motoru; Streamlit pages ve tests tarafından kullanılıyor |
-| `pages/2_Screens.py` | MVP iskeleti — 28 screen filtresi UI; dummy veri; henüz geliştirilmekte |
-| `seed_symbol_lists.py` | **Tek seferlik** — symbol_lists tablosunu doldurur, çalıştırıldı mı doğrulanmadı |
-| `quanfina.db` | SQLite legacy (618 KB, 03 May 2026) — PostgreSQL'e geçildi, referans olarak duruyor |
-| `visual_test*.mjs` | **Aktif** Playwright testleri — son rapor: Watchlist kısmi (4 fail), Journal geçti |
-| `_list_cols.py` | Finviz kolon keşif scripti — tek seferlik yardımcı |
-| `migrate_to_postgres.py` | Tek seferlik SQLite→PG migration — tamamlandı, referans |
+Tam harita + durumu belirsiz dosyalar → `notebook/Notebook_C2_EK1-8.md` (D3-01 Teknik Bağlam); dinamik envanter: `scripts/build_index.ps1`.
 
 ---
 
 ## GCP Altyapısı
-
-| Servis | Adı / Detay |
-|--------|-------------|
-| Cloud Run | `quanfina-scanner` (Flask scanner, 3600s timeout, europe-west1) |
-| Cloud Run | `quanfina-app` (Streamlit, yakında durdurulacak) |
-| Cloud SQL | PostgreSQL, europe-west1 |
-| Cloud Build | `cloudbuild.yaml` — 2 imaj build + deploy |
-| Cloud Scheduler | Günlük POST /scan → quanfina-scanner (schedule GCP Console'da tanımlı, kodda yok) |
-| Artifact Registry | `europe-west1-docker.pkg.dev/{PROJECT_ID}/quanfina/` |
-| Secret Manager | PG_HOST, PG_PORT, PG_DATABASE, PG_USER, PG_PASSWORD, FINVIZ_API_KEY |
-
-Ortam değişkenleri: `.env` (local) / Secret Manager (production)
+Cloud Run (quanfina-scanner) + Cloud SQL + Cloud Build + Scheduler + Secret Manager tablosu → `notebook/Notebook_C2_EK1-8.md` (D3-01 Teknik Bağlam). Ortam değişkenleri: `.env` (local) / Secret Manager (prod).
 
 ---
 
 ## PostgreSQL Şeması
-
-### Web katmanı (FastAPI — aktif)
-
-| Tablo | Açıklama |
-|-------|---------|
-| `web_watchlist` | PRIMARY KEY (symbol, strategy); consensus_count, consensus_strategies (JSONB) |
-| `web_trades` | SERIAL PK; symbol, strategy, entry/exit, pl_dollar, pl_pct, grade, lessons |
-| `symbol_lists` | user_id, strategy, list_type (watch/on_deck/focus/buy), symbol |
-
-### Streamlit / TradeJournal tabloları (legacy — korunuyor)
-
-| Tablo | Açıklama |
-|-------|---------|
-| `trades` | 40 kolon; status: 'Open'/'Closed'/'Deleted' (BÜYÜK HARF) |
-| `trade_legs` | Multi-leg pyramiding — ON DELETE CASCADE |
-| `trade_exits` | Kısmi/tam çıkış — ON DELETE CASCADE |
-| `stop_history` | Trailing stop — ON DELETE CASCADE |
-| `journal_entries` | Serbest metin günlüğü — ON DELETE SET NULL |
-| `portfolios` | Portföy değerleri; portfolio_id FK kullanılıyor |
-
-### trades tablosu — kolon notları
-
-- `trade_type` VARCHAR ('Long'/'Short') — eski kolon, mevcut kod kullanıyor
-- `invest_type` SMALLINT (1=LONG, 2=SHORT) — yeni kolon, TradeJournal API bunu kullanıyor
-- `portfolio_id` INTEGER FK → `portfolios`
-- `notes` TEXT (plural) — mevcut naming korundu
-- `entry_date` / `exit_date` TIMESTAMP (DATE'e dönüştürülmedi)
-- `deleted_at` TIMESTAMP — soft delete
-
-### Yabancı anahtar davranışları
-
-- `trade_legs.trade_id` → `trades.id` ON DELETE CASCADE
-- `trade_exits.leg_id` → `trade_legs.id` ON DELETE CASCADE
-- `stop_history.trade_id` → `trades.id` ON DELETE CASCADE
-- `journal_entries.linked_trade_id` → `trades.id` ON DELETE SET NULL
-
-### Scanner tabloları (quanfina-scanner — aktif)
-
-| Tablo | Açıklama |
-|-------|---------|
-| `minervini_scans` | Trend Template tarama sonuçları (günlük) |
-| `minervini_fundamental_scans` | Teknik + Temel filtre |
-| `minervini_fundamental_only` | Sadece temel filtre |
-| `minervini_52w_high` | 52 hafta yeni yüksek |
-| `sector_rotation` | 11 SPDR ETF RS rank (günlük) |
-
-**Not:** `trades.status` BÜYÜK HARF ('Open'), `web_trades.status` küçük harf ('open') — karıştırma.
+Tam şema → `notebook/Notebook_C3_EK9_DBSchema.md` (D3-01 eki: web/scanner tabloları, kolon notları, FK davranışları). KRİTİK: `trades.status` BÜYÜK HARF ('Open'), `web_trades.status` küçük harf ('open') — karıştırma.
 
 ---
 
 ## FastAPI API Katmanı (api/)
-
-**Çalıştırma:**
-```powershell
-cd api
-.\.venv\Scripts\python.exe -m uvicorn main:app --reload --port 8000
-```
-
-**Endpoint durumları:**
-
-| Method | Path | Durum |
-|--------|------|-------|
-| GET | /api/health | REAL (db_health_check) |
-| GET | /api/watchlist | REAL (watchlist_get_all) |
-| POST | /api/watchlist | REAL (watchlist_insert + consensus) |
-| PATCH | /api/watchlist/{symbol}/{strategy} | REAL (watchlist_update) |
-| DELETE | /api/watchlist/{symbol}/{strategy} | REAL (watchlist_delete) |
-| POST | /api/watchlist/{symbol}/{strategy}/promote | REAL |
-| GET | /api/signals | REAL (watchlist'ten türetilmiş) |
-| GET | /api/trades | REAL (trades_get_all) |
-| POST | /api/trades | REAL (trades_insert + PL hesabı) |
-| PATCH | /api/trades/{trade_id} | REAL (trades_update) |
-| DELETE | /api/trades/{trade_id} | REAL (trades_delete) |
-| GET | /api/minervini/stocks | **MOCK** |
-| GET | /api/market/status | **MOCK** |
-| GET | /api/terms | **MOCK** |
-| GET | /api/terms/{key} | **MOCK** |
-| GET | /api/stock/{symbol}/info | **MOCK** |
-| GET | /api/stock/{symbol}/ohlcv | **MOCK** |
-| GET | /api/setup-types | **MOCK** |
-
-**db_helpers.py fonksiyonları:**
-```python
-watchlist_get_all(), watchlist_get_one(symbol, strategy)
-watchlist_insert(row), watchlist_update(symbol, strategy, updates)
-watchlist_delete(symbol, strategy), watchlist_recompute_consensus()
-trades_get_all(), trades_get_by_id(id)
-trades_insert(trade), trades_update(id, updates), trades_delete(id)
-db_health_check()
-```
+Çalıştırma: `cd api; .\.venv\Scripts\python.exe -m uvicorn main:app --reload --port 8000`. Endpoint durum tablosu + db_helpers fonksiyon listesi → `notebook/Notebook_C2_EK1-8.md` (D3-01 Teknik Bağlam); asıl kaynak: `api/main.py` + `api/db_helpers.py`.
 
 ---
 
 ## Next.js Frontend (web/)
-
-**Çalıştırma:**
-```powershell
-cd web
-pnpm dev      # http://localhost:3000
-```
-
-**API proxy:** `web/next.config.ts` → `/api/*` istekleri `http://localhost:8000`'e yönlenir.
-
-**Tamamlanan sayfalar:** watchlist, journal, signals, piyasa-durumu, minervini, carr
-**Eksik (Streamlit'ten taşınmamış):** Sektör Rotasyonu, Portfolio Risk, İstatistikler
+Çalıştırma: `cd web; pnpm dev` (http://localhost:3000). API proxy: `next.config.ts` → `/api/*` → `http://localhost:8000`. Sayfa envanteri → `notebook/Notebook_C2_EK1-8.md` (D3-01 Teknik Bağlam).
 
 ---
 
 ## Bağlantı Yönetimi (Python)
-
-```python
-# api/ için (db_helpers.py) — port 8000
-from sqlalchemy import create_engine
-engine = create_engine(_URL, pool_pre_ping=True)
-
-# Streamlit/TradeJournal için (db_connection.py)
-from db_connection import get_connection, get_engine
-conn = get_connection()   # psycopg2
-engine = get_engine()     # SQLAlchemy
-```
-
-Ortam değişkenleri: `PG_HOST`, `PG_DATABASE`, `PG_USER`, `PG_PASSWORD`, `PG_PORT`
+Snippet'ler (SQLAlchemy engine + psycopg2) → `notebook/Notebook_C2_EK1-8.md` (D3-01 Teknik Bağlam). Ortam değişkenleri: PG_HOST/PG_DATABASE/PG_USER/PG_PASSWORD/PG_PORT.
 
 ---
 
-## TradeJournal API (Streamlit legacy — korunuyor)
-
-```python
-from trade_journal import TradeJournal
-
-with TradeJournal() as tj:
-    tid = tj.add_trade('NVDA', invest_type=1, entry_date=..., entry_price=120.0,
-                        stop_loss=115.0, quantity=100)
-    tj.update_stop(tid, new_stop_price=118.0, reason='trailing')
-    result = tj.close_trade(tid, exit_date=..., exit_price=130.0)
-```
-
-**Transaction kuralı:** `TradeJournal(conn=external)` → class commit çağırmaz, caller yönetir.
+## TradeJournal API (Streamlit legacy)
+Kullanım örneği + transaction kuralı → `notebook/Notebook_C2_EK1-8.md` (D3-01 Teknik Bağlam); asıl kaynak: `trade_journal.py`.
 
 ---
 
 ## quanfina_math.py — Matematik Motoru (aktif)
-
-Tüm Minervini disiplinindeki matematiksel hesaplamalar burada. Streamlit pages ve testler tarafından kullanılıyor. İleride FastAPI endpoint'lerine taşınacak.
-
-Temel fonksiyon grupları:
-- Günlük değişim, kâr/zarar hesabı (Long/Short)
-- R-Multiple ve Risk Dolarları
-- Stop Loss yönetimi (initial, breakeven, trail)
-- 52W mesafesi, SMA20, Hacim metrikleri (V50, VRR)
-- Distribution Days
-- RBA (Result-Based Analysis — beklenti, adjusted ratio)
-- TradeGrader (17 kategori — BP, BL, CE, SP, SE, SL vb.)
+⭐ Kritik dosya — R-Multiple, RBA, TradeGrader, Stop yönetimi. Fonksiyon grubu özeti → `notebook/Notebook_C2_EK1-8.md` (D3-01 Teknik Bağlam).
 
 ---
 
 ## Testler
-
-```powershell
-# Python testleri
-venv\Scripts\python.exe -m pytest tests\test_trade_journal.py -v
-venv\Scripts\python.exe -m pytest tests\test_quanfina_math.py -v
-
-# E2E testler (Playwright)
-npx playwright test visual_test.mjs
-npx playwright test visual_test_journal.mjs
-npx playwright test visual_test_quick.mjs
-```
-
-Test stratejisi (Python): gerçek PostgreSQL + savepoint/rollback — veri DB'de kalmaz.
-E2E test hedefi: `http://localhost:3000` — Watchlist ve Journal sayfaları.
-
-**Mevcut test durumu (son rapor: visual_test_report.json):**
-- Watchlist E2E: kısmi başarı (4 test fail)
-- Journal E2E: tüm testler geçti
-- Test iyileştirme Aşama 1 dışında, ileri tarihte ele alınacak
+pytest: `venv\Scripts\python.exe -m pytest tests\ -v` · E2E: `npx playwright test visual_test*.mjs`. Komut detayı + test stratejisi → `notebook/Notebook_C2_EK1-8.md` (D3-01 Teknik Bağlam).
 
 ---
 
 ## UX Tasarım Çalışmaları
-
-> **Bu klasör Sn. Ferit'in UX tasarım çalışmasıdır. Her UI/UX kararı verilirken önce
-> buraya bakılmalıdır. Bu çalışma daha önce sistem tarafından gözden kaçırıldı;
-> artık bilgi haritasının parçasıdır.**
-
-`ux_tarama/` klasörü `.gitignore`'da — git'e PUSH EDİLMEZ.
-
-| Dosya | İçerik | Durum |
-|-------|--------|-------|
-| `_INDEX.md` | Master index — 232 bulgu, 5 kategori | Tamamlanmış, 09 May 2026 |
-| `A_mevcut_ux_gozlemleri.md` | Streamlit UX'teki 21 şikayet — 7+4 tab karmaşası, ham liste sorunları | Tamamlanmış, Next.js için hâlâ geçerli |
-| `B_markets360_ogrenimi.md` | 74 bulgu — AG Grid, 4 liste hiyerarşisi, badge sistemi, layout | Tamamlanmış, Next.js'de uygulanacak |
-| `C_hedef_tasarim_kararlari.md` | 64 karar — Hedef UX blueprint; Watch/On Deck/Focus/Buy yapısı, sütun hiyerarşisi | Tamamlanmış, ELZEM — her UI kararında referans |
-| `D_streamlit_teknik.md` | 37 teknik bulgu — Streamlit bileşen envanteri (dönüşüm için referans) | Tamamlanmış, sınırlı geçerlilik |
-| `E_acik_sorular.md` | 36 açık soru — Report Card, Books UI, 5 Reflection, TradeJournal leg/exit | AÇIK — çözüm bekliyor |
-
-**En kritik referans:** `ux_tarama/C_hedef_tasarim_kararlari.md` — Watch/On Deck/Focus/Buy 4 liste yapısı,
-sütun hiyerarşisi, badge sistemi, piyasa sağlığı 5 metriye.
+**Her UI/UX kararında ÖNCE `ux_tarama/` taranır — en kritik referans: `ux_tarama/C_hedef_tasarim_kararlari.md`** (Watch/On Deck/Focus/Buy 4 liste, sütun hiyerarşisi, badge). Dosya tablosu → `notebook/Notebook_C2_EK1-8.md` (D3-01 Teknik Bağlam).
 
 ---
 
@@ -2380,21 +1800,7 @@ sütun hiyerarşisi, badge sistemi, piyasa sağlığı 5 metriye.
 
 `notebook/` klasörü `.gitignore`'da — git'e PUSH EDİLMEZ.
 
-| Dosya | İçerik |
-|-------|--------|
-| `Notebook_A_Vizyon.md` | Ana proje vizyonu (~7064 satır); KARAR#, AÇIK KONU#, İLKE# sistemli |
-| `YAPILANLAR.md` | Yaşayan hafıza — tamamlanan adımlar, kaldığı yer |
-| `kitaplar/Minervini` | Minervini metodoloji (kitap analizi) |
-| `kitaplar/Minervini_Video` | Minervini video analizleri |
-| `kitaplar/Carr` | Carr metodoloji ✅ |
-| `analizler/Markets360_Bundle` | Markets360 platform analizi (clean-room uyumu: kaynak koda atıf yapma) |
-| `analizler/FMP_Matematik` | FMP matematik karşılaştırma |
-| `analizler/Markets360_Gorsel_1, 2` | UI görsel analizi (Markets360 ekranları) |
-| `Notebook_B6` | Sprint protokolleri, adımlar listesi |
-| `Notebook_C1` | Sprint quickstart kılavuzu |
-| `Notebook_C2` | Teknik EK'ler (EK1-8), matematik, formüller |
-| `Notebook_C3` | Veritabanı şeması (EK9) |
-| `EK10` | TradeGrader algoritması sentezi |
+Dosya haritası → aşağıda "Bilgi Haritası" tablosu (DRY) + `scripts/build_index.ps1`.
 
 **Karar sistemi (Notebook_A_Vizyon.md):**
 - `KARAR #X` — teknik/mimari kararlar (443 karar, v20.39 itibarıyla)
@@ -2420,6 +1826,8 @@ Yeni oturum başında **son 100 satırı** okumak yeterlidir. Eski kararlar değ
 | Hesap/araç + URL matrisi | `notebook/_LINKLER.md` | Sistem |
 | Devir notu (Web↔Code handoff) | `notebook/_DEVIR.md` | Sistem |
 | Hata günlüğü | `notebook/_HATALAR.md` | Sistem |
+| Manifesto felsefe katmanı (9 Özellik + Felsefi Temel + Testler) | `notebook/_MANIFESTO.md` | Sistem |
+| Kural gerekçe/kanıt kuyrukları (D3-01) | `notebook/_KURAL_GEREKCELERI.md` | Sistem |
 | Proje vizyonu, kararlar, açık konular | `notebook/Notebook_A_Vizyon.md` | Karar günlüğü |
 | Minervini metodoloji | `notebook/kitaplar/Minervini.md` | Strateji bilgisi |
 | Minervini video analizleri | `notebook/kitaplar/Minervini_Video.md` | Strateji bilgisi |
@@ -2469,31 +1877,6 @@ Bu yüzden:
 - `minervini_fundamental_scans`, `minervini_52w_high` → benzer pattern
 
 Bu refactor çok-strateji kullanımı somutlaştığında ele alınır.
-
----
-
-## AI Rol Dağılımı
-
-| Rol | Araç | Sorumluluk |
-|-----|------|-----------|
-| Stratejist | Web Claude | Vizyon, prompt tasarımı, karar sentezi |
-| Uygulayıcı | Claude Code | PLAN MODE (keşif/taslak) → EDIT MODE (uygulama) |
-| Karar sahibi | Sn. Ferit | Nihai onay, yön belirleme |
-
-**İş akışı:** Web Claude prompt üretir → Sn. Ferit Claude Code'a verir →
-PLAN MODE'da taslak → onay → EDIT MODE'da uygulama → Notebook'a kayıt.
-
----
-
-## Terminoloji Disiplini
-
-| ❌ Kullanılmaz | ✅ Kullanılır |
-|--------------|--------------|
-| "Faz 1/2/3" | "Aşama 1 / Aşama 2" (büyük gruplar) |
-| "Sprint" | "Adım X.Y" (aşama içindeki işler) |
-| "KARAR ADAY + KESİN" | Sadece "KARAR ADAY" veya "KARAR KESİN" (ikisi birden olmaz) |
-
-Scope prefix zorunluluğu: bağlamı net yaz ("DB-Aşama 1", "UI-Adım 2.1" gibi).
 
 ---
 

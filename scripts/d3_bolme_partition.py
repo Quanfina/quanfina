@@ -27,13 +27,18 @@ YÖNTEM — "partition" (içerik kaybı İMKÂNSIZ):
        "Gerekçe/kanıt → _KURAL_GEREKCELERI.md (Kural #N)". Hedef dosyada her kural
        "## Kural #N — <ad>" başlığıyla aranabilir.
 
-DURUM (05 Tem 2026):
-  ✅ AŞAMA 1 (Manifesto) UYGULANDI + commit'li — bu script ile.
+DURUM (06 Tem 2026 — D3-01 TAMAMLANDI):
+  ✅ AŞAMA 1 (Manifesto) UYGULANDI + commit'li (`518b8f5`) — bu script ile.
      Satır 17-178 (9 Özellik + Felsefi Temel + Testler + Sürekli Yaşar) -> notebook/_MANIFESTO.md
      CLAUDE.md 2695 -> 2539. Aritmetik: 2695 = 14 + 162 + 2513 + 6(ayrac). Sıfır kayıp.
-  ⏳ AŞAMA 2 (BEKLİYOR — taze oturum): 28 kural gerekçe kuyrukları -> notebook/_KURAL_GEREKCELERI.md
-     + teknik yarı DRY-doğrulama sonrası pointer + GitHub İlke 1-7 + 2 çiftleme (AI Rol / Terminoloji).
-     Hedef ≤~1300 (Ş1); aşarsa DUR+raporla (plan §6.4a).
+  ✅ AŞAMA 2 (06 Tem 2026) UYGULANDI: 23 kural/alt-bölüm gerekçe kuyruğu + GitHub İlke 4-6
+     + K28 audit + K20 repertuar -> notebook/_KURAL_GEREKCELERI.md (474 satır, 28 h2 başlık);
+     teknik yarı -> Notebook_C2 (D3-01 Teknik Bağlam EK) + Notebook_C3 (şema eki);
+     2 çiftleme SİL (AI Rol / Terminoloji 2. kopya — 2 unique satır primary'ye entegre).
+     CLAUDE.md 2539 -> 1922. Aritmetik: 2539 = 1827 + 687 + 25 ✓ (61 sınır assert).
+     Ş1 DUR şartı uygulandı: yargı tabanı 1917 > hedef ~1300 -> DUR + rapor -> Sn. Ferit C kararı
+     (1922 ile uygula; 2. tur kesim Kural #18 hijyen turunda ~Eki 2026, _YAPILACAKLAR V. bölüm).
+     Sürücü: scratchpad d3_asama2_apply.py (oturum-içi; MOVE tablosu YAPILANLAR 06 Tem bloğunda özetli).
 
 AŞAMA 2 KULLANIMI (taze oturum için şablon):
   1) CLAUDE.md'nin GÜNCEL skeleton'unu çıkar: grep -nE "^### Kural|^## " CLAUDE.md
