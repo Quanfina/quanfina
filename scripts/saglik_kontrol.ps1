@@ -197,7 +197,17 @@ Show-Yedek -path $lokalYedek -etiket "Lokal (`$USERPROFILE\Quanfina_Backup)"
 if ($driveYedek) {
     Show-Yedek -path $driveYedek -etiket "Drive ($driveYedek)"
 } else {
-    Add-Line "| Drive | [auto-detect basarisiz] | - | - |"
+    # v0.6 (22 Tem 2026): Drive erisilemezse GORUNUR uyari + zaman damgasi.
+    # Paket KIRILMAZ (exit 0 devam) - kalan kontroller calisir, sinyal sonmez.
+    # Sebep: Drive for Desktop kapali/G: yokken sessiz "[auto-detect basarisiz]"
+    # satiri fark edilmiyordu; Drive sessiz olumu haftalarca gorulmeyebilir.
+    $simdi = (Get-Date).ToString("yyyy-MM-dd HH:mm")
+    Add-Line "| Drive | **[UYARI] DRIVE ERISILEMIYOR** | $simdi | - |"
+    Add-Line ""
+    Add-Line "> **[UYARI] DRIVE ERISILEMIYOR ($simdi)** - Google Drive for Desktop kapali"
+    Add-Line "> veya G: baglanmamis. Etkilenen: Drive zip yedegi + drive_sync _txt uretimi"
+    Add-Line "> (NotebookLM kaynagi). Kontrol: GoogleDriveFS sureci calisiyor mu."
+    Write-Host "[UYARI] DRIVE ERISILEMIYOR ($simdi) - zip yedek + _txt uretimi etkilenir" -ForegroundColor Yellow
 }
 
 $task = Get-ScheduledTask -TaskName "Quanfina_Notebook_Yedek_Gunluk" -ErrorAction SilentlyContinue

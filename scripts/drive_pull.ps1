@@ -1,3 +1,21 @@
+# ############################################################
+# ## DEVRE DISI [22 Tem 2026] - CALISTIRMAYIN                ##
+# ############################################################
+# Gerekce (3 katman):
+#  1) URETICI KALMADI: Kural #9 v2 alt-bolum (Yontem B) Web Claude'un Drive'a
+#     YAZMASINI zaten yasakladi -> bu script'in cekecegi yeni icerik yok.
+#  2) YAZMA YARISI: notebook/ artik Google Drive for Desktop "Bilgisayarlar"
+#     DOGRUDAN klasor-senkronunda izleniyor. Bu script ayni klasore GERI YAZAR
+#     -> Drive-desktop ile ayni dosyada iki yazici (kilit/churn/eski-icerik
+#     diriltme riski). Senkron degisikligi oncesi bu risk yoktu.
+#  3) KAPALI DONGU: notebook -> (robocopy) -> G: -> (bu script) -> notebook ->
+#     (Drive-desktop) -> bulut. Saatlik tur, sifir fayda.
+# Durum: ScheduledTask "Quanfina_Notebook_Drive_Pull" DISABLED (silinmedi,
+#        geri acilabilir). Script arsive TASINMADI - yerinde isaretli kaldi.
+# Geri acmak icin: Enable-ScheduledTask -TaskName "Quanfina_Notebook_Drive_Pull"
+# Iliskili: notebook/_HATALAR.md H#19, notebook/_DEVIR.md (senkron mimarisi v2)
+# ############################################################
+#
 # Quanfina Notebook Drive Pull (G: -> C:)
 # Referans: CLAUDE.md Kural #9 v2 (Akilli Dagilim + Handoff)
 #           Otomatik Cift Yonlu Senkron alt-bolum (KARAR #449)

@@ -15,6 +15,13 @@
 #   .\scripts\drive_sync.ps1 -ScheduledTask   # Windows task kayit (saatlik)
 #   .\scripts\drive_sync.ps1 -UnregisterTask  # Task sil
 #
+# Versiyon: v2.7 (22 Tem 2026): MD MIRROR AYAGI KALDIRILDI -> script artik SADECE
+#            md->txt donusumu + _txt/ yazimi yapar (NotebookLM kaynagi). Sebep: notebook/
+#            artik Drive for Desktop "Bilgisayarlar" DOGRUDAN klasor-senkronunda; robocopy
+#            ile 2. bir Drive hedefine .md kopyalamak ciftleme idi (Ilke #4 DRY) + notebook/
+#            Drive tarafindan izlendigi icin yazma-yarisi yuzeyi yaratiyordu.
+#            H#A10 KORUMA: _txt yolu + .txt adlandirmasi BIT DEGISMEDI (kaynak $Hedef ->
+#            $notebookDir; ayna 1:1 oldugu icin goreli yollar ayni -> ayni isimler).
 # Versiyon: v2.6 (22 Haz 2026, P581 KRITIK: /XD _txt — H#A10 kok neden fix.
 #            /MIR her run _txt'yi purge edip 53 .txt'yi yeni file-ID ile yeniden
 #            yaratiyordu -> NotebookLM kaynak linkleri her saat kiriliyordu. /XD ile coz.)
@@ -163,9 +170,10 @@ if ($ScheduledTask -or $UnregisterTask) {
 # Mirror modu (default)
 # ============================================================
 Write-Host ""
-Write-Host "=== Quanfina Notebook Drive Mirror ===" -ForegroundColor Cyan
-Write-Host "Kaynak: $notebookDir"
-Write-Host "Hedef : $Hedef"
+Write-Host "=== Quanfina Notebook -> _txt (NotebookLM kaynagi) [v2.7 _txt-only] ===" -ForegroundColor Cyan
+Write-Host "Kaynak: $notebookDir  (.md)"
+Write-Host "Hedef : $Hedef\_txt  (.txt)"
+Write-Host "Not   : .md bulut yedegi = Drive-desktop DOGRUDAN klasor senkronu (bu script degil)" -ForegroundColor DarkGray
 if ($KuruCalisma) {
     Write-Host "Mod   : KURU CALISMA (dry-run, dosya degismez)" -ForegroundColor Yellow
 }
@@ -177,66 +185,27 @@ if (-not (Test-Path $Hedef)) {
     New-Item -ItemType Directory -Path $Hedef -Force | Out-Null
 }
 
-# Robocopy ile mirror
-# /MIR = mirror (silmeleri yansit)
-# /R:3 = 3 retry
-# /W:5 = 5 saniye bekle
-# /NDL = log'ta directory listesi yok
-# /NFL = log'ta dosya listesi yok (sadece ozet)
-# /L   = dry-run (sadece liste)
-# /XO  = sadece daha yeni dosyalari kopyala
-# /XD _txt = v2.6 KRITIK FIX (P581, H#A10 kok neden): _txt/ kaynak notebook/'ta YOK,
-#   bu yuzden /MIR onu "ekstra dizin" sayip HER RUN SILIYORDU. /XF *.txt dosyalari
-#   korur ama DIZINI kurtarmaz -> _txt her sync silinip yeniden yaratiliyor -> 53 .txt
-#   yeni Drive file-ID aliyor -> NotebookLM kaynak linkleri HER SAAT kiriliyordu. /XD ile
-#   _txt purge'den muaf; .txt'ler Copy-Item -Force ile yerinde guncellenir (file-ID stabil).
-$txtKlasorYol = Join-Path $Hedef "_txt"
-$robocopyArgs = @(
-    $notebookDir,
-    $Hedef,
-    "/MIR",
-    "/R:3",
-    "/W:5",
-    "/NDL",
-    "/NFL",
-    "/XF", "*.txt",  # v2.1: hedef .txt'leri extra sayilmaz - NotebookLM kaynaklari korunur
-    "/XD", $txtKlasorYol  # v2.6: _txt dizinini /MIR purge'den koru (H#A10 fix)
-)
-if ($KuruCalisma) {
-    $robocopyArgs += "/L"
-}
-
-# Robocopy native exe - Kural #16 uyari: 2>&1 yok
-$robocopyCikti = & robocopy @robocopyArgs
-
-# Robocopy exit kod ozellikleri:
-# 0 = degisiklik yok
-# 1 = dosya kopyalandi (basarili)
-# 2 = ekstra dosya/dizin
-# 3 = 1+2 (kopyalandi + ekstra)
-# 4 = uyumsuzluk
-# 8 = en az 1 hata
-# 16 = ciddi hata
-$rc = $LASTEXITCODE
-
-Write-Host ""
-if ($rc -le 3) {
-    Write-Host "[ok] Mirror tamam (robocopy exit: $rc)" -ForegroundColor Green
-    if ($rc -eq 0) {
-        Write-Host "  - Degisiklik yok" -ForegroundColor DarkGray
-    } elseif ($rc -eq 1) {
-        Write-Host "  - Dosyalar kopyalandi" -ForegroundColor DarkGray
-    } elseif ($rc -eq 2) {
-        Write-Host "  - Ekstra dosya/dizin tespit" -ForegroundColor DarkGray
-    } elseif ($rc -eq 3) {
-        Write-Host "  - Hem kopyalama hem ekstra" -ForegroundColor DarkGray
-    }
-} elseif ($rc -ge 8) {
-    Write-Host "[hata] Robocopy hata (exit: $rc)" -ForegroundColor Red
-    exit 1
-} else {
-    Write-Host "[uyari] Robocopy uyumsuzluk (exit: $rc)" -ForegroundColor Yellow
-}
+# ============================================================
+# v2.7 (22 Tem 2026): MD MIRROR AYAGI KALDIRILDI
+# ============================================================
+# Sebep: notebook/ artik Google Drive for Desktop "Bilgisayarlar" DOGRUDAN
+# klasor-senkronunda (Drive Tercihler > Dizustu Bilgisayarim > notebook, 11.6 MB
+# canli; 22 Tem 06:39'da _HATALAR.md yuklemesi bulut tarafinda dogrulandi).
+# .md dosyalarinin bulut yedegi artik dogrudan senkronun isi -> robocopy /MIR
+# ayni .md'leri 2. bir Drive hedefine kopyalamak CIFTLEME idi (Ilke #4 DRY):
+#   - gereksiz Drive trafigi + depolama
+#   - /MIR silme yayilim riski
+#   - notebook/ artik Drive tarafindan izlendigi icin yazma yarisi yuzeyi
+# v2.7 sonrasi bu script'in TEK isi: md -> txt donusumu + _txt/ hedefine yazim
+# (NotebookLM Plus kaynagi; .md uzantisi Drive picker'da listelenmez - H#8).
+#
+# H#A10 KORUMASI: _txt/ klasor yolu ve .txt dosya adlandirmasi BIT DEGISMEDI.
+# Onceden .md kaynagi $Hedef (ayna) idi; artik $notebookDir (lokal). Ayna 1:1
+# kopya oldugu icin goreli yollar AYNI -> Get-TxtFileName ayni isimleri uretir
+# -> NotebookLM file-ID baglari korunur (H#A10 tekrarlanmaz).
+#
+# NOT (bilinen artik): $Hedef altindaki mevcut .md dosyalari artik GUNCELLENMEZ
+# (donmus kopya). Silinmediler - temizlik ayri karar (Kural #4).
 
 # ============================================================
 # v2.1 NotebookLM .txt paralel kopya uretimi
@@ -261,7 +230,9 @@ if (-not (Test-Path $txtKlasoru)) {
 # tum alt klasorleri kapsadigi icin arsivlenen .md'ler orphan logic'inde
 # "kaynak var" olarak gozukup karsiligi .txt'ler silinmiyordu (8 orphan
 # birikti). Now: kok klasor .md'leri al, _archive/ dahil etme.
-$mdDosyalari = Get-ChildItem -Path $Hedef -Recurse -File -Filter "*.md" -ErrorAction SilentlyContinue |
+# v2.7: kaynak $Hedef (ayna) DEGIL, lokal $notebookDir. Ayna 1:1 kopya oldugu icin
+# goreli yol yapisi ayni -> uretilen .txt isimleri BIT AYNI (H#A10 koruma).
+$mdDosyalari = Get-ChildItem -Path $notebookDir -Recurse -File -Filter "*.md" -ErrorAction SilentlyContinue |
     Where-Object { $_.FullName -notmatch '[\\/]_archive[\\/]' }
 
 # v2.5-A (22 May 2026): CLAUDE.md de _txt'e yansir (Vizyon Bekcisi NotebookLM
@@ -300,14 +271,15 @@ foreach ($md in $mdDosyalari) {
         $txtYolu = Join-Path $txtKlasoru "CLAUDE.txt"
     } else {
         # notebook/ icindeki dosyalar
-        $txtFileName = Get-TxtFileName -mdItem $md -baseDir $Hedef
+        $txtFileName = Get-TxtFileName -mdItem $md -baseDir $notebookDir
         $txtYolu = Join-Path $txtKlasoru $txtFileName
     }
     try {
         if ($KuruCalisma) {
             # Dry-run: sadece ne uretilecegini raporla
+            # v2.7: kuru-calisma da ayni 2sn toleransi kullanir (rapor tutarliligi)
             if (-not (Test-Path $txtYolu) -or `
-                (Get-Item $txtYolu).LastWriteTime -lt $md.LastWriteTime) {
+                (Get-Item $txtYolu).LastWriteTime -lt $md.LastWriteTime.AddSeconds(-2)) {
                 $txtUretildi++
             } else {
                 $txtAtlandi++
@@ -317,8 +289,17 @@ foreach ($md in $mdDosyalari) {
             $kopyalaGerek = $true
             if (Test-Path $txtYolu) {
                 $txtMevcut = Get-Item $txtYolu
-                if ($txtMevcut.LastWriteTime -ge $md.LastWriteTime -and `
-                    $txtMevcut.Length -eq $md.Length) {
+                # v2.7 KRITIK (22 Tem 2026): 2 saniye TOLERANS.
+                # Google Drive sanal FS zaman damgasini KIRPAR (NTFS 100ns tick ->
+                # Drive ~ms). Copy-Item kaynak mtime'ini yazar ama hedef mikrosaniye
+                # daha ESKI gorunur (orn. .3700171 -> .3700000) -> ham "-ge" HER ZAMAN
+                # False -> her kosuda 57 dosya yeniden yazilir -> gereksiz Drive
+                # trafigi + NotebookLM saatlik yeniden indeksleme (churn).
+                # v2.6'da kaynak da Drive FS'teydi (ayni kirpma) -> sorun gorunmuyordu;
+                # v2.7 kaynagi lokal NTFS yapinca ortaya cikti.
+                # Tolerans gercek duzenlemeyi maskelemez (gercek edit >> 2sn fark).
+                if ($txtMevcut.Length -eq $md.Length -and `
+                    $txtMevcut.LastWriteTime -ge $md.LastWriteTime.AddSeconds(-2)) {
                     $kopyalaGerek = $false
                 }
             }
@@ -368,7 +349,7 @@ foreach ($md in $mdDosyalari) {
     if ($md.FullName -eq $claudeMdPath) {
         $beklenenTxtBase["CLAUDE"] = $true
     } else {
-        $txtName = Get-TxtFileName -mdItem $md -baseDir $Hedef
+        $txtName = Get-TxtFileName -mdItem $md -baseDir $notebookDir
         $beklenenTxtBase[[System.IO.Path]::GetFileNameWithoutExtension($txtName)] = $true
     }
 }
@@ -407,7 +388,7 @@ $hedefBoyutMB = [math]::Round(((Get-ChildItem -Path $Hedef -Recurse -File -Error
 Write-Host ""
 Write-Host "=== OZET ===" -ForegroundColor Cyan
 Write-Host "Drive hedef   : $Hedef"
-Write-Host "Toplam dosya  : $hedefDosyaSayisi  (.md: $hedefMdSayisi, .txt: $hedefTxtSayisi)"
+Write-Host "Toplam dosya  : $hedefDosyaSayisi  (.txt CANLI: $hedefTxtSayisi | .md DONMUS: $hedefMdSayisi - v2.7'den beri guncellenmiyor)"
 Write-Host "Toplam boyut  : $hedefBoyutMB MB"
 Write-Host ""
 Write-Host "NotebookLM Plus: drive.google.com/drive uzerinden klasor goruncu" -ForegroundColor Yellow
